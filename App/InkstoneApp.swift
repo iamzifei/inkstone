@@ -4,13 +4,11 @@ import InkstoneCore
 @main
 struct InkstoneApp: App {
     @State private var workspace = Workspace()
-    @Environment(\.colorScheme) private var systemColorScheme
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            StyledRoot { RootView() }
                 .environment(workspace)
-                .environment(\.style, style)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
                 .onAppear(perform: openLastVault)
@@ -22,29 +20,15 @@ struct InkstoneApp: App {
 
         #if os(macOS)
         Settings {
-            SettingsView()
+            StyledRoot { SettingsView() }
                 .environment(workspace)
-                .environment(\.style, style)
+                .preferredColorScheme(preferredColorScheme)
+                .environment(\.locale, locale)
         }
         #endif
     }
 
     // MARK: - Derived environment
-
-    /// Resolves theme + typography once per render pass so no view has to.
-    private var style: Style {
-        let isDark: Bool
-        switch workspace.settings.data.appearance {
-        case .system: isDark = systemColorScheme == .dark
-        case .light: isDark = false
-        case .dark: isDark = true
-        }
-        return Style(
-            palette: workspace.settings.theme.palette(isDark: isDark),
-            typography: workspace.settings.data.typography,
-            isDark: isDark
-        )
-    }
 
     private var preferredColorScheme: ColorScheme? {
         switch workspace.settings.data.appearance {

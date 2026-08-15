@@ -6,6 +6,14 @@ conversation on another machine can pick up without re-deriving anything.
 Read this top to bottom before touching code. The **Open bug** section is where
 work actually stopped.
 
+> **Update 2026-08-16.** The §4 crash **did not reproduce** on a second machine
+> with real displays attached, and the UI has now been seen and screenshotted.
+> Since then: system dark/light following was broken and is fixed, the accent is
+> now cinnabar, contrast is asserted by tests, and the app has an icon. Current
+> state and the remaining UI defect list live in
+> `/Users/james/Dev/inkstone/docs/plans/2026-08-16-ui-theming-and-icon.md` —
+> read that alongside this file.
+
 ---
 
 ## 1. What this is
@@ -129,10 +137,10 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 
 ### NOT verified — be honest about this
 
-- **Nobody has ever seen the UI.** Not one screenshot. The assistant had no Screen
-  Recording permission and peekaboo fell back to a local host instead of the
-  OpenClaw GUI bridge. Live preview quality, CJK line-height, graph smoothness,
-  Liquid Glass conformance — all unknown.
+- ~~**Nobody has ever seen the UI.**~~ Resolved 2026-08-16: the macOS UI has been
+  run and screenshotted on a machine with real displays. Live preview, CJK
+  typography and the inspector all render. Graph view is blank — see the defect
+  list in `docs/plans/2026-08-16-ui-theming-and-icon.md`.
 - **iOS has never been run.** Typechecks only. The UIKit editor path
   (tap-to-follow-link hit testing via `layoutManager.characterIndex`, keyboard
   insets) has never executed a single line.
@@ -151,12 +159,12 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Link index, backlinks, unresolved links | ✅ tested |
 | Rename with vault-wide link rewriting | ✅ tested |
 | Tags (inline + frontmatter, nested, CJK) | ✅ tested |
-| Live-preview editor (TextKit) | ⚠️ built, never seen |
+| Live-preview editor (TextKit) | ✅ seen working; task lists not rendered |
 | Quick switcher + full-text search | ✅ tested |
-| Graph view (force-directed, local graph) | ✅ logic tested, never seen |
+| Graph view (force-directed, local graph) | ⚠️ logic tested; **view renders blank** |
 | Canvas (JSON Canvas 1.0) | ✅ round-trip tested, never seen |
 | Calendar + daily notes | ⚠️ built, never seen |
-| Themes, typography, CJK settings | ⚠️ built, never seen |
+| Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred (§6) |
 | GitHub sync | ❌ not started |
@@ -306,9 +314,9 @@ under a different team.
 
 ## 7. Known defects (separate from the crash)
 
-- **The app has no icon.** `AppIcon.appiconset/Contents.json` declares image slots
-  but contains no image files; `xcrun assetutil --info` on the built `Assets.car`
-  shows only `AccentColor`. Needs real icon art (macOS 26 wants Icon Composer).
+- ~~**The app has no icon.**~~ Fixed 2026-08-16. `Tools/generate-app-icon.py`
+  builds every slot from `Tools/icon-artwork.png`; `Assets.car` now carries 11
+  `AppIcon` entries.
 - **Reading mode silently behaves as live preview** — the picker offers a mode
   that doesn't exist yet.
 - Graph `TimelineView`/`Canvas` mutates `@State` from inside the draw closure via
