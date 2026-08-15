@@ -5,10 +5,12 @@ import InkstoneCore
 import AppKit
 typealias PlatformFont = NSFont
 typealias PlatformColor = NSColor
+typealias PlatformImage = NSImage
 #else
 import UIKit
 typealias PlatformFont = UIFont
 typealias PlatformColor = UIColor
+typealias PlatformImage = UIImage
 #endif
 
 extension ThemeColor {
@@ -136,7 +138,13 @@ struct StyledRoot<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        content.environment(\.style, style)
+        content
+            .environment(\.style, style)
+            // Without this, every stock SwiftUI control (toggles, segmented
+            // pickers, selected tabs) paints itself in the *system* accent colour
+            // the user set in System Settings, so the app's own accent only ever
+            // showed up on text we coloured by hand.
+            .tint(style.accent)
     }
 
     private var style: Style {

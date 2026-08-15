@@ -81,6 +81,21 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var attachmentFolder = "Attachments"
     public var defaultNewNoteFolder = ""
 
+    /// Which file types take part in sync.
+    ///
+    /// Stored as an optional and surfaced through `syncPolicy` below. Settings are
+    /// read with `try? JSONDecoder().decode(SettingsData.self, ...)`, and Swift's
+    /// synthesised decoding treats a missing key as an error even when the
+    /// property has a default — so adding a plain non-optional field here would
+    /// make every settings file written by an earlier build fail to decode and
+    /// silently reset *all* of the user's preferences.
+    var storedSyncPolicy: SyncFilePolicy?
+
+    public var syncPolicy: SyncFilePolicy {
+        get { storedSyncPolicy ?? SyncFilePolicy() }
+        set { storedSyncPolicy = newValue }
+    }
+
     // Graph
     public var graphShowTags = true
     public var graphShowAttachments = false

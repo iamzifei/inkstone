@@ -53,6 +53,8 @@ final class Workspace {
     private(set) var store: NoteStore?
     private(set) var tree: FileNode?
     private(set) var index = IndexSnapshot()
+    /// Non-note files, so `![[diagram.png]]` can resolve. Rebuilt with the tree.
+    private(set) var attachments = AttachmentIndex()
     private(set) var isIndexing = false
 
     // MARK: - Editing state
@@ -147,7 +149,92 @@ final class Workspace {
 
     func refreshTree() {
         guard let root else { return }
-        tree = VaultScanner().scan(root)
+        let scanned = VaultScanner().scan(root)
+        tree = scanned
+        attachments = AttachmentIndex(tree: scanned)
+    }
+
+    // MARK: - Attachments
+
+    /// Where a newly imported file should live: the configured attachment folder,
+    /// created on demand, falling back to the vault root if it cannot be made.
+    private func attachmentDestination(for root: URL) -> URL {
+        let folder = settings.data.attachmentFolder.trimmingCharacters(in: .whitespaces)
+        guard !folder.isEmpty else { return root }
+        let url = root.appending(path: folder)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+        return FileManager.default.fileExists(atPath: url.path) ? url : root
+    }
+
+    /// Copies a file into the vault and returns its new location.
+    ///
+    /// The file is *copied*, never moved or referenced in place: a vault has to
+    /// stay self-contained, or the note breaks as soon as the original is moved
+    /// or the external volume is unplugged. Name collisions get a numeric suffix
+    /// rather than overwriting someone's existing attachment.
+    @discardableResult
+    func importAttachment(from source: URL, preferredName: String? = nil) -> URL? {
+        guard let root else { return nil }
+        let folder = attachmentDestination(for: root)
+        let name = preferredName ?? source.lastPathComponent
+        let destination = uniqueURL(in: folder, name: name)
+
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            return nil
+        }
+        refreshTree()
+        return destination
+    }
+
+    /// Writes raw data — a pasted image, say — into the attachment folder.
+    @discardableResult
+    func importAttachment(data: Data, name: String) -> URL? {
+        guard let root else { return nil }
+        let destination = uniqueURL(in: attachmentDestination(for: root), name: name)
+        guard (try? data.write(to: destination)) != nil else { return nil }
+        refreshTree()
+        return destination
+    }
+
+    private func uniqueURL(in folder: URL, name: String) -> URL {
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var candidate = folder.appending(path: name)
+        var counter = 1
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            let suffixed = ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)"
+            candidate = folder.appending(path: suffixed)
+            counter += 1
+        }
+        return candidate
+    }
+
+    /// The embed text to insert for a file that now lives inside the vault.
+    ///
+    /// Uses a path relative to the vault root when the file sits in a subfolder,
+    /// so the link keeps working if two attachments ever share a name.
+    func embedMarkup(for url: URL) -> String {
+        guard let root else { return "![[\(url.lastPathComponent)]]" }
+        let relative = url.path.hasPrefix(root.path + "/")
+            ? String(url.path.dropFirst(root.path.count + 1))
+            : url.lastPathComponent
+        return "![[\(relative)]]"
+    }
+
+    /// Resolves an embed target to a file on disk, note or attachment.
+    func resolveEmbed(_ target: String, from source: URL) -> URL? {
+        guard let root else { return nil }
+        if let attachment = attachments.resolve(target, from: source, vaultRoot: root) {
+            return attachment
+        }
+        return index.resolve(target, from: source, vaultRoot: root)
     }
 
     func reindex() {

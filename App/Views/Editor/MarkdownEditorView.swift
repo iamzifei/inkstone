@@ -13,6 +13,15 @@ struct EditorActions {
     var followWikiLink: (WikiLink) -> Void = { _ in }
     var followTag: (String) -> Void = { _ in }
     var openExternal: (URL) -> Void = { _ in }
+    /// Resolves an embed target to a file in the vault, for inline previews.
+    var resolveAttachment: (String) -> URL? = { _ in nil }
+    /// Copies a dropped or pasted file into the vault and returns the markup to
+    /// insert for it. Returns nil when the import fails.
+    var importAttachment: (URL) -> String? = { _ in nil }
+    /// Same, for raw data such as an image on the pasteboard.
+    var importAttachmentData: (Data, String) -> String? = { _, _ in nil }
+    /// Opens an attachment with the system handler.
+    var openAttachment: (URL) -> Void = { _ in }
 }
 
 /// The Markdown editor.
@@ -53,8 +62,39 @@ class EditorCoordinator: NSObject {
     }
 
     var highlighter: MarkdownHighlighter {
-        MarkdownHighlighter(style: style, mode: mode)
+        var highlighter = MarkdownHighlighter(style: style, mode: mode)
+        highlighter.resolveAttachment = actions.resolveAttachment
+        highlighter.availableWidth = inlineImageWidth
+        return highlighter
     }
+
+    /// Width inline images are scaled to. Tracks the text measure so an embedded
+    /// screenshot fits the column instead of overflowing it.
+    var inlineImageWidth: CGFloat = 680
+
+    #if os(macOS)
+    /// Imports whatever the pasteboard holds into the vault and returns the
+    /// Markdown to insert, or nil if there is nothing importable.
+    ///
+    /// File URLs win over image data: dropping a PNG offers both, and copying the
+    /// original file preserves its name and its bytes exactly, where the image
+    /// representation would be re-encoded and lose the filename.
+    func attachmentMarkup(from pasteboard: NSPasteboard) -> String? {
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
+            let markup = urls.compactMap { actions.importAttachment($0) }
+            guard !markup.isEmpty else { return nil }
+            return markup.joined(separator: "\n")
+        }
+
+        // A screenshot or an image copied out of another app arrives as raw data.
+        for (type, ext) in [(NSPasteboard.PasteboardType.png, "png"),
+                            (NSPasteboard.PasteboardType.tiff, "tiff")] {
+            guard let data = pasteboard.data(forType: type) else { continue }
+            return actions.importAttachmentData(data, "Pasted image.\(ext)")
+        }
+        return nil
+    }
+    #endif
 
     /// Paragraph range containing the caret, so live preview can reveal syntax
     /// on the line being edited.
@@ -70,6 +110,13 @@ class EditorCoordinator: NSObject {
         guard index >= 0, index < storage.length else { return false }
         let attributes = storage.attributes(at: index, effectiveRange: nil)
 
+        // Attachments are checked before wikilinks: an `![[clip.mp4]]` carries
+        // both attributes, and clicking it should play the file rather than try
+        // to open a note that does not exist.
+        if let attachment = attributes[.inkstoneAttachment] as? URL {
+            actions.openAttachment(attachment)
+            return true
+        }
         if let link = attributes[.inkstoneWikiLink] as? WikiLink {
             actions.followWikiLink(link)
             return true
@@ -160,6 +207,69 @@ final class InkstoneTextView: NSTextView {
             return
         }
         super.mouseDown(with: event)
+    }
+
+    /// Paints inline attachment images into the space the highlighter reserved.
+    ///
+    /// See `MarkdownHighlighter.inlineImage` for why this is drawn by hand rather
+    /// than with `NSTextAttachment`: the layout manager only renders attachments
+    /// for the U+FFFC character, and adding one to the note's text would change
+    /// the file on disk.
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
+
+        let origin = textContainerOrigin
+        storage.enumerateAttribute(
+            .inkstoneInlineImage,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let image = value as? NSImage else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard lineRect.intersects(rect) else { return }
+
+            let size = image.size
+            let target = NSRect(
+                x: lineRect.minX,
+                y: lineRect.minY + MarkdownHighlighter.inlineImagePadding,
+                width: size.width,
+                height: size.height
+            )
+
+            // A text view uses flipped coordinates, so drawing an NSImage
+            // straight into it lands the picture upside down. Flip the CTM about
+            // the target rect and draw the CGImage into the corrected space.
+            guard let context = NSGraphicsContext.current?.cgContext,
+                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            else { return }
+
+            context.saveGState()
+            context.translateBy(x: 0, y: target.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(
+                cgImage,
+                in: CGRect(x: target.minX, y: 0, width: target.width, height: target.height)
+            )
+            context.restoreGState()
+        }
+    }
+
+    /// Single entry point for both drag-and-drop and paste — AppKit routes both
+    /// through here — so a file dropped on the editor and one pasted into it are
+    /// imported identically.
+    override func readSelection(from pasteboard: NSPasteboard) -> Bool {
+        if let coordinator,
+           let markup = MainActor.assumeIsolated({ coordinator.attachmentMarkup(from: pasteboard) }) {
+            insertText(markup, replacementRange: selectedRange())
+            return true
+        }
+        return super.readSelection(from: pasteboard)
+    }
+
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        [.fileURL, .png, .tiff] + super.readablePasteboardTypes
     }
 
     override func resetCursorRects() {
@@ -296,6 +406,14 @@ private struct TextViewRepresentable: NSViewRepresentable {
                 : available - 48
             let horizontal = max(24, (available - measure) / 2)
             textView.textContainerInset = NSSize(width: horizontal, height: 32)
+
+            // Inline images are scaled to the measure. Only re-highlight when the
+            // width has moved enough to matter — the image cache buckets by 32pt,
+            // so re-running on every pixel of a live resize would be wasted work.
+            if abs(inlineImageWidth - measure) >= 32 {
+                inlineImageWidth = measure
+                rehighlight()
+            }
         }
 
         func rehighlight() {

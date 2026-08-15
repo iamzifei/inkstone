@@ -14,10 +14,21 @@ import UIKit
 /// like rendered prose, *except* on the line the caret is on, where they reappear
 /// so the user can edit them. That is the behaviour that makes an Obsidian-style
 /// editor feel like writing rather than like coding.
+/// Main-actor bound: it reads the shared image cache for inline attachments, and
+/// its only caller is the editor coordinator, which is already on the main actor.
+@MainActor
 struct MarkdownHighlighter {
     let style: Style
     let mode: EditorMode
     let scanner = SyntaxScanner()
+
+    /// Resolves an embed target to a file in the vault. Injected rather than
+    /// reached for directly so the highlighter stays free of app state and can be
+    /// exercised without a vault.
+    var resolveAttachment: ((String) -> URL?)?
+    /// Text width available for inline images, so a photo is scaled to the
+    /// measure rather than overflowing the column.
+    var availableWidth: CGFloat = 680
 
     /// Font size used to visually collapse syntax markers. Zero is rejected by
     /// TextKit, so we use the smallest size that still lays out.
@@ -209,7 +220,30 @@ struct MarkdownHighlighter {
             setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
             storage.addAttribute(.foregroundColor, value: palette.accent.platformColor, range: token.range)
 
-        case .wikiLink(let link), .embed(let link):
+        case .embed(let link):
+            // An embed of an image is replaced by the image itself; anything else
+            // (video, PDF, a note transclusion) keeps its link styling so it is
+            // still visible and clickable rather than silently disappearing.
+            let resolved = resolveAttachment?(link.target)
+            if let resolved, AttachmentKind(url: resolved) == .image, !isBeingEdited,
+               let image = AttachmentImageCache.shared.image(for: resolved, maxWidth: availableWidth) {
+                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
+                break
+            }
+
+            storage.addAttribute(.foregroundColor, value: palette.link.platformColor, range: token.range)
+            if let resolved {
+                storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
+            } else {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.unresolvedLink.platformColor, range: token.range
+                )
+            }
+            storage.addAttribute(.inkstoneWikiLink, value: link, range: token.range)
+            if !isBeingEdited { conceal(delimiters(of: token)) }
+
+        case .wikiLink(let link):
             storage.addAttribute(.foregroundColor, value: palette.link.platformColor, range: token.range)
             storage.addAttribute(.inkstoneWikiLink, value: link, range: token.range)
             if !isBeingEdited {
@@ -310,6 +344,43 @@ struct MarkdownHighlighter {
             storage.addAttribute(.foregroundColor, value: palette.secondaryText.platformColor, range: token.range)
         }
     }
+
+    /// Makes room for an inline image and tags the run so the text view can draw it.
+    ///
+    /// `NSTextAttachment` is deliberately not used. TextKit 1's layout manager only
+    /// produces an attachment glyph for the attachment character U+FFFC, and adding
+    /// an `.attachment` attribute to ordinary characters is silently ignored — the
+    /// image simply never appears. Inserting U+FFFC is not an option either,
+    /// because the text storage is the note, and the file on disk must not gain
+    /// characters the user did not type.
+    ///
+    /// So instead: collapse the `![[...]]` markup, reserve the image's height by
+    /// raising the line height of that paragraph, and let `InkstoneTextView` paint
+    /// the picture into the space that opens up.
+    private func inlineImage(
+        _ image: PlatformImage,
+        to storage: NSTextStorage,
+        in range: NSRange,
+        fullText: NSString
+    ) {
+        guard range.length > 0 else { return }
+
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = image.size.height + Self.inlineImagePadding * 2
+        paragraph.maximumLineHeight = image.size.height + Self.inlineImagePadding * 2
+        paragraph.paragraphSpacing = style.typography.paragraphSpacing
+
+        let line = fullText.paragraphRange(for: range)
+        storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
+        storage.addAttribute(.inkstoneInlineImage, value: image, range: range)
+    }
+
+    /// Breathing room above and below an inline image.
+    static let inlineImagePadding: CGFloat = 8
 
     private func styleDelimiters(
         _ ranges: [NSRange],
@@ -480,4 +551,9 @@ extension NSAttributedString.Key {
     static let inkstoneLinkDestination = NSAttributedString.Key("inkstoneLinkDestination")
     /// Attached to `#tag` runs.
     static let inkstoneTag = NSAttributedString.Key("inkstoneTag")
+    /// Attached to `![[embed]]` runs that resolve to a file in the vault, so a
+    /// click can open or preview it.
+    static let inkstoneAttachment = NSAttributedString.Key("inkstoneAttachment")
+    /// Carries the decoded image for an embed the text view should paint itself.
+    static let inkstoneInlineImage = NSAttributedString.Key("inkstoneInlineImage")
 }

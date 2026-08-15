@@ -226,8 +226,50 @@ private struct SyncSettings: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Toggle("Images", isOn: syncBinding(for: .image))
+                Toggle("Audio", isOn: syncBinding(for: .audio))
+                Toggle("PDFs", isOn: syncBinding(for: .pdf))
+                Toggle("Video", isOn: syncBinding(for: .video))
+                Toggle("Other files", isOn: syncBinding(for: .other))
+
+                LabeledContent("Skip files larger than") {
+                    HStack(spacing: 6) {
+                        TextField(
+                            "",
+                            value: sizeLimitBinding,
+                            format: .number
+                        )
+                        .labelsHidden()
+                        .frame(width: 70)
+                        Text("MB")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("File types to sync")
+            } footer: {
+                Text("Notes and canvases always sync. Set the size limit to 0 for no limit.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private func syncBinding(for kind: AttachmentKind) -> Binding<Bool> {
+        Binding(
+            get: { workspace.settings.data.syncPolicy.syncs(kind) },
+            set: { workspace.settings.data.syncPolicy.setSyncs(kind, $0) }
+        )
+    }
+
+    private var sizeLimitBinding: Binding<Int> {
+        Binding(
+            get: { workspace.settings.data.syncPolicy.maximumFileSizeMB },
+            set: { workspace.settings.data.syncPolicy.maximumFileSizeMB = max(0, $0) }
+        )
     }
 }
 

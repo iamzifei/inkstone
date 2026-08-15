@@ -29,7 +29,21 @@ struct NoteEditorPane: View {
                             workspace.sidebarSection = .tags
                             workspace.searchQuery = "tag:" + tag
                         },
-                        openExternal: { openURL($0) }
+                        openExternal: { openURL($0) },
+                        resolveAttachment: { target in
+                            workspace.resolveEmbed(target, from: url)
+                        },
+                        importAttachment: { source in
+                            guard let imported = workspace.importAttachment(from: source) else { return nil }
+                            return workspace.embedMarkup(for: imported)
+                        },
+                        importAttachmentData: { data, name in
+                            guard let imported = workspace.importAttachment(data: data, name: name) else {
+                                return nil
+                            }
+                            return workspace.embedMarkup(for: imported)
+                        },
+                        openAttachment: { openURL($0) }
                     )
                 )
 
