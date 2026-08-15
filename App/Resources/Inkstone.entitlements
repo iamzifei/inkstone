@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Vaults are folders the user picks anywhere on disk. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- Required to restore vault access after relaunch via bookmarks. -->
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
+	<!-- Outbound only: GitHub sync. No inbound server. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!--
+	iCloud Drive vault storage is intentionally NOT enabled here yet. The
+	`iCloud.com.orris.inkstone` container has to exist in the developer portal
+	before Xcode can mint a provisioning profile for it; enabling it early makes
+	every local build fail to sign. Re-add these keys once the container exists:
+
+		com.apple.developer.ubiquity-container-identifiers
+		com.apple.developer.icloud-container-identifiers
+		com.apple.developer.icloud-services  (CloudDocuments)
+
+	The code path in WelcomeView.createICloudVault() already handles the
+	container being unavailable, so the app degrades cleanly until then.
+	-->
+</dict>
+</plist>

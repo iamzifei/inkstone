@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	Development-only entitlements. The App Sandbox is off so a test harness can
+	point the app at a vault anywhere on disk via INKSTONE_OPEN_VAULT, without
+	going through the file picker (a separate process that can't be scripted).
+
+	Never ship with this file: use Inkstone.entitlements for real builds.
+
+	Select it with:
+	  xcodebuild ... CODE_SIGN_ENTITLEMENTS=App/Resources/Inkstone-Dev.entitlements
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

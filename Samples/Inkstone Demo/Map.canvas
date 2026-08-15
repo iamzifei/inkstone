@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {
+      "id": "a",
+      "type": "text",
+      "x": -260,
+      "y": -80,
+      "width": 240,
+      "height": 120,
+      "text": "Canvas works\n\nJSON Canvas 1.0",
+      "color": "4"
+    },
+    {
+      "id": "b",
+      "type": "file",
+      "x": 120,
+      "y": -80,
+      "width": 260,
+      "height": 140,
+      "file": "Typography Notes.md"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "a",
+      "toNode": "b",
+      "toEnd": "arrow"
+    }
+  ]
+}

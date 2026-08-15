@@ -1,0 +1,228 @@
+import SwiftUI
+import InkstoneCore
+
+/// The note editing surface: title bar, editor, and status line.
+struct NoteEditorPane: View {
+    let url: URL
+
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        if let document = workspace.document(for: url) {
+            @Bindable var document = document
+
+            VStack(spacing: 0) {
+                header(for: document)
+                Divider().overlay(style.divider)
+
+                MarkdownEditorView(
+                    text: $document.text,
+                    style: style,
+                    mode: workspace.settings.data.editorMode,
+                    actions: EditorActions(
+                        followWikiLink: { link in
+                            workspace.follow(link: link, from: url)
+                        },
+                        followTag: { tag in
+                            workspace.sidebarSection = .tags
+                            workspace.searchQuery = "tag:" + tag
+                        },
+                        openExternal: { openURL($0) }
+                    )
+                )
+
+                Divider().overlay(style.divider)
+                statusLine(for: document)
+            }
+            .onDisappear { document.save() }
+        } else {
+            ContentUnavailableView("Couldn't open note", systemImage: "exclamationmark.triangle")
+        }
+    }
+
+    @ViewBuilder
+    private func header(for document: NoteDocument) -> some View {
+        HStack(spacing: 8) {
+            Text(url.deletingPathExtension().lastPathComponent)
+                .font(style.uiFont.weight(.semibold))
+                .foregroundStyle(style.text)
+                .lineLimit(1)
+
+            if document.isDirty {
+                Circle()
+                    .fill(style.accent.opacity(0.6))
+                    .frame(width: 6, height: 6)
+                    .help(String(localized: "Unsaved changes"))
+            }
+
+            Spacer()
+
+            Picker("", selection: editorModeBinding) {
+                Image(systemName: "eye").tag(EditorMode.livePreview)
+                Image(systemName: "chevron.left.forwardslash.chevron.right").tag(EditorMode.source)
+                Image(systemName: "book").tag(EditorMode.reading)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 130)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private var editorModeBinding: Binding<EditorMode> {
+        Binding(
+            get: { workspace.settings.data.editorMode },
+            set: { workspace.settings.data.editorMode = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private func statusLine(for document: NoteDocument) -> some View {
+        let backlinkCount = workspace.index.incoming(to: url).count
+        HStack(spacing: 14) {
+            Text("\(document.wordCount) words")
+            if backlinkCount > 0 {
+                Text("\(backlinkCount) backlinks")
+            }
+            Spacer()
+            if let saved = document.lastSaved {
+                Text("Saved \(saved.formatted(date: .omitted, time: .shortened))")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(style.faintText)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 5)
+    }
+}
+
+/// Right column: note properties, backlinks, and unlinked mentions.
+struct InspectorView: View {
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+
+    var body: some View {
+        if let url = workspace.activeTab?.url, let note = workspace.index.metadata(for: url) {
+            List {
+                if !note.frontmatter.properties.isEmpty {
+                    Section(String(localized: "Properties")) {
+                        ForEach(note.frontmatter.properties.keys.sorted(), id: \.self) { key in
+                            HStack(alignment: .top) {
+                                Text(key)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(style.secondaryText)
+                                Spacer()
+                                Text(displayValue(note.frontmatter.properties[key]))
+                                    .font(.caption)
+                                    .foregroundStyle(style.text)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                }
+
+                if !note.tags.isEmpty {
+                    Section(String(localized: "Tags")) {
+                        FlowLayout(spacing: 6) {
+                            ForEach(note.tags, id: \.self) { tag in
+                                Text("#" + tag)
+                                    .font(.caption)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(style.tagColor.opacity(0.15)))
+                                    .foregroundStyle(style.tagColor)
+                            }
+                        }
+                    }
+                }
+
+                Section(String(localized: "Backlinks")) {
+                    let backlinks = workspace.index.incoming(to: url)
+                    if backlinks.isEmpty {
+                        Text("No backlinks yet")
+                            .font(.caption)
+                            .foregroundStyle(style.faintText)
+                    }
+                    ForEach(Array(Set(backlinks.map(\.source))), id: \.self) { source in
+                        Text(workspace.index.metadata(for: source)?.title ?? source.lastPathComponent)
+                            .font(style.uiFont)
+                            .contentShape(.rect)
+                            .onTapGesture { workspace.openNote(at: source) }
+                    }
+                }
+
+                Section(String(localized: "Outgoing links")) {
+                    ForEach(Array(workspace.index.outgoing(from: url).enumerated()), id: \.offset) { _, edge in
+                        HStack {
+                            Image(systemName: edge.destination == nil ? "link.badge.plus" : "link")
+                                .font(.caption2)
+                                .foregroundStyle(edge.destination == nil ? style.unresolvedLink : style.link)
+                            Text(edge.destination.map { workspace.index.metadata(for: $0)?.title ?? $0.lastPathComponent }
+                                 ?? edge.unresolvedTarget)
+                                .font(style.uiFont)
+                        }
+                        .contentShape(.rect)
+                        .onTapGesture {
+                            if let destination = edge.destination { workspace.openNote(at: destination) }
+                        }
+                    }
+                }
+
+                Section(String(localized: "Local graph")) {
+                    LocalGraphThumbnail(url: url)
+                        .frame(height: 200)
+                }
+            }
+            .listStyle(.sidebar)
+        } else {
+            ContentUnavailableView("Nothing selected", systemImage: "sidebar.trailing")
+        }
+    }
+
+    private func displayValue(_ value: PropertyValue?) -> String {
+        guard let value else { return "" }
+        switch value {
+        case .list(let items): return items.compactMap(\.stringValue).joined(separator: ", ")
+        default: return value.stringValue ?? ""
+        }
+    }
+}
+
+/// Simple wrapping layout for tag chips.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+}

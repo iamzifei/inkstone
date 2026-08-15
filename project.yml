@@ -1,0 +1,70 @@
+name: Inkstone
+options:
+  bundleIdPrefix: com.orris
+  developmentLanguage: en
+  deploymentTarget:
+    macOS: "26.0"
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  InkstoneCore:
+    path: Packages/InkstoneCore
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: K9YT36SP4B
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  Inkstone:
+    type: application
+    supportedDestinations: [macOS, iOS]
+    sources:
+      - path: App
+    dependencies:
+      - package: InkstoneCore
+    info:
+      path: App/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Inkstone
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        CFBundleLocalizations: [en, zh-Hans, zh-Hant]
+        UILaunchScreen: {}
+        # Documents the app can open. `.md` is a public type; `.canvas` is
+        # declared below so the JSON Canvas format is a first-class citizen.
+        UISupportsDocumentBrowser: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UIFileSharingEnabled: true
+        NSHumanReadableCopyright: ""
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: md.obsidian.canvas
+            UTTypeDescription: JSON Canvas
+            UTTypeConformsTo: [public.json]
+            UTTypeTagSpecification:
+              public.filename-extension: [canvas]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.orris.inkstone
+        # Ship all three UI languages; the in-app picker overrides the system
+        # language by swapping the SwiftUI locale.
+        SWIFT_EMIT_LOC_STRINGS: YES
+        PRODUCT_NAME: Inkstone
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: App/Resources/Inkstone.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG

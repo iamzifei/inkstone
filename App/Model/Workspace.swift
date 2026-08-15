@@ -1,0 +1,380 @@
+import Foundation
+import Observation
+import SwiftUI
+import InkstoneCore
+
+/// What an open tab is showing.
+enum TabContent: Hashable, Identifiable {
+    case note(URL)
+    case canvas(URL)
+    case graph
+    case calendar
+
+    var id: String {
+        switch self {
+        case .note(let url): return "note:" + url.path(percentEncoded: false)
+        case .canvas(let url): return "canvas:" + url.path(percentEncoded: false)
+        case .graph: return "graph"
+        case .calendar: return "calendar"
+        }
+    }
+
+    var url: URL? {
+        switch self {
+        case .note(let url), .canvas(let url): return url
+        case .graph, .calendar: return nil
+        }
+    }
+}
+
+/// Which pane the sidebar is showing.
+enum SidebarSection: String, CaseIterable, Identifiable {
+    case files, search, tags, links, outline
+    var id: String { rawValue }
+}
+
+/// The application's central state: the open vault, its index, and the tabs.
+///
+/// Deliberately one object rather than several: nearly every action (open a link,
+/// rename a note, follow a tag) touches the vault, the index, and the tab stack
+/// together, and splitting them would only spread the coordination around.
+@MainActor
+@Observable
+final class Workspace {
+    // MARK: - Dependencies
+
+    let registry: VaultRegistry
+    let settings: AppSettings
+
+    // MARK: - Vault state
+
+    private(set) var vault: Vault?
+    private(set) var root: URL?
+    private(set) var store: NoteStore?
+    private(set) var tree: FileNode?
+    private(set) var index = IndexSnapshot()
+    private(set) var isIndexing = false
+
+    // MARK: - Editing state
+
+    /// Open documents, keyed by URL. Kept alive across tab switches so scroll
+    /// position and unsaved edits survive.
+    private(set) var documents: [URL: NoteDocument] = [:]
+
+    var tabs: [TabContent] = []
+    var activeTab: TabContent? {
+        didSet {
+            guard let activeTab, activeTab != oldValue else { return }
+            pushHistory(activeTab)
+        }
+    }
+
+    var sidebarSection: SidebarSection = .files
+    var isQuickSwitcherPresented = false
+    var searchQuery = ""
+
+    /// Back/forward navigation, like a browser. Cheap to maintain and users
+    /// expect it the moment links exist.
+    private(set) var history: [TabContent] = []
+    private(set) var historyIndex = -1
+    private var isNavigatingHistory = false
+
+    private var watcher: VaultWatcher?
+    private let indexBuilder = IndexBuilder()
+    private var reindexTask: Task<Void, Never>?
+
+    init(registry: VaultRegistry = VaultRegistry(), settings: AppSettings = AppSettings()) {
+        self.registry = registry
+        self.settings = settings
+    }
+
+    // MARK: - Vault lifecycle
+
+    func open(_ vault: Vault) {
+        closeCurrentVault()
+        do {
+            let url = try registry.beginAccess(to: vault)
+            self.vault = vault
+            root = url
+            store = NoteStore(root: url)
+            settings.loadThemes(fromVault: url)
+            refreshTree()
+            reindex()
+            startWatching(url)
+        } catch {
+            self.vault = nil
+            root = nil
+            store = nil
+        }
+    }
+
+    func closeCurrentVault() {
+        saveAll()
+        watcher?.stop()
+        watcher = nil
+        if let vault { registry.endAccess(to: vault) }
+        vault = nil
+        root = nil
+        store = nil
+        tree = nil
+        index = IndexSnapshot()
+        documents.removeAll()
+        tabs.removeAll()
+        activeTab = nil
+        history.removeAll()
+        historyIndex = -1
+    }
+
+    private func startWatching(_ url: URL) {
+        let watcher = VaultWatcher(root: url) { [weak self] in
+            Task { @MainActor in
+                self?.handleExternalChange()
+            }
+        }
+        watcher.start()
+        self.watcher = watcher
+    }
+
+    private func handleExternalChange() {
+        refreshTree()
+        reindex()
+        for document in documents.values {
+            document.reloadIfUnchangedLocally()
+        }
+    }
+
+    // MARK: - Index
+
+    func refreshTree() {
+        guard let root else { return }
+        tree = VaultScanner().scan(root)
+    }
+
+    func reindex() {
+        guard let root else { return }
+        reindexTask?.cancel()
+        isIndexing = true
+        reindexTask = Task { [indexBuilder] in
+            let snapshot = await indexBuilder.build(vaultRoot: root)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.index = snapshot
+                self.isIndexing = false
+            }
+        }
+    }
+
+    // MARK: - Documents
+
+    func document(for url: URL) -> NoteDocument? {
+        guard let store else { return nil }
+        if let existing = documents[url] { return existing }
+        let document = NoteDocument(url: url, store: store)
+        documents[url] = document
+        return document
+    }
+
+    func saveAll() {
+        for document in documents.values { document.save() }
+    }
+
+    // MARK: - Tabs & navigation
+
+    func open(_ content: TabContent, inNewTab: Bool = false) {
+        if !tabs.contains(content) {
+            if inNewTab || tabs.isEmpty || activeTab == nil {
+                tabs.append(content)
+            } else if let activeTab, let index = tabs.firstIndex(of: activeTab) {
+                // Replace the current tab, matching how a browser handles a
+                // plain click versus a ⌘-click.
+                tabs[index] = content
+            } else {
+                tabs.append(content)
+            }
+        }
+        activeTab = content
+    }
+
+    func openNote(at url: URL, inNewTab: Bool = false) {
+        if url.pathExtension.lowercased() == "canvas" {
+            open(.canvas(url), inNewTab: inNewTab)
+        } else {
+            open(.note(url), inNewTab: inNewTab)
+        }
+    }
+
+    func closeTab(_ content: TabContent) {
+        if let url = content.url {
+            documents[url]?.save()
+            documents.removeValue(forKey: url)
+        }
+        guard let index = tabs.firstIndex(of: content) else { return }
+        tabs.remove(at: index)
+        if activeTab == content {
+            activeTab = tabs.indices.contains(index) ? tabs[index] : tabs.last
+        }
+    }
+
+    private func pushHistory(_ content: TabContent) {
+        guard !isNavigatingHistory else { return }
+        if historyIndex < history.count - 1 {
+            history.removeSubrange((historyIndex + 1)...)
+        }
+        history.append(content)
+        historyIndex = history.count - 1
+    }
+
+    var canGoBack: Bool { historyIndex > 0 }
+    var canGoForward: Bool { historyIndex < history.count - 1 }
+
+    func goBack() {
+        guard canGoBack else { return }
+        historyIndex -= 1
+        navigateHistory()
+    }
+
+    func goForward() {
+        guard canGoForward else { return }
+        historyIndex += 1
+        navigateHistory()
+    }
+
+    private func navigateHistory() {
+        isNavigatingHistory = true
+        defer { isNavigatingHistory = false }
+        let target = history[historyIndex]
+        if !tabs.contains(target) { tabs.append(target) }
+        activeTab = target
+    }
+
+    // MARK: - Link following
+
+    /// Opens a `[[wikilink]]`. Creating the note on the fly when it doesn't exist
+    /// is what makes writing-first workflows work: you link to an idea, then fill
+    /// it in later.
+    func follow(link: WikiLink, from source: URL, createIfMissing: Bool = true) {
+        guard let root, let store else { return }
+        if let destination = index.resolve(link.target, from: source, vaultRoot: root) {
+            openNote(at: destination)
+            return
+        }
+        guard createIfMissing, !link.target.isEmpty else { return }
+
+        let folder = settings.data.defaultNewNoteFolder.isEmpty
+            ? source.deletingLastPathComponent()
+            : root.appending(path: settings.data.defaultNewNoteFolder, directoryHint: .isDirectory)
+        guard let url = try? store.createNote(named: link.target, in: folder) else { return }
+        refreshTree()
+        reindex()
+        openNote(at: url)
+    }
+
+    // MARK: - File actions
+
+    @discardableResult
+    func createNote(named name: String = "Untitled", in directory: URL? = nil) -> URL? {
+        guard let store else { return nil }
+        guard let url = try? store.createNote(named: name, in: directory) else { return nil }
+        refreshTree()
+        reindex()
+        openNote(at: url)
+        return url
+    }
+
+    @discardableResult
+    func createCanvas(named name: String = "Untitled", in directory: URL? = nil) -> URL? {
+        guard let store, let root else { return nil }
+        let url = store.uniqueURL(for: name, extension: "canvas", in: directory ?? root)
+        guard (try? CanvasDocument().save(to: url)) != nil else { return nil }
+        refreshTree()
+        open(.canvas(url))
+        return url
+    }
+
+    func rename(_ url: URL, to newBasename: String) {
+        guard let store, let root, !newBasename.isEmpty else { return }
+        let oldBasename = url.deletingPathExtension().lastPathComponent
+        guard oldBasename != newBasename else { return }
+        guard let destination = try? store.rename(url, to: newBasename) else { return }
+
+        if settings.data.updateLinksOnRename {
+            let others = VaultScanner().markdownFiles(in: root).filter { $0 != destination }
+            LinkRewriter(store: store).rename(from: oldBasename, to: newBasename, in: others)
+        }
+
+        // Move any open document/tab over to the new URL.
+        if let document = documents.removeValue(forKey: url) {
+            document.save()
+            documents[destination] = NoteDocument(url: destination, store: store)
+            _ = document
+        }
+        if let tabIndex = tabs.firstIndex(where: { $0.url == url }) {
+            let replacement: TabContent = destination.pathExtension == "canvas"
+                ? .canvas(destination) : .note(destination)
+            tabs[tabIndex] = replacement
+            if activeTab?.url == url { activeTab = replacement }
+        }
+
+        refreshTree()
+        reindex()
+    }
+
+    func delete(_ url: URL) {
+        guard let store else { return }
+        try? store.delete(url)
+        documents.removeValue(forKey: url)
+        tabs.removeAll { $0.url == url }
+        if activeTab?.url == url { activeTab = tabs.last }
+        refreshTree()
+        reindex()
+    }
+
+    // MARK: - Daily notes
+
+    /// Opens (creating if needed) the daily note for a date.
+    @discardableResult
+    func openDailyNote(for date: Date = .now) -> URL? {
+        guard let store, let root else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = settings.data.dailyNoteFormat
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let name = formatter.string(from: date)
+
+        let folder = settings.data.dailyNoteFolder.isEmpty
+            ? root
+            : root.appending(path: settings.data.dailyNoteFolder, directoryHint: .isDirectory)
+        let url = folder.appending(path: name + ".md")
+
+        if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+            openNote(at: url)
+            return url
+        }
+
+        let template = settings.data.dailyNoteTemplate.isEmpty
+            ? "# \(name)\n\n"
+            : settings.data.dailyNoteTemplate
+        try? store.write(template, to: url)
+        refreshTree()
+        reindex()
+        openNote(at: url)
+        return url
+    }
+
+    /// Existing daily notes keyed by day, for the calendar's dot indicators.
+    func dailyNoteDates() -> Set<DateComponents> {
+        guard let root else { return [] }
+        let folder = settings.data.dailyNoteFolder.isEmpty
+            ? root
+            : root.appending(path: settings.data.dailyNoteFolder, directoryHint: .isDirectory)
+        let formatter = DateFormatter()
+        formatter.dateFormat = settings.data.dailyNoteFormat
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        var result: Set<DateComponents> = []
+        for (url, _) in index.notes where url.path(percentEncoded: false).hasPrefix(folder.path(percentEncoded: false)) {
+            guard let date = formatter.date(from: url.deletingPathExtension().lastPathComponent) else { continue }
+            result.insert(Calendar.current.dateComponents([.year, .month, .day], from: date))
+        }
+        return result
+    }
+}
