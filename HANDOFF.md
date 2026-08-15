@@ -12,7 +12,9 @@ work actually stopped.
 > now cinnabar, contrast is asserted by tests, and the app has an icon. Current
 > state and the remaining UI defect list live in
 > `/Users/james/Dev/inkstone/docs/plans/2026-08-16-ui-theming-and-icon.md` —
-> read that alongside this file.
+> read that alongside this file. Since then: tables render, the graph bug is
+> fixed, and attachments (inline images, drop/paste import, per-type sync
+> filters) are implemented. Tests 26 → 51.
 
 ---
 
@@ -159,9 +161,9 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Link index, backlinks, unresolved links | ✅ tested |
 | Rename with vault-wide link rewriting | ✅ tested |
 | Tags (inline + frontmatter, nested, CJK) | ✅ tested |
-| Live-preview editor (TextKit) | ✅ seen working; task lists not rendered |
+| Live-preview editor (TextKit) | ✅ seen working |
 | Quick switcher + full-text search | ✅ tested |
-| Graph view (force-directed, local graph) | ⚠️ logic tested; **view renders blank** |
+| Graph view (force-directed, local graph) | ✅ tested and seen rendering |
 | Canvas (JSON Canvas 1.0) | ✅ round-trip tested, never seen |
 | Calendar + daily notes | ⚠️ built, never seen |
 | Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
@@ -169,8 +171,9 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | iCloud vault storage | ⚠️ code done, entitlement deferred (§6) |
 | GitHub sync | ❌ not started |
 | Reading-mode renderer | ❌ not started |
-| **Attachments / images / video + preview** | ❌ **not started (requested)** |
-| **Per-file-type sync filters** | ❌ **not started (requested)** |
+| **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
+| **Per-file-type sync filters** | ⚠️ policy + UI done; no sync engine to apply it |
+| GFM tables | ✅ rendered, columns aligned by kerning |
 | Math, Mermaid, PDF embeds | ❌ not started |
 | Plugin API | ❌ not started |
 

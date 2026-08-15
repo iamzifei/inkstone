@@ -19,7 +19,9 @@ James's asks, in the order he gave them:
 - [x] Every built-in theme clears WCAG AA in both appearances, asserted by a test
 - [x] Accent colour changed to cinnabar and used consistently
 - [x] App icon present in `Assets.car` at every declared size, legible at 16px
-- [ ] Remaining UI defects below triaged and fixed
+- [x] Remaining UI defects triaged and fixed (Phase 5)
+- [x] Markdown tables render (Phase 6)
+- [x] Attachments: images, media, import, per-type sync filters (Phase 7)
 - [ ] iOS run (never executed — carried over from HANDOFF §3)
 
 ## Phase 1 — crash and first sight ✅
@@ -75,22 +77,77 @@ which a Chinese reader spots instantly.
 `xcrun assetutil --info` now reports 11 `AppIcon` entries; previously the
 `Assets.car` contained only `AccentColor` (HANDOFF §7).
 
-## Phase 5 — remaining UI defects (not yet fixed)
+## Phase 5 — UI defects ✅
 
-Found while walking the panes. Ordered by how much they hurt.
+All fixed and verified on screen.
 
-1. **Graph View renders blank.** Opening it from the View menu gives an empty
-   pane and the inspector drops to "Nothing selected". The graph *logic* is unit
-   tested, so this is a view-layer problem, not the simulation.
-2. **Raw frontmatter fills the top of every note.** `---` / `tags:` / `aliases:`
-   / `---` are shown as literal text, duplicating the inspector's Properties
-   panel and pushing the actual note below the fold.
-3. **Two menus both named "View"** in the menu bar — SwiftUI's built-in one plus
-   `CommandMenu("View")`. Should merge into the standard menu via `CommandGroup`.
-4. **No readable line length.** Body text runs the full width of the editor pane;
-   on a wide window lines get far too long to read comfortably.
-5. **GFM task lists don't render.** `- [ ] a task` stays literal in live preview.
-6. Reading mode still silently falls back to live preview (HANDOFF §7).
+1. **Graph view rendered blank.** Two causes, both about how a `Canvas` observes
+   state. SwiftUI records a `@State` property as a dependency of `body` only if
+   `body` reads it; `simulation` was read exclusively inside the draw closure,
+   which runs at render time, so the view never re-evaluated once the simulation
+   was built and the closure kept the `nil` it captured first. Diagnostics
+   showed `rebuild()` reporting 18 nodes against 303 consecutive draws seeing
+   nil. It is now read during body evaluation and passed in as a value. The
+   `TimelineView` also ignored its context, so frames were not distinct.
+   `LocalGraphThumbnail` had the same latent bug and got the same fix.
+2. **Raw frontmatter** is concealed in live preview, restored in source mode and
+   when the caret moves onto it.
+3. **Duplicate "View" menu** merged into the system menu with
+   `CommandGroup(after: .toolbar)`.
+4. **Readable line length never applied.** The setting and the centring code
+   both existed; the inset was simply only recomputed when the *style* changed,
+   so it kept whatever it calculated on first layout — usually at zero width.
+   Now recomputed on scroll-view frame changes. (This one was listed as "no
+   readable line length" earlier, which was wrong: the feature was there and
+   broken, not missing.)
+5. **Task lists** now colour their marker and strike through completed items.
+6. Reading mode still falls back to live preview — unchanged, still open.
+
+## Phase 6 — Markdown tables ✅
+
+Tables were never scanned at all. `SyntaxScanner` now emits `.table`,
+`.tableHeaderRow` and `.tableDelimiterRow`; the block is deliberately not masked
+so inline syntax inside cells still works.
+
+Columns are aligned by **kerning the last character of each cell**, not by
+rewriting the file — the same rendering-only approach as the CJK spacing. Widths
+are *measured* rather than derived from character counts: the first attempt
+assumed one Han character equals two Latin ones, which is wrong because a
+monospaced Latin font has no CJK glyphs and the fallback family's advance is not
+exactly double. That draft was visibly ragged; measuring fixed it.
+
+## Phase 7 — Attachments ✅
+
+The largest untouched piece of the original brief.
+
+- `AttachmentKind`, `AttachmentIndex` and `SyncFilePolicy` in
+  `InkstoneCore/Vault/Attachments.swift`, with 14 tests.
+- Images embedded as `![[file.png]]` render inline. **Not** with
+  `NSTextAttachment`: TextKit 1 only draws attachments for the U+FFFC character,
+  and inserting one would add bytes the user never typed. The markup is
+  concealed, line height is raised to reserve space, and the text view paints
+  the image itself — flipping the CTM, since text views use flipped coordinates
+  and the picture otherwise renders upside down.
+- Drop or paste a file and it is copied into the attachment folder with the
+  embed markup inserted. Verified end to end: a pasted image landed as
+  `Attachments/Pasted image.png` with `![[Attachments/Pasted image.png]]`
+  inserted at the caret.
+- Settings gained a **File types to sync** section: images, audio, PDFs, video,
+  other files, plus a size ceiling. Notes and canvases always sync.
+
+⚠️ **Scope note, stated plainly:** the sync *filter* is implemented, but there is
+still no sync engine to filter. iCloud is entitlement-blocked (HANDOFF §6) and
+GitHub sync is not started. The policy is honest configuration waiting for a
+consumer, not working sync.
+
+## Latent issue found along the way
+
+`SettingsData` is decoded with `try?`, and Swift's synthesised decoding treats a
+missing key as an error even when the property has a default. So **any** newly
+added settings field silently resets every preference the user has. The sync
+policy is stored as an optional to dodge this, and `SettingsCompatibilityTests`
+pins the behaviour — but the underlying fragility applies to the next field
+anyone adds. Worth a proper `decodeIfPresent` pass on all ~30 fields.
 
 ### One unreproduced observation — do not treat as a known bug yet
 
@@ -113,5 +170,6 @@ round-trip *unit* test passes, so any bug is in the view layer, not the model.
   `/Users/james/Dev/inkstone/Tools/icon-artwork.png`
 - **iCloud container** still has to be created in the developer portal before the
   entitlement can be uncommented (HANDOFF §6). Blocks iCloud sync.
-- Attachments/images/video + per-file-type sync filters remain **not started** —
-  requested twice, still the largest untouched piece of the original brief.
+- Attachments and per-type sync filters are **done** (Phase 7), but real sync
+  still needs the iCloud container created in the developer portal, or GitHub
+  sync built.
