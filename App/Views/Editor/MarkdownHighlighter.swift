@@ -37,12 +37,35 @@ struct MarkdownHighlighter {
         applyBaseAttributes(to: storage, range: full)
 
         let tokens = scanner.scan(text)
+        // Table cells are laid out with a monospaced font so columns line up.
+        // Inline runs inside a cell have to use the same metrics or a single bold
+        // word would knock the whole column out of alignment, so the ranges are
+        // collected up front and consulted when styling those runs.
+        let tableRanges = tokens.compactMap { token -> NSRange? in
+            if case .table = token.kind { return token.range }
+            return nil
+        }
         for token in tokens {
-            apply(token, to: storage, caretLineRange: caretLineRange, fullText: text as NSString)
+            apply(
+                token,
+                to: storage,
+                caretLineRange: caretLineRange,
+                fullText: text as NSString,
+                tableRanges: tableRanges
+            )
         }
 
         if style.typography.cjkLatinSpacing {
             applyCJKLatinSpacing(to: storage, text: text as NSString)
+        }
+
+        // Last, because column alignment and CJK spacing both write `.kern` and
+        // the alignment values have to be the ones that survive — otherwise a
+        // cell ending on a Han/Latin boundary silently loses its padding.
+        if mode != .source {
+            for range in tableRanges {
+                alignTableColumns(range, in: storage, text: text as NSString)
+            }
         }
     }
 
@@ -70,13 +93,25 @@ struct MarkdownHighlighter {
         _ token: SyntaxToken,
         to storage: NSTextStorage,
         caretLineRange: NSRange?,
-        fullText: NSString
+        fullText: NSString,
+        tableRanges: [NSRange]
     ) {
         let typography = style.typography
         let palette = style.palette
         // Editing the line the caret is on always shows raw syntax.
         let isBeingEdited = mode == .source
             || (caretLineRange.map { NSIntersectionRange($0, token.range).length > 0 } ?? false)
+
+        let isInTable = tableRanges.contains { NSIntersectionRange($0, token.range).length > 0 }
+
+        /// The face an inline run should use, so runs inside a table keep the
+        /// monospaced metrics the surrounding cells were laid out with.
+        func runFont(weight: PlatformFont.Weight? = nil) -> PlatformFont {
+            let family = isInTable ? typography.codeFont : typography.editorFont
+            let size = isInTable ? typography.codeFontSize : typography.editorFontSize
+            if let weight { return family.platformFont(size: size, weight: weight) }
+            return family.platformFont(size: size)
+        }
 
         func setFont(_ font: PlatformFont, range: NSRange) {
             storage.addAttribute(.font, value: font, range: range)
@@ -107,8 +142,18 @@ struct MarkdownHighlighter {
 
         switch token.kind {
         case .frontmatter:
-            storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
-            setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
+            // In live preview the properties are already presented by the
+            // inspector, so showing the raw YAML as well pushed the actual note
+            // below the fold on every single file. It reappears in source mode,
+            // and the moment the caret moves onto one of its lines.
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
+                )
+                setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
+            } else {
+                conceal([token.range])
+            }
 
         case .heading(let level):
             let size = typography.headingSize(level: level)
@@ -127,14 +172,11 @@ struct MarkdownHighlighter {
             }
 
         case .bold:
-            setFont(
-                typography.editorFont.platformFont(size: typography.editorFontSize, weight: .bold),
-                range: token.contentRange
-            )
+            setFont(runFont(weight: .bold), range: token.contentRange)
             styleDelimiters(delimiters(of: token), in: storage, isBeingEdited: isBeingEdited, conceal: conceal)
 
         case .italic:
-            setFont(italicFont(size: typography.editorFontSize), range: token.contentRange)
+            setFont(italicVariant(of: runFont()), range: token.contentRange)
             styleDelimiters(delimiters(of: token), in: storage, isBeingEdited: isBeingEdited, conceal: conceal)
 
         case .strikethrough:
@@ -208,9 +250,57 @@ struct MarkdownHighlighter {
         case .comment:
             storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
 
+        case .table:
+            // Monospaced, so the pipes in the source line up into columns. This
+            // is what makes a Markdown table readable without a real table
+            // layout, which TextKit cannot give us without rewriting the text.
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineHeightMultiple = typography.codeLineHeightMultiple
+            paragraph.firstLineHeadIndent = 8
+            paragraph.headIndent = 8
+            paragraph.lineBreakMode = .byClipping
+            storage.addAttributes([
+                .font: typography.codeFont.platformFont(size: typography.codeFontSize),
+                .backgroundColor: palette.codeBackground.platformColor,
+                .foregroundColor: palette.text.platformColor,
+                .paragraphStyle: paragraph,
+            ], range: token.range)
+
+        case .tableHeaderRow:
+            setFont(
+                typography.codeFont.platformFont(size: typography.codeFontSize, weight: .semibold),
+                range: token.range
+            )
+
+        case .tableDelimiterRow:
+            // Pure scaffolding. Dimmed while editing so the row can still be
+            // corrected, collapsed entirely once the caret leaves it.
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
+                )
+            } else {
+                conceal([token.range])
+            }
+
         case .task(let checked):
+            // The marker is coloured like an accent so a task list scans as a
+            // list of checkboxes, and completed items recede.
+            let markerLength = min(3, max(0, token.range.length))
+            let markerStart = max(token.range.location, token.contentRange.location - markerLength)
+            let marker = NSRange(location: markerStart, length: markerLength)
+            if marker.location + marker.length <= fullText.length {
+                storage.addAttribute(
+                    .foregroundColor,
+                    value: (checked ? palette.accent : palette.secondaryText).platformColor,
+                    range: marker
+                )
+            }
             if checked {
-                storage.addAttribute(.foregroundColor, value: palette.secondaryText.platformColor, range: token.range)
+                storage.addAttributes([
+                    .foregroundColor: palette.faintText.platformColor,
+                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                ], range: token.contentRange)
             }
 
         case .horizontalRule:
@@ -236,13 +326,12 @@ struct MarkdownHighlighter {
         }
     }
 
-    private func italicFont(size: CGFloat) -> PlatformFont {
-        let base = style.typography.editorFont.platformFont(size: size)
+    private func italicVariant(of base: PlatformFont) -> PlatformFont {
         #if os(macOS)
         return NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
         #else
         guard let descriptor = base.fontDescriptor.withSymbolicTraits(.traitItalic) else { return base }
-        return UIFont(descriptor: descriptor, size: size)
+        return UIFont(descriptor: descriptor, size: base.pointSize)
         #endif
     }
 
@@ -255,6 +344,92 @@ struct MarkdownHighlighter {
         case "quote", "cite": return style.palette.secondaryText
         case "example": return ThemeColor("#8A6BC4")
         default: return style.palette.accent
+        }
+    }
+
+    // MARK: - Table alignment
+
+    /// Pads a table's columns visually so they line up, without touching the file.
+    ///
+    /// A monospaced font alone is not enough: it only guarantees that columns line
+    /// up if the *source* is already padded, and most hand-written Markdown is
+    /// not. Rather than rewriting the user's file to insert spaces — which would
+    /// dirty the document and fight sync — the extra width is added as kerning on
+    /// the last character of each cell. Same trick as the CJK spacing below:
+    /// rendering-time only, the bytes on disk never change.
+    ///
+    /// Known limitation: cell width is measured from the raw characters, so a cell
+    /// whose `**markers**` get concealed measures slightly wide and its column can
+    /// sit a fraction off. Plain-text cells — nearly all of them — are exact.
+    private func alignTableColumns(_ tableRange: NSRange, in storage: NSTextStorage, text: NSString) {
+        let font = style.typography.codeFont.platformFont(size: style.typography.codeFontSize)
+
+        /// Measures a cell as it will actually be drawn.
+        ///
+        /// Counting characters and assuming "one Han character is two Latin ones"
+        /// is wrong in practice: a monospaced Latin font has no CJK glyphs, so
+        /// those fall back to a different family whose advance is not exactly
+        /// double. Measuring sidesteps the whole question.
+        func width(of range: NSRange) -> CGFloat {
+            (text.substring(with: range) as NSString)
+                .size(withAttributes: [.font: font])
+                .width
+        }
+
+        // Cells per row, as ranges between the pipes. Delimiter rows are skipped:
+        // they are concealed anyway, and their dashes would distort the widths.
+        var rows: [[NSRange]] = []
+        var lineStart = tableRange.location
+        let tableEnd = tableRange.location + tableRange.length
+
+        while lineStart < tableEnd {
+            let line = text.lineRange(for: NSRange(location: lineStart, length: 0))
+            let end = min(line.location + line.length, tableEnd)
+            let content = NSRange(location: line.location, length: end - line.location)
+            defer { lineStart = line.location + line.length }
+
+            guard content.length > 0 else { continue }
+            let raw = text.substring(with: content)
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("|") else { continue }
+            // A delimiter row is only pipes, dashes, colons and spaces.
+            if trimmed.allSatisfy({ "|-: \t".contains($0) }) { continue }
+
+            var pipes: [Int] = []
+            for offset in 0..<content.length where text.character(at: content.location + offset) == 0x7C {
+                pipes.append(content.location + offset)
+            }
+            guard pipes.count >= 2 else { continue }
+
+            var cells: [NSRange] = []
+            for index in 0..<(pipes.count - 1) {
+                let start = pipes[index] + 1
+                let length = pipes[index + 1] - start
+                if length > 0 { cells.append(NSRange(location: start, length: length)) }
+            }
+            if !cells.isEmpty { rows.append(cells) }
+        }
+
+        guard rows.count > 1 else { return }
+
+        let columnCount = rows.map(\.count).max() ?? 0
+        var widths = [CGFloat](repeating: 0, count: columnCount)
+        for row in rows {
+            for (column, cell) in row.enumerated() {
+                widths[column] = max(widths[column], width(of: cell))
+            }
+        }
+
+        for row in rows {
+            for (column, cell) in row.enumerated() {
+                let deficit = widths[column] - width(of: cell)
+                // Sub-point deficits are invisible and only add attribute churn.
+                guard deficit > 0.5, cell.length > 0 else { continue }
+                // Kerning applies *after* the glyph, so it goes on the final
+                // character of the cell and pushes the closing pipe rightwards.
+                let last = NSRange(location: cell.location + cell.length - 1, length: 1)
+                storage.addAttribute(.kern, value: deficit, range: last)
+            }
         }
     }
 

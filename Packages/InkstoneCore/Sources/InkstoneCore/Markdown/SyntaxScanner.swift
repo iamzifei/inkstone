@@ -27,6 +27,13 @@ public enum TokenKind: Hashable, Sendable {
     case comment
     case horizontalRule
     case frontmatter
+    /// A whole GFM table block, header and body together.
+    case table
+    /// The header row of a table, so it can be weighted differently.
+    case tableHeaderRow
+    /// The `|---|:--:|` alignment row, which is scaffolding rather than content
+    /// and is hidden in live preview.
+    case tableDelimiterRow
 }
 
 public struct SyntaxToken: Hashable, Sendable {
@@ -101,6 +108,14 @@ public struct SyntaxScanner: Sendable {
                 range: match.range
             ))
             maskedRegions.append(match.range)
+        }
+
+        // Tables are emitted before the inline patterns so the block-level
+        // attributes land first, but deliberately *not* masked: a cell can hold
+        // bold text, a [[wikilink]] or a #tag, and those must still be scanned.
+        for match in Patterns.table.matches(in: text, range: full)
+        where !isMasked(match.range, in: maskedRegions) {
+            tokens.append(contentsOf: tableTokens(for: match.range, in: nsText))
         }
 
         for match in Patterns.mathBlock.matches(in: text, range: full)
@@ -237,6 +252,46 @@ public struct SyntaxScanner: Sendable {
         return WikiLink(target: target, fragment: fragment, alias: alias)
     }
 
+    /// Splits a matched table block into the whole-block token plus a token for
+    /// the header row and one for the alignment row.
+    ///
+    /// The renderer needs the three separately: the block gets a monospaced font
+    /// so columns line up, the header gets weight, and the alignment row is
+    /// hidden in live preview because it carries no information a reader wants.
+    private func tableTokens(for blockRange: NSRange, in text: NSString) -> [SyntaxToken] {
+        var tokens = [SyntaxToken(kind: .table, range: blockRange)]
+
+        var lineStart = blockRange.location
+        let blockEnd = blockRange.location + blockRange.length
+        var lineIndex = 0
+
+        while lineStart < blockEnd, lineIndex < 2 {
+            let lineRange = text.lineRange(for: NSRange(location: lineStart, length: 0))
+            // Clip to the block and drop the trailing newline so the attribute
+            // does not bleed into the following paragraph.
+            let end = min(lineRange.location + lineRange.length, blockEnd)
+            var length = end - lineRange.location
+            while length > 0,
+                  let last = Unicode.Scalar(text.character(at: lineRange.location + length - 1)),
+                  CharacterSet.newlines.contains(last) {
+                length -= 1
+            }
+
+            if length > 0 {
+                let trimmed = NSRange(location: lineRange.location, length: length)
+                tokens.append(SyntaxToken(
+                    kind: lineIndex == 0 ? .tableHeaderRow : .tableDelimiterRow,
+                    range: trimmed
+                ))
+            }
+
+            lineStart = lineRange.location + lineRange.length
+            lineIndex += 1
+        }
+
+        return tokens
+    }
+
     private func frontmatterRange(in text: NSString) -> NSRange? {
         guard text.hasPrefix("---") else { return nil }
         let full = NSRange(location: 0, length: text.length)
@@ -289,6 +344,16 @@ private enum Patterns {
     static let highlight = make(#"==(?!\s)([^=\n]+?)(?<!\s)=="#)
 
     static let horizontalRule = make(#"(?m)^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$"#)
+
+    /// A GFM table: a header row, an alignment row, then zero or more body rows.
+    /// Requires the leading and trailing pipes — the pipe-less form GFM also
+    /// allows is ambiguous with ordinary prose containing a `|`, and every editor
+    /// that writes these files (Obsidian included) emits the fenced form.
+    static let table = make(
+        #"(?m)^[ \t]*\|[^\n]*\|[ \t]*\n"#          // header row
+        + #"[ \t]*\|(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*\n"#  // |---|:--:| alignment row
+        + #"(?:[ \t]*\|[^\n]*\|[ \t]*(?:\n|\z))*"#       // body rows
+    )
 
     private static func make(_ pattern: String) -> NSRegularExpression {
         // Patterns are compile-time constants; a failure here is a programmer

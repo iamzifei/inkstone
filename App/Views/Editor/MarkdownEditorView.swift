@@ -214,6 +214,21 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         scrollView.documentView = textView
         context.coordinator.textView = textView
+
+        // The readable-measure inset depends on the scroll view's width, so it
+        // has to be recomputed whenever that width changes. Without this it was
+        // only ever calculated on the first layout — when the width is often
+        // still zero — and the text column then ran the full width of the window
+        // no matter how wide the user dragged it.
+        scrollView.postsFrameChangedNotifications = true
+        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification,
+            object: scrollView,
+            queue: .main
+        ) { [weak coordinator = context.coordinator] _ in
+            MainActor.assumeIsolated { coordinator?.updateInsets() }
+        }
+
         context.coordinator.applyStyle()
         context.coordinator.rehighlight()
         return scrollView
@@ -248,6 +263,18 @@ private struct TextViewRepresentable: NSViewRepresentable {
     @MainActor
     final class MacCoordinator: EditorCoordinator, NSTextViewDelegate {
         weak var textView: InkstoneTextView?
+        /// Token for the scroll view's frame-change observation; removed on
+        /// deinit so a closed tab does not keep re-laying-out a dead editor.
+        ///
+        /// `nonisolated(unsafe)` because `deinit` runs outside the main actor and
+        /// cannot touch an isolated property. Safe in practice: it is only ever
+        /// written once during `makeNSView` on the main actor, and only read
+        /// again when the coordinator is being torn down.
+        nonisolated(unsafe) var frameObserver: (any NSObjectProtocol)?
+
+        deinit {
+            if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
+        }
 
         func applyStyle() {
             guard let textView else { return }

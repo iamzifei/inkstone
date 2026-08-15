@@ -168,7 +168,11 @@ struct InkstoneApp: App {
                 .keyboardShortcut("s")
         }
 
-        CommandMenu("View") {
+        // Merged into the system View menu rather than declared as
+        // `CommandMenu("View")`, which produced a *second* menu also called
+        // "View" sitting next to the built-in one in the menu bar.
+        CommandGroup(after: .toolbar) {
+            Divider()
             Button("Graph View") { workspace.open(.graph) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
             Button("Calendar") { workspace.open(.calendar) }

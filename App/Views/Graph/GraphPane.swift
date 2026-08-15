@@ -18,12 +18,26 @@ struct GraphPane: View {
     @State private var hoveredNode: String?
 
     var body: some View {
-        GeometryReader { geometry in
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: alpha < 0.005)) { _ in
+        // `simulation` is read *here*, during body evaluation, and handed to the
+        // canvas as a value. That is load-bearing, not stylistic.
+        //
+        // SwiftUI records a @State property as a dependency of `body` only if
+        // `body` actually reads it. Reading it solely inside the `Canvas` draw
+        // closure does not count — that runs at render time, not evaluation time.
+        // So the graph never re-evaluated when the simulation was built: the draw
+        // closure kept the copy it captured on first evaluation, where it was
+        // still nil, and the pane stayed blank forever while `rebuild()` happily
+        // reported 18 nodes.
+        let snapshot = simulation
+
+        return GeometryReader { geometry in
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: alpha < 0.005)) { timeline in
+                // `timeline.date` is likewise threaded in so each frame is a
+                // distinct value and the canvas keeps redrawing as the layout
+                // settles.
                 Canvas { context, size in
-                    draw(in: &context, size: size)
+                    draw(snapshot, in: &context, size: size, at: timeline.date)
                 }
-                .onChange(of: alpha) { _, _ in }
             }
             .background(style.background)
             .contentShape(.rect)
@@ -39,8 +53,16 @@ struct GraphPane: View {
 
     // MARK: - Drawing
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
-        guard var simulation else { return }
+    private func draw(
+        _ snapshot: GraphSimulation?,
+        in context: inout GraphicsContext,
+        size: CGSize,
+        at date: Date
+    ) {
+        // Read but unused: it is the value that makes SwiftUI treat each frame as
+        // distinct, which is what keeps the canvas redrawing. See the call site.
+        _ = date
+        guard var simulation = snapshot else { return }
 
         // Advance the simulation and cool it down; a graph that never settles is
         // exhausting to look at.
@@ -190,9 +212,14 @@ struct LocalGraphThumbnail: View {
     @State private var alpha: Double = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: alpha < 0.01)) { _ in
+        // Same reason as GraphPane: read during body evaluation so SwiftUI knows
+        // the canvas depends on it.
+        let snapshot = simulation
+
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: alpha < 0.01)) { timeline in
             Canvas { context, size in
-                guard var simulation else { return }
+                _ = timeline.date
+                guard var simulation = snapshot else { return }
                 if alpha > 0.01 {
                     simulation.step(alpha: alpha)
                     Task { @MainActor in
