@@ -219,6 +219,9 @@ final class InkstoneTextView: NSTextView {
         super.drawBackground(in: rect)
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
 
+        // Fills go down first so text and images sit on top of them.
+        drawInlineFills(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+
         let origin = textContainerOrigin
         storage.enumerateAttribute(
             .inkstoneInlineImage,
@@ -257,6 +260,115 @@ final class InkstoneTextView: NSTextView {
 
         drawBullets(in: rect, storage: storage, layoutManager: layoutManager, container: container)
         drawQuoteRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+        drawCheckboxes(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+    }
+
+    /// Paints rounded fills behind inline code and attachment chips.
+    ///
+    /// `NSAttributedString.backgroundColor` fills the entire line fragment, which
+    /// at a 1.75 line-height multiple is roughly twice the height of the glyphs —
+    /// the tint ends up looming above the text instead of hugging it. Drawing it
+    /// here allows a box sized to the font and rounded like a chip.
+    private func drawInlineFills(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        let origin = textContainerOrigin
+        storage.enumerateAttribute(
+            .inkstoneInlineFill,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let colour = value as? NSColor, range.length > 0 else { return }
+            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+
+            // A run can wrap, so each line fragment gets its own chip.
+            layoutManager.enumerateEnclosingRects(
+                forGlyphRange: glyphRange,
+                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                in: container
+            ) { fragment, _ in
+                let box = fragment.offsetBy(dx: origin.x, dy: origin.y)
+                guard box.intersects(rect) else { return }
+
+                // Positioned from the baseline, not the fragment's centre: with a
+                // line-height multiple the fragment is far taller than the text
+                // and sits above it, so centring on it floats the chip clear of
+                // the words.
+                let ascender = font?.ascender ?? 12
+                let descender = font?.descender ?? -3
+                let baseline = box.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
+                let chip = NSRect(
+                    x: box.minX - 3,
+                    y: baseline - ascender - 2,
+                    width: box.width + 6,
+                    height: (ascender - descender) + 4
+                )
+                colour.setFill()
+                NSBezierPath(roundedRect: chip, xRadius: 4, yRadius: 4).fill()
+            }
+        }
+    }
+
+    /// Draws a checkbox where a `- [ ]` marker was concealed.
+    ///
+    /// Same reasoning as the bullets: the brackets cannot be swapped for a real
+    /// checkbox glyph without editing the note, so the marker is hidden and the
+    /// box is painted into the space it left.
+    private func drawCheckboxes(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        guard let coordinator else { return }
+        let palette = MainActor.assumeIsolated { coordinator.style.palette }
+        let origin = textContainerOrigin
+
+        storage.enumerateAttribute(
+            .inkstoneCheckbox,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let checked = value as? Bool else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard markerRect.intersects(rect) else { return }
+
+            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+            let side: CGFloat = 12
+            let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
+            // Sits in the indent the paragraph style reserved, to the left of
+            // the task text rather than under it.
+            let box = NSRect(
+                x: markerRect.minX - side - 5,
+                y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
+                width: side,
+                height: side
+            )
+
+            let path = NSBezierPath(roundedRect: box, xRadius: 3, yRadius: 3)
+            if checked {
+                palette.accent.platformColor.setFill()
+                path.fill()
+                // A tick, drawn rather than set in a font so it scales with the box.
+                let tick = NSBezierPath()
+                tick.move(to: NSPoint(x: box.minX + side * 0.24, y: box.midY + side * 0.02))
+                tick.line(to: NSPoint(x: box.minX + side * 0.43, y: box.maxY - side * 0.26))
+                tick.line(to: NSPoint(x: box.maxX - side * 0.22, y: box.minY + side * 0.28))
+                tick.lineWidth = 1.8
+                tick.lineCapStyle = .round
+                tick.lineJoinStyle = .round
+                palette.background.platformColor.setStroke()
+                tick.stroke()
+            } else {
+                palette.faintText.platformColor.setStroke()
+                path.lineWidth = 1.2
+                path.stroke()
+            }
+        }
     }
 
     /// Paints a real bullet where the `-` of a list item was concealed.

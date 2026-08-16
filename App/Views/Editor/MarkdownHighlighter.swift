@@ -201,8 +201,19 @@ struct MarkdownHighlighter {
 
         case .inlineCode:
             setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
-            storage.addAttribute(.backgroundColor, value: palette.codeBackground.platformColor, range: token.range)
             storage.addAttribute(.foregroundColor, value: palette.accent.platformColor, range: token.contentRange)
+            // The tinted background is what marks this as code, so the backticks
+            // themselves can go — and the background has to shrink with them or
+            // it leaves a stub hanging off each end.
+            // Drawn by the text view rather than set as `.backgroundColor`: that
+            // attribute fills the whole line fragment, and with a line-height
+            // multiple of 1.75 the tint towers over the words it is meant to hug.
+            storage.addAttribute(
+                .inkstoneInlineFill,
+                value: palette.codeBackground.platformColor,
+                range: isBeingEdited ? token.range : token.contentRange
+            )
+            if !isBeingEdited { conceal(delimiters(of: token)) }
 
         case .codeBlock:
             let paragraph = NSMutableParagraphStyle()
@@ -249,7 +260,7 @@ struct MarkdownHighlighter {
                     // token would tint the collapsed `![[` and `]]` too, and those
                     // sit on a 0.01pt line, which drags the highlight off-centre.
                     storage.addAttribute(
-                        .backgroundColor,
+                        .inkstoneInlineFill,
                         value: palette.codeBackground.platformColor,
                         range: isBeingEdited ? token.range : token.contentRange
                     )
@@ -360,23 +371,45 @@ struct MarkdownHighlighter {
             }
 
         case .task(let checked):
-            // The marker is coloured like an accent so a task list scans as a
-            // list of checkboxes, and completed items recede.
-            let markerLength = min(3, max(0, token.range.length))
-            let markerStart = max(token.range.location, token.contentRange.location - markerLength)
-            let marker = NSRange(location: markerStart, length: markerLength)
-            if marker.location + marker.length <= fullText.length {
+            // Indent the item the way a bullet list is indented, so tasks and
+            // bullets in the same list line up.
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            // Both indents, not just `headIndent`: the marker is collapsed to
+            // zero width, so without indenting the *first* line too the text
+            // starts at the margin and the checkbox is painted on top of it.
+            paragraph.firstLineHeadIndent = Self.listIndent
+            paragraph.headIndent = Self.listIndent
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
+            paragraph.lineBreakStrategy = [.pushOut]
+            storage.addAttribute(
+                .paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range)
+            )
+
+            if isBeingEdited {
                 storage.addAttribute(
-                    .foregroundColor,
-                    value: (checked ? palette.accent : palette.secondaryText).platformColor,
-                    range: marker
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
                 )
+            } else {
+                // Collapse the whole `- [x] ` marker and let the text view draw a
+                // real checkbox where it was. Showing the raw brackets was the
+                // one place a rendered list still looked like source.
+                conceal([token.range])
+                storage.addAttribute(.inkstoneCheckbox, value: checked, range: token.range)
             }
+
             if checked {
-                storage.addAttributes([
-                    .foregroundColor: palette.faintText.platformColor,
-                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                ], range: token.contentRange)
+                // Strike through the task text, not the marker.
+                let line = fullText.paragraphRange(for: token.range)
+                let bodyStart = token.range.location + token.range.length
+                let body = NSRange(location: bodyStart, length: max(0, line.location + line.length - bodyStart))
+                if body.length > 0 {
+                    storage.addAttributes([
+                        .foregroundColor: palette.faintText.platformColor,
+                        .strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                        .strikethroughColor: palette.faintText.platformColor,
+                    ], range: body)
+                }
             }
 
         case .horizontalRule:
@@ -676,4 +709,8 @@ extension NSAttributedString.Key {
     static let inkstoneBullet = NSAttributedString.Key("inkstoneBullet")
     /// Marks a quoted line so its left rule can be drawn.
     static let inkstoneQuoteDepth = NSAttributedString.Key("inkstoneQuoteDepth")
+    /// Marks a concealed task marker so a checkbox can be drawn there. Bool.
+    static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
+    /// A rounded fill hugging the text, drawn by the view. Value is a colour.
+    static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
 }
