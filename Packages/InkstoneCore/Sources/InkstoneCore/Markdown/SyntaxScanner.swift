@@ -21,8 +21,10 @@ public enum TokenKind: Hashable, Sendable {
     case tag(String)
     case blockIdentifier(String)
     case callout(type: String, folded: Bool, title: String)
-    case blockquote
-    case listMarker
+    /// `>` quote prefix. `depth` counts the nesting of `>` characters.
+    case blockquote(depth: Int)
+    /// The `-`/`*`/`1.` at the head of a list item. `level` is the indent depth.
+    case listMarker(level: Int, ordered: Bool)
     case task(checked: Bool)
     case comment
     case horizontalRule
@@ -152,14 +154,41 @@ public struct SyntaxScanner: Sendable {
             return SyntaxToken(kind: .heading(level: level), range: match.range, contentRange: match.range(at: 2))
         }
 
+        addMatches(Patterns.blockquote) { match, text in
+            let markers = text.substring(with: match.range(at: 2))
+            return SyntaxToken(
+                kind: .blockquote(depth: markers.filter { $0 == ">" }.count),
+                range: match.range,
+                contentRange: match.range(at: 2)
+            )
+        }
+
+        addMatches(Patterns.listMarker) { match, text in
+            let indent = text.substring(with: match.range(at: 1))
+            let marker = text.substring(with: match.range(at: 2))
+            // A tab counts as one level; spaces are grouped in pairs, which is
+            // what both Obsidian and most Markdown formatters emit.
+            let spaces = indent.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) }
+            return SyntaxToken(
+                kind: .listMarker(level: spaces / 2, ordered: marker.first?.isNumber == true),
+                range: match.range,
+                contentRange: match.range(at: 2)
+            )
+        }
+
         addMatches(Patterns.callout) { match, text in
             let type = text.substring(with: match.range(at: 1)).lowercased()
             let foldMarker = match.range(at: 2).length > 0 ? text.substring(with: match.range(at: 2)) : ""
             let title = match.range(at: 3).location != NSNotFound
                 ? text.substring(with: match.range(at: 3)) : ""
+            // contentRange points at the title so the renderer can conceal the
+            // `[!type]` marker in front of it while keeping the words visible.
             return SyntaxToken(
                 kind: .callout(type: type, folded: foldMarker == "-", title: title),
-                range: match.range
+                range: match.range,
+                contentRange: match.range(at: 3).location != NSNotFound
+                    ? match.range(at: 3)
+                    : NSRange(location: match.range.location + match.range.length, length: 0)
             )
         }
 
@@ -212,6 +241,7 @@ public struct SyntaxScanner: Sendable {
         addMatches(Patterns.horizontalRule) { match, _ in
             SyntaxToken(kind: .horizontalRule, range: match.range)
         }
+
 
         return tokens.sorted { $0.range.location < $1.range.location }
     }
@@ -344,6 +374,14 @@ private enum Patterns {
     static let highlight = make(#"==(?!\s)([^=\n]+?)(?<!\s)=="#)
 
     static let horizontalRule = make(#"(?m)^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$"#)
+
+    /// The `>` prefix of a quoted line, including nested `> >`.
+    static let blockquote = make(#"(?m)^([ \t]*)((?:>[ \t]?)+)"#)
+
+    /// A list item's leading marker. The lookahead skips `- [ ]` task items,
+    /// which are scanned separately and rendered as checkboxes rather than
+    /// bullets; without it every task would get both treatments.
+    static let listMarker = make(#"(?m)^([ \t]*)([-*+]|\d+[.)])[ \t]+(?!\[.\][ \t])"#)
 
     /// A GFM table: a header row, an alignment row, then zero or more body rows.
     /// Requires the leading and trailing pipes — the pipe-less form GFM also

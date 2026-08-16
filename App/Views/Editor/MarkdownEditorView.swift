@@ -254,6 +254,90 @@ final class InkstoneTextView: NSTextView {
             )
             context.restoreGState()
         }
+
+        drawBullets(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+        drawQuoteRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+    }
+
+    /// Paints a real bullet where the `-` of a list item was concealed.
+    ///
+    /// The marker cannot simply be swapped for "•" — that would edit the note.
+    /// Hiding it and drawing a dot in the space it occupied gives the rendered
+    /// look without touching a byte of the file.
+    private func drawBullets(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        guard let coordinator else { return }
+        let colour = MainActor.assumeIsolated { coordinator.style.palette.faintText.platformColor }
+        let origin = textContainerOrigin
+
+        storage.enumerateAttribute(
+            .inkstoneBullet,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let level = value as? Int else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard markerRect.intersects(rect) else { return }
+
+            // Nested levels get a smaller, hollow dot, the way outliners do.
+            let diameter: CGFloat = level == 0 ? 5 : 4
+            // Sit the dot on the text's optical centre, not the line box's. With
+            // a line-height multiple above 1 the box is much taller than the
+            // glyphs, so centring on it floats the bullet above the words.
+            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+            let baseline = markerRect.minY
+                + layoutManager.location(forGlyphAt: glyphRange.location).y
+            let centre = baseline - (font?.xHeight ?? 8) / 2
+            let dot = NSRect(
+                x: markerRect.minX,
+                y: centre - diameter / 2,
+                width: diameter,
+                height: diameter
+            )
+            colour.setFill()
+            let path = NSBezierPath(ovalIn: dot)
+            if level == 0 {
+                path.fill()
+            } else {
+                colour.setStroke()
+                path.lineWidth = 1
+                path.stroke()
+            }
+        }
+    }
+
+    /// Draws the vertical rule down the left edge of quoted lines.
+    private func drawQuoteRules(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        guard let coordinator else { return }
+        let colour = MainActor.assumeIsolated { coordinator.style.palette.divider.platformColor }
+        let origin = textContainerOrigin
+
+        storage.enumerateAttribute(
+            .inkstoneQuoteDepth,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let depth = value as? Int else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard lineRect.intersects(rect) else { return }
+
+            colour.setFill()
+            for level in 0..<depth {
+                let x = origin.x + CGFloat(level) * MarkdownHighlighter.quoteIndent + 4
+                NSRect(x: x, y: lineRect.minY, width: 2, height: lineRect.height).fill()
+            }
+        }
     }
 
     /// Single entry point for both drag-and-drop and paste — AppKit routes both

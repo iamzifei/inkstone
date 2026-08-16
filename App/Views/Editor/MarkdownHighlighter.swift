@@ -216,6 +216,13 @@ struct MarkdownHighlighter {
                 .paragraphStyle: paragraph,
             ], range: token.range)
 
+            // Collapse the ``` fences themselves: the shaded block already says
+            // "this is code", so the backticks are pure noise once you stop
+            // editing them.
+            if !isBeingEdited {
+                conceal(fenceLines(of: token.range, in: fullText))
+            }
+
         case .mathInline, .mathBlock:
             setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
             storage.addAttribute(.foregroundColor, value: palette.accent.platformColor, range: token.range)
@@ -280,6 +287,15 @@ struct MarkdownHighlighter {
                 .foregroundColor: calloutColor(for: type).platformColor,
                 .font: typography.editorFont.platformFont(size: typography.editorFontSize, weight: .semibold),
             ], range: token.range)
+            // Collapse the `> [!warning]` scaffolding, keeping the title. The
+            // colour already communicates the type, so the literal marker is
+            // noise once the caret leaves the line.
+            if !isBeingEdited, token.contentRange.location > token.range.location {
+                conceal([NSRange(
+                    location: token.range.location,
+                    length: token.contentRange.location - token.range.location
+                )])
+            }
 
         case .comment:
             storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
@@ -340,9 +356,79 @@ struct MarkdownHighlighter {
         case .horizontalRule:
             storage.addAttribute(.foregroundColor, value: palette.divider.platformColor, range: token.range)
 
-        case .blockquote, .listMarker:
-            storage.addAttribute(.foregroundColor, value: palette.secondaryText.platformColor, range: token.range)
+        case .listMarker(let level, let ordered):
+            // Hanging indent, so a wrapped list item lines up under its own text
+            // instead of running back to the margin.
+            let indent = Self.listIndent * CGFloat(level + 1)
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            paragraph.firstLineHeadIndent = indent - Self.listIndent
+            paragraph.headIndent = indent
+            // List items are one list, not a run of separate paragraphs; full
+            // paragraph spacing between them makes a short list look shattered.
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
+            paragraph.lineBreakStrategy = [.pushOut]
+            storage.addAttribute(.paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range))
+
+            if ordered {
+                // The number carries meaning, so it stays visible, just quieter.
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.contentRange
+                )
+            } else if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.contentRange
+                )
+            } else {
+                // Hide the `-` and let the text view draw a real bullet in its
+                // place; see InkstoneTextView.drawBackground.
+                storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: token.contentRange)
+                storage.addAttribute(.inkstoneBullet, value: level, range: token.contentRange)
+            }
+
+        case .blockquote(let depth):
+            let indent = Self.quoteIndent * CGFloat(depth)
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            paragraph.firstLineHeadIndent = indent
+            paragraph.headIndent = indent
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.3
+            paragraph.lineBreakStrategy = [.pushOut]
+
+            let line = fullText.paragraphRange(for: token.range)
+            storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
+            storage.addAttribute(.foregroundColor, value: palette.secondaryText.platformColor, range: line)
+            // The rule down the left edge is drawn by the text view.
+            storage.addAttribute(.inkstoneQuoteDepth, value: depth, range: line)
+
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.contentRange
+                )
+            } else {
+                conceal([token.contentRange])
+            }
         }
+    }
+
+    /// The opening and closing ``` lines of a fenced block, including the
+    /// trailing newline of the opener so the collapsed line takes no height.
+    private func fenceLines(of block: NSRange, in text: NSString) -> [NSRange] {
+        var lines: [NSRange] = []
+        let opener = text.lineRange(for: NSRange(location: block.location, length: 0))
+        lines.append(NSRange(
+            location: opener.location,
+            length: min(opener.length, block.location + block.length - opener.location)
+        ))
+
+        let lastIndex = max(block.location, block.location + block.length - 1)
+        let closer = text.lineRange(for: NSRange(location: lastIndex, length: 0))
+        // A block that was never closed has only one fence.
+        if closer.location > opener.location {
+            let end = min(closer.location + closer.length, block.location + block.length)
+            lines.append(NSRange(location: closer.location, length: end - closer.location))
+        }
+        return lines.filter { $0.length > 0 }
     }
 
     /// Makes room for an inline image and tags the run so the text view can draw it.
@@ -381,6 +467,10 @@ struct MarkdownHighlighter {
 
     /// Breathing room above and below an inline image.
     static let inlineImagePadding: CGFloat = 8
+    /// Indent applied per list nesting level.
+    static let listIndent: CGFloat = 22
+    /// Indent applied per level of `>` quoting.
+    static let quoteIndent: CGFloat = 20
 
     private func styleDelimiters(
         _ ranges: [NSRange],
@@ -556,4 +646,8 @@ extension NSAttributedString.Key {
     static let inkstoneAttachment = NSAttributedString.Key("inkstoneAttachment")
     /// Carries the decoded image for an embed the text view should paint itself.
     static let inkstoneInlineImage = NSAttributedString.Key("inkstoneInlineImage")
+    /// Marks a concealed list marker so a bullet can be drawn in its place.
+    static let inkstoneBullet = NSAttributedString.Key("inkstoneBullet")
+    /// Marks a quoted line so its left rule can be drawn.
+    static let inkstoneQuoteDepth = NSAttributedString.Key("inkstoneQuoteDepth")
 }
