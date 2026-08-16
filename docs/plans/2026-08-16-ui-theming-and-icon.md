@@ -250,3 +250,57 @@ network boundary is tested; the round trip is not.
 | App icon | ✅ |
 | Math / Mermaid / PDF embeds | ❌ not in the original brief; would need a new dependency |
 | iOS | ❌ never run — next phase |
+
+
+## HUMAN QUEUE — iCloud container (blocks iCloud sync)
+
+Inkstone's iCloud code is written and handles the container being absent, so the
+app degrades cleanly today. What is missing is the container itself: it must
+exist in the developer portal before Xcode can mint a provisioning profile for
+it. Enabling the entitlement first makes *every* local build fail to sign, which
+is why the keys sit commented in `App/Resources/Inkstone.entitlements`.
+
+Facts needed:
+
+  - Team:         Orris Technology — K9YT36SP4B
+  - Bundle ID:    com.orris.inkstone
+  - Container ID: iCloud.com.orris.inkstone   (exactly this, "iCloud." prefix included)
+
+### Easiest route — let Xcode create it
+
+1. `open /Users/james/Dev/inkstone/Inkstone.xcodeproj`
+2. Select the **Inkstone** project in the navigator, then the **Inkstone**
+   target, then the **Signing & Capabilities** tab.
+3. Check Team reads *Orris Technology*.
+4. Click **+ Capability**, search *iCloud*, double-click it.
+5. Tick **iCloud Documents**.
+6. Under Containers click **+**, enter `iCloud.com.orris.inkstone`, confirm.
+7. Wait for the spinner to settle. Xcode registers the container in the portal
+   and refreshes the profile.
+
+Xcode's edits to the `.xcodeproj` are thrown away by the next `xcodegen
+generate` — that is fine and expected. **The container it registered in the
+portal is what matters, and that persists.**
+
+### If Xcode refuses
+
+Some accounts will not let Xcode register containers. Then do it by hand:
+
+1. developer.apple.com/account → **Certificates, Identifiers & Profiles**
+2. **Identifiers** → change the dropdown at the top right from *App IDs* to
+   **iCloud Containers** → **+**
+3. Description `Inkstone`, Identifier `iCloud.com.orris.inkstone` → Continue →
+   Register
+4. Back to **Identifiers** → *App IDs* → `com.orris.inkstone` → tick **iCloud**
+   → **Configure** → select the container just made → Save
+
+### Then
+
+Tell me, and I re-enable these three keys in `Inkstone.entitlements`:
+
+    com.apple.developer.ubiquity-container-identifiers
+    com.apple.developer.icloud-container-identifiers
+    com.apple.developer.icloud-services   (CloudDocuments)
+
+and verify the app signs, launches, and that "Create Vault in iCloud Drive"
+produces a working vault instead of its current alert.
