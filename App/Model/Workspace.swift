@@ -154,6 +154,62 @@ final class Workspace {
         attachments = AttachmentIndex(tree: scanned)
     }
 
+    // MARK: - Sync
+
+    /// Where a sync run has got to, for the settings pane to display.
+    enum SyncStatus: Equatable {
+        case idle
+        case running(String)
+        case finished(SyncReport)
+        case failed(String)
+    }
+
+    private(set) var syncStatus: SyncStatus = .idle
+    var isSyncing: Bool { if case .running = syncStatus { return true }; return false }
+
+    /// Pushes and pulls the vault against the configured GitHub repository.
+    ///
+    /// Deliberately manual rather than on a timer: an automatic background sync
+    /// that hits a conflict while the user is mid-sentence is a good way to lose
+    /// their trust, and the conflict handling wants someone present to see it.
+    func sync() async {
+        guard let root else { return }
+        guard !settings.data.gitHubRepository.isEmpty, let token = SyncCredentials.token() else {
+            syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
+            return
+        }
+
+        // Flush anything the user has typed but not yet auto-saved, or sync
+        // would upload a stale copy and then report success.
+        saveAll()
+
+        let engine = SyncEngine(
+            client: GitHubClient(
+                configuration: .init(
+                    repository: settings.data.gitHubRepository,
+                    branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch
+                ),
+                token: token
+            ),
+            vaultRoot: root,
+            policy: settings.data.syncPolicy
+        )
+
+        syncStatus = .running("Starting…")
+        do {
+            let report = try await engine.run { message in
+                Task { @MainActor in self.syncStatus = .running(message) }
+            }
+            syncStatus = .finished(report)
+            // Files may have arrived or vanished underneath us.
+            refreshTree()
+            reindex()
+            for document in documents.values { document.reloadIfUnchangedLocally() }
+        } catch {
+            syncStatus = .failed(error.localizedDescription)
+        }
+    }
+
     // MARK: - Attachments
 
     /// Where a newly imported file should live: the configured attachment folder,

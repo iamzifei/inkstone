@@ -83,6 +83,10 @@ public struct SettingsData: Codable, Hashable, Sendable {
 
     /// Which file types take part in sync.
     public var syncPolicy = SyncFilePolicy()
+    /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
+    /// here — this struct is a plain JSON blob in UserDefaults.
+    public var gitHubRepository = ""
+    public var gitHubBranch = "main"
 
     // Graph
     public var graphShowTags = true
@@ -140,6 +144,8 @@ public struct SettingsData: Codable, Hashable, Sendable {
         attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)
         defaultNewNoteFolder = value(.defaultNewNoteFolder, defaults.defaultNewNoteFolder)
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
+        gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
+        gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)
 
         graphShowTags = value(.graphShowTags, defaults.graphShowTags)
         graphShowAttachments = value(.graphShowAttachments, defaults.graphShowAttachments)

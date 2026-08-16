@@ -209,6 +209,67 @@ private struct FilesSettings: View {
 
 private struct SyncSettings: View {
     @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+    /// Held only long enough to save it; the stored value lives in the Keychain.
+    @State private var token = ""
+
+    private func saveToken() {
+        SyncCredentials.setToken(token)
+        token = ""
+    }
+
+    @ViewBuilder
+    private var syncStatusView: some View {
+        switch workspace.syncStatus {
+        case .idle:
+            EmptyView()
+        case .running(let message):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(message).font(.callout).foregroundStyle(.secondary)
+            }
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .foregroundStyle(style.palette.unresolvedLink.color)
+        case .finished(let report):
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    report.changeCount == 0
+                        ? "Already up to date."
+                        : "\(report.uploaded.count) uploaded, \(report.downloaded.count) downloaded, "
+                          + "\(report.deletedLocally.count + report.deletedRemotely.count) deleted.",
+                    systemImage: "checkmark.circle"
+                )
+                .font(.callout)
+
+                // Conflicts are surfaced rather than buried: each one left a
+                // second copy in the vault that the user has to resolve.
+                if !report.conflicted.isEmpty {
+                    Label(
+                        "\(report.conflicted.count) conflict(s) — a copy of the GitHub version was saved next to each: "
+                            + report.conflicted.prefix(3).joined(separator: ", "),
+                        systemImage: "arrow.triangle.branch"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(style.palette.accent.color)
+                }
+                if !report.failures.isEmpty {
+                    Label(
+                        "\(report.failures.count) file(s) failed: \(report.failures.first?.message ?? "")",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(style.palette.unresolvedLink.color)
+                }
+                if report.skipped > 0 {
+                    Text("\(report.skipped) file(s) skipped by the file-type filter.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
 
     var body: some View {
         Form {
@@ -221,9 +282,40 @@ private struct SyncSettings: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("GitHub") {
-                Text("Git sync is not wired up yet in this build.")
-                    .font(.callout)
+            Section {
+                @Bindable var settings = workspace.settings
+                TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
+                TextField("Branch", text: $settings.data.gitHubBranch, prompt: Text("main"))
+
+                SecureField("Personal access token", text: $token, prompt: Text(
+                    SyncCredentials.hasToken ? "Saved in Keychain" : "ghp_…"
+                ))
+                .onSubmit(saveToken)
+
+                HStack {
+                    Button("Save token", action: saveToken)
+                        .disabled(token.isEmpty)
+                    if SyncCredentials.hasToken {
+                        Button("Remove", role: .destructive) {
+                            SyncCredentials.setToken(nil)
+                            token = ""
+                        }
+                    }
+                    Spacer()
+                    Button(workspace.isSyncing ? "Syncing…" : "Sync now") {
+                        Task { await workspace.sync() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(workspace.isSyncing || workspace.root == nil
+                              || workspace.settings.data.gitHubRepository.isEmpty)
+                }
+
+                syncStatusView
+            } header: {
+                Text("GitHub")
+            } footer: {
+                Text("Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
