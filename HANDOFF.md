@@ -14,7 +14,11 @@ work actually stopped.
 > `/Users/james/Dev/inkstone/docs/plans/2026-08-16-ui-theming-and-icon.md` —
 > read that alongside this file. Since then: tables render, the graph bug is
 > fixed, and attachments (inline images, drop/paste import, per-type sync
-> filters) are implemented. Tests 26 → 51.
+> filters) are implemented, block-level live preview (lists, quotes, callouts,
+> checkboxes, code chips) landed, canvas and graph frame their content, reading
+> mode is read-only, and GitHub sync is built. Tests 26 → 90. **The desktop app
+> is feature-complete against the original brief except iCloud, which is blocked
+> on the container entitlement. iOS has still never been run.**
 
 ---
 
@@ -164,15 +168,15 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Live-preview editor (TextKit) | ✅ seen working |
 | Quick switcher + full-text search | ✅ tested |
 | Graph view (force-directed, local graph) | ✅ tested and seen rendering |
-| Canvas (JSON Canvas 1.0) | ✅ round-trip tested, never seen |
-| Calendar + daily notes | ⚠️ built, never seen |
+| Canvas (JSON Canvas 1.0) | ✅ round-trip tested; frames content on open |
+| Calendar + daily notes | ✅ seen working |
 | Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred (§6) |
-| GitHub sync | ❌ not started |
-| Reading-mode renderer | ❌ not started |
+| GitHub sync | ✅ built + unit tested; not yet run against a live repo |
+| Reading mode | ✅ read-only, block-level rendering |
 | **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
-| **Per-file-type sync filters** | ⚠️ policy + UI done; no sync engine to apply it |
+| **Per-file-type sync filters** | ✅ applied by the GitHub sync engine |
 | GFM tables | ✅ rendered, columns aligned by kerning |
 | Math, Mermaid, PDF embeds | ❌ not started |
 | Plugin API | ❌ not started |

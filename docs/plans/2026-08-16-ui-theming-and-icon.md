@@ -22,6 +22,7 @@ James's asks, in the order he gave them:
 - [x] Remaining UI defects triaged and fixed (Phase 5)
 - [x] Markdown tables render (Phase 6)
 - [x] Attachments: images, media, import, per-type sync filters (Phase 7)
+- [x] Desktop feature-complete against the original brief (Phases 8–10)
 - [ ] iOS run (never executed — carried over from HANDOFF §3)
 
 ## Phase 1 — crash and first sight ✅
@@ -173,3 +174,79 @@ round-trip *unit* test passes, so any bug is in the view layer, not the model.
 - Attachments and per-type sync filters are **done** (Phase 7), but real sync
   still needs the iCloud container created in the developer portal, or GitHub
   sync built.
+
+
+## Phase 8 — block-level live preview ✅
+
+`TokenKind` had `.blockquote` and `.listMarker` cases the scanner never emitted,
+so every `-` and `>` showed raw. Both are scanned now, and the renderer does the
+rest: hanging indents, drawn bullets, a rule down the left of quotes, concealed
+`> [!type]` callout scaffolding, hidden ``` fences, real checkboxes for tasks,
+and inline-code chips.
+
+Two of these could not be done by substituting characters, because that would
+edit the note. The marker is concealed and the shape — bullet, checkbox, chip —
+is painted into the space it left.
+
+The chips also could not use `.backgroundColor`: that attribute fills the entire
+line fragment, and at a 1.75 line-height multiple the fill towers over the text.
+They are drawn from the font's own metrics and positioned from the baseline.
+
+## Phase 9 — panes that frame their content ✅
+
+Opening a canvas showed one corner of one card. `fitToContent()` set `pan` to the
+negated content centre, putting that centre at the *origin* — the top-left of the
+view — and it had no viewport size to centre against. The graph was centred but
+its force layout is far smaller than the viewport, so the vault sat in a knot in
+the middle. Both now fit their content, and both gained a fit button.
+
+Reading mode is genuinely read-only now; previously it hid the syntax but left
+the document editable, so the picker offered a mode that did not exist.
+
+## Phase 10 — GitHub sync ✅
+
+The other half of "sync via iCloud or GitHub". iCloud is still blocked on the
+container entitlement, so GitHub is the path that needs nothing created first.
+
+- Local files are identified by their **git blob SHA**, which is exactly what
+  the GitHub API reports, so both sides are named by the same hash and "did this
+  change?" needs no timestamps and no clock agreement. Verified against
+  `git hash-object`.
+- `SyncPlanner` is pure and three-way: local, remote, and the state at the last
+  clean sync. Two-way syncing cannot distinguish "I edited this" from "they
+  deleted it" — that is how sync tools eat notes. Every combination is tested.
+- **Conflicts never overwrite.** The remote copy lands beside the local one as
+  `Note (conflict <time>).md` and is reported in the UI.
+- The file-type policy from Phase 7 is finally applied.
+- The token is in the Keychain, not `SettingsData` (a plain JSON blob in
+  UserDefaults). Sync is manual by design.
+- The client is tested against a stubbed `URLProtocol`. That caught a real bug:
+  paths were percent-encoded *before* `URL.appending(path:)`, which escapes the
+  `%` again — "Product Ideas.md" would have been written as
+  "Product%2520Ideas.md".
+
+⚠️ **Not yet run against a real repository.** Doing so needs James's own token,
+and writing to his GitHub is not something to do unasked. Everything up to the
+network boundary is tested; the round trip is not.
+
+## Desktop status against the original brief
+
+| Requirement | State |
+| --- | --- |
+| Vaults, multi-vault | ✅ |
+| Sync — GitHub | ✅ built, untested against a live repo |
+| Sync — iCloud | ⛔ blocked on the container entitlement |
+| Markdown + GFM, tables | ✅ |
+| Themes, fonts, separate code font | ✅ |
+| Knowledge base, tags | ✅ |
+| Internal + external links | ✅ |
+| Graph view | ✅ |
+| Canvas (JSON Canvas 1.0) | ✅ |
+| Calendar / daily notes | ✅ |
+| en / 简体 / 繁體 | ✅ |
+| CJK-Latin typography | ✅ |
+| Attachments, images, media, previews | ✅ |
+| Per-file-type sync filters | ✅ |
+| App icon | ✅ |
+| Math / Mermaid / PDF embeds | ❌ not in the original brief; would need a new dependency |
+| iOS | ❌ never run — next phase |
