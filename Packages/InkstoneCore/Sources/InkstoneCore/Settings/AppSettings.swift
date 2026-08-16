@@ -82,19 +82,7 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var defaultNewNoteFolder = ""
 
     /// Which file types take part in sync.
-    ///
-    /// Stored as an optional and surfaced through `syncPolicy` below. Settings are
-    /// read with `try? JSONDecoder().decode(SettingsData.self, ...)`, and Swift's
-    /// synthesised decoding treats a missing key as an error even when the
-    /// property has a default — so adding a plain non-optional field here would
-    /// make every settings file written by an earlier build fail to decode and
-    /// silently reset *all* of the user's preferences.
-    var storedSyncPolicy: SyncFilePolicy?
-
-    public var syncPolicy: SyncFilePolicy {
-        get { storedSyncPolicy ?? SyncFilePolicy() }
-        set { storedSyncPolicy = newValue }
-    }
+    public var syncPolicy = SyncFilePolicy()
 
     // Graph
     public var graphShowTags = true
@@ -108,6 +96,55 @@ public struct SettingsData: Codable, Hashable, Sendable {
     }
 
     public init() {}
+
+    /// Decodes leniently: any key that is absent keeps its default.
+    ///
+    /// This is not a nicety, it is a data-loss guard. Settings are loaded with
+    /// `try? JSONDecoder().decode(...)`, and Swift's synthesised decoding treats
+    /// a *missing* key as an error even when the property has a default value.
+    /// With synthesised decoding, therefore, adding any new field to this struct
+    /// makes every settings file written by an earlier build fail to decode — and
+    /// because the failure is swallowed by `try?`, the user silently loses every
+    /// preference they had set. Decoding field by field means an old file simply
+    /// picks up defaults for whatever is new.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            (try? container.decodeIfPresent(T.self, forKey: key)) .flatMap { $0 } ?? fallback
+        }
+        let defaults = SettingsData()
+
+        language = value(.language, defaults.language)
+        appearance = value(.appearance, defaults.appearance)
+        themeID = value(.themeID, defaults.themeID)
+        typography = value(.typography, defaults.typography)
+        editorMode = value(.editorMode, defaults.editorMode)
+
+        showLineNumbers = value(.showLineNumbers, defaults.showLineNumbers)
+        spellCheck = value(.spellCheck, defaults.spellCheck)
+        autoPairBrackets = value(.autoPairBrackets, defaults.autoPairBrackets)
+        smartLists = value(.smartLists, defaults.smartLists)
+        showFrontmatterAsProperties = value(.showFrontmatterAsProperties, defaults.showFrontmatterAsProperties)
+        indentWithTabs = value(.indentWithTabs, defaults.indentWithTabs)
+        tabSize = value(.tabSize, defaults.tabSize)
+
+        useShortestPathLinks = value(.useShortestPathLinks, defaults.useShortestPathLinks)
+        updateLinksOnRename = value(.updateLinksOnRename, defaults.updateLinksOnRename)
+        newLinkFormat = value(.newLinkFormat, defaults.newLinkFormat)
+
+        dailyNoteFolder = value(.dailyNoteFolder, defaults.dailyNoteFolder)
+        dailyNoteFormat = value(.dailyNoteFormat, defaults.dailyNoteFormat)
+        dailyNoteTemplate = value(.dailyNoteTemplate, defaults.dailyNoteTemplate)
+        weekStartsOnMonday = value(.weekStartsOnMonday, defaults.weekStartsOnMonday)
+
+        attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)
+        defaultNewNoteFolder = value(.defaultNewNoteFolder, defaults.defaultNewNoteFolder)
+        syncPolicy = value(.syncPolicy, defaults.syncPolicy)
+
+        graphShowTags = value(.graphShowTags, defaults.graphShowTags)
+        graphShowAttachments = value(.graphShowAttachments, defaults.graphShowAttachments)
+        graphShowUnresolved = value(.graphShowUnresolved, defaults.graphShowUnresolved)
+    }
 }
 
 /// Observable settings store backed by `UserDefaults`.

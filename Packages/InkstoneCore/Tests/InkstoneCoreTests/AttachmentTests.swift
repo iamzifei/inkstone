@@ -158,7 +158,7 @@ struct SettingsCompatibilityTests {
         var object = try JSONSerialization.jsonObject(
             with: try JSONEncoder().encode(current)
         ) as! [String: Any]
-        object.removeValue(forKey: "storedSyncPolicy")
+        object.removeValue(forKey: "syncPolicy")
         let legacy = try JSONSerialization.data(withJSONObject: object)
 
         let decoded = try JSONDecoder().decode(SettingsData.self, from: legacy)
@@ -168,6 +168,25 @@ struct SettingsCompatibilityTests {
         // ...and the new setting comes back as its default rather than throwing,
         // which would have reset every preference on first launch.
         #expect(decoded.syncPolicy == SyncFilePolicy())
+    }
+
+    @Test("Any single missing key falls back to its default")
+    func toleratesAnyMissingKey() throws {
+        // Guards the whole struct, not just the newest field: dropping any one
+        // key must not take the other preferences down with it.
+        var current = SettingsData()
+        current.attachmentFolder = "Files"
+        current.tabSize = 8
+        let encoded = try JSONEncoder().encode(current)
+        let object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+
+        for key in object.keys {
+            var stripped = object
+            stripped.removeValue(forKey: key)
+            let data = try JSONSerialization.data(withJSONObject: stripped)
+            let decoded = try? JSONDecoder().decode(SettingsData.self, from: data)
+            #expect(decoded != nil, "removing \(key) made the whole settings file undecodable")
+        }
     }
 
     @Test("Sync policy survives a settings round-trip")

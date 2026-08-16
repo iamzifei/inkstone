@@ -476,7 +476,15 @@ private struct TextViewRepresentable: NSViewRepresentable {
             textView.selectedTextAttributes = [
                 .backgroundColor: style.palette.selection.platformColor
             ]
-            textView.isContinuousSpellCheckingEnabled = true
+            textView.isContinuousSpellCheckingEnabled = mode != .reading
+
+            // Reading mode was previously indistinguishable from live preview:
+            // it hid the syntax but the document stayed fully editable, so the
+            // mode picker offered something that did not exist. Making it
+            // read-only is what the name promises — text stays selectable so it
+            // can still be copied.
+            textView.isEditable = mode != .reading
+            textView.isSelectable = true
             updateInsets()
         }
 
@@ -640,6 +648,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
         func applyStyle() {
             guard let textView else { return }
             textView.tintColor = style.palette.accent.platformColor
+            // See the macOS coordinator: reading mode is read-only, not just
+            // "live preview with the syntax hidden".
+            textView.isEditable = mode != .reading
+            textView.isSelectable = true
             updateInsets()
         }
 
