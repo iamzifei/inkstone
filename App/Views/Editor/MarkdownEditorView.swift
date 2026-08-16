@@ -427,10 +427,10 @@ final class InkstoneTextView: NSTextView {
             let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
             let side: CGFloat = 12
             let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-            // Sits in the indent the paragraph style reserved, to the left of
-            // the task text rather than under it.
+            // Same gutter centre as a bullet, so bullets and checkboxes in one
+            // list share a vertical axis.
             let box = NSRect(
-                x: markerRect.minX - side - 5,
+                x: markerRect.minX - MarkdownHighlighter.markerGutter - side / 2,
                 y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
                 width: side,
                 height: side
@@ -485,6 +485,9 @@ final class InkstoneTextView: NSTextView {
 
             // Nested levels get a smaller, hollow dot, the way outliners do.
             let diameter: CGFloat = level == 0 ? 5 : 4
+            // Centre of the gutter the paragraph indent reserved. Checkboxes use
+            // the same centre, so a mixed list lines up down one axis.
+            let gutterCentre = markerRect.minX - MarkdownHighlighter.markerGutter
             // Sit the dot on the text's optical centre, not the line box's. With
             // a line-height multiple above 1 the box is much taller than the
             // glyphs, so centring on it floats the bullet above the words.
@@ -493,7 +496,7 @@ final class InkstoneTextView: NSTextView {
                 + layoutManager.location(forGlyphAt: glyphRange.location).y
             let centre = baseline - (font?.xHeight ?? 8) / 2
             let dot = NSRect(
-                x: markerRect.minX,
+                x: gutterCentre - diameter / 2,
                 y: centre - diameter / 2,
                 width: diameter,
                 height: diameter

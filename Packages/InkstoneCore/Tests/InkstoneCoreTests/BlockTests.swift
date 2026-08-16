@@ -147,3 +147,31 @@ struct EditorDefaultsTests {
         #expect(SettingsData().spellCheck == false)
     }
 }
+
+@Suite("Task nesting")
+struct TaskNestingTests {
+    private let scanner = SyntaxScanner()
+
+    private func levels(_ text: String) -> [Int] {
+        scanner.scan(text).compactMap {
+            if case .task(_, let level) = $0.kind { return level }
+            return nil
+        }
+    }
+
+    @Test("Tasks carry their nesting level, like bullets")
+    func nesting() {
+        // Without this a nested task rendered at the outer margin while the
+        // bullets around it were indented.
+        #expect(levels("- [ ] top\n  - [ ] nested\n    - [x] deeper") == [0, 1, 2])
+    }
+
+    @Test("Checked state still parses at every level")
+    func checkedState() {
+        let states = scanner.scan("- [ ] a\n  - [x] b").compactMap { token -> Bool? in
+            if case .task(let checked, _) = token.kind { return checked }
+            return nil
+        }
+        #expect(states == [false, true])
+    }
+}

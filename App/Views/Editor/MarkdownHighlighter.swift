@@ -502,7 +502,7 @@ struct MarkdownHighlighter {
                 concealLines(token.range)
             }
 
-        case .task(let checked):
+        case .task(let checked, let level):
             // Indent the item the way a bullet list is indented, so tasks and
             // bullets in the same list line up.
             let paragraph = paragraph(
@@ -511,8 +511,11 @@ struct MarkdownHighlighter {
             // Both indents, not just `headIndent`: the marker is collapsed to
             // zero width, so without indenting the *first* line too the text
             // starts at the margin and the checkbox is painted on top of it.
-            paragraph.firstLineHeadIndent = Self.listIndent
-            paragraph.headIndent = Self.listIndent
+            // Scaled by nesting depth, exactly as a bullet is, so a nested task
+            // lines up with the nested bullets beside it.
+            let taskIndent = Self.listIndent * CGFloat(level + 1)
+            paragraph.firstLineHeadIndent = taskIndent
+            paragraph.headIndent = taskIndent
             paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
             storage.addAttribute(
                 .paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range)
@@ -548,13 +551,20 @@ struct MarkdownHighlighter {
             storage.addAttribute(.foregroundColor, value: palette.divider.platformColor, range: token.range)
 
         case .listMarker(let level, let ordered):
-            // Hanging indent, so a wrapped list item lines up under its own text
-            // instead of running back to the margin.
             let indent = Self.listIndent * CGFloat(level + 1)
             let paragraph = paragraph(
                 lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
             )
-            paragraph.firstLineHeadIndent = indent - Self.listIndent
+            // A bulleted item indents its first line to the same place as its
+            // wrapped lines, exactly like a task item, and the whole `- ` marker
+            // is collapsed so it occupies no width. Previously the marker kept
+            // its character width and only the first line was outdented, so
+            // bullets and checkboxes in the same list started their text at
+            // different x positions.
+            //
+            // An ordered item is the exception: the number carries meaning and
+            // stays visible, so it keeps a classic hanging indent.
+            paragraph.firstLineHeadIndent = ordered ? indent - Self.listIndent : indent
             paragraph.headIndent = indent
             // List items are one list, not a run of separate paragraphs; full
             // paragraph spacing between them makes a short list look shattered.
@@ -571,10 +581,11 @@ struct MarkdownHighlighter {
                     .foregroundColor, value: palette.faintText.platformColor, range: token.contentRange
                 )
             } else {
-                // Hide the `-` and let the text view draw a real bullet in its
-                // place; see InkstoneTextView.drawBackground.
-                storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: token.contentRange)
-                storage.addAttribute(.inkstoneBullet, value: level, range: token.contentRange)
+                // Collapse the marker *and* the space after it, so the text
+                // starts precisely at the paragraph indent. The bullet is then
+                // painted into the reserved gutter; see InkstoneTextView.
+                conceal([token.range])
+                storage.addAttribute(.inkstoneBullet, value: level, range: token.range)
             }
 
         case .blockquote(let depth):
@@ -689,6 +700,9 @@ struct MarkdownHighlighter {
     private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
     /// Indent applied per list nesting level.
     static let listIndent: CGFloat = 22
+    /// Distance from the text's left edge to the centre of its list marker.
+    /// Bullets and checkboxes share it so a mixed list lines up.
+    static let markerGutter: CGFloat = 11
     /// Indent applied per level of `>` quoting.
     static let quoteIndent: CGFloat = 20
 

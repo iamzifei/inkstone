@@ -73,6 +73,29 @@ struct InkstoneApp: App {
             return samples.sorted()
         }
 
+        // Indent dump: verifies that bullets, tasks and their nested forms all
+        // start their text at the same x, which is hard to confirm by eye and
+        // impossible when the display is asleep.
+        if ProcessInfo.processInfo.environment["INKSTONE_INDENT_DUMP"] != nil {
+            let ns = storage.string as NSString
+            var report = ""
+            var location = 0
+            while location < ns.length {
+                let line = ns.lineRange(for: NSRange(location: location, length: 0))
+                defer { location = max(line.location + line.length, location + 1) }
+                let text = ns.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                let style = storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil)
+                    as? NSParagraphStyle
+                report += String(
+                    format: "  first=%5.1f head=%5.1f  %@\n",
+                    style?.firstLineHeadIndent ?? -1, style?.headIndent ?? -1,
+                    text.prefix(34) as CVarArg
+                )
+            }
+            FileHandle.standardOutput.write(Data(report.utf8))
+        }
+
         let samples = measure(nil)
         var summary = String(
             format: "highlight %d chars (%.0f KB): median %.1f ms  (min %.1f, max %.1f)\n",

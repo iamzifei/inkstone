@@ -25,7 +25,9 @@ public enum TokenKind: Hashable, Sendable {
     case blockquote(depth: Int)
     /// The `-`/`*`/`1.` at the head of a list item. `level` is the indent depth.
     case listMarker(level: Int, ordered: Bool)
-    case task(checked: Bool)
+    /// A `- [ ]` item. `level` is the indent depth, matching `listMarker`, so a
+    /// nested task lines up with the nested bullets around it.
+    case task(checked: Bool, level: Int)
     case comment
     case horizontalRule
     case frontmatter
@@ -226,8 +228,14 @@ public struct SyntaxScanner: Sendable {
         }
 
         addMatches(Patterns.task) { match, text in
-            let marker = text.substring(with: match.range(at: 1))
-            return SyntaxToken(kind: .task(checked: marker != " "), range: match.range, contentRange: match.range(at: 1))
+            let indent = text.substring(with: match.range(at: 1))
+            let marker = text.substring(with: match.range(at: 2))
+            let spaces = indent.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) }
+            return SyntaxToken(
+                kind: .task(checked: marker != " ", level: spaces / 2),
+                range: match.range,
+                contentRange: match.range(at: 2)
+            )
         }
 
         addMatches(Patterns.bold) { match, _ in
@@ -384,7 +392,7 @@ private enum Patterns {
     /// Block identifier anchored at end of line: `Some text ^my-block`.
     static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)
 
-    static let task = make(#"(?m)^[ \t]*[-*+][ \t]+\[(.)\][ \t]+"#)
+    static let task = make(#"(?m)^([ \t]*)[-*+][ \t]+\[(.)\][ \t]+"#)
 
     static let bold = make(#"(?<!\*)\*\*(?!\s)([^\*]+?)(?<!\s)\*\*(?!\*)"#)
     static let italic = make(#"(?<![\*\w])\*(?!\s|\*)([^\*\n]+?)(?<!\s)\*(?!\*)"#)
