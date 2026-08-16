@@ -242,6 +242,18 @@ struct MarkdownHighlighter {
             storage.addAttribute(.foregroundColor, value: palette.link.platformColor, range: token.range)
             if let resolved {
                 storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
+                // A video or PDF gets a tinted chip so it reads as a file you can
+                // open, not as a link to another note.
+                if AttachmentKind(url: resolved) != .image {
+                    // Only the visible filename gets the chip. Covering the whole
+                    // token would tint the collapsed `![[` and `]]` too, and those
+                    // sit on a 0.01pt line, which drags the highlight off-centre.
+                    storage.addAttribute(
+                        .backgroundColor,
+                        value: palette.codeBackground.platformColor,
+                        range: isBeingEdited ? token.range : token.contentRange
+                    )
+                }
             } else {
                 storage.addAttribute(
                     .foregroundColor, value: palette.unresolvedLink.platformColor, range: token.range
@@ -269,6 +281,20 @@ struct MarkdownHighlighter {
             }
 
         case .markdownLink(let destination):
+            // `![alt](path.png)` is the image form. It matters because notes
+            // pasted in from other editors use this rather than `![[...]]`, and
+            // without it those images stayed as raw link text.
+            let isImage = token.range.location < fullText.length
+                && fullText.character(at: token.range.location) == 0x21  // "!"
+            if isImage, !isBeingEdited, !destination.contains("://"),
+               let resolved = resolveAttachment?(destination),
+               AttachmentKind(url: resolved) == .image,
+               let image = AttachmentImageCache.shared.image(for: resolved, maxWidth: availableWidth) {
+                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
+                break
+            }
+
             storage.addAttribute(.foregroundColor, value: palette.link.platformColor, range: token.contentRange)
             storage.addAttribute(.inkstoneLinkDestination, value: destination, range: token.range)
             if !isBeingEdited { conceal(delimiters(of: token)) }
