@@ -444,6 +444,67 @@ struct MarkdownHighlighter {
                 .inkstoneTag: name,
             ], range: token.range)
 
+        case .footnoteReference(let id):
+            // Rendered as a raised marker, the way a typeset footnote looks. The
+            // brackets and caret are scaffolding and collapse; the identifier is
+            // what a reader needs.
+            let raised = typography.editorFont.platformFont(size: typography.editorFontSize * 0.72)
+            storage.addAttributes([
+                .font: raised,
+                .foregroundColor: palette.accent.platformColor,
+                .baselineOffset: typography.editorFontSize * 0.32,
+                .inkstoneFootnote: id,
+            ], range: token.contentRange)
+            if !isBeingEdited { conceal(delimiters(of: token)) }
+
+        case .footnoteDefinition(let id):
+            // The definition line reads as an aside: smaller, quieter, indented.
+            let line = fullText.paragraphRange(for: token.range)
+            let paragraph = paragraph(
+                lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize * 0.88
+            )
+            paragraph.firstLineHeadIndent = Self.listIndent
+            paragraph.headIndent = Self.listIndent
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
+            storage.addAttributes([
+                .paragraphStyle: paragraph,
+                .font: typography.editorFont.platformFont(size: typography.editorFontSize * 0.88),
+                .foregroundColor: palette.secondaryText.platformColor,
+            ], range: line)
+            storage.addAttributes([
+                .foregroundColor: palette.accent.platformColor,
+                .inkstoneFootnote: id,
+            ], range: token.contentRange)
+            if !isBeingEdited {
+                // Collapse `[^` and `]:` but keep the identifier visible so the
+                // reader can match it to the reference.
+                conceal(delimiters(of: token))
+                // Collapsing `]: ` takes the separating space with it, which ran
+                // the identifier straight into the text ("1Knuth"). Put the gap
+                // back as kerning on the identifier's last character.
+                if token.contentRange.length > 0 {
+                    let last = NSRange(
+                        location: token.contentRange.location + token.contentRange.length - 1,
+                        length: 1
+                    )
+                    storage.addAttribute(.kern, value: typography.editorFontSize * 0.4, range: last)
+                }
+            }
+
+        case .superscript:
+            storage.addAttributes([
+                .font: typography.editorFont.platformFont(size: typography.editorFontSize * 0.72),
+                .baselineOffset: typography.editorFontSize * 0.32,
+            ], range: token.contentRange)
+            if !isBeingEdited { conceal(delimiters(of: token)) }
+
+        case .subscript:
+            storage.addAttributes([
+                .font: typography.editorFont.platformFont(size: typography.editorFontSize * 0.72),
+                .baselineOffset: -typography.editorFontSize * 0.16,
+            ], range: token.contentRange)
+            if !isBeingEdited { conceal(delimiters(of: token)) }
+
         case .blockIdentifier:
             storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
 
@@ -940,6 +1001,8 @@ extension NSAttributedString.Key {
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
     /// A typeset formula to be drawn within a line of prose. Value is an image.
     static let inkstoneInlineMath = NSAttributedString.Key("inkstoneInlineMath")
+    /// Attached to a footnote marker so clicking it can jump to its definition.
+    static let inkstoneFootnote = NSAttributedString.Key("inkstoneFootnote")
     /// Marks an h1/h2 so a rule can be drawn beneath it. Value is the level.
     static let inkstoneHeadingRule = NSAttributedString.Key("inkstoneHeadingRule")
 }

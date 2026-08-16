@@ -124,6 +124,12 @@ class EditorCoordinator: NSObject {
             actions.openAttachment(attachment)
             return true
         }
+        // A footnote marker jumps to its counterpart — reference to definition,
+        // and back again — which is the whole point of numbering them.
+        if let id = attributes[.inkstoneFootnote] as? String {
+            jumpToFootnote(id: id, from: index, in: storage)
+            return true
+        }
         if let link = attributes[.inkstoneWikiLink] as? WikiLink {
             actions.followWikiLink(link)
             return true
@@ -142,6 +148,29 @@ class EditorCoordinator: NSObject {
         }
         return false
     }
+
+    /// Scrolls to the other end of a footnote pair.
+    func jumpToFootnote(id: String, from index: Int, in storage: NSTextStorage) {
+        var destination: NSRange?
+        storage.enumerateAttribute(
+            .inkstoneFootnote,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, stop in
+            guard value as? String == id, !NSLocationInRange(index, range) else { return }
+            destination = range
+            stop.pointee = true
+        }
+        guard let destination else { return }
+        #if os(macOS)
+        textViewForScrolling?.scrollRangeToVisible(destination)
+        textViewForScrolling?.setSelectedRange(NSRange(location: destination.location, length: 0))
+        #endif
+    }
+
+    #if os(macOS)
+    /// Set by the AppKit coordinator; nil elsewhere.
+    var textViewForScrolling: NSTextView? { nil }
+    #endif
 
     /// Continues Markdown lists on Return: `- item` → `- `, `1. item` → `2. `,
     /// `- [ ] task` → `- [ ] `. Pressing Return on an empty list item ends the
@@ -677,6 +706,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
     @MainActor
     final class MacCoordinator: EditorCoordinator, NSTextViewDelegate {
         weak var textView: InkstoneTextView?
+        override var textViewForScrolling: NSTextView? { textView }
         /// Token for the scroll view's frame-change observation; removed on
         /// deinit so a closed tab does not keep re-laying-out a dead editor.
         ///

@@ -31,6 +31,14 @@ public enum TokenKind: Hashable, Sendable {
     case comment
     case horizontalRule
     case frontmatter
+    /// `[^1]` in the body of a note.
+    case footnoteReference(id: String)
+    /// `[^1]: …` at the start of a line, defining the note.
+    case footnoteDefinition(id: String)
+    /// `^text^`
+    case superscript
+    /// `~text~` — distinct from `~~strikethrough~~`.
+    case `subscript`
     /// A whole GFM table block, header and body together.
     case table
     /// The header row of a table, so it can be weighted differently.
@@ -238,6 +246,31 @@ public struct SyntaxScanner: Sendable {
             )
         }
 
+        // Footnote definitions before references: `[^1]: text` at the head of a
+        // line is a definition, and its `[^1]` must not also match as a
+        // reference to itself.
+        addMatches(Patterns.footnoteDefinition) { match, text in
+            SyntaxToken(
+                kind: .footnoteDefinition(id: text.substring(with: match.range(at: 1))),
+                range: match.range,
+                contentRange: match.range(at: 1)
+            )
+        }
+        addMatches(Patterns.footnoteReference) { match, text in
+            SyntaxToken(
+                kind: .footnoteReference(id: text.substring(with: match.range(at: 1))),
+                range: match.range,
+                contentRange: match.range(at: 1)
+            )
+        }
+
+        addMatches(Patterns.superscript) { match, _ in
+            SyntaxToken(kind: .superscript, range: match.range, contentRange: match.range(at: 1))
+        }
+        addMatches(Patterns.subscript) { match, _ in
+            SyntaxToken(kind: .subscript, range: match.range, contentRange: match.range(at: 1))
+        }
+
         addMatches(Patterns.bold) { match, _ in
             SyntaxToken(kind: .bold, range: match.range, contentRange: match.range(at: 1))
         }
@@ -397,6 +430,18 @@ private enum Patterns {
     static let bold = make(#"(?<!\*)\*\*(?!\s)([^\*]+?)(?<!\s)\*\*(?!\*)"#)
     static let italic = make(#"(?<![\*\w])\*(?!\s|\*)([^\*\n]+?)(?<!\s)\*(?!\*)"#)
     static let strikethrough = make(#"~~(?!\s)([^~]+?)(?<!\s)~~"#)
+
+    /// `[^1]: …` — a definition, anchored to the start of a line.
+    static let footnoteDefinition = make(#"(?m)^\[\^([^\]\s]+)\]:[ \t]*"#)
+    /// `[^1]` used in the body. The lookahead keeps it from swallowing a
+    /// definition's own marker.
+    static let footnoteReference = make(#"\[\^([^\]\s]+)\](?!:)"#)
+
+    /// `^text^`. Spaces are excluded so `2^10^` works but `a ^ b` is arithmetic.
+    static let superscript = make(#"\^(?!\s)([^\^\s]+)(?<!\s)\^"#)
+    /// `~text~`, guarded on both sides so `~~strikethrough~~` is not mistaken
+    /// for two adjacent subscripts.
+    static let `subscript` = make(#"(?<!~)~(?!~|\s)([^~\n]+?)(?<!\s)~(?!~)"#)
     static let highlight = make(#"==(?!\s)([^=\n]+?)(?<!\s)=="#)
 
     static let horizontalRule = make(#"(?m)^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$"#)

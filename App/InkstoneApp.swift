@@ -87,10 +87,19 @@ struct InkstoneApp: App {
                 guard !text.isEmpty else { continue }
                 let style = storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil)
                     as? NSParagraphStyle
+                // Kerning matters where a collapsed marker took a separating
+                // space with it and the gap had to be put back.
+                var kerns: [String] = []
+                storage.enumerateAttribute(.kern, in: line) { value, r, _ in
+                    if let k = value as? Double, k > 0.5 {
+                        kerns.append(String(format: "%@=%.1f", ns.substring(with: r), k))
+                    }
+                }
                 report += String(
-                    format: "  first=%5.1f head=%5.1f  %@\n",
+                    format: "  first=%5.1f head=%5.1f kern=[%@]  %@\n",
                     style?.firstLineHeadIndent ?? -1, style?.headIndent ?? -1,
-                    text.prefix(34) as CVarArg
+                    kerns.joined(separator: " ") as CVarArg,
+                    text.prefix(30) as CVarArg
                 )
             }
             FileHandle.standardOutput.write(Data(report.utf8))
