@@ -245,6 +245,68 @@ final class InkstoneTextView: NSTextView {
         super.mouseDown(with: event)
     }
 
+    /// Draws the caret at the height of the line rather than of the font.
+    ///
+    /// AppKit sizes the insertion point to the font's own line height. Once a
+    /// paragraph carries an explicit line height — 1.6x the font size here, for
+    /// CSS-like leading — the caret is markedly shorter than the line it sits
+    /// in, and reads as belonging to some other, smaller document.
+    ///
+    /// The caret is also nudged right by a hair. It is drawn flush against the
+    /// preceding glyph, which at this size and weight looks stuck to the last
+    /// letter; a fraction of a point restores the gap without moving it far
+    /// enough to misrepresent where text will be inserted.
+    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
+        var rect = rect
+        if let height = lineHeightAtCaret(), height > rect.height {
+            // Keep it centred on the glyphs, so the extra height is shared
+            // between ascender and descender instead of hanging below.
+            rect.origin.y -= (height - rect.height) / 2
+            rect.size.height = height
+        }
+        rect.origin.x += Self.caretInset
+        super.drawInsertionPoint(in: rect, color: color, turnedOn: flag)
+    }
+
+    /// AppKit invalidates the area of the caret it *would* have drawn, which is
+    /// shorter than the one actually drawn — without widening it, a moving caret
+    /// leaves fragments of itself behind.
+    override func setNeedsDisplay(_ invalidRect: NSRect, avoidAdditionalLayout flag: Bool) {
+        var rect = invalidRect
+        rect.origin.y -= Self.caretOvershoot
+        rect.size.height += Self.caretOvershoot * 2
+        rect.size.width += Self.caretInset + 1
+        super.setNeedsDisplay(rect, avoidAdditionalLayout: flag)
+    }
+
+    private static let caretInset: CGFloat = 0.75
+    /// Half the largest gap between a line height and the font's own height —
+    /// 6.8pt on body text, less on headings, so 4pt each way covers it. This
+    /// widens *every* invalidation, not just the caret's, so it is kept to what
+    /// is actually needed rather than a comfortable overestimate.
+    private static let caretOvershoot: CGFloat = 4
+
+    /// The height of the line fragment the caret currently sits in.
+    private func lineHeightAtCaret() -> CGFloat? {
+        guard let storage = textStorage, storage.length > 0 else { return nil }
+        let location = min(selectedRange().location, storage.length - 1)
+
+        // The paragraph's own line height, not the line fragment's. A fragment
+        // that ends a paragraph also carries `paragraphSpacing` — 4pt on a list
+        // item — and sizing the caret from it would overshoot the text by that
+        // much on exactly the lines where the caret is most often placed.
+        if let style = storage.attribute(.paragraphStyle, at: location, effectiveRange: nil)
+            as? NSParagraphStyle, style.maximumLineHeight > 0 {
+            return style.maximumLineHeight
+        }
+
+        guard let layoutManager else { return nil }
+        let glyph = layoutManager.glyphIndexForCharacter(at: location)
+        guard glyph < layoutManager.numberOfGlyphs else { return nil }
+        let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        return fragment.height > 0 ? fragment.height : nil
+    }
+
     /// Paints inline attachment images into the space the highlighter reserved.
     ///
     /// See `MarkdownHighlighter.inlineImage` for why this is drawn by hand rather

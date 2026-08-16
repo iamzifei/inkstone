@@ -139,6 +139,49 @@ struct InkstoneApp: App {
             FileHandle.standardOutput.write(Data(report.utf8))
         }
 
+        // Caret dump: the caret is drawn at the font's natural height while the
+        // line is laid out at an explicit multiple of the font size, so the two
+        // diverge. Measured through a real layout manager rather than derived.
+        if ProcessInfo.processInfo.environment["INKSTONE_CARET_DUMP"] != nil {
+            highlighter.highlight(storage, caretLineRange: nil)
+            let layoutManager = NSLayoutManager()
+            let container = NSTextContainer(size: CGSize(width: 800, height: CGFloat.greatestFiniteMagnitude))
+            container.lineFragmentPadding = 5
+            layoutManager.addTextContainer(container)
+            storage.addLayoutManager(layoutManager)
+            layoutManager.ensureLayout(for: container)
+
+            let ns = storage.string as NSString
+            var report = "\n"
+            var location = 0
+            while location < ns.length {
+                let line = ns.lineRange(for: NSRange(location: location, length: 0))
+                defer { location = max(line.location + line.length, location + 1) }
+                let text = ns.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                let glyph = layoutManager.glyphIndexForCharacter(at: line.location)
+                guard glyph < layoutManager.numberOfGlyphs else { continue }
+                let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+                // Measured at the first *visible* character: the start of a
+                // heading or task line is a concealed 0.01pt marker, whose
+                // metrics say nothing about the line.
+                var probe = line.location
+                while probe < line.location + line.length,
+                      let f = storage.attribute(.font, at: probe, effectiveRange: nil) as? PlatformFont,
+                      f.pointSize < 1 { probe += 1 }
+                let font = storage.attribute(.font, at: probe, effectiveRange: nil) as? PlatformFont
+                let paragraph = storage.attribute(.paragraphStyle, at: probe, effectiveRange: nil)
+                    as? NSParagraphStyle
+                let natural = (font?.ascender ?? 0) - (font?.descender ?? 0)
+                report += String(
+                    format: "  fragment=%5.1f  paraLineHeight=%5.1f  caretWas=%5.1f  gain=%4.1f   %@\n",
+                    fragment.height, paragraph?.maximumLineHeight ?? -1, natural,
+                    (paragraph?.maximumLineHeight ?? 0) - natural, text.prefix(22) as CVarArg
+                )
+            }
+            FileHandle.standardOutput.write(Data((report + "\n").utf8))
+        }
+
         // Checkbox dump: whether a task line is collapsed to a drawn checkbox,
         // and whether that depends on the caret. Reported for both caret states
         // because "shows [ ] instead of a checkbox" is exactly what the
