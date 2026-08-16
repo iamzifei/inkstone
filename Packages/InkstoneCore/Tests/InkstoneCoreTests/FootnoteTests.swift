@@ -92,3 +92,34 @@ struct FootnoteTests {
         #expect(token.map { ns.substring(with: $0.contentRange) } == "2")
     }
 }
+
+@Suite("Table of contents")
+struct TOCTests {
+    private let scanner = SyntaxScanner()
+
+    private func hasTOC(_ text: String) -> Bool {
+        scanner.scan(text).contains { $0.kind == .tableOfContents }
+    }
+
+    @Test("[TOC] alone on a line is recognised, in either case")
+    func recognised() {
+        #expect(hasTOC("# Title\n\n[TOC]\n\nBody"))
+        #expect(hasTOC("[toc]"))
+    }
+
+    @Test("A bracketed word mid-sentence is not a TOC")
+    func notInline() {
+        // Otherwise a sentence mentioning [TOC] would sprout a table of contents.
+        #expect(!hasTOC("The [TOC] marker generates a table of contents."))
+    }
+
+    @Test("A wikilink that merely looks similar is left alone")
+    func wikilinkUnaffected() {
+        #expect(!hasTOC("[[TOC]]"))
+    }
+
+    @Test("A TOC inside a code fence is not a TOC")
+    func codeWins() {
+        #expect(!hasTOC("```\n[TOC]\n```"))
+    }
+}

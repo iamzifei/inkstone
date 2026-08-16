@@ -35,6 +35,9 @@ public enum TokenKind: Hashable, Sendable {
     case footnoteReference(id: String)
     /// `[^1]: …` at the start of a line, defining the note.
     case footnoteDefinition(id: String)
+    /// `[TOC]` on its own line — a placeholder the renderer replaces with a
+    /// table of contents built from the document's headings.
+    case tableOfContents
     /// `^text^`
     case superscript
     /// `~text~` — distinct from `~~strikethrough~~`.
@@ -264,6 +267,10 @@ public struct SyntaxScanner: Sendable {
             )
         }
 
+        addMatches(Patterns.tableOfContents) { match, _ in
+            SyntaxToken(kind: .tableOfContents, range: match.range)
+        }
+
         addMatches(Patterns.superscript) { match, _ in
             SyntaxToken(kind: .superscript, range: match.range, contentRange: match.range(at: 1))
         }
@@ -436,6 +443,9 @@ private enum Patterns {
     /// `[^1]` used in the body. The lookahead keeps it from swallowing a
     /// definition's own marker.
     static let footnoteReference = make(#"\[\^([^\]\s]+)\](?!:)"#)
+
+    /// `[TOC]` alone on a line, case-insensitively, as Typora accepts it.
+    static let tableOfContents = make(#"(?mi)^[ \t]*\[toc\][ \t]*$"#)
 
     /// `^text^`. Spaces are excluded so `2^10^` works but `a ^ b` is arithmetic.
     static let superscript = make(#"\^(?!\s)([^\^\s]+)(?<!\s)\^"#)

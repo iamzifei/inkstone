@@ -273,8 +273,10 @@ final class InkstoneTextView: NSTextView {
             // The paragraph is centred, but the glyphs it contains are collapsed
             // to nothing, so the line rect carries no useful x. Centre against
             // the text container instead.
+            let centred = (storage.attribute(.inkstoneImageCentred, at: range.location, effectiveRange: nil)
+                as? Bool) ?? true
             let available = container.size.width - container.lineFragmentPadding * 2
-            let x = origin.x + max(0, (available - size.width) / 2)
+            let x = centred ? origin.x + max(0, (available - size.width) / 2) : origin.x
             let target = NSRect(
                 x: x,
                 y: lineRect.minY + MarkdownHighlighter.inlineImagePadding,

@@ -75,6 +75,15 @@ struct MarkdownHighlighter {
             tableIndices.insert(integersIn: range.location..<(range.location + range.length))
         }
 
+        // Headings are collected up front: a [TOC] anywhere in the document has
+        // to list all of them, including ones that appear after it.
+        let headings: [(level: Int, title: String)] = tokens.compactMap { token in
+            guard case .heading(let level) = token.kind else { return nil }
+            let title = (text as NSString).substring(with: token.contentRange)
+                .trimmingCharacters(in: .whitespaces)
+            return title.isEmpty ? nil : (level, title)
+        }
+
         for token in tokens {
             // Tokens wholly outside the styled scope cost nothing to skip.
             guard NSIntersectionRange(token.range, scope).length > 0
@@ -85,7 +94,8 @@ struct MarkdownHighlighter {
                 to: storage,
                 caretLineRange: caretLineRange,
                 fullText: text as NSString,
-                tableIndices: tableIndices
+                tableIndices: tableIndices,
+                headings: headings
             )
         }
 
@@ -152,7 +162,8 @@ struct MarkdownHighlighter {
         to storage: NSTextStorage,
         caretLineRange: NSRange?,
         fullText: NSString,
-        tableIndices: IndexSet
+        tableIndices: IndexSet,
+        headings: [(level: Int, title: String)]
     ) {
         let typography = style.typography
         let palette = style.palette
@@ -491,6 +502,18 @@ struct MarkdownHighlighter {
                 }
             }
 
+        case .tableOfContents:
+            guard !isBeingEdited, !headings.isEmpty,
+                  let image = tableOfContentsImage(headings)
+            else {
+                storage.addAttributes([
+                    .font: typography.codeFont.platformFont(size: typography.codeFontSize),
+                    .foregroundColor: palette.faintText.platformColor,
+                ], range: token.range)
+                break
+            }
+            inlineImage(image, to: storage, in: token.range, fullText: fullText, centred: false)
+
         case .superscript:
             storage.addAttributes([
                 .font: typography.editorFont.platformFont(size: typography.editorFontSize * 0.72),
@@ -697,6 +720,58 @@ struct MarkdownHighlighter {
         return lines.filter { $0.length > 0 }
     }
 
+    /// Draws a document's headings into an image to stand in for `[TOC]`.
+    ///
+    /// An image, because the placeholder is four characters wide and the table
+    /// of contents is many lines tall — and the text on disk must not gain the
+    /// lines it displays. The same reservation trick as an inline image: hide
+    /// the marker, raise the line height, paint into the space.
+    private func tableOfContentsImage(_ headings: [(level: Int, title: String)]) -> PlatformImage? {
+        let body = NSMutableAttributedString()
+        let size = style.typography.editorFontSize
+
+        for heading in headings {
+            let indent = CGFloat(min(heading.level, 6) - 1) * 18
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.firstLineHeadIndent = indent
+            paragraph.headIndent = indent
+            paragraph.lineSpacing = 3
+
+            body.append(NSAttributedString(
+                string: heading.title + "\n",
+                attributes: [
+                    .font: style.typography.editorFont.platformFont(
+                        size: heading.level <= 1 ? size * 0.95 : size * 0.88,
+                        weight: heading.level <= 1 ? .semibold : .regular
+                    ),
+                    .foregroundColor: (heading.level <= 2 ? style.palette.text : style.palette.secondaryText)
+                        .platformColor,
+                    .paragraphStyle: paragraph,
+                ]
+            ))
+        }
+        guard body.length > 0 else { return nil }
+
+        let bounds = body.boundingRect(
+            with: CGSize(width: availableWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin]
+        )
+        let canvas = CGSize(width: ceil(bounds.width) + 2, height: ceil(bounds.height) + 2)
+        guard canvas.width > 1, canvas.height > 1 else { return nil }
+
+        #if os(macOS)
+        let image = NSImage(size: canvas)
+        image.lockFocus()
+        body.draw(with: CGRect(origin: .zero, size: canvas), options: [.usesLineFragmentOrigin])
+        image.unlockFocus()
+        return image
+        #else
+        return UIGraphicsImageRenderer(size: canvas).image { _ in
+            body.draw(with: CGRect(origin: .zero, size: canvas), options: [.usesLineFragmentOrigin])
+        }
+        #endif
+    }
+
     /// Reserves horizontal space for an inline formula and tags it for drawing.
     ///
     /// Unlike a block formula, this has to sit *within* a line of prose, so it
@@ -732,7 +807,8 @@ struct MarkdownHighlighter {
         _ image: PlatformImage,
         to storage: NSTextStorage,
         in range: NSRange,
-        fullText: NSString
+        fullText: NSString,
+        centred: Bool = true
     ) {
         guard range.length > 0 else { return }
 
@@ -745,12 +821,14 @@ struct MarkdownHighlighter {
         paragraph.maximumLineHeight = image.size.height + Self.inlineImagePadding * 2
         paragraph.paragraphSpacing = style.typography.paragraphSpacing
         // Typora centres block images and display formulas; so does every
-        // Markdown renderer worth copying.
-        paragraph.alignment = .center
+        // Markdown renderer worth copying. A table of contents is prose, though,
+        // and belongs on the left margin.
+        paragraph.alignment = centred ? .center : .natural
 
         let line = fullText.paragraphRange(for: range)
         storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
         storage.addAttribute(.inkstoneInlineImage, value: image, range: range)
+        storage.addAttribute(.inkstoneImageCentred, value: centred, range: range)
     }
 
     /// Breathing room above and below an inline image.
@@ -1003,6 +1081,8 @@ extension NSAttributedString.Key {
     static let inkstoneInlineMath = NSAttributedString.Key("inkstoneInlineMath")
     /// Attached to a footnote marker so clicking it can jump to its definition.
     static let inkstoneFootnote = NSAttributedString.Key("inkstoneFootnote")
+    /// Whether a block image is centred. Value is a Bool.
+    static let inkstoneImageCentred = NSAttributedString.Key("inkstoneImageCentred")
     /// Marks an h1/h2 so a rule can be drawn beneath it. Value is the level.
     static let inkstoneHeadingRule = NSAttributedString.Key("inkstoneHeadingRule")
 }
