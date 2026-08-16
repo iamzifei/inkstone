@@ -100,6 +100,14 @@ final class Workspace {
             root = url
             store = NoteStore(root: url)
             settings.loadThemes(fromVault: url)
+
+            // A vault in iCloud may have had notes evicted to save disk space,
+            // leaving hidden placeholders in their place. Ask for them back, off
+            // the main thread — the watcher rescans as they land.
+            if settings.data.iCloudSyncEnabled && vault.isCloudBacked {
+                Task.detached(priority: .utility) { ICloudFiles.requestDownloads(in: url) }
+            }
+
             refreshTree()
             reindex()
             startWatching(url)
@@ -339,6 +347,12 @@ final class Workspace {
     }
 
     func openNote(at url: URL, inNewTab: Bool = false) {
+        // Opening an evicted note has to wait for its bytes, or it opens blank
+        // and an empty buffer then overwrites the real note on the next save.
+        // Costs nothing in the normal case, where the file is already on disk.
+        if settings.data.iCloudSyncEnabled, vault?.isCloudBacked == true {
+            _ = ICloudFiles.ensureDownloaded(url, timeout: 2)
+        }
         if url.pathExtension.lowercased() == "canvas" {
             open(.canvas(url), inNewTab: inNewTab)
         } else {

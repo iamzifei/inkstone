@@ -84,6 +84,18 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var attachmentFolder = "Attachments"
     public var defaultNewNoteFolder = ""
 
+    /// Whether to keep an iCloud-backed vault's files present on disk.
+    ///
+    /// On by default: a vault in iCloud whose notes have been evicted looks like
+    /// a vault that has lost notes. Turning it off leaves eviction alone, which
+    /// is what you want on a machine short of disk space.
+    public var iCloudSyncEnabled = true
+
+    /// Whether GitHub sync is active. Off by default — it needs a repository and
+    /// a token before it can do anything, so it stays out of the way until asked
+    /// for.
+    public var gitHubSyncEnabled = false
+
     /// Which file types take part in sync.
     public var syncPolicy = SyncFilePolicy()
     /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
@@ -146,6 +158,8 @@ public struct SettingsData: Codable, Hashable, Sendable {
 
         attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)
         defaultNewNoteFolder = value(.defaultNewNoteFolder, defaults.defaultNewNoteFolder)
+        iCloudSyncEnabled = value(.iCloudSyncEnabled, defaults.iCloudSyncEnabled)
+        gitHubSyncEnabled = value(.gitHubSyncEnabled, defaults.gitHubSyncEnabled)
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
         gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
         gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)

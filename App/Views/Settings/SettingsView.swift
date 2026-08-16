@@ -273,28 +273,53 @@ private struct SyncSettings: View {
 
     var body: some View {
         Form {
-            Section("iCloud Drive") {
+            Section {
+                @Bindable var settings = workspace.settings
+                Toggle("Sync this vault with iCloud Drive", isOn: $settings.data.iCloudSyncEnabled)
+                    .disabled(workspace.vault?.isCloudBacked != true)
+
                 if workspace.vault?.isCloudBacked == true {
-                    Label("This vault lives in iCloud Drive and syncs automatically.", systemImage: "checkmark.icloud")
+                    Label(
+                        settings.data.iCloudSyncEnabled
+                            ? "Syncing. Notes are kept downloaded on this Mac."
+                            : "Paused. iCloud may move notes off this Mac to save space.",
+                        systemImage: settings.data.iCloudSyncEnabled ? "checkmark.icloud" : "icloud.slash"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 } else {
-                    Text("This vault is stored locally. Move it into iCloud Drive to sync across devices.")
+                    Text("This vault is stored locally. Create a vault in iCloud Drive, or move this folder there, to sync it across your devices.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("iCloud Drive")
+            } footer: {
+                // Worth stating plainly, because the switch does less than it
+                // looks like it does: iCloud moves the files, not this app.
+                Text("iCloud Drive syncs the folder itself. This keeps notes downloaded rather than evicted, so they stay visible and open instantly — turn it off on a Mac short of disk space.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 @Bindable var settings = workspace.settings
+                Toggle("Sync this vault with GitHub", isOn: $settings.data.gitHubSyncEnabled)
+
+                let off = !settings.data.gitHubSyncEnabled
                 TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
+                    .disabled(off)
                 TextField("Branch", text: $settings.data.gitHubBranch, prompt: Text("main"))
+                    .disabled(off)
 
                 SecureField("Personal access token", text: $token, prompt: Text(
                     SyncCredentials.hasToken ? "Saved in Keychain" : "ghp_…"
                 ))
                 .onSubmit(saveToken)
+                .disabled(off)
 
                 HStack {
                     Button("Save token", action: saveToken)
-                        .disabled(token.isEmpty)
+                        .disabled(token.isEmpty || off)
                     if SyncCredentials.hasToken {
                         Button("Remove", role: .destructive) {
                             SyncCredentials.setToken(nil)
@@ -306,7 +331,7 @@ private struct SyncSettings: View {
                         Task { await workspace.sync() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(workspace.isSyncing || workspace.root == nil
+                    .disabled(off || workspace.isSyncing || workspace.root == nil
                               || workspace.settings.data.gitHubRepository.isEmpty)
                 }
 

@@ -51,20 +51,35 @@ public struct VaultScanner: Sendable {
 
     private func scanChildren(of directory: URL) -> [FileNode] {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isHiddenKey]
+        // Hidden entries are filtered below rather than by `.skipsHiddenFiles`,
+        // because an iCloud placeholder *is* a hidden file standing in for a
+        // visible note. Skipping it makes evicted notes vanish from the sidebar.
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: [.skipsPackageDescendants]
         ) else { return [] }
 
         var nodes: [FileNode] = []
+        var seen = Set<String>()
         for entry in entries {
+            var entry = entry
+            if entry.lastPathComponent.hasPrefix(".") {
+                // Show the placeholder under the name the file will have once it
+                // has been downloaded, so the note is visible and openable while
+                // iCloud is still fetching it.
+                guard let name = ICloudFiles.materialisedName(for: entry.lastPathComponent) else { continue }
+                entry = directory.appending(path: name)
+            }
             let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDirectory {
                 guard !Self.ignoredDirectories.contains(entry.lastPathComponent) else { continue }
                 nodes.append(FileNode(url: entry, isDirectory: true, children: scanChildren(of: entry)))
             } else {
                 guard Self.visibleExtensions.contains(entry.pathExtension.lowercased()) else { continue }
+                // A file that finished downloading mid-scan can appear both as
+                // itself and as a leftover placeholder; list it once.
+                guard seen.insert(entry.lastPathComponent).inserted else { continue }
                 nodes.append(FileNode(url: entry, isDirectory: false))
             }
         }
