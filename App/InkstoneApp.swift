@@ -32,19 +32,42 @@ struct InkstoneApp: App {
 
         highlighter.highlight(storage, caretLineRange: nil)  // warm up
 
-        var samples: [Double] = []
-        for _ in 0..<5 {
-            let started = DispatchTime.now().uptimeNanoseconds
-            // A caret range is the realistic case: that is what every keystroke does.
-            highlighter.highlight(storage, caretLineRange: NSRange(location: 0, length: 1))
-            samples.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
-        }
-        samples.sort()
+        // Optional second figure: what a viewport-sized pass costs, which is what
+        // the editor actually does on a large document.
+        let window = ProcessInfo.processInfo.environment["INKSTONE_BENCH_WINDOW"].flatMap(Int.init)
 
-        let summary = String(
+        func measure(_ visible: NSRange?) -> [Double] {
+            var samples: [Double] = []
+            for _ in 0..<5 {
+                let started = DispatchTime.now().uptimeNanoseconds
+                // A caret range is the realistic case: that is what every keystroke does.
+                highlighter.highlight(
+                    storage, caretLineRange: NSRange(location: 0, length: 1), visibleRange: visible
+                )
+                samples.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
+            }
+            return samples.sorted()
+        }
+
+        let samples = measure(nil)
+        var summary = String(
             format: "highlight %d chars (%.0f KB): median %.1f ms  (min %.1f, max %.1f)\n",
             storage.length, Double(text.utf8.count) / 1024, samples[2], samples[0], samples[4]
         )
+        if let window {
+            let scope = NSRange(location: 0, length: min(window, storage.length))
+            let scoped = measure(scope)
+            summary += String(format: "  scoped to %d chars: median %.1f ms\n", scope.length, scoped[2])
+
+            // Sanity check that scoping styles what it claims to and nothing else:
+            // a heading inside the scope must be larger than body text, and text
+            // well beyond it must be untouched by this pass.
+            var stylesInScope = 0
+            storage.enumerateAttribute(.font, in: scope) { value, _, _ in
+                if let font = value as? NSFont, font.pointSize > 20 { stylesInScope += 1 }
+            }
+            summary += "  headings styled inside scope: \(stylesInScope)\n"
+        }
         FileHandle.standardOutput.write(Data(summary.utf8))
         exit(0)
     }

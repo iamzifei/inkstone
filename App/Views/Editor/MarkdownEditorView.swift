@@ -557,6 +557,16 @@ private struct TextViewRepresentable: NSViewRepresentable {
         // only ever calculated on the first layout — when the width is often
         // still zero — and the text column then ran the full width of the window
         // no matter how wide the user dragged it.
+        // Re-style as the reader scrolls into text that has not been styled yet.
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        context.coordinator.scrollObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak coordinator = context.coordinator] _ in
+            MainActor.assumeIsolated { coordinator?.rehighlightForScrollIfNeeded() }
+        }
+
         scrollView.postsFrameChangedNotifications = true
         context.coordinator.frameObserver = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
@@ -608,9 +618,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
         /// written once during `makeNSView` on the main actor, and only read
         /// again when the coordinator is being torn down.
         nonisolated(unsafe) var frameObserver: (any NSObjectProtocol)?
+        nonisolated(unsafe) var scrollObserver: (any NSObjectProtocol)?
 
         deinit {
             if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
+            if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
         }
 
         func applyStyle() {
@@ -651,6 +663,47 @@ private struct TextViewRepresentable: NSViewRepresentable {
             }
         }
 
+        /// Documents below this size are always styled whole: the pass is already
+        /// inside a frame, and doing it in one go avoids any chance of a seam
+        /// between styled and unstyled text.
+        static let viewportThreshold = 40_000
+
+        /// Character range last styled, so scrolling only re-runs when the reader
+        /// approaches the edge of it.
+        var styledRange: NSRange?
+
+        /// The slice worth styling: what is on screen, plus a screenful either
+        /// side so scrolling has somewhere to go before it needs more.
+        func viewportScope() -> NSRange? {
+            guard let textView, let storage = textView.textStorage,
+                  storage.length > Self.viewportThreshold,
+                  let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer
+            else { return nil }
+
+            let glyphRange = layoutManager.glyphRange(forBoundingRect: textView.visibleRect, in: container)
+            let visible = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            guard visible.length > 0 else { return nil }
+
+            let padding = max(visible.length, 2_000)
+            let start = max(0, visible.location - padding)
+            let end = min(storage.length, visible.location + visible.length + padding)
+            return NSRange(location: start, length: end - start)
+        }
+
+        /// Re-styles after scrolling, but only once the viewport nears the edge of
+        /// what is already styled — otherwise every scroll event would re-run the
+        /// whole pass.
+        func rehighlightForScrollIfNeeded() {
+            guard let scope = viewportScope() else { return }
+            if let styled = styledRange,
+               scope.location >= styled.location,
+               scope.location + scope.length <= styled.location + styled.length {
+                return
+            }
+            rehighlight()
+        }
+
         func rehighlight() {
             guard let textView, let storage = textView.textStorage else { return }
             #if DEBUG
@@ -673,7 +726,9 @@ private struct TextViewRepresentable: NSViewRepresentable {
             isApplyingAttributes = true
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange())
-            highlighter.highlight(storage, caretLineRange: caretRange)
+            let scope = viewportScope()
+            styledRange = scope
+            highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: scope)
         }
 
         func textDidChange(_ notification: Notification) {

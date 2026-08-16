@@ -35,17 +35,27 @@ struct MarkdownHighlighter {
     private static let concealedFontSize: CGFloat = 0.01
 
     /// Applies attributes to `storage` in place.
-    /// - Parameter caretLineRange: the paragraph containing the caret, which is
-    ///   never concealed. Pass `nil` to conceal everything (reading mode).
-    func highlight(_ storage: NSTextStorage, caretLineRange: NSRange?) {
+    ///
+    /// - Parameters:
+    ///   - caretLineRange: the paragraph containing the caret, which is never
+    ///     concealed. Pass `nil` to conceal everything (reading mode).
+    ///   - visibleRange: when given, only text intersecting this range is styled.
+    ///     Parsing still covers the whole document — a fenced block or table has
+    ///     to be recognised even when it starts off-screen, or the text inside it
+    ///     would be mistaken for ordinary Markdown. It is applying the attributes
+    ///     that costs, and that is what this skips.
+    func highlight(_ storage: NSTextStorage, caretLineRange: NSRange?, visibleRange: NSRange? = nil) {
         let text = storage.string
         let full = NSRange(location: 0, length: (text as NSString).length)
         guard full.length > 0 else { return }
 
+        let scope = visibleRange.map { NSIntersectionRange($0, full) } ?? full
+        guard scope.length > 0 else { return }
+
         storage.beginEditing()
         defer { storage.endEditing() }
 
-        applyBaseAttributes(to: storage, range: full)
+        applyBaseAttributes(to: storage, range: scope)
 
         let tokens = scanner.scan(text)
         // Table cells are laid out with a monospaced font so columns line up.
@@ -66,6 +76,10 @@ struct MarkdownHighlighter {
         }
 
         for token in tokens {
+            // Tokens wholly outside the styled scope cost nothing to skip.
+            guard NSIntersectionRange(token.range, scope).length > 0
+                    || NSLocationInRange(scope.location, token.range)
+            else { continue }
             apply(
                 token,
                 to: storage,
@@ -75,17 +89,18 @@ struct MarkdownHighlighter {
             )
         }
 
-        compressBlankLines(in: storage, text: text as NSString)
+        compressBlankLines(in: storage, text: text as NSString, within: scope)
 
         if style.typography.cjkLatinSpacing {
-            applyCJKLatinSpacing(to: storage, text: text as NSString)
+            applyCJKLatinSpacing(to: storage, text: text as NSString, within: scope)
         }
 
         // Last, because column alignment and CJK spacing both write `.kern` and
         // the alignment values have to be the ones that survive — otherwise a
         // cell ending on a Han/Latin boundary silently loses its padding.
         if mode != .source {
-            for range in tableRanges {
+            for range in tableRanges
+            where NSIntersectionRange(range, scope).length > 0 {
                 alignTableColumns(range, in: storage, text: text as NSString)
             }
         }
@@ -660,13 +675,14 @@ struct MarkdownHighlighter {
     /// full line height — with body leading that is a much bigger gap than the
     /// 1rem Typora puts between paragraphs. Compressing it lands in the same
     /// place visually while keeping the line editable and selectable.
-    private func compressBlankLines(in storage: NSTextStorage, text: NSString) {
+    private func compressBlankLines(in storage: NSTextStorage, text: NSString, within scope: NSRange) {
         guard mode != .source else { return }
         let gap = style.typography.paragraphSpacing
         guard gap > 0 else { return }
 
-        var location = 0
-        while location < text.length {
+        var location = scope.location
+        let end = scope.location + scope.length
+        while location < end {
             let line = text.lineRange(for: NSRange(location: location, length: 0))
             defer { location = max(line.location + line.length, location + 1) }
 
@@ -791,12 +807,15 @@ struct MarkdownHighlighter {
     /// Inserts a small amount of kerning between Han characters and adjacent
     /// Latin letters or digits — the "盘古之白" convention — without touching the
     /// underlying text. Purely visual, so the file on disk stays clean.
-    private func applyCJKLatinSpacing(to storage: NSTextStorage, text: NSString) {
-        let string = storage.string
+    private func applyCJKLatinSpacing(to storage: NSTextStorage, text: NSString, within scope: NSRange) {
+        // Only the scoped substring is walked. On a large document this loop
+        // visits every character, so restricting it matters as much as skipping
+        // the tokens does.
+        let string = text.substring(with: scope)
         let characters = Array(string.unicodeScalars)
         guard characters.count > 1 else { return }
 
-        var utf16Offset = 0
+        var utf16Offset = scope.location
         var previousScalar: Unicode.Scalar?
         let spacing = style.typography.editorFontSize * 0.14
 
@@ -808,7 +827,7 @@ struct MarkdownHighlighter {
             guard let previous = previousScalar else { continue }
             let boundary = (isHan(previous) && isLatinOrDigit(scalar))
                 || (isLatinOrDigit(previous) && isHan(scalar))
-            guard boundary, utf16Offset > 0, utf16Offset < text.length else { continue }
+            guard boundary, utf16Offset > scope.location, utf16Offset < text.length else { continue }
             storage.addAttribute(.kern, value: spacing, range: NSRange(location: utf16Offset - 1, length: 1))
         }
     }
