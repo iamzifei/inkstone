@@ -92,13 +92,20 @@ public struct SyntaxScanner: Sendable {
         let full = NSRange(location: 0, length: nsText.length)
 
         var tokens: [SyntaxToken] = []
-        var maskedRegions: [NSRange] = []
+        // An IndexSet, not an array of ranges.
+        //
+        // `isMasked` runs once per regex match, and the masked set grows with the
+        // document, so a linear scan made the whole pass quadratic: a 55KB note
+        // took 39ms to scan — over a frame, on every keystroke — and a 223KB one
+        // took 517ms. IndexSet keeps sorted, coalesced ranges and answers
+        // intersection queries in logarithmic time.
+        var maskedRegions = IndexSet()
 
         // Frontmatter is masked so its YAML `#comments` and `[[values]]` don't
         // leak into the token stream as tags and links.
         if let frontmatterRange = frontmatterRange(in: nsText) {
             tokens.append(SyntaxToken(kind: .frontmatter, range: frontmatterRange))
-            maskedRegions.append(frontmatterRange)
+            maskedRegions.insert(range: frontmatterRange)
         }
 
         for match in Patterns.codeBlock.matches(in: text, range: full) {
@@ -109,33 +116,33 @@ public struct SyntaxScanner: Sendable {
                 kind: .codeBlock(language: language?.isEmpty == false ? language : nil),
                 range: match.range
             ))
-            maskedRegions.append(match.range)
+            maskedRegions.insert(range: match.range)
         }
 
         // Tables are emitted before the inline patterns so the block-level
         // attributes land first, but deliberately *not* masked: a cell can hold
         // bold text, a [[wikilink]] or a #tag, and those must still be scanned.
         for match in Patterns.table.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
+        where !maskedRegions.intersects(match.range) {
             tokens.append(contentsOf: tableTokens(for: match.range, in: nsText))
         }
 
         for match in Patterns.mathBlock.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
+        where !maskedRegions.intersects(match.range) {
             tokens.append(SyntaxToken(kind: .mathBlock, range: match.range, contentRange: match.range(at: 1)))
-            maskedRegions.append(match.range)
+            maskedRegions.insert(range: match.range)
         }
 
         for match in Patterns.comment.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
+        where !maskedRegions.intersects(match.range) {
             tokens.append(SyntaxToken(kind: .comment, range: match.range))
-            maskedRegions.append(match.range)
+            maskedRegions.insert(range: match.range)
         }
 
         for match in Patterns.inlineCode.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
+        where !maskedRegions.intersects(match.range) {
             tokens.append(SyntaxToken(kind: .inlineCode, range: match.range, contentRange: match.range(at: 1)))
-            maskedRegions.append(match.range)
+            maskedRegions.insert(range: match.range)
         }
 
         // From here on, every pattern respects the mask.
@@ -144,7 +151,7 @@ public struct SyntaxScanner: Sendable {
             _ makeToken: (NSTextCheckingResult, NSString) -> SyntaxToken?
         ) {
             for match in regex.matches(in: text, range: full) {
-                guard !isMasked(match.range, in: maskedRegions) else { continue }
+                guard !maskedRegions.intersects(match.range) else { continue }
                 if let token = makeToken(match, nsText) { tokens.append(token) }
             }
         }
@@ -330,8 +337,19 @@ public struct SyntaxScanner: Sendable {
         return match.range
     }
 
-    private func isMasked(_ range: NSRange, in regions: [NSRange]) -> Bool {
-        regions.contains { NSIntersectionRange($0, range).length > 0 }
+}
+
+private extension IndexSet {
+    /// Adds a UTF-16 range to the masked set.
+    mutating func insert(range: NSRange) {
+        guard range.length > 0, range.location != NSNotFound else { return }
+        insert(integersIn: range.location..<(range.location + range.length))
+    }
+
+    /// Whether any part of `range` is already masked.
+    func intersects(_ range: NSRange) -> Bool {
+        guard range.length > 0, range.location != NSNotFound else { return false }
+        return intersects(integersIn: range.location..<(range.location + range.length))
     }
 }
 
