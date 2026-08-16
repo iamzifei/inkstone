@@ -374,3 +374,45 @@ script:
     so it must reach Apple to validate and fails offline.
 
 Verified: Release build launches, does not crash, and quits cleanly.
+
+
+## Checkbox always drawn — 2026-08-16
+
+Reported as "preview mode still shows [] instead of a tickable checkbox".
+
+The highlighter was right and the source text was standard `- [ ] a task`; a
+dump of three caret positions found that only *caret on the task's own line*
+produced raw brackets. That was the live-preview rule — reveal the source on the
+line being edited — applied where it does not belong. A checkbox is a control:
+hiding it when the caret lands on its line means moving the caret away before
+you can tick the box in front of you.
+
+Task markers now collapse regardless of the caret (`hide`, which skips the caret
+check; `conceal` keeps it for everything else). Source mode still shows source.
+`INKSTONE_CHECKBOX_DUMP=1` reproduces the check.
+
+## GitHub sync made usable — 2026-08-16
+
+The engine was complete but reachable only through Settings. Added: a toolbar
+button carrying sync state, ⇧⌘Y, a sync when a vault opens, and a configurable
+repeat (default 15 min).
+
+The old comment justifying manual-only sync is gone. It worried about a
+background sync hitting a conflict mid-sentence — but conflicts save the remote
+copy *alongside* the local one and overwrite nothing, so the cost is an extra
+file, not lost work, and relying on the user to press a button was the larger
+risk.
+
+### Token permission — settled by measurement
+
+The PAT in use is **read-only**, confirmed rather than assumed: `DELETE` on a
+non-existent path returns 403 "Resource not accessible by personal access
+token" while `GET` on the same repository returns 200. Creating a repository
+returns 403 as well, so a throwaway test repository cannot be made with it.
+
+Note for anyone re-checking this: `/user/repos` reports `push=true` for these
+repositories, which is about **the user's** access and says nothing about what
+the token may do. Reading it as token permission is the obvious mistake here.
+
+Pull is verified end to end; **upload and delete remain unverified** and need a
+token with Contents: read *and* write.
