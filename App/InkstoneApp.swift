@@ -168,7 +168,18 @@ struct InkstoneApp: App {
                             concealed = true
                         }
                     }
-                    report += "    checkbox=\(checkbox) markerHidden=\(concealed)  \(text.prefix(28))\n"
+                    // The two font sizes the checkbox drawing depends on: the
+                    // marker's (collapsed) and the text's (what it must align to).
+                    var sizes = "—"
+                    if let markerRange = storage.range(of: nil, in: line, key: .inkstoneCheckbox) {
+                        let markerFont = storage.attribute(.font, at: markerRange.location, effectiveRange: nil) as? PlatformFont
+                        let after = min(markerRange.location + markerRange.length, storage.length - 1)
+                        let textFont = storage.attribute(.font, at: max(0, after), effectiveRange: nil) as? PlatformFont
+                        sizes = String(format: "marker=%.2fpt(xh %.2f) text=%.2fpt(xh %.2f)",
+                                       markerFont?.pointSize ?? -1, markerFont?.xHeight ?? -1,
+                                       textFont?.pointSize ?? -1, textFont?.xHeight ?? -1)
+                    }
+                    report += "    checkbox=\(checkbox) markerHidden=\(concealed) \(sizes)  \(text.prefix(20))\n"
                 }
             }
             FileHandle.standardOutput.write(Data((report + "\n").utf8))
@@ -408,5 +419,16 @@ struct InkstoneApp: App {
                 .keyboardShortcut("]", modifiers: [.command])
                 .disabled(!workspace.canGoForward)
         }
+    }
+}
+
+private extension NSTextStorage {
+    /// First range in `line` carrying `key`. Debug helper for the dumps above.
+    func range(of _: Any?, in line: NSRange, key: NSAttributedString.Key) -> NSRange? {
+        var found: NSRange?
+        enumerateAttribute(key, in: line) { value, range, stop in
+            if value != nil { found = range; stop.pointee = true }
+        }
+        return found
     }
 }

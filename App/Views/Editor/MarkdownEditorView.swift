@@ -455,11 +455,21 @@ final class InkstoneTextView: NSTextView {
                 .offsetBy(dx: origin.x, dy: origin.y)
             guard markerRect.intersects(rect) else { return }
 
-            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+            // The font of the *task text*, not of the marker.
+            //
+            // The marker was collapsed to 0.01pt to hide it, so reading the font
+            // at `range.location` returns that hair-thin font and an x-height of
+            // effectively zero — which put the box half a line below the words it
+            // belongs to. The first character after the marker is the text the
+            // checkbox has to line up with.
+            let textLocation = min(range.location + range.length, storage.length - 1)
+            let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? NSFont
             let side: CGFloat = 12
             let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-            // Same gutter centre as a bullet, so bullets and checkboxes in one
-            // list share a vertical axis.
+            // Centred on the x-height rather than the baseline: a box centred on
+            // the baseline sits visibly low, because letters extend upward from
+            // it. Same gutter centre as a bullet, so bullets and checkboxes in
+            // one list share a vertical axis.
             let box = NSRect(
                 x: markerRect.minX - MarkdownHighlighter.markerGutter - side / 2,
                 y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
@@ -522,7 +532,13 @@ final class InkstoneTextView: NSTextView {
             // Sit the dot on the text's optical centre, not the line box's. With
             // a line-height multiple above 1 the box is much taller than the
             // glyphs, so centring on it floats the bullet above the words.
-            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+            //
+            // Measured on the text after the marker, not the marker: the marker
+            // is collapsed to 0.01pt, whose x-height is effectively zero and
+            // would drop the dot to the baseline. Checkboxes measure the same
+            // way, which is what keeps a mixed list on one axis.
+            let textLocation = min(range.location + range.length, storage.length - 1)
+            let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? NSFont
             let baseline = markerRect.minY
                 + layoutManager.location(forGlyphAt: glyphRange.location).y
             let centre = baseline - (font?.xHeight ?? 8) / 2
