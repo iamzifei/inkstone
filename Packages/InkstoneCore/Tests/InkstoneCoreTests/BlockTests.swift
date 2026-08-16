@@ -93,3 +93,47 @@ struct BlockTests {
         #expect(callout?.contentRange.length == 0)
     }
 }
+
+/// Typography defaults are calibrated against Typora's default theme, which is
+/// the reference James asked to match. These pin the ratios so a later tweak to
+/// one value cannot quietly break the scale.
+@Suite("Typography scale")
+struct TypographyScaleTests {
+
+    @Test("Heading sizes follow the GitHub/Typora ratios")
+    func headingRatios() {
+        var typography = Typography()
+        typography.editorFontSize = 16
+
+        #expect(typography.headingSize(level: 1) == 36)     // 2.25em
+        #expect(typography.headingSize(level: 2) == 28)     // 1.75em
+        #expect(typography.headingSize(level: 3) == 24)     // 1.5em
+        #expect(typography.headingSize(level: 4) == 20)     // 1.25em
+        #expect(typography.headingSize(level: 6) == 16)     // 1em — a label, not emphasis
+    }
+
+    @Test("Headings never shrink below body text")
+    func headingsNeverSmallerThanBody() {
+        // The old modular scale made h6 *larger* than body text; the opposite
+        // mistake would be just as wrong.
+        var typography = Typography()
+        typography.editorFontSize = 16
+        for level in 1...6 {
+            #expect(typography.headingSize(level: level) >= typography.editorFontSize)
+        }
+    }
+
+    @Test("Heading sizes decrease monotonically")
+    func monotonic() {
+        let typography = Typography()
+        let sizes = (1...6).map { typography.headingSize(level: $0) }
+        #expect(sizes == sizes.sorted(by: >))
+    }
+
+    @Test("Out-of-range levels are clamped rather than crashing")
+    func clamping() {
+        let typography = Typography()
+        #expect(typography.headingSize(level: 0) == typography.headingSize(level: 1))
+        #expect(typography.headingSize(level: 99) == typography.headingSize(level: 6))
+    }
+}

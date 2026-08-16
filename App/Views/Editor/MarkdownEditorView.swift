@@ -261,6 +261,36 @@ final class InkstoneTextView: NSTextView {
         drawBullets(in: rect, storage: storage, layoutManager: layoutManager, container: container)
         drawQuoteRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
         drawCheckboxes(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+        drawHeadingRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+    }
+
+    /// Rules off h1 and h2, the way Typora's default theme does.
+    private func drawHeadingRules(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        guard let coordinator else { return }
+        let colour = MainActor.assumeIsolated { coordinator.style.palette.divider.platformColor }
+        let origin = textContainerOrigin
+        let width = container.size.width - container.lineFragmentPadding * 2
+
+        storage.enumerateAttribute(
+            .inkstoneHeadingRule,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard box.intersects(rect) else { return }
+
+            colour.setFill()
+            // Sits just under the text, not at the bottom of the paragraph's
+            // trailing space, which would leave it floating.
+            NSRect(x: origin.x, y: box.maxY - 1, width: width, height: 1).fill()
+        }
     }
 
     /// Paints rounded fills behind inline code and attachment chips.
@@ -446,8 +476,9 @@ final class InkstoneTextView: NSTextView {
 
             colour.setFill()
             for level in 0..<depth {
-                let x = origin.x + CGFloat(level) * MarkdownHighlighter.quoteIndent + 4
-                NSRect(x: x, y: lineRect.minY, width: 2, height: lineRect.height).fill()
+                // 4pt, matching Typora's `border-left: 4px`.
+                let x = origin.x + CGFloat(level) * MarkdownHighlighter.quoteIndent + 2
+                NSRect(x: x, y: lineRect.minY, width: 4, height: lineRect.height).fill()
             }
         }
     }

@@ -42,21 +42,28 @@ public struct Typography: Codable, Hashable, Sendable {
     // Editor + preview body text.
     public var editorFont: FontChoice = .system
     public var editorFontSize: Double = 16
-    /// Multiple of the font size. 1.7–1.8 reads best for mixed CJK/Latin.
-    public var lineHeightMultiple: Double = 1.75
-    public var paragraphSpacing: Double = 10
+    /// Multiple of the font size.
+    ///
+    /// 1.6 matches Typora's default theme. Earlier this was 1.75, which is a
+    /// reasonable figure for dense CJK but left Latin prose looking airy and
+    /// pushed everything below the fold.
+    public var lineHeightMultiple: Double = 1.6
+    /// Space after a paragraph. One line of body text, as Typora uses.
+    public var paragraphSpacing: Double = 16
     /// Maximum measure in points. Long lines are the enemy of reading comfort.
-    public var readableLineWidth: Double = 700
+    /// Typora's default theme caps its column at 860pt including 30pt of padding
+    /// each side, so ~800pt of text.
+    public var readableLineWidth: Double = 800
     public var isReadableLineWidthEnabled: Bool = true
     /// Extra tracking, in points. Slight positive tracking helps dense CJK text.
     public var letterSpacing: Double = 0
 
     // Code blocks and inline code, deliberately separate from body text.
     public var codeFont: FontChoice = .monospaced
-    public var codeFontSize: Double = 13.5
-    public var codeLineHeightMultiple: Double = 1.5
+    public var codeFontSize: Double = 14
+    public var codeLineHeightMultiple: Double = 1.45
 
-    // Headings scale off the body size using a modular scale.
+    // Headings scale off the body size.
     public var headingScale: Double = 1.22
     public var headingWeightBoost: Bool = true
 
@@ -71,10 +78,17 @@ public struct Typography: Codable, Hashable, Sendable {
 
     public init() {}
 
-    /// Point size for a heading of the given level, derived from the modular scale.
+    /// Multipliers of the body size, one per heading level.
+    ///
+    /// These are Typora's (and GitHub's) ratios rather than a modular scale. The
+    /// scale produced an h6 *larger* than body text, which is backwards — a
+    /// level-six heading should read as a label, not as emphasis.
+    static let headingRatios: [Double] = [2.25, 1.75, 1.5, 1.25, 1.125, 1.0]
+
+    /// Point size for a heading of the given level.
     public func headingSize(level: Int) -> Double {
-        let steps = Double(max(0, 7 - max(1, min(6, level))))
-        return editorFontSize * pow(headingScale, steps / 1.6)
+        let index = max(1, min(6, level)) - 1
+        return editorFontSize * Self.headingRatios[index]
     }
 
     /// Curated font families that render Chinese well, offered first in pickers.

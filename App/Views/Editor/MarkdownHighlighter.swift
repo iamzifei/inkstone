@@ -66,6 +66,8 @@ struct MarkdownHighlighter {
             )
         }
 
+        compressBlankLines(in: storage, text: text as NSString)
+
         if style.typography.cjkLatinSpacing {
             applyCJKLatinSpacing(to: storage, text: text as NSString)
         }
@@ -82,13 +84,34 @@ struct MarkdownHighlighter {
 
     // MARK: - Base
 
+    /// Builds a paragraph style whose line height is a multiple of the *font
+    /// size*, the way CSS `line-height` works.
+    ///
+    /// `NSParagraphStyle.lineHeightMultiple` multiplies the font's own default
+    /// line height, which already includes leading — for the 16pt system font
+    /// that is about 19pt, so a "1.6 multiple" rendered at 30.4pt, nearly twice
+    /// the font size. Typora's 1.6 means 25.6pt. Setting the minimum and maximum
+    /// explicitly is the only way to express the CSS meaning.
+    func paragraph(lineHeight multiple: Double, size: Double) -> NSMutableParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        let height = size * multiple
+        style.minimumLineHeight = height
+        style.maximumLineHeight = height
+        style.lineBreakStrategy = [.pushOut]
+        return style
+    }
+
     private func applyBaseAttributes(to storage: NSTextStorage, range: NSRange) {
         let typography = style.typography
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineHeightMultiple = typography.lineHeightMultiple
-        paragraph.paragraphSpacing = typography.paragraphSpacing
         // Break CJK text by character; there are no spaces to break on.
-        paragraph.lineBreakStrategy = [.pushOut]
+        // No paragraph spacing. In a plain-text editor every newline is its own
+        // paragraph, so spacing after each one would apply to soft line breaks
+        // *within* a Markdown paragraph too — doubling the leading everywhere.
+        // The blank line between paragraphs supplies the gap instead; see
+        // `compressBlankLines`, which sizes it to match Typora's 1rem.
+        let paragraph = paragraph(
+            lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
+        )
 
         storage.setAttributes([
             .font: typography.editorFont.platformFont(size: typography.editorFontSize),
@@ -137,6 +160,25 @@ struct MarkdownHighlighter {
             }
         }
 
+        /// Collapses whole lines: hides the text *and* removes the height the
+        /// line would otherwise still occupy.
+        ///
+        /// Concealing sets a 0.01pt font, which used to be enough because line
+        /// height followed the font. Now that paragraphs carry an explicit
+        /// `minimumLineHeight` (to get CSS line-height semantics), a hidden line
+        /// still reserves a full line — four lines of invisible frontmatter at
+        /// the top of every note, and a gap inside every table and code block.
+        func concealLines(_ range: NSRange) {
+            guard !isBeingEdited, mode != .source, range.length > 0 else { return }
+            conceal([range])
+            let collapsed = NSMutableParagraphStyle()
+            collapsed.minimumLineHeight = 0.01
+            collapsed.maximumLineHeight = 0.01
+            collapsed.paragraphSpacing = 0
+            collapsed.paragraphSpacingBefore = 0
+            storage.addAttribute(.paragraphStyle, value: collapsed, range: range)
+        }
+
         /// The delimiter ranges either side of a token's content.
         func delimiters(of token: SyntaxToken) -> [NSRange] {
             let leading = NSRange(
@@ -163,7 +205,7 @@ struct MarkdownHighlighter {
                 )
                 setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
             } else {
-                conceal([token.range])
+                concealLines(token.range)
             }
 
         case .heading(let level):
@@ -181,6 +223,24 @@ struct MarkdownHighlighter {
             } else {
                 conceal([hashRange])
             }
+
+            // Typora's default theme rules off h1 and h2, which is what gives a
+            // long document its sense of chapters. Drawn by the view: paragraph
+            // styles have no border of their own.
+            if level <= 2 {
+                storage.addAttribute(.inkstoneHeadingRule, value: level, range: token.range)
+            }
+
+            // Headings set their own metrics; the body line-height multiple is
+            // far too loose at 36pt and leaves a chasm above every title.
+            let headingParagraph = paragraph(
+                lineHeight: level <= 2 ? 1.25 : 1.35, size: size
+            )
+            headingParagraph.paragraphSpacingBefore = typography.paragraphSpacing * 1.5
+            headingParagraph.paragraphSpacing = typography.paragraphSpacing * (level <= 2 ? 0.75 : 0.5)
+            storage.addAttribute(
+                .paragraphStyle, value: headingParagraph, range: fullText.paragraphRange(for: token.range)
+            )
 
         case .bold:
             setFont(runFont(weight: .bold), range: token.contentRange)
@@ -216,10 +276,14 @@ struct MarkdownHighlighter {
             if !isBeingEdited { conceal(delimiters(of: token)) }
 
         case .codeBlock:
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = typography.codeLineHeightMultiple
+            let paragraph = paragraph(
+                lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
+            )
             paragraph.firstLineHeadIndent = 8
             paragraph.headIndent = 8
+            // Matches Typora's 15px margin around a fenced block.
+            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
             storage.addAttributes([
                 .font: typography.codeFont.platformFont(size: typography.codeFontSize),
                 .backgroundColor: palette.codeBackground.platformColor,
@@ -231,7 +295,7 @@ struct MarkdownHighlighter {
             // "this is code", so the backticks are pure noise once you stop
             // editing them.
             if !isBeingEdited {
-                conceal(fenceLines(of: token.range, in: fullText))
+                for line in fenceLines(of: token.range, in: fullText) { concealLines(line) }
             }
 
         case .mathInline, .mathBlock:
@@ -341,11 +405,15 @@ struct MarkdownHighlighter {
             // Monospaced, so the pipes in the source line up into columns. This
             // is what makes a Markdown table readable without a real table
             // layout, which TextKit cannot give us without rewriting the text.
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = typography.codeLineHeightMultiple
+            let paragraph = paragraph(
+                lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
+            )
             paragraph.firstLineHeadIndent = 8
             paragraph.headIndent = 8
             paragraph.lineBreakMode = .byClipping
+            // Typora sets `margin: 0.8em 0` on tables.
+            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
             storage.addAttributes([
                 .font: typography.codeFont.platformFont(size: typography.codeFontSize),
                 .backgroundColor: palette.codeBackground.platformColor,
@@ -367,21 +435,21 @@ struct MarkdownHighlighter {
                     .foregroundColor, value: palette.faintText.platformColor, range: token.range
                 )
             } else {
-                conceal([token.range])
+                concealLines(token.range)
             }
 
         case .task(let checked):
             // Indent the item the way a bullet list is indented, so tasks and
             // bullets in the same list line up.
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            let paragraph = paragraph(
+                lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
+            )
             // Both indents, not just `headIndent`: the marker is collapsed to
             // zero width, so without indenting the *first* line too the text
             // starts at the margin and the checkbox is painted on top of it.
             paragraph.firstLineHeadIndent = Self.listIndent
             paragraph.headIndent = Self.listIndent
             paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
-            paragraph.lineBreakStrategy = [.pushOut]
             storage.addAttribute(
                 .paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range)
             )
@@ -419,14 +487,14 @@ struct MarkdownHighlighter {
             // Hanging indent, so a wrapped list item lines up under its own text
             // instead of running back to the margin.
             let indent = Self.listIndent * CGFloat(level + 1)
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            let paragraph = paragraph(
+                lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
+            )
             paragraph.firstLineHeadIndent = indent - Self.listIndent
             paragraph.headIndent = indent
             // List items are one list, not a run of separate paragraphs; full
             // paragraph spacing between them makes a short list look shattered.
             paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
-            paragraph.lineBreakStrategy = [.pushOut]
             storage.addAttribute(.paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range))
 
             if ordered {
@@ -447,12 +515,15 @@ struct MarkdownHighlighter {
 
         case .blockquote(let depth):
             let indent = Self.quoteIndent * CGFloat(depth)
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.lineHeightMultiple = typography.lineHeightMultiple
+            let paragraph = paragraph(
+                lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
+            )
             paragraph.firstLineHeadIndent = indent
             paragraph.headIndent = indent
-            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.3
-            paragraph.lineBreakStrategy = [.pushOut]
+            // Typora gives a blockquote `margin: 1rem 0`. Halved here because a
+            // blank line in the source already contributes part of the gap.
+            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.5
+            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.5
 
             let line = fullText.paragraphRange(for: token.range)
             storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
@@ -564,6 +635,43 @@ struct MarkdownHighlighter {
         case "quote", "cite": return style.palette.secondaryText
         case "example": return ThemeColor("#8A6BC4")
         default: return style.palette.accent
+        }
+    }
+
+    /// Shrinks empty lines to the height of one paragraph gap.
+    ///
+    /// A blank line in the source is a real line in a text editor and takes a
+    /// full line height — with body leading that is a much bigger gap than the
+    /// 1rem Typora puts between paragraphs. Compressing it lands in the same
+    /// place visually while keeping the line editable and selectable.
+    private func compressBlankLines(in storage: NSTextStorage, text: NSString) {
+        guard mode != .source else { return }
+        let gap = style.typography.paragraphSpacing
+        guard gap > 0 else { return }
+
+        var location = 0
+        while location < text.length {
+            let line = text.lineRange(for: NSRange(location: location, length: 0))
+            defer { location = max(line.location + line.length, location + 1) }
+
+            // Content excluding the newline itself.
+            var contentLength = line.length
+            while contentLength > 0,
+                  let scalar = Unicode.Scalar(text.character(at: line.location + contentLength - 1)),
+                  CharacterSet.newlines.contains(scalar) {
+                contentLength -= 1
+            }
+            guard contentLength == 0, line.length > 0 else { continue }
+
+            // Never touch a blank line inside a fenced block or a table, where it
+            // is content rather than a separator.
+            let existing = storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil)
+            if let style = existing as? NSParagraphStyle, style.lineBreakMode == .byClipping { continue }
+
+            let blank = NSMutableParagraphStyle()
+            blank.minimumLineHeight = gap
+            blank.maximumLineHeight = gap
+            storage.addAttribute(.paragraphStyle, value: blank, range: line)
         }
     }
 
@@ -713,4 +821,6 @@ extension NSAttributedString.Key {
     static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
     /// A rounded fill hugging the text, drawn by the view. Value is a colour.
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
+    /// Marks an h1/h2 so a rule can be drawn beneath it. Value is the level.
+    static let inkstoneHeadingRule = NSAttributedString.Key("inkstoneHeadingRule")
 }
