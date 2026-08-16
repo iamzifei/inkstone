@@ -56,13 +56,22 @@ struct MarkdownHighlighter {
             if case .table = token.kind { return token.range }
             return nil
         }
+        // As an IndexSet, not an array. The "is this run inside a table?" check
+        // runs once per token, and scanning every table range each time made the
+        // pass quadratic — on a note with 200 tables that was the single largest
+        // cost in highlighting.
+        var tableIndices = IndexSet()
+        for range in tableRanges where range.length > 0 {
+            tableIndices.insert(integersIn: range.location..<(range.location + range.length))
+        }
+
         for token in tokens {
             apply(
                 token,
                 to: storage,
                 caretLineRange: caretLineRange,
                 fullText: text as NSString,
-                tableRanges: tableRanges
+                tableIndices: tableIndices
             )
         }
 
@@ -128,7 +137,7 @@ struct MarkdownHighlighter {
         to storage: NSTextStorage,
         caretLineRange: NSRange?,
         fullText: NSString,
-        tableRanges: [NSRange]
+        tableIndices: IndexSet
     ) {
         let typography = style.typography
         let palette = style.palette
@@ -136,7 +145,10 @@ struct MarkdownHighlighter {
         let isBeingEdited = mode == .source
             || (caretLineRange.map { NSIntersectionRange($0, token.range).length > 0 } ?? false)
 
-        let isInTable = tableRanges.contains { NSIntersectionRange($0, token.range).length > 0 }
+        let isInTable = token.range.length > 0
+            && tableIndices.intersects(
+                integersIn: token.range.location..<(token.range.location + token.range.length)
+            )
 
         /// The face an inline run should use, so runs inside a table keep the
         /// monospaced metrics the surrounding cells were laid out with.
@@ -597,6 +609,10 @@ struct MarkdownHighlighter {
 
     /// Breathing room above and below an inline image.
     static let inlineImagePadding: CGFloat = 8
+
+    /// Cached text measurements for table cells, keyed by the cell's text.
+    /// Bounded so a pathological document cannot grow it without limit.
+    private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
     /// Indent applied per list nesting level.
     static let listIndent: CGFloat = 22
     /// Indent applied per level of `>` quoting.
@@ -698,10 +714,17 @@ struct MarkdownHighlighter {
         /// is wrong in practice: a monospaced Latin font has no CJK glyphs, so
         /// those fall back to a different family whose advance is not exactly
         /// double. Measuring sidesteps the whole question.
+        ///
+        /// Text measurement lays out glyphs and is by far the most expensive part
+        /// of highlighting a document full of tables — it accounted for more than
+        /// half the time on a 56KB note. Results are cached per (string, font):
+        /// table cells repeat heavily, so the hit rate is high.
         func width(of range: NSRange) -> CGFloat {
-            (text.substring(with: range) as NSString)
-                .size(withAttributes: [.font: font])
-                .width
+            let key = text.substring(with: range)
+            if let cached = Self.cellWidthCache[key] { return cached }
+            let measured = (key as NSString).size(withAttributes: [.font: font]).width
+            if Self.cellWidthCache.count < 4096 { Self.cellWidthCache[key] = measured }
+            return measured
         }
 
         // Cells per row, as ranges between the pipes. Delimiter rows are skipped:
@@ -742,15 +765,17 @@ struct MarkdownHighlighter {
 
         let columnCount = rows.map(\.count).max() ?? 0
         var widths = [CGFloat](repeating: 0, count: columnCount)
-        for row in rows {
-            for (column, cell) in row.enumerated() {
-                widths[column] = max(widths[column], width(of: cell))
+        // Measure once and keep it; the second pass used to re-measure every cell.
+        var measured: [[CGFloat]] = rows.map { row in row.map { width(of: $0) } }
+        for (rowIndex, row) in rows.enumerated() {
+            for column in row.indices {
+                widths[column] = max(widths[column], measured[rowIndex][column])
             }
         }
 
-        for row in rows {
+        for (rowIndex, row) in rows.enumerated() {
             for (column, cell) in row.enumerated() {
-                let deficit = widths[column] - width(of: cell)
+                let deficit = widths[column] - measured[rowIndex][column]
                 // Sub-point deficits are invisible and only add attribute churn.
                 guard deficit > 0.5, cell.length > 0 else { continue }
                 // Kerning applies *after* the glyph, so it goes on the final

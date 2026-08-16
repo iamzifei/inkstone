@@ -5,6 +5,51 @@ import InkstoneCore
 struct InkstoneApp: App {
     @State private var workspace = Workspace()
 
+    init() {
+        #if DEBUG
+        Self.runHighlightBenchmarkIfRequested()
+        #endif
+    }
+
+    #if DEBUG
+    /// Measures the full highlight pass on a file, with no window involved.
+    ///
+    ///     INKSTONE_BENCH=/path/to/note.md .../Inkstone.app/Contents/MacOS/Inkstone
+    ///
+    /// Runs from `init` and exits, so it works when the display is asleep or a
+    /// full-screen Space is in the way — GUI automation is not a reliable way to
+    /// measure this, and the highlighter needs AppKit so it cannot live in the
+    /// package's own test suite.
+    @MainActor
+    private static func runHighlightBenchmarkIfRequested() {
+        guard let path = ProcessInfo.processInfo.environment["INKSTONE_BENCH"],
+              let text = try? String(contentsOfFile: path, encoding: .utf8)
+        else { return }
+
+        let storage = NSTextStorage(string: text)
+        var highlighter = MarkdownHighlighter(style: .fallback, mode: .livePreview)
+        highlighter.availableWidth = 800
+
+        highlighter.highlight(storage, caretLineRange: nil)  // warm up
+
+        var samples: [Double] = []
+        for _ in 0..<5 {
+            let started = DispatchTime.now().uptimeNanoseconds
+            // A caret range is the realistic case: that is what every keystroke does.
+            highlighter.highlight(storage, caretLineRange: NSRange(location: 0, length: 1))
+            samples.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
+        }
+        samples.sort()
+
+        let summary = String(
+            format: "highlight %d chars (%.0f KB): median %.1f ms  (min %.1f, max %.1f)\n",
+            storage.length, Double(text.utf8.count) / 1024, samples[2], samples[0], samples[4]
+        )
+        FileHandle.standardOutput.write(Data(summary.utf8))
+        exit(0)
+    }
+    #endif
+
     var body: some Scene {
         WindowGroup {
             StyledRoot { RootView() }

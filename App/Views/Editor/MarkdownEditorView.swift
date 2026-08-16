@@ -653,6 +653,23 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         func rehighlight() {
             guard let textView, let storage = textView.textStorage else { return }
+            #if DEBUG
+            let started = DispatchTime.now().uptimeNanoseconds
+            defer {
+                let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+                if ms > 8 {
+                    FileHandle.standardError.write(Data(
+                        "[inkstone] highlight \(storage.length) chars in \(String(format: "%.1f", ms)) ms\n".utf8
+                    ))
+                    let url = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                        ?? URL(fileURLWithPath: NSTemporaryDirectory())).appending(path: "inkstone-debug.log")
+                    let line = "[perf] highlight \(storage.length) chars \(String(format: "%.1f", ms)) ms\n"
+                    if let handle = try? FileHandle(forWritingTo: url) {
+                        handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
+                    } else { try? Data(line.utf8).write(to: url) }
+                }
+            }
+            #endif
             isApplyingAttributes = true
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange())
