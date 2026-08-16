@@ -243,17 +243,31 @@ class EditorCoordinator: NSObject {
 /// disagreeing with each other.
 enum CaretMetrics {
 
-    static func height(in storage: NSTextStorage, at location: Int) -> CGFloat? {
+    /// The height, and how far its top sits above the text's baseline.
+    ///
+    /// Both are needed together: the extra space an explicit line height buys is
+    /// added almost entirely *above* the glyphs — measured at 7.1pt above and
+    /// none below on body text — so anything centred on the line fragment lands
+    /// too high. The baseline is the only stable anchor.
+    static func metrics(in storage: NSTextStorage, at location: Int) -> (height: CGFloat, aboveBaseline: CGFloat)? {
         guard storage.length > 0 else { return nil }
         let location = min(max(0, location), storage.length - 1)
 
         guard let style = storage.attribute(.paragraphStyle, at: location, effectiveRange: nil)
             as? NSParagraphStyle, style.maximumLineHeight > 0 else { return nil }
-
         guard let font = visibleFont(in: storage, at: location) else { return nil }
+
         let glyphs = font.ascender - font.descender
-        guard style.maximumLineHeight > glyphs else { return glyphs }
-        return glyphs + (style.maximumLineHeight - glyphs) * 0.5
+        let height = style.maximumLineHeight > glyphs
+            ? glyphs + (style.maximumLineHeight - glyphs) * 0.5
+            : glyphs
+        // Centre it on the glyphs: the same margin above the ascender as below
+        // the descender.
+        return (height, font.ascender + (height - glyphs) / 2)
+    }
+
+    static func height(in storage: NSTextStorage, at location: Int) -> CGFloat? {
+        metrics(in: storage, at: location)?.height
     }
 
     /// The font of the first character on the line that is actually drawn.
@@ -271,7 +285,23 @@ enum CaretMetrics {
             }
             probe += 1
         }
-        return storage.attribute(.font, at: location, effectiveRange: nil) as? NSFont
+
+        // An empty task line — "- [ ] " and nothing else — has no visible
+        // character at all, and its collapsed marker would measure 0.01pt and
+        // paint a speck. Borrow the nearest real font in the document instead.
+        var back = line.location - 1
+        var forward = NSMaxRange(line)
+        while back >= 0 || forward < storage.length {
+            if back >= 0,
+               let font = storage.attribute(.font, at: back, effectiveRange: nil) as? NSFont,
+               font.pointSize >= 1 { return font }
+            if forward < storage.length,
+               let font = storage.attribute(.font, at: forward, effectiveRange: nil) as? NSFont,
+               font.pointSize >= 1 { return font }
+            back -= 1
+            forward += 1
+        }
+        return nil
     }
 }
 
@@ -284,9 +314,7 @@ final class InkstoneLayoutManager: NSLayoutManager {
         forCharacterRange charRange: NSRange,
         color: NSColor
     ) {
-        guard let storage = textStorage,
-              let height = CaretMetrics.height(in: storage, at: charRange.location)
-        else {
+        guard let storage = textStorage, let container = textContainers.first else {
             super.fillBackgroundRectArray(rectArray, count: count, forCharacterRange: charRange, color: color)
             return
         }
@@ -295,11 +323,20 @@ final class InkstoneLayoutManager: NSLayoutManager {
         rects.reserveCapacity(count)
         for index in 0..<count {
             var rect = rectArray[index]
-            if rect.height > height {
-                // Centred on the line box, so consecutive selected lines stay
-                // evenly spaced instead of drifting toward one edge.
-                rect.origin.y += (rect.height - height) / 2
-                rect.size.height = height
+
+            // Each rect is one line of the selection, so it is measured against
+            // that line rather than against the range's first character — a
+            // selection spanning a heading and body text has a different answer
+            // per line.
+            let glyph = glyphIndex(for: CGPoint(x: rect.midX, y: rect.midY), in: container)
+            let character = characterIndexForGlyph(at: glyph)
+            let fragment = lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            let baseline = fragment.minY + location(forGlyphAt: glyph).y
+
+            if let metrics = CaretMetrics.metrics(in: storage, at: character),
+               metrics.height < rect.height {
+                rect.origin.y = baseline - metrics.aboveBaseline
+                rect.size.height = metrics.height
             }
             rects.append(rect)
         }
@@ -341,13 +378,20 @@ final class InkstoneTextView: NSTextView {
     /// enough to misrepresent where text will be inserted.
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         var rect = rect
-        if let storage = textStorage,
-           let height = CaretMetrics.height(in: storage, at: selectedRange().location),
-           height > rect.height {
-            // Centred on the glyphs, so the extra is shared between ascender and
-            // descender rather than hanging below the baseline.
-            rect.origin.y -= (height - rect.height) / 2
-            rect.size.height = height
+        // Positioned from the baseline, by the same metric the selection uses.
+        // Adjusting the rect AppKit supplies would mean trusting what its height
+        // means, and the two would drift apart the moment that changed.
+        if let storage = textStorage, let layoutManager,
+           storage.length > 0,
+           let metrics = CaretMetrics.metrics(in: storage, at: selectedRange().location) {
+            let location = min(selectedRange().location, storage.length - 1)
+            let glyph = layoutManager.glyphIndexForCharacter(at: location)
+            if glyph < layoutManager.numberOfGlyphs {
+                let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+                let baseline = fragment.minY + layoutManager.location(forGlyphAt: glyph).y
+                rect.origin.y = baseline - metrics.aboveBaseline + textContainerOrigin.y
+                rect.size.height = metrics.height
+            }
         }
         rect.origin.x += Self.caretInset
         super.drawInsertionPoint(in: rect, color: color, turnedOn: flag)

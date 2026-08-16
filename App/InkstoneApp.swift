@@ -173,14 +173,22 @@ struct InkstoneApp: App {
                 let paragraph = storage.attribute(.paragraphStyle, at: probe, effectiveRange: nil)
                     as? NSParagraphStyle
                 let natural = (font?.ascender ?? 0) - (font?.descender ?? 0)
-                let lineHeight = paragraph?.maximumLineHeight ?? 0
-                // Straight from the shared metric, so this reports what the caret
-                // and the selection actually use rather than a parallel formula.
-                let shared = CaretMetrics.height(in: storage, at: probe) ?? -1
+                // Where the glyphs actually sit inside the fragment. Centring the
+                // highlight on the fragment assumes the text is centred in it;
+                // that assumption is what this measures.
+                let used = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+                let baseline = fragment.minY + layoutManager.location(forGlyphAt: glyph).y
+                let ascender = font?.ascender ?? 0
+                let textTop = baseline - ascender
+                let m = CaretMetrics.metrics(in: storage, at: probe)
+                let top = baseline - (m?.aboveBaseline ?? 0)
                 report += String(
-                    format: "  fragment=%5.1f  lineHeight=%5.1f  text=%5.1f  caret&selection=%5.1f   %@\n",
-                    fragment.height, lineHeight, natural, shared, text.prefix(20) as CVarArg
+                    format: "  textTop=%6.1f..%6.1f (h%5.1f)   caret&sel=%6.1f..%6.1f (h%5.1f)   %@\n",
+                    textTop, baseline - (font?.descender ?? 0), (font?.ascender ?? 0) - (font?.descender ?? 0),
+                    top, top + (m?.height ?? 0), m?.height ?? -1,
+                    text.prefix(18) as CVarArg
                 )
+                _ = used
             }
             FileHandle.standardOutput.write(Data((report + "\n").utf8))
         }
