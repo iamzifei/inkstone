@@ -416,3 +416,53 @@ the token may do. Reading it as token permission is the obvious mistake here.
 
 Pull is verified end to end; **upload and delete remain unverified** and need a
 token with Contents: read *and* write.
+
+
+## GitHub sync verified end to end — 2026-08-16
+
+Against a throwaway private repository (`iamzifei/inkstone-sync-test`) with a
+write-scoped token. Upload, read back and delete all pass, alongside the pull
+path. 17 integration tests; the repository is left clean.
+
+The round trip immediately found two faults that a read-only token could never
+reach. Both were in code that already had passing unit tests.
+
+### Stale file listings could delete notes
+
+GitHub answers `cache-control: private, max-age=60`, and `URLRequest`'s default
+policy honours it. Syncing twice inside a minute therefore got a **cached** file
+list. The second run sees the file it just uploaded missing from the remote
+while the recorded state says it was there — and that is precisely the shape of
+a remote deletion, so three-way comparison deletes the local note.
+
+Requests now use `.reloadIgnoringLocalAndRemoteCacheData`. A minute-old listing
+is worthless when the entire purpose of the request is to learn what changed.
+
+### A repository with no commits answers 409, not 404
+
+The trees API returns 409 "Git Repository is empty", which the error mapping
+read as a mid-sync conflict — so the first sync into a newly created repository
+failed outright. That is the normal way someone starts using sync.
+
+There *was* a test named "An empty repository lists no files rather than
+failing". It mocked a 404. The name was right and the fixture was wrong, which
+is worse than having no test, because it reads as coverage.
+
+Also worth recording: the trees API returns **404 for an empty tree** (a
+repository whose files have all been deleted), while a repository with content
+returns 200. Both empty cases now map to an empty list.
+
+### Test interference the cache had been hiding
+
+The pull and integration suites ran concurrently against one repository, so the
+round trip's uploads appeared here as phantom changes. This only became visible
+once the cache was disabled. The pull suite is now nested inside the integration
+suite so `.serialized` covers both.
+
+## Checkbox and bullet alignment — 2026-08-16
+
+Both were positioned using the x-height of the font at the *marker's* location.
+The marker is collapsed to 0.01pt to hide it, so that x-height is 0.01 where the
+text's is 8.42 — the box sat about four points below its own words. Both now
+measure the first character after the marker. Same rule for both, which is what
+keeps a mixed list on one axis.
