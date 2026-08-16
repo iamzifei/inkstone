@@ -189,8 +189,13 @@ struct MarkdownHighlighter {
             storage.addAttribute(.font, value: font, range: range)
         }
 
-        func conceal(_ ranges: [NSRange]) {
-            guard !isBeingEdited, mode != .source else { return }
+        /// Hides text regardless of where the caret is.
+        ///
+        /// Only for markers that are replaced by something interactive, where
+        /// revealing the source would take the control away from under the
+        /// pointer. Everything else should use `conceal`.
+        func hide(_ ranges: [NSRange]) {
+            guard mode != .source else { return }
             let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
             for range in ranges where range.length > 0 {
                 storage.addAttribute(.font, value: tiny, range: range)
@@ -200,6 +205,11 @@ struct MarkdownHighlighter {
                 // single red dot floating under the rendered content.
                 storage.addAttribute(.spellingState, value: 0, range: range)
             }
+        }
+
+        func conceal(_ ranges: [NSRange]) {
+            guard !isBeingEdited else { return }
+            hide(ranges)
         }
 
         /// Collapses whole lines: hides the text *and* removes the height the
@@ -619,17 +629,16 @@ struct MarkdownHighlighter {
                 .paragraphStyle, value: paragraph, range: fullText.paragraphRange(for: token.range)
             )
 
-            if isBeingEdited {
-                storage.addAttribute(
-                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
-                )
-            } else {
-                // Collapse the whole `- [x] ` marker and let the text view draw a
-                // real checkbox where it was. Showing the raw brackets was the
-                // one place a rendered list still looked like source.
-                conceal([token.range])
-                storage.addAttribute(.inkstoneCheckbox, value: checked, range: token.range)
-            }
+            // Collapse the whole `- [x] ` marker and let the text view draw a
+            // real checkbox where it was.
+            //
+            // Deliberately not gated on `isBeingEdited`, unlike every other
+            // marker. Revealing the source on the caret's line is right for
+            // syntax you might want to edit, but a checkbox is a control: hiding
+            // it the moment the caret lands on its line means you have to move
+            // the caret away before you can tick the box you are looking at.
+            hide([token.range])
+            storage.addAttribute(.inkstoneCheckbox, value: checked, range: token.range)
 
             if checked {
                 // Strike through the task text, not the marker.

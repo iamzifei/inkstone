@@ -335,3 +335,42 @@ Verified end to end:
     `INKSTONE_ICLOUD_CHECK=1 …/Inkstone` prints AVAILABLE.
   - **Ordinary builds still work with no extra flags**, both the sandboxed and
     the unsandboxed dev variant, so day-to-day iteration is unchanged.
+
+
+## iCloud sync, actually working — 2026-08-16
+
+The container being reachable was only half of it. iCloud Drive evicts files it
+considers unused, leaving a hidden placeholder `.Note.md.icloud` in place of the
+note. The scanner used `.skipsHiddenFiles`, so an evicted note disappeared from
+the sidebar entirely — indistinguishable, to a user, from sync having lost it.
+
+Fixed in three places, in `ICloudFiles` plus its two call sites:
+
+  - The scanner filters hidden entries itself and lists a placeholder under the
+    name the file will have once downloaded, so the note stays visible.
+  - Opening a vault requests every evicted file back, off the main thread.
+  - Opening an evicted note waits up to 2s for its bytes. Without this it opens
+    blank and the empty buffer overwrites the real note on the next save — a
+    display bug becoming data loss.
+
+Both syncs now have a switch. iCloud defaults on and governs only keeping files
+present; the app cannot opt out of iCloud moving the folder, and the UI says so
+rather than implying more control than exists. GitHub defaults off.
+
+## Signed distribution — 2026-08-16
+
+`Tools/package-dmg.sh [--install]` produces a notarised DMG; `spctl` returns
+"accepted, source=Notarized Developer ID". Two traps, both recorded in the
+script:
+
+  - Automatic signing cannot mint a **Developer ID** profile with this API key
+    ("Cloud signing permission error"), though it mints Development profiles
+    fine. The profile was created once via `POST /v1/profiles` with
+    `profileType: MAC_APP_DIRECT`. The certificate type is
+    `DEVELOPER_ID_APPLICATION_G2` — filtering for `DEVELOPER_ID_APPLICATION`
+    returns an empty list, which reads as "no certificate" and is not.
+  - Notarise and staple the **app** before building the DMG, then notarise and
+    staple the DMG. Stapling only the DMG leaves a dragged-out copy ticketless,
+    so it must reach Apple to validate and fails offline.
+
+Verified: Release build launches, does not crash, and quits cleanly.

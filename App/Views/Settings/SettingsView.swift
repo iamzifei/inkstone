@@ -304,6 +304,7 @@ private struct SyncSettings: View {
             Section {
                 @Bindable var settings = workspace.settings
                 Toggle("Sync this vault with GitHub", isOn: $settings.data.gitHubSyncEnabled)
+                    .onChange(of: settings.data.gitHubSyncEnabled) { workspace.restartAutoSync() }
 
                 let off = !settings.data.gitHubSyncEnabled
                 TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
@@ -316,6 +317,24 @@ private struct SyncSettings: View {
                 ))
                 .onSubmit(saveToken)
                 .disabled(off)
+
+                Toggle("Sync automatically", isOn: $settings.data.gitHubAutoSync)
+                    .disabled(off)
+                    .onChange(of: settings.data.gitHubAutoSync) { workspace.restartAutoSync() }
+
+                if settings.data.gitHubAutoSync {
+                    Picker("Every", selection: $settings.data.gitHubSyncIntervalMinutes) {
+                        Text("Only when opening a vault").tag(0)
+                        Text("5 minutes").tag(5)
+                        Text("15 minutes").tag(15)
+                        Text("30 minutes").tag(30)
+                        Text("Hour").tag(60)
+                    }
+                    .disabled(off)
+                    .onChange(of: settings.data.gitHubSyncIntervalMinutes) {
+                        workspace.restartAutoSync()
+                    }
+                }
 
                 HStack {
                     Button("Save token", action: saveToken)

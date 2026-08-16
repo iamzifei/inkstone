@@ -111,6 +111,11 @@ final class Workspace {
             refreshTree()
             reindex()
             startWatching(url)
+
+            if settings.data.gitHubAutoSync {
+                Task { await syncIfEnabled() }
+            }
+            restartAutoSync()
         } catch {
             self.vault = nil
             root = nil
@@ -118,8 +123,36 @@ final class Workspace {
         }
     }
 
+    /// Syncs only if it is configured and switched on, and stays quiet
+    /// otherwise. Used by the automatic paths, which must not surface a "not
+    /// configured" error to someone who never asked for GitHub sync.
+    func syncIfEnabled() async {
+        guard canSync else { return }
+        await sync()
+    }
+
+    /// Restarts the periodic sync to match the current settings.
+    func restartAutoSync() {
+        autoSyncTask?.cancel()
+        autoSyncTask = nil
+
+        guard settings.data.gitHubSyncEnabled, settings.data.gitHubAutoSync else { return }
+        let minutes = settings.data.gitHubSyncIntervalMinutes
+        guard minutes > 0 else { return }
+
+        autoSyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Double(minutes) * 60))
+                guard !Task.isCancelled else { return }
+                await self?.syncIfEnabled()
+            }
+        }
+    }
+
     func closeCurrentVault() {
         saveAll()
+        autoSyncTask?.cancel()
+        autoSyncTask = nil
         watcher?.stop()
         watcher = nil
         if let vault { registry.endAccess(to: vault) }
@@ -173,13 +206,29 @@ final class Workspace {
     }
 
     private(set) var syncStatus: SyncStatus = .idle
+
+    /// The repeating background sync, cancelled when the vault closes or the
+    /// interval changes.
+    @ObservationIgnored private var autoSyncTask: Task<Void, Never>?
     var isSyncing: Bool { if case .running = syncStatus { return true }; return false }
+
+    /// Whether a sync could run right now — enabled, configured, and idle.
+    var canSync: Bool {
+        settings.data.gitHubSyncEnabled
+            && !settings.data.gitHubRepository.isEmpty
+            && SyncCredentials.hasToken
+            && root != nil
+            && !isSyncing
+    }
 
     /// Pushes and pulls the vault against the configured GitHub repository.
     ///
-    /// Deliberately manual rather than on a timer: an automatic background sync
-    /// that hits a conflict while the user is mid-sentence is a good way to lose
-    /// their trust, and the conflict handling wants someone present to see it.
+    /// This used to be manual only, on the reasoning that a background sync
+    /// hitting a conflict mid-sentence would cost the user's trust. That worry
+    /// does not survive contact with how conflicts are actually handled: the
+    /// remote copy is saved *alongside* the local one and nothing is
+    /// overwritten, so the cost of a badly timed sync is an extra file, not lost
+    /// work. Requiring someone to remember to press a button is the larger risk.
     func sync() async {
         guard let root else { return }
         guard !settings.data.gitHubRepository.isEmpty, let token = SyncCredentials.token() else {

@@ -40,6 +40,26 @@ struct RootView: View {
         }
     }
 
+    private var syncSymbol: String {
+        switch workspace.syncStatus {
+        case .running: "arrow.trianglehead.2.clockwise"
+        case .failed: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
+        default: "arrow.trianglehead.2.clockwise"
+        }
+    }
+
+    private var syncHelp: String {
+        switch workspace.syncStatus {
+        case .idle: String(localized: "Sync with GitHub")
+        case .running(let message): message
+        case .failed(let message): message
+        case .finished(let report):
+            report.changeCount == 0
+                ? String(localized: "Up to date")
+                : String(localized: "\(report.changeCount) change(s) synced")
+        }
+    }
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
@@ -83,6 +103,19 @@ struct RootView: View {
                 Button("Today's Daily Note", systemImage: "sun.max") { workspace.openDailyNote() }
             } label: {
                 Label("New", systemImage: "plus")
+            }
+
+            // Only present once GitHub sync is switched on: a sync button that
+            // can never do anything is worse than no button.
+            if workspace.settings.data.gitHubSyncEnabled {
+                Button {
+                    Task { await workspace.sync() }
+                } label: {
+                    Label("Sync with GitHub", systemImage: syncSymbol)
+                        .symbolEffect(.rotate, isActive: workspace.isSyncing)
+                }
+                .disabled(!workspace.canSync)
+                .help(syncHelp)
             }
 
             Button {

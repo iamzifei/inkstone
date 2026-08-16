@@ -96,6 +96,11 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// for.
     public var gitHubSyncEnabled = false
 
+    /// Sync with GitHub on its own, rather than only when asked.
+    public var gitHubAutoSync = true
+    /// How often to sync while the app is open. 0 syncs only when a vault opens.
+    public var gitHubSyncIntervalMinutes = 15
+
     /// Which file types take part in sync.
     public var syncPolicy = SyncFilePolicy()
     /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
@@ -160,6 +165,8 @@ public struct SettingsData: Codable, Hashable, Sendable {
         defaultNewNoteFolder = value(.defaultNewNoteFolder, defaults.defaultNewNoteFolder)
         iCloudSyncEnabled = value(.iCloudSyncEnabled, defaults.iCloudSyncEnabled)
         gitHubSyncEnabled = value(.gitHubSyncEnabled, defaults.gitHubSyncEnabled)
+        gitHubAutoSync = value(.gitHubAutoSync, defaults.gitHubAutoSync)
+        gitHubSyncIntervalMinutes = value(.gitHubSyncIntervalMinutes, defaults.gitHubSyncIntervalMinutes)
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
         gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
         gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)

@@ -139,6 +139,41 @@ struct InkstoneApp: App {
             FileHandle.standardOutput.write(Data(report.utf8))
         }
 
+        // Checkbox dump: whether a task line is collapsed to a drawn checkbox,
+        // and whether that depends on the caret. Reported for both caret states
+        // because "shows [ ] instead of a checkbox" is exactly what the
+        // caret-on-this-line branch is supposed to do.
+        if ProcessInfo.processInfo.environment["INKSTONE_CHECKBOX_DUMP"] != nil {
+            let ns = storage.string as NSString
+            var report = ""
+            let taskLine = ns.range(of: "- [ ]")
+            for (label, caret) in [("no caret", nil as NSRange?),
+                                   ("caret on line 1", NSRange(location: 0, length: 1)),
+                                   ("caret ON the task line", taskLine)] {
+                highlighter.highlight(storage, caretLineRange: caret)
+                report += "\n  \(label):\n"
+                var location = 0
+                while location < ns.length {
+                    let line = ns.lineRange(for: NSRange(location: location, length: 0))
+                    defer { location = max(line.location + line.length, location + 1) }
+                    let text = ns.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard text.contains("[") || text.hasPrefix("-") else { continue }
+                    var checkbox = "none"
+                    var concealed = false
+                    storage.enumerateAttributes(in: line) { attributes, _, _ in
+                        if let checked = attributes[.inkstoneCheckbox] as? Bool {
+                            checkbox = checked ? "checked" : "unchecked"
+                        }
+                        if let font = attributes[.font] as? PlatformFont, font.pointSize < 1 {
+                            concealed = true
+                        }
+                    }
+                    report += "    checkbox=\(checkbox) markerHidden=\(concealed)  \(text.prefix(28))\n"
+                }
+            }
+            FileHandle.standardOutput.write(Data((report + "\n").utf8))
+        }
+
         let samples = measure(nil)
         var summary = String(
             format: "highlight %d chars (%.0f KB): median %.1f ms  (min %.1f, max %.1f)\n",
@@ -344,6 +379,12 @@ struct InkstoneApp: App {
                 .keyboardShortcut("o")
             Button("Save") { workspace.saveAll() }
                 .keyboardShortcut("s")
+            Divider()
+            Button(workspace.isSyncing ? "Syncing…" : "Sync with GitHub") {
+                Task { await workspace.sync() }
+            }
+            .keyboardShortcut("y", modifiers: [.command, .shift])
+            .disabled(!workspace.canSync)
         }
 
         // Merged into the system View menu rather than declared as
