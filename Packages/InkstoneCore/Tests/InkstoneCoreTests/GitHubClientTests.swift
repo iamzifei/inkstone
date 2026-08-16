@@ -82,12 +82,36 @@ struct GitHubClientTests {
         #expect(url.contains("recursive=1"))
     }
 
+    @Test("A repository with no commits lists no files rather than failing")
+    func repositoryWithNoCommitsIsEmpty() async throws {
+        // Distinct from the 404 case above. A repository created with no initial
+        // commit answers 409 "Git Repository is empty" — which the error mapping
+        // otherwise reads as a mid-sync conflict, so a first sync into a brand
+        // new repository failed outright. Found against the real API.
+        let client = makeClient { _ in
+            (self.response(409), Data(#"{"message":"Git Repository is empty."}"#.utf8))
+        }
+        #expect(try await client.listFiles().isEmpty)
+    }
+
     @Test("An empty repository lists no files rather than failing")
     func emptyRepository() async throws {
         // A repo with no commits has no tree. That is a valid starting point for
         // a first sync, not an error to show the user.
         let client = makeClient { _ in (self.response(404), Data("{}".utf8)) }
         #expect(try await client.listFiles().isEmpty)
+    }
+
+    @Test("Requests bypass the URL cache")
+    func requestsBypassCache() async throws {
+        // GitHub sends `cache-control: private, max-age=60`. Honouring it means a
+        // second sync within a minute sees a stale file list, misreads the file
+        // it just uploaded as deleted on the remote, and deletes the local copy.
+        // Found by running a real upload/list round trip.
+        let client = makeClient { _ in (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8)) }
+        _ = try await client.verify()
+
+        #expect(StubProtocol.lastRequest?.cachePolicy == .reloadIgnoringLocalAndRemoteCacheData)
     }
 
     @Test("Requests carry the token and API version")

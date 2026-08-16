@@ -96,87 +96,93 @@ struct GitHubIntegrationTests {
         let after = try await client.listFiles()
         #expect(!after.contains { $0.path == path })
     }
-}
 
-/// Pulls a whole repository into an empty vault against the live API.
-///
-/// Separate from the round-trip test because downloading needs only Contents:
-/// **read**. That covers half of sync — listing, diffing, fetching, writing to
-/// disk and recording state — without any write access to the repository.
-///
-///     INKSTONE_GITHUB_TOKEN=<pat> INKSTONE_TEST_REPO=owner/repo \
-///     INKSTONE_TEST_PULL=1 swift test --filter GitHubPullTests
-@Suite("GitHub pull", .serialized)
-struct GitHubPullTests {
-
-    private static var enabled: Bool {
-        ProcessInfo.processInfo.environment["INKSTONE_TEST_PULL"] == "1"
-            && ProcessInfo.processInfo.environment["INKSTONE_GITHUB_TOKEN"] != nil
-            && ProcessInfo.processInfo.environment["INKSTONE_TEST_REPO"] != nil
-    }
-
-    @Test("An empty vault pulls the repository down", .enabled(if: enabled))
-    func pullIntoEmptyVault() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        let client = GitHubClient(
-            configuration: .init(repository: environment["INKSTONE_TEST_REPO"]!, branch: "main"),
-            token: environment["INKSTONE_GITHUB_TOKEN"]!
-        )
-
-        let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appending(path: "inkstone-pull-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        // Only notes, so a code repository does not drag its binaries down.
-        var policy = SyncFilePolicy()
-        for kind in AttachmentKind.allCases { policy.setSyncs(kind, false) }
-
-        let engine = SyncEngine(client: client, vaultRoot: root, policy: policy)
-        let report = try await engine.run()
-
-        #expect(!report.downloaded.isEmpty, "an empty vault should receive files")
-        #expect(report.uploaded.isEmpty, "nothing to upload from an empty vault")
-        #expect(report.conflicted.isEmpty)
-        #expect(report.failures.isEmpty, "failures: \(report.failures.map(\.message))")
-
-        // Every downloaded file must actually be on disk, with the content whose
-        // hash the remote reported — that equivalence is what sync rests on.
-        let remote = Dictionary(uniqueKeysWithValues: try await client.listFiles().map { ($0.path, $0.sha) })
-        for path in report.downloaded.prefix(20) {
-            let url = root.appending(path: path)
-            let data = try #require(try? Data(contentsOf: url), "missing on disk: \(path)")
-            #expect(gitBlobSHA(data) == remote[path], "content mismatch for \(path)")
+    /// Pulls a whole repository into an empty vault against the live API.
+    ///
+    /// Nested inside `GitHub integration` so that `.serialized` covers both: as
+    /// separate top-level suites they ran concurrently against the same repository,
+    /// and the round-trip test's uploads and deletes showed up as unexpected changes
+    /// here. That only surfaced once the URL cache was disabled — a stale listing
+    /// had been hiding the interference.
+    ///
+    /// Separate from the round-trip test because downloading needs only Contents:
+    /// **read**. That covers half of sync — listing, diffing, fetching, writing to
+    /// disk and recording state — without any write access to the repository.
+    ///
+    ///     INKSTONE_GITHUB_TOKEN=<pat> INKSTONE_TEST_REPO=owner/repo \
+    ///     INKSTONE_TEST_PULL=1 swift test --filter GitHubPullTests
+    @Suite("GitHub pull", .serialized)
+    struct GitHubPullTests {
+    
+        private static var enabled: Bool {
+            ProcessInfo.processInfo.environment["INKSTONE_TEST_PULL"] == "1"
+                && ProcessInfo.processInfo.environment["INKSTONE_GITHUB_TOKEN"] != nil
+                && ProcessInfo.processInfo.environment["INKSTONE_TEST_REPO"] != nil
         }
-
-        // And the run must have recorded a base state for the next comparison.
-        let state = SyncState.load(from: root)
-        #expect(state.blobs.count == report.downloaded.count)
-        #expect(state.lastSyncedAt != nil)
-    }
-
-    @Test("A second run finds nothing to do", .enabled(if: enabled))
-    func secondRunIsQuiet() async throws {
-        // The point of recording state: syncing twice must not re-download
-        // everything, or every sync would rewrite the whole vault.
-        let environment = ProcessInfo.processInfo.environment
-        let client = GitHubClient(
-            configuration: .init(repository: environment["INKSTONE_TEST_REPO"]!, branch: "main"),
-            token: environment["INKSTONE_GITHUB_TOKEN"]!
-        )
-        let root = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appending(path: "inkstone-pull2-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        var policy = SyncFilePolicy()
-        for kind in AttachmentKind.allCases { policy.setSyncs(kind, false) }
-        let engine = SyncEngine(client: client, vaultRoot: root, policy: policy)
-
-        let first = try await engine.run()
-        #expect(!first.downloaded.isEmpty)
-
-        let second = try await engine.run()
-        #expect(second.changeCount == 0, "a settled vault must be quiet, got \(second.changeCount) changes")
+    
+        @Test("An empty vault pulls the repository down", .enabled(if: enabled))
+        func pullIntoEmptyVault() async throws {
+            let environment = ProcessInfo.processInfo.environment
+            let client = GitHubClient(
+                configuration: .init(repository: environment["INKSTONE_TEST_REPO"]!, branch: "main"),
+                token: environment["INKSTONE_GITHUB_TOKEN"]!
+            )
+    
+            let root = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appending(path: "inkstone-pull-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+    
+            // Only notes, so a code repository does not drag its binaries down.
+            var policy = SyncFilePolicy()
+            for kind in AttachmentKind.allCases { policy.setSyncs(kind, false) }
+    
+            let engine = SyncEngine(client: client, vaultRoot: root, policy: policy)
+            let report = try await engine.run()
+    
+            #expect(!report.downloaded.isEmpty, "an empty vault should receive files")
+            #expect(report.uploaded.isEmpty, "nothing to upload from an empty vault")
+            #expect(report.conflicted.isEmpty)
+            #expect(report.failures.isEmpty, "failures: \(report.failures.map(\.message))")
+    
+            // Every downloaded file must actually be on disk, with the content whose
+            // hash the remote reported — that equivalence is what sync rests on.
+            let remote = Dictionary(uniqueKeysWithValues: try await client.listFiles().map { ($0.path, $0.sha) })
+            for path in report.downloaded.prefix(20) {
+                let url = root.appending(path: path)
+                let data = try #require(try? Data(contentsOf: url), "missing on disk: \(path)")
+                #expect(gitBlobSHA(data) == remote[path], "content mismatch for \(path)")
+            }
+    
+            // And the run must have recorded a base state for the next comparison.
+            let state = SyncState.load(from: root)
+            #expect(state.blobs.count == report.downloaded.count)
+            #expect(state.lastSyncedAt != nil)
+        }
+    
+        @Test("A second run finds nothing to do", .enabled(if: enabled))
+        func secondRunIsQuiet() async throws {
+            // The point of recording state: syncing twice must not re-download
+            // everything, or every sync would rewrite the whole vault.
+            let environment = ProcessInfo.processInfo.environment
+            let client = GitHubClient(
+                configuration: .init(repository: environment["INKSTONE_TEST_REPO"]!, branch: "main"),
+                token: environment["INKSTONE_GITHUB_TOKEN"]!
+            )
+            let root = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appending(path: "inkstone-pull2-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+    
+            var policy = SyncFilePolicy()
+            for kind in AttachmentKind.allCases { policy.setSyncs(kind, false) }
+            let engine = SyncEngine(client: client, vaultRoot: root, policy: policy)
+    
+            let first = try await engine.run()
+            #expect(!first.downloaded.isEmpty)
+    
+            let second = try await engine.run()
+            #expect(second.changeCount == 0, "a settled vault must be quiet, got \(second.changeCount) changes")
+        }
     }
 }

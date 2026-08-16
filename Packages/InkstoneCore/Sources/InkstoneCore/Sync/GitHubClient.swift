@@ -108,6 +108,16 @@ public struct GitHubClient: Sendable {
     private func request(_ url: URL, method: String = "GET", body: Data? = nil) -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
+        // Never serve sync from the URL cache.
+        //
+        // GitHub answers with `cache-control: private, max-age=60`, and the
+        // default protocol policy honours it. Syncing twice inside a minute then
+        // sees a *stale* file list: the second run finds the file it just
+        // uploaded missing from the remote, and since the recorded state says it
+        // was there, three-way comparison reads that as a remote deletion and
+        // deletes the local note. A minute-old listing is worthless here; the
+        // whole point of the request is to learn what changed.
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.httpBody = body
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -162,6 +172,12 @@ public struct GitHubClient: Sendable {
         } catch GitHubError.notFound {
             // An empty repository has no tree yet. That is a legitimate starting
             // point for a first sync, not an error.
+            return []
+        } catch GitHubError.conflict {
+            // A repository with no commits at all answers 409 ("Git Repository
+            // is empty"), not 404 — found by pointing this at a freshly created
+            // repository, which is exactly how a first sync starts. On this
+            // endpoint 409 has no other meaning, so it is the same empty case.
             return []
         }
 
