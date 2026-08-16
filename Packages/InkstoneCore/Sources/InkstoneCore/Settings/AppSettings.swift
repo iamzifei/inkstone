@@ -55,7 +55,10 @@ public struct SettingsData: Codable, Hashable, Sendable {
 
     // Editor behaviour
     public var showLineNumbers = false
-    public var spellCheck = true
+    /// Off by default. In Markdown the checker flags LaTeX, code, wikilinks and
+    /// tags as misspellings, and on collapsed syntax the squiggle shrinks to a
+    /// stray red dot under the rendered content. Obsidian defaults to off too.
+    public var spellCheck = false
     public var autoPairBrackets = true
     /// Turns `- ` into a continued list on Return, and continues checkboxes.
     public var smartLists = true

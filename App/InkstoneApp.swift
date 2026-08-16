@@ -20,8 +20,32 @@ struct InkstoneApp: App {
     /// full-screen Space is in the way — GUI automation is not a reliable way to
     /// measure this, and the highlighter needs AppKit so it cannot live in the
     /// package's own test suite.
+    /// Dumps a rendered formula to a PNG so its actual pixels can be inspected.
+    ///
+    ///     INKSTONE_MATH_DUMP='\sqrt{x^2}' INKSTONE_MATH_OUT=/tmp/f.png ... Inkstone
+    @MainActor
+    private static func dumpMathIfRequested() {
+        guard let latex = ProcessInfo.processInfo.environment["INKSTONE_MATH_DUMP"],
+              let out = ProcessInfo.processInfo.environment["INKSTONE_MATH_OUT"]
+        else { return }
+        guard let image = MathRenderer.shared.image(
+            latex: latex, fontSize: 16, isDisplay: false, colour: .black
+        ) else {
+            FileHandle.standardOutput.write(Data("render failed\n".utf8))
+            exit(1)
+        }
+        if let tiff = image.tiffRepresentation,
+           let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: out))
+            FileHandle.standardOutput.write(Data("size \(image.size)\n".utf8))
+        }
+        exit(0)
+    }
+
     @MainActor
     private static func runHighlightBenchmarkIfRequested() {
+        dumpMathIfRequested()
         guard let path = ProcessInfo.processInfo.environment["INKSTONE_BENCH"],
               let text = try? String(contentsOfFile: path, encoding: .utf8)
         else { return }

@@ -35,10 +35,13 @@ struct MarkdownEditorView: View {
     let style: Style
     let mode: EditorMode
     let actions: EditorActions
+    var spellCheck: Bool = false
 
     var body: some View {
-        TextViewRepresentable(text: $text, style: style, mode: mode, actions: actions)
-            .background(style.background)
+        TextViewRepresentable(
+            text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck
+        )
+        .background(style.background)
     }
 }
 
@@ -51,14 +54,18 @@ class EditorCoordinator: NSObject {
     var style: Style
     var mode: EditorMode
     var actions: EditorActions
+    /// Whether the system spell checker runs. Read from settings rather than
+    /// hard-coded — the preference existed but nothing consulted it.
+    var spellCheck: Bool
     /// Guards against the re-entrant highlight → didChange → highlight loop.
     var isApplyingAttributes = false
 
-    init(text: Binding<String>, style: Style, mode: EditorMode, actions: EditorActions) {
+    init(text: Binding<String>, style: Style, mode: EditorMode, actions: EditorActions, spellCheck: Bool) {
         self.text = text
         self.style = style
         self.mode = mode
         self.actions = actions
+        self.spellCheck = spellCheck
     }
 
     var highlighter: MarkdownHighlighter {
@@ -234,8 +241,13 @@ final class InkstoneTextView: NSTextView {
             guard lineRect.intersects(rect) else { return }
 
             let size = image.size
+            // The paragraph is centred, but the glyphs it contains are collapsed
+            // to nothing, so the line rect carries no useful x. Centre against
+            // the text container instead.
+            let available = container.size.width - container.lineFragmentPadding * 2
+            let x = origin.x + max(0, (available - size.width) / 2)
             let target = NSRect(
-                x: lineRect.minX,
+                x: x,
                 y: lineRect.minY + MarkdownHighlighter.inlineImagePadding,
                 width: size.width,
                 height: size.height
@@ -262,6 +274,51 @@ final class InkstoneTextView: NSTextView {
         drawQuoteRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
         drawCheckboxes(in: rect, storage: storage, layoutManager: layoutManager, container: container)
         drawHeadingRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+        drawInlineMath(in: rect, storage: storage, layoutManager: layoutManager, container: container)
+    }
+
+    /// Draws inline formulas into the space their kerning reserved.
+    ///
+    /// Sat on the baseline rather than centred in the line box: an inline formula
+    /// has to sit on the same line as the words around it, and a line box with a
+    /// line-height multiple is much taller than the text.
+    private func drawInlineMath(
+        in rect: NSRect,
+        storage: NSTextStorage,
+        layoutManager: NSLayoutManager,
+        container: NSTextContainer
+    ) {
+        let origin = textContainerOrigin
+        storage.enumerateAttribute(
+            .inkstoneInlineMath,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let image = value as? NSImage else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard box.intersects(rect) else { return }
+
+            let baseline = box.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
+            let size = image.size
+            // Roughly centre the formula on the x-height, which is where a
+            // reader expects an inline expression to sit.
+            let target = NSRect(
+                x: box.minX,
+                y: baseline - size.height * 0.72,
+                width: size.width,
+                height: size.height
+            )
+
+            guard let context = NSGraphicsContext.current?.cgContext,
+                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            else { return }
+            context.saveGState()
+            context.translateBy(x: 0, y: target.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(cgImage, in: CGRect(x: target.minX, y: 0, width: target.width, height: target.height))
+            context.restoreGState()
+        }
     }
 
     /// Rules off h1 and h2, the way Typora's default theme does.
@@ -521,9 +578,10 @@ private struct TextViewRepresentable: NSViewRepresentable {
     let style: Style
     let mode: EditorMode
     let actions: EditorActions
+    let spellCheck: Bool
 
     func makeCoordinator() -> MacCoordinator {
-        MacCoordinator(text: $text, style: style, mode: mode, actions: actions)
+        MacCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -541,7 +599,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
-        textView.isContinuousSpellCheckingEnabled = true
+        // Left to applyStyle(), which consults the setting. Hard-coding it here
+        // meant the "Check spelling" preference had no effect on a freshly
+        // opened note — it only ever took hold after some other style change.
+        textView.isContinuousSpellCheckingEnabled = spellCheck
+        textView.isGrammarCheckingEnabled = false
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -599,9 +661,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         if coordinator.style.typography != style.typography
             || coordinator.style.isDark != style.isDark
-            || coordinator.mode != mode {
+            || coordinator.mode != mode
+            || coordinator.spellCheck != spellCheck {
             coordinator.style = style
             coordinator.mode = mode
+            coordinator.spellCheck = spellCheck
             coordinator.applyStyle()
             coordinator.rehighlight()
         }
@@ -631,7 +695,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
             textView.selectedTextAttributes = [
                 .backgroundColor: style.palette.selection.platformColor
             ]
-            textView.isContinuousSpellCheckingEnabled = mode != .reading
+            textView.isContinuousSpellCheckingEnabled = spellCheck && mode != .reading
 
             // Reading mode was previously indistinguishable from live preview:
             // it hid the syntax but the document stayed fully editable, so the
@@ -796,9 +860,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
     let style: Style
     let mode: EditorMode
     let actions: EditorActions
+    let spellCheck: Bool
 
     func makeCoordinator() -> PhoneCoordinator {
-        PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions)
+        PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -848,9 +913,11 @@ private struct TextViewRepresentable: UIViewRepresentable {
 
         if coordinator.style.typography != style.typography
             || coordinator.style.isDark != style.isDark
-            || coordinator.mode != mode {
+            || coordinator.mode != mode
+            || coordinator.spellCheck != spellCheck {
             coordinator.style = style
             coordinator.mode = mode
+            coordinator.spellCheck = spellCheck
             coordinator.applyStyle()
             coordinator.rehighlight()
         }

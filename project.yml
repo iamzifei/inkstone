@@ -11,6 +11,12 @@ options:
 packages:
   InkstoneCore:
     path: Packages/InkstoneCore
+  # LaTeX maths typesetting. Pure Swift with its own bundled maths fonts, so no
+  # JavaScript engine and no WebView — MathJax/KaTeX would mean embedding a whole
+  # browser to render `$x^2$` in a note. MIT licensed.
+  SwiftMath:
+    url: https://github.com/mgriebling/SwiftMath.git
+    from: "1.7.3"
 
 settings:
   base:
@@ -31,6 +37,7 @@ targets:
       - path: App
     dependencies:
       - package: InkstoneCore
+      - package: SwiftMath
     info:
       path: App/Resources/Info.plist
       properties:

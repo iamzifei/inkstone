@@ -137,3 +137,13 @@ struct TypographyScaleTests {
         #expect(typography.headingSize(level: 99) == typography.headingSize(level: 6))
     }
 }
+
+@Suite("Editor defaults")
+struct EditorDefaultsTests {
+    @Test("Spell checking is off by default")
+    func spellCheckDefault() {
+        // In Markdown the checker flags LaTeX, code, wikilinks and tags, and on
+        // collapsed syntax the squiggle shrinks to a stray red dot.
+        #expect(SettingsData().spellCheck == false)
+    }
+}

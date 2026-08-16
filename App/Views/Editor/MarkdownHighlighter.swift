@@ -184,6 +184,10 @@ struct MarkdownHighlighter {
             for range in ranges where range.length > 0 {
                 storage.addAttribute(.font, value: tiny, range: range)
                 storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+                // Collapsed text must not be spell-checked. The squiggle is drawn
+                // at the run's width, and on a 0.01pt run that collapses to a
+                // single red dot floating under the rendered content.
+                storage.addAttribute(.spellingState, value: 0, range: range)
             }
         }
 
@@ -326,8 +330,41 @@ struct MarkdownHighlighter {
             }
 
         case .mathInline, .mathBlock:
-            setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
-            storage.addAttribute(.foregroundColor, value: palette.accent.platformColor, range: token.range)
+            let isDisplay: Bool
+            if case .mathBlock = token.kind { isDisplay = true } else { isDisplay = false }
+            let latex = fullText.substring(with: token.contentRange)
+
+            // Source stays visible while the caret is on it, so the formula can
+            // be edited; it becomes the typeset result as soon as focus leaves.
+            if isBeingEdited {
+                setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
+                storage.addAttribute(.foregroundColor, value: palette.accent.platformColor, range: token.range)
+                break
+            }
+
+            let renderer = MathRenderer.shared
+            guard let image = renderer.image(
+                latex: latex,
+                fontSize: typography.editorFontSize * (isDisplay ? 1.15 : 1.0),
+                isDisplay: isDisplay,
+                colour: palette.text.platformColor
+            ) else {
+                // Invalid LaTeX shows its source in the unresolved colour rather
+                // than vanishing — a formula that silently disappears is worse
+                // than one that visibly did not parse.
+                setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
+                storage.addAttribute(
+                    .foregroundColor, value: palette.unresolvedLink.platformColor, range: token.range
+                )
+                break
+            }
+
+            if isDisplay {
+                // A block formula gets its own line, like an inline image.
+                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+            } else {
+                inlineMath(image, to: storage, in: token.range)
+            }
 
         case .embed(let link):
             // An embed of an image is replaced by the image itself; anything else
@@ -588,6 +625,25 @@ struct MarkdownHighlighter {
         return lines.filter { $0.length > 0 }
     }
 
+    /// Reserves horizontal space for an inline formula and tags it for drawing.
+    ///
+    /// Unlike a block formula, this has to sit *within* a line of prose, so it
+    /// cannot take the whole paragraph. The source is collapsed and the width the
+    /// formula needs is added as kerning on its last character, pushing the
+    /// following words along — the same rendering-only trick the table column
+    /// alignment uses. Nothing is written to the file.
+    private func inlineMath(_ image: PlatformImage, to storage: NSTextStorage, in range: NSRange) {
+        guard range.length > 0 else { return }
+
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+
+        let last = NSRange(location: range.location + range.length - 1, length: 1)
+        storage.addAttribute(.kern, value: image.size.width + 4, range: last)
+        storage.addAttribute(.inkstoneInlineMath, value: image, range: range)
+    }
+
     /// Makes room for an inline image and tags the run so the text view can draw it.
     ///
     /// `NSTextAttachment` is deliberately not used. TextKit 1's layout manager only
@@ -616,6 +672,9 @@ struct MarkdownHighlighter {
         paragraph.minimumLineHeight = image.size.height + Self.inlineImagePadding * 2
         paragraph.maximumLineHeight = image.size.height + Self.inlineImagePadding * 2
         paragraph.paragraphSpacing = style.typography.paragraphSpacing
+        // Typora centres block images and display formulas; so does every
+        // Markdown renderer worth copying.
+        paragraph.alignment = .center
 
         let line = fullText.paragraphRange(for: range)
         storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
@@ -865,6 +924,8 @@ extension NSAttributedString.Key {
     static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
     /// A rounded fill hugging the text, drawn by the view. Value is a colour.
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
+    /// A typeset formula to be drawn within a line of prose. Value is an image.
+    static let inkstoneInlineMath = NSAttributedString.Key("inkstoneInlineMath")
     /// Marks an h1/h2 so a rule can be drawn beneath it. Value is the level.
     static let inkstoneHeadingRule = NSAttributedString.Key("inkstoneHeadingRule")
 }

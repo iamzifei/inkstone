@@ -44,7 +44,8 @@ struct NoteEditorPane: View {
                             return workspace.embedMarkup(for: imported)
                         },
                         openAttachment: { openURL($0) }
-                    )
+                    ),
+                    spellCheck: workspace.settings.data.spellCheck
                 )
 
                 Divider().overlay(style.divider)
