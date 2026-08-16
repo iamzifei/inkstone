@@ -317,6 +317,20 @@ struct MarkdownHighlighter {
             )
             if !isBeingEdited { conceal(delimiters(of: token)) }
 
+        case .codeBlock(let language) where language?.lowercased() == "mermaid" && !isBeingEdited:
+            // A diagram renders asynchronously, so the first pass sees nothing
+            // and shows the source as an ordinary code block. When the image
+            // lands the renderer asks the editor to run again and it appears.
+            let body = mermaidBody(of: token.range, in: fullText)
+            if let image = MermaidRenderer.shared.image(for: body, isDark: style.isDark) {
+                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+            } else {
+                applyCodeBlockStyle(to: storage, token: token, fullText: fullText, conceal: conceal, isBeingEdited: isBeingEdited)
+                // Same fence handling as an ordinary block, so a diagram waiting
+                // to render looks like code rather than like raw source.
+                for line in fenceLines(of: token.range, in: fullText) { concealLines(line) }
+            }
+
         case .codeBlock:
             let paragraph = paragraph(
                 lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
@@ -700,6 +714,41 @@ struct MarkdownHighlighter {
         }
     }
 
+    /// The text between a fenced block's ``` lines — the diagram source.
+    private func mermaidBody(of block: NSRange, in text: NSString) -> String {
+        let lines = fenceLines(of: block, in: text)
+        guard let opener = lines.first else { return "" }
+        let start = opener.location + opener.length
+        let end = lines.count > 1 ? lines[1].location : block.location + block.length
+        guard end > start else { return "" }
+        return text.substring(with: NSRange(location: start, length: end - start))
+    }
+
+    /// Styles a fenced block as code. Extracted so an unrendered Mermaid diagram
+    /// can fall back to exactly the same presentation.
+    private func applyCodeBlockStyle(
+        to storage: NSTextStorage,
+        token: SyntaxToken,
+        fullText: NSString,
+        conceal: ([NSRange]) -> Void,
+        isBeingEdited: Bool
+    ) {
+        let typography = style.typography
+        let paragraph = paragraph(
+            lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
+        )
+        paragraph.firstLineHeadIndent = 8
+        paragraph.headIndent = 8
+        paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
+        paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
+        storage.addAttributes([
+            .font: typography.codeFont.platformFont(size: typography.codeFontSize),
+            .backgroundColor: style.palette.codeBackground.platformColor,
+            .foregroundColor: style.palette.text.platformColor,
+            .paragraphStyle: paragraph,
+        ], range: token.range)
+    }
+
     /// The opening and closing ``` lines of a fenced block, including the
     /// trailing newline of the opener so the collapsed line takes no height.
     private func fenceLines(of block: NSRange, in text: NSString) -> [NSRange] {
@@ -825,8 +874,30 @@ struct MarkdownHighlighter {
         // and belongs on the left margin.
         paragraph.alignment = centred ? .center : .natural
 
-        let line = fullText.paragraphRange(for: range)
-        storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
+        // Only the *first* line carries the image's height. A fenced Mermaid
+        // block or a multi-line `$$…$$` spans several lines, and leaving the
+        // rest at body height left a column of invisible blank lines that
+        // pushed everything after the diagram off the screen.
+        let firstLine = fullText.lineRange(for: NSRange(location: range.location, length: 0))
+        storage.addAttribute(.paragraphStyle, value: paragraph, range: firstLine)
+
+        let flattened = NSMutableParagraphStyle()
+        flattened.minimumLineHeight = 0.01
+        flattened.maximumLineHeight = 0.01
+        var location = firstLine.location + firstLine.length
+        let end = range.location + range.length
+        while location < end {
+            let line = fullText.lineRange(for: NSRange(location: location, length: 0))
+            let clipped = NSRange(
+                location: line.location,
+                length: min(line.length, end - line.location)
+            )
+            if clipped.length > 0 {
+                storage.addAttribute(.paragraphStyle, value: flattened, range: clipped)
+            }
+            location = max(line.location + line.length, location + 1)
+        }
+
         storage.addAttribute(.inkstoneInlineImage, value: image, range: range)
         storage.addAttribute(.inkstoneImageCentred, value: centred, range: range)
     }

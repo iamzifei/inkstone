@@ -672,6 +672,13 @@ private struct TextViewRepresentable: NSViewRepresentable {
             MainActor.assumeIsolated { coordinator?.updateInsets() }
         }
 
+        // A Mermaid diagram renders asynchronously; when one lands, run again so
+        // it replaces its source. Guarded by the renderer's cache, so this
+        // settles rather than looping.
+        MermaidRenderer.shared.onRendered = { [weak coordinator = context.coordinator] in
+            MainActor.assumeIsolated { coordinator?.rehighlight() }
+        }
+
         context.coordinator.applyStyle()
         context.coordinator.rehighlight()
         return scrollView

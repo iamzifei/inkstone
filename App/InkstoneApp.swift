@@ -197,14 +197,34 @@ struct InkstoneApp: App {
         }
 
         let hookFile = "/tmp/inkstone-test-vault"
-        let hookPath = (try? String(contentsOfFile: hookFile, encoding: .utf8))?
+        let hookContents = (try? String(contentsOfFile: hookFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        // "<vault path>" or "<vault path>|<note file name>".
+        let hookParts = hookContents?.split(separator: "|", maxSplits: 1).map(String.init)
+        let hookPath = hookParts?.first
+        let hookNote = hookParts?.count == 2 ? hookParts?[1] : nil
         if let path = (hookPath?.isEmpty == false ? hookPath : nil)
             ?? ProcessInfo.processInfo.environment["INKSTONE_OPEN_VAULT"] {
             do {
                 let vault = try workspace.registry.register(folder: URL(fileURLWithPath: path, isDirectory: true))
                 workspace.open(vault)
                 debugLog("opened test vault: \(path)")
+
+                // Optionally open a note straight away. Clicking the sidebar is
+                // unreliable to automate — the app cannot always be brought to
+                // the front, and the display sleeps — so this makes a specific
+                // note reachable without touching the UI at all.
+                //
+                //   echo "<vault>|<note.md>" > /tmp/inkstone-test-vault
+                if let noteName = hookNote, !noteName.isEmpty {
+                    let note = URL(fileURLWithPath: path, isDirectory: true).appending(path: noteName)
+                    if FileManager.default.fileExists(atPath: note.path) {
+                        workspace.openNote(at: note)
+                        debugLog("opened test note: \(noteName)")
+                    } else {
+                        debugLog("test note not found: \(noteName)")
+                    }
+                }
             } catch {
                 debugLog("test vault failed: \(error)")
             }
