@@ -258,9 +258,16 @@ final class InkstoneTextView: NSTextView {
     /// enough to misrepresent where text will be inserted.
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         var rect = rect
-        if let height = lineHeightAtCaret(), height > rect.height {
-            // Keep it centred on the glyphs, so the extra height is shared
-            // between ascender and descender instead of hanging below.
+        if let lineHeight = lineHeightAtCaret(), lineHeight > rect.height {
+            // Halfway between the glyphs and the line box, not the full line
+            // box. The caret belongs to the text, not to the leading around it:
+            // drawn at the full line height it stands visibly taller than the
+            // words — and than a checkbox — on every list line. Drawn at the
+            // font's own height, as AppKit does, it looks stunted against a
+            // 1.6x line height. Half the leading reads as neither.
+            let height = rect.height + (lineHeight - rect.height) * 0.5
+            // Centred on the glyphs, so the extra is shared between ascender and
+            // descender rather than hanging below the baseline.
             rect.origin.y -= (height - rect.height) / 2
             rect.size.height = height
         }
@@ -280,11 +287,11 @@ final class InkstoneTextView: NSTextView {
     }
 
     private static let caretInset: CGFloat = 0.75
-    /// Half the largest gap between a line height and the font's own height —
-    /// 6.8pt on body text, less on headings, so 4pt each way covers it. This
-    /// widens *every* invalidation, not just the caret's, so it is kept to what
-    /// is actually needed rather than a comfortable overestimate.
-    private static let caretOvershoot: CGFloat = 4
+    /// Covers the tallest caret extension in use. Body text gains 3.4pt of
+    /// height, so 2pt each way; 3 leaves a margin. This widens *every*
+    /// invalidation, not only the caret's, so it stays at what the measurements
+    /// call for rather than a comfortable overestimate.
+    private static let caretOvershoot: CGFloat = 3
 
     /// The height of the line fragment the caret currently sits in.
     private func lineHeightAtCaret() -> CGFloat? {

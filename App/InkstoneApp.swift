@@ -173,10 +173,11 @@ struct InkstoneApp: App {
                 let paragraph = storage.attribute(.paragraphStyle, at: probe, effectiveRange: nil)
                     as? NSParagraphStyle
                 let natural = (font?.ascender ?? 0) - (font?.descender ?? 0)
+                let lineHeight = paragraph?.maximumLineHeight ?? 0
+                let caret = lineHeight > natural ? natural + (lineHeight - natural) * 0.5 : natural
                 report += String(
-                    format: "  fragment=%5.1f  paraLineHeight=%5.1f  caretWas=%5.1f  gain=%4.1f   %@\n",
-                    fragment.height, paragraph?.maximumLineHeight ?? -1, natural,
-                    (paragraph?.maximumLineHeight ?? 0) - natural, text.prefix(22) as CVarArg
+                    format: "  lineHeight=%5.1f  text=%5.1f  caret=%5.1f (was %5.1f)   %@\n",
+                    lineHeight, natural, caret, natural, text.prefix(22) as CVarArg
                 )
             }
             FileHandle.standardOutput.write(Data((report + "\n").utf8))
