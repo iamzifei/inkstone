@@ -4,9 +4,9 @@
 Inkstone.xcodeproj/
 
 # Build products
-.build/
-.build-xcode/
-.build-dev/
+# Every derived-data directory, however it is suffixed. Listing them one by one
+# meant a new one (.build-ios) slipped straight into a commit.
+.build*/
 DerivedData/
 *.xcuserdatadata
 xcuserdata/
