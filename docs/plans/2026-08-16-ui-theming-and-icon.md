@@ -252,7 +252,9 @@ network boundary is tested; the round trip is not.
 | iOS | ❌ never run — next phase |
 
 
-## HUMAN QUEUE — iCloud container (blocks iCloud sync)
+## iCloud container — DONE 2026-08-16
+
+**Resolved.** Kept below for the record; nothing here is outstanding.
 
 Inkstone's iCloud code is written and handles the container being absent, so the
 app degrades cleanly today. What is missing is the container itself: it must
@@ -304,3 +306,32 @@ Tell me, and I re-enable these three keys in `Inkstone.entitlements`:
 
 and verify the app signs, launches, and that "Create Vault in iCloud Drive"
 produces a working vault instead of its current alert.
+
+
+### How the iCloud container was actually set up
+
+The portal steps above were never needed. What blocked it was not the container
+but **an unregistered device**: with an iCloud entitlement, a macOS build needs a
+real Mac App Development profile, and a profile must contain a registered
+device. The error only ever said "no profiles were found", which points at the
+wrong thing.
+
+Done with the App Store Connect API (key `UYGG95M882`, Admin):
+
+1. Verified the account first, read-only — `com.orris.inkstone` exists as bundle
+   ID `52S6ATX4NV`, team `K9YT36SP4B`. Never write to a developer account before
+   confirming it is the right one.
+2. `POST /v1/devices` registered this Mac (`00006050-001468EA1131401C`).
+3. The ICLOUD capability was *already* enabled on the app ID, so nothing to add.
+4. Built with `-allowProvisioningUpdates` plus `-authenticationKeyPath/-ID/
+   -IssuerID`. Xcode's own account was not visible to `xcodebuild` ("No
+   Accounts"), and the API key sidesteps that entirely.
+
+Verified end to end:
+
+  - The profile carries `iCloud.com.orris.inkstone` and team `K9YT36SP4B`.
+  - The signed app's entitlements carry the container.
+  - At runtime the container resolves and its Documents folder is writable:
+    `INKSTONE_ICLOUD_CHECK=1 …/Inkstone` prints AVAILABLE.
+  - **Ordinary builds still work with no extra flags**, both the sandboxed and
+    the unsandboxed dev variant, so day-to-day iteration is unchanged.

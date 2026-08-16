@@ -23,6 +23,39 @@ struct InkstoneApp: App {
     /// Dumps a rendered formula to a PNG so its actual pixels can be inspected.
     ///
     ///     INKSTONE_MATH_DUMP='\sqrt{x^2}' INKSTONE_MATH_OUT=/tmp/f.png ... Inkstone
+    /// Checks that the iCloud container is actually reachable at runtime.
+    ///
+    ///     INKSTONE_ICLOUD_CHECK=1 .../Inkstone.app/Contents/MacOS/Inkstone
+    ///
+    /// The entitlement being present is not the same as the container working:
+    /// that also needs the container to exist in the portal, the profile to
+    /// carry it, and the user to be signed in to iCloud Drive.
+    @MainActor
+    private static func checkICloudIfRequested() {
+        guard ProcessInfo.processInfo.environment["INKSTONE_ICLOUD_CHECK"] != nil else { return }
+
+        let identifier = "iCloud.com.orris.inkstone"
+        if let url = FileManager.default.url(forUbiquityContainerIdentifier: identifier) {
+            let documents = url.appending(path: "Documents")
+            try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+            let reachable = FileManager.default.fileExists(atPath: documents.path)
+            FileHandle.standardOutput.write(Data("""
+            iCloud container: AVAILABLE
+              url: \(url.path)
+              Documents writable: \(reachable)
+
+            """.utf8))
+        } else {
+            FileHandle.standardOutput.write(Data("""
+            iCloud container: UNAVAILABLE for \(identifier)
+              (entitlement present but container not reachable — check the portal
+               container exists and that iCloud Drive is signed in)
+
+            """.utf8))
+        }
+        exit(0)
+    }
+
     @MainActor
     private static func dumpMathIfRequested() {
         guard let latex = ProcessInfo.processInfo.environment["INKSTONE_MATH_DUMP"],
@@ -45,6 +78,7 @@ struct InkstoneApp: App {
 
     @MainActor
     private static func runHighlightBenchmarkIfRequested() {
+        checkICloudIfRequested()
         dumpMathIfRequested()
         guard let path = ProcessInfo.processInfo.environment["INKSTONE_BENCH"],
               let text = try? String(contentsOfFile: path, encoding: .utf8)
