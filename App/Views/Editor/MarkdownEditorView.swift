@@ -228,6 +228,89 @@ class EditorCoordinator: NSObject {
 
 /// `NSTextView` subclass that routes clicks on links to the coordinator before
 /// AppKit moves the caret.
+/// How tall the caret and the selection highlight should be on a given line.
+///
+/// Neither should be the height of the line *fragment*. That is the line box:
+/// an explicit 1.6x line height plus, at the end of a paragraph, its
+/// `paragraphSpacing` — 29.6pt around 18.8pt of text on a list item. Painting
+/// either to that box makes both stand conspicuously taller than the words and
+/// the checkbox beside them, and makes a task line's highlight taller than a
+/// body line's for no reason a reader can see.
+///
+/// Nor should they be the glyph height alone, which looks stunted against that
+/// leading. Half the leading sits between the two, and — more importantly — is
+/// the *same* answer for the caret and the selection, which is what stops them
+/// disagreeing with each other.
+enum CaretMetrics {
+
+    static func height(in storage: NSTextStorage, at location: Int) -> CGFloat? {
+        guard storage.length > 0 else { return nil }
+        let location = min(max(0, location), storage.length - 1)
+
+        guard let style = storage.attribute(.paragraphStyle, at: location, effectiveRange: nil)
+            as? NSParagraphStyle, style.maximumLineHeight > 0 else { return nil }
+
+        guard let font = visibleFont(in: storage, at: location) else { return nil }
+        let glyphs = font.ascender - font.descender
+        guard style.maximumLineHeight > glyphs else { return glyphs }
+        return glyphs + (style.maximumLineHeight - glyphs) * 0.5
+    }
+
+    /// The font of the first character on the line that is actually drawn.
+    ///
+    /// A heading or task line begins with a marker collapsed to 0.01pt, whose
+    /// metrics describe nothing on screen; measuring it would size the caret to
+    /// a hair.
+    private static func visibleFont(in storage: NSTextStorage, at location: Int) -> NSFont? {
+        let line = (storage.string as NSString).lineRange(for: NSRange(location: location, length: 0))
+        var probe = line.location
+        while probe < NSMaxRange(line), probe < storage.length {
+            if let font = storage.attribute(.font, at: probe, effectiveRange: nil) as? NSFont,
+               font.pointSize >= 1 {
+                return font
+            }
+            probe += 1
+        }
+        return storage.attribute(.font, at: location, effectiveRange: nil) as? NSFont
+    }
+}
+
+/// Draws the selection at the height of the text rather than of the line box.
+final class InkstoneLayoutManager: NSLayoutManager {
+
+    override func fillBackgroundRectArray(
+        _ rectArray: UnsafePointer<NSRect>,
+        count: Int,
+        forCharacterRange charRange: NSRange,
+        color: NSColor
+    ) {
+        guard let storage = textStorage,
+              let height = CaretMetrics.height(in: storage, at: charRange.location)
+        else {
+            super.fillBackgroundRectArray(rectArray, count: count, forCharacterRange: charRange, color: color)
+            return
+        }
+
+        var rects: [NSRect] = []
+        rects.reserveCapacity(count)
+        for index in 0..<count {
+            var rect = rectArray[index]
+            if rect.height > height {
+                // Centred on the line box, so consecutive selected lines stay
+                // evenly spaced instead of drifting toward one edge.
+                rect.origin.y += (rect.height - height) / 2
+                rect.size.height = height
+            }
+            rects.append(rect)
+        }
+
+        rects.withUnsafeBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            super.fillBackgroundRectArray(base, count: count, forCharacterRange: charRange, color: color)
+        }
+    }
+}
+
 final class InkstoneTextView: NSTextView {
     weak var coordinator: EditorCoordinator?
 
@@ -258,14 +341,9 @@ final class InkstoneTextView: NSTextView {
     /// enough to misrepresent where text will be inserted.
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         var rect = rect
-        if let lineHeight = lineHeightAtCaret(), lineHeight > rect.height {
-            // Halfway between the glyphs and the line box, not the full line
-            // box. The caret belongs to the text, not to the leading around it:
-            // drawn at the full line height it stands visibly taller than the
-            // words — and than a checkbox — on every list line. Drawn at the
-            // font's own height, as AppKit does, it looks stunted against a
-            // 1.6x line height. Half the leading reads as neither.
-            let height = rect.height + (lineHeight - rect.height) * 0.5
+        if let storage = textStorage,
+           let height = CaretMetrics.height(in: storage, at: selectedRange().location),
+           height > rect.height {
             // Centred on the glyphs, so the extra is shared between ascender and
             // descender rather than hanging below the baseline.
             rect.origin.y -= (height - rect.height) / 2
@@ -294,25 +372,6 @@ final class InkstoneTextView: NSTextView {
     private static let caretOvershoot: CGFloat = 3
 
     /// The height of the line fragment the caret currently sits in.
-    private func lineHeightAtCaret() -> CGFloat? {
-        guard let storage = textStorage, storage.length > 0 else { return nil }
-        let location = min(selectedRange().location, storage.length - 1)
-
-        // The paragraph's own line height, not the line fragment's. A fragment
-        // that ends a paragraph also carries `paragraphSpacing` — 4pt on a list
-        // item — and sizing the caret from it would overshoot the text by that
-        // much on exactly the lines where the caret is most often placed.
-        if let style = storage.attribute(.paragraphStyle, at: location, effectiveRange: nil)
-            as? NSParagraphStyle, style.maximumLineHeight > 0 {
-            return style.maximumLineHeight
-        }
-
-        guard let layoutManager else { return nil }
-        let glyph = layoutManager.glyphIndexForCharacter(at: location)
-        guard glyph < layoutManager.numberOfGlyphs else { return nil }
-        let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
-        return fragment.height > 0 ? fragment.height : nil
-    }
 
     /// Paints inline attachment images into the space the highlighter reserved.
     ///
@@ -710,6 +769,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
         scrollView.autohidesScrollers = true
 
         let textView = InkstoneTextView()
+        // Swap in the layout manager that draws the selection at text height.
+        // Replacing it on the existing container keeps AppKit's own text stack
+        // intact — building the stack by hand would mean re-wiring storage,
+        // container sizing and the scroll view's tracking as well.
+        textView.textContainer?.replaceLayoutManager(InkstoneLayoutManager())
         textView.coordinator = context.coordinator
         textView.delegate = context.coordinator
         textView.isRichText = false

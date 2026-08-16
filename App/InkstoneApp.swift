@@ -174,10 +174,12 @@ struct InkstoneApp: App {
                     as? NSParagraphStyle
                 let natural = (font?.ascender ?? 0) - (font?.descender ?? 0)
                 let lineHeight = paragraph?.maximumLineHeight ?? 0
-                let caret = lineHeight > natural ? natural + (lineHeight - natural) * 0.5 : natural
+                // Straight from the shared metric, so this reports what the caret
+                // and the selection actually use rather than a parallel formula.
+                let shared = CaretMetrics.height(in: storage, at: probe) ?? -1
                 report += String(
-                    format: "  lineHeight=%5.1f  text=%5.1f  caret=%5.1f (was %5.1f)   %@\n",
-                    lineHeight, natural, caret, natural, text.prefix(22) as CVarArg
+                    format: "  fragment=%5.1f  lineHeight=%5.1f  text=%5.1f  caret&selection=%5.1f   %@\n",
+                    fragment.height, lineHeight, natural, shared, text.prefix(20) as CVarArg
                 )
             }
             FileHandle.standardOutput.write(Data((report + "\n").utf8))
