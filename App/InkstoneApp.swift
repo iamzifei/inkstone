@@ -29,32 +29,74 @@ struct InkstoneApp: App {
     ///
     ///     INKSTONE_ICLOUD_CHECK=1 .../Inkstone.app/Contents/MacOS/Inkstone
     ///
-    /// The entitlement being present is not the same as the container working:
-    /// that also needs the container to exist in the portal, the profile to
-    /// carry it, and the user to be signed in to iCloud Drive.
+    /// **This hook needs a build signed with the shipping entitlements.** It is
+    /// compiled into debug builds only, and debug builds are routinely signed
+    /// with `Inkstone-Dev.entitlements`, which has no iCloud keys — so the hook
+    /// and the entitlement were never present in the same binary, and the hook's
+    /// verdict was an artefact of that. To run it honestly:
+    ///
+    ///     xcodebuild ... -configuration Debug -derivedDataPath .build-icloud
+    ///     cp /Applications/Inkstone.app/Contents/embedded.provisionprofile \
+    ///        .build-icloud/Build/Products/Debug/Inkstone.app/Contents/
+    ///     codesign --force --options runtime --sign "Developer ID Application" \
+    ///       --entitlements App/Resources/Inkstone.entitlements \
+    ///       .build-icloud/Build/Products/Debug/Inkstone.app
+    ///
+    /// It now reports which of the three causes applies, so a build that cannot
+    /// ask the question can no longer be read as an answer about the container.
     @MainActor
     private static func checkICloudIfRequested() {
         guard ProcessInfo.processInfo.environment["INKSTONE_ICLOUD_CHECK"] != nil else { return }
 
-        let identifier = "iCloud.com.orris.inkstone"
-        if let url = FileManager.default.url(forUbiquityContainerIdentifier: identifier) {
-            let documents = url.appending(path: "Documents")
-            try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
-            let reachable = FileManager.default.fileExists(atPath: documents.path)
-            FileHandle.standardOutput.write(Data("""
+        // A semaphore rather than an async main: this runs from `init`, before
+        // there is a run loop to drive a Task to completion.
+        let semaphore = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var result: ICloudAvailability = .unreachable
+        Task.detached {
+            result = await ICloudContainer.resolve(ICloudContainer.identifier)
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        var report: String
+        switch result {
+        case .available(let url):
+            report = """
             iCloud container: AVAILABLE
               url: \(url.path)
-              Documents writable: \(reachable)
-
-            """.utf8))
-        } else {
-            FileHandle.standardOutput.write(Data("""
-            iCloud container: UNAVAILABLE for \(identifier)
-              (entitlement present but container not reachable — check the portal
-               container exists and that iCloud Drive is signed in)
-
-            """.utf8))
+            """
+            // INKSTONE_ICLOUD_CHECK=create also makes the vault, through the
+            // same call the button uses — so this verifies the shipping path
+            // rather than a re-implementation of it that could drift.
+            if ProcessInfo.processInfo.environment["INKSTONE_ICLOUD_CHECK"] == "create" {
+                do {
+                    let vault = try ICloudContainer.createVaultFolder(in: url)
+                    report += "\n  vault: \(vault.path)"
+                } catch {
+                    report += "\n  vault: FAILED — \(error.localizedDescription)"
+                }
+            }
+        case .notEntitled:
+            report = """
+            iCloud container: NOT ENTITLED
+              This binary is not signed with a ubiquity-container entitlement, so
+              it cannot reach any container and says nothing about whether one
+              exists. Re-sign it as shown above and run the check again.
+            """
+        case .notSignedIn:
+            report = """
+            iCloud container: NOT SIGNED IN
+              No iCloud identity for ubiquitous files. Sign in to iCloud and turn
+              on iCloud Drive.
+            """
+        case .unreachable:
+            report = """
+            iCloud container: UNREACHABLE for \(ICloudContainer.identifier)
+              Entitled and signed in, and the container still did not resolve —
+              this one really is about the container.
+            """
         }
+        FileHandle.standardOutput.write(Data((report + "\n").utf8))
         exit(0)
     }
 

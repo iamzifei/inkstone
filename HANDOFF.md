@@ -174,7 +174,7 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Calendar + daily notes | ✅ seen working |
 | Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
-| iCloud vault storage | ⛔️ **blocked on the portal container** — the entitlement is live and shipped, the container is not reachable (§6) |
+| iCloud vault storage | ✅ container resolves, vault created, a note verified uploaded (§6) |
 | GitHub sync | ⚠️ built + unit tested; integration tests exist but are gated behind `INKSTONE_GITHUB_TOKEN` and were not run this session |
 | Reading mode | ✅ read-only, no caret reveal |
 | **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
@@ -312,18 +312,45 @@ shadowed Xcode's own copy, so `xcodebuild` couldn't load `IDESimulatorFoundation
 and refused to build *anything*. Fixed with `sudo xcodebuild -runFirstLaunch`.
 If the second machine shows the same symptom, that's the fix.
 
-**iCloud is entitled but has no container.** Updated 2026-08-17: the keys are no
-longer commented out — `App/Resources/Inkstone.entitlements` carries them and the
-signed, notarised build ships them. What is missing is the container itself:
+**iCloud works. It was never blocked, and the entry that said so was wrong.**
+Corrected 2026-08-17. What this file previously reported:
 
 ```
 $ INKSTONE_ICLOUD_CHECK=1 .build-xcode/Build/Products/Debug/Inkstone.app/Contents/MacOS/Inkstone
 iCloud container: UNAVAILABLE for iCloud.com.orris.inkstone
 ```
 
-**Create `iCloud.com.orris.inkstone` in the developer portal.** Nothing else is
-known to be missing, and nothing can be verified until it exists — this is the
-one item on the desktop that only James can unblock.
+That command cannot produce any other answer. `INKSTONE_ICLOUD_CHECK` is compiled
+into debug builds only, and that debug build was signed with
+`Inkstone-Dev.entitlements` — which carries no iCloud keys at all. **The only
+binary containing the check was the only binary guaranteed to fail it.** Its
+`nil` was a fact about the entitlements it was signed with, and it was written
+down as a fact about Apple's servers, where it then sat for a day directing work
+that did not need doing.
+
+What is actually true, each measured:
+
+| claim | evidence |
+|---|---|
+| the container exists in the portal | `/Applications/Inkstone.app/Contents/embedded.provisionprofile` grants `iCloud.com.orris.inkstone` — Apple does not sign a profile for a container that does not exist |
+| it is live and syncing | `brctl status iCloud.com.orris.inkstone` → `ever-full-sync`, `caught-up`, last-sync updating on each write |
+| a Developer ID build reaches it | archive + export through `Tools/package-dmg.sh`'s exact signing → `iCloud container: AVAILABLE` |
+| the vault path works | `INKSTONE_ICLOUD_CHECK=create` → `Documents/Inkstone` created through the same call the button uses |
+| a note actually uploads | `URLResourceValues` on a note in it → `isUbiquitous: true`, `containerName: Inkstone`, `isUploaded: true` |
+
+One wrong turn is worth keeping, because it nearly became a second false entry:
+a Developer-ID build re-signed by hand with `codesign --force` reports
+UNREACHABLE. That is the re-signing, not the configuration — `codesign` applies
+the entitlements file you hand it, and the shipping entitlements come from
+`-exportArchive` merging the profile. Signing something yourself to test how the
+shipped thing behaves changes the thing being tested.
+
+To run the check honestly, the hook and the entitlement have to be in the same
+binary — the doc comment on `checkICloudIfRequested` gives the commands.
+
+**Left to verify:** that the vault appears on a physical iPhone. The Simulator
+has no iCloud account, so it reports `notSignedIn`, correctly. A note called
+`Sync check.md` is sitting in the container waiting to be looked at.
 
 **`DEVELOPMENT_TEAM: K9YT36SP4B`** (Orris Technology) is committed in
 `project.yml`. Team IDs aren't secret — they appear in every notarised app — and
