@@ -12,6 +12,21 @@ enum SyncCredentials {
     private static let account = "personal-access-token"
 
     static func token() -> String? {
+        #if DEBUG
+        // Lets a debug build reach a real repository without typing a token into
+        // a Simulator, which is how the repository and branch pickers get looked
+        // at rather than assumed — they only appear once a token exists.
+        //
+        //     SIMCTL_CHILD_INKSTONE_GITHUB_TOKEN=$(gh auth token) xcrun simctl launch …
+        //
+        // Never in a release build: this reads a credential from the process
+        // environment, which is the wrong place for one to live.
+        if let injected = ProcessInfo.processInfo.environment["INKSTONE_GITHUB_TOKEN"],
+           !injected.isEmpty {
+            return injected
+        }
+        #endif
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

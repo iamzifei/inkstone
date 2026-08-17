@@ -305,9 +305,136 @@ private struct SyncSettings: View {
     /// Held only long enough to save it; the stored value lives in the Keychain.
     @State private var token = ""
 
+    // The picker's contents. Empty until asked for, and falling back to the
+    // free-text fields when it stays empty — a picker that cannot be filled must
+    // not be the only way to name a repository.
+    @State private var repositories: [GitHubClient.Repository] = []
+    @State private var branches: [String] = []
+    @State private var isLoadingRepositories = false
+    @State private var listError: String?
+    @State private var verification: String?
+    @State private var isVerifying = false
+
     private func saveToken() {
         SyncCredentials.setToken(token)
         token = ""
+        // The token is what makes the list askable, so ask as soon as there is
+        // one rather than making the user find a second button.
+        Task { await loadRepositories() }
+    }
+
+    /// Repositories this token can reach.
+    private func loadRepositories() async {
+        guard let client = workspace.gitHubClient() else { return }
+        isLoadingRepositories = true
+        listError = nil
+        defer { isLoadingRepositories = false }
+        do {
+            repositories = try await client.listRepositories()
+            await loadBranches()
+        } catch {
+            // Say why and leave the text fields in place; a token with no
+            // metadata permission can still sync perfectly well.
+            listError = error.localizedDescription
+        }
+    }
+
+    private func loadBranches() async {
+        let repository = workspace.settings.data.gitHubRepository
+        guard !repository.isEmpty, let client = workspace.gitHubClient() else { return }
+        branches = (try? await client.listBranches()) ?? []
+    }
+
+    /// Answers "is this configuration going to work" now, rather than at the end
+    /// of the first sync.
+    private func verify() async {
+        guard let client = workspace.gitHubClient() else {
+            verification = String(localized: "No token saved.")
+            return
+        }
+        isVerifying = true
+        defer { isVerifying = false }
+        do {
+            let name = try await client.verify()
+            let files = try await client.listFiles()
+            verification = String(localized: "Verified \(name) · \(files.count) files")
+        } catch {
+            verification = error.localizedDescription
+        }
+    }
+
+    /// One action row, so the Mac and the phone lay out the same set of buttons
+    /// differently without either of them going out of date when one changes.
+    private struct SyncAction: Identifiable {
+        let id = UUID()
+        let button: AnyView
+        var isLast = false
+    }
+
+    @MainActor
+    private func actions(off: Bool) -> [SyncAction] {
+        var list: [SyncAction] = [
+            SyncAction(button: AnyView(
+                Button("Save token", action: saveToken).disabled(token.isEmpty || off)
+            ))
+        ]
+        if SyncCredentials.hasToken {
+            list.append(SyncAction(button: AnyView(
+                Button(isLoadingRepositories ? "Loading…" : "Refresh list") {
+                    Task { await loadRepositories() }
+                }
+                .disabled(off || isLoadingRepositories)
+            )))
+            list.append(SyncAction(button: AnyView(
+                Button(isVerifying ? "Checking…" : "Verify") { Task { await verify() } }
+                    .disabled(off || isVerifying || workspace.settings.data.gitHubRepository.isEmpty)
+            )))
+        }
+        list[list.count - 1].isLast = true
+        list.append(SyncAction(button: AnyView(
+            Button(workspace.isSyncing ? "Syncing…" : "Sync now") {
+                Task { await workspace.sync() }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(off || workspace.isSyncing || workspace.root == nil
+                      || workspace.settings.data.gitHubRepository.isEmpty)
+        )))
+        if SyncCredentials.hasToken {
+            list.append(SyncAction(button: AnyView(
+                Button("Remove token", role: .destructive) {
+                    SyncCredentials.setToken(nil)
+                    token = ""
+                    repositories = []
+                    branches = []
+                    verification = nil
+                }
+                .disabled(off)
+            )))
+        }
+        return list
+    }
+
+    /// The chosen repository is always offered, even if listing did not return
+    /// it — otherwise opening the picker would silently change the setting.
+    private var repositoryOptions: [String] {
+        let chosen = workspace.settings.data.gitHubRepository
+        var names = repositories.map(\.fullName)
+        if !chosen.isEmpty, !names.contains(chosen) { names.insert(chosen, at: 0) }
+        return names
+    }
+
+    /// Same rule as the repositories: whatever is configured stays selectable,
+    /// so opening the picker cannot quietly move the branch.
+    private var branchOptions: [String] {
+        let chosen = workspace.settings.data.gitHubBranch
+        var names = branches
+        if !chosen.isEmpty, !names.contains(chosen) { names.insert(chosen, at: 0) }
+        return names
+    }
+
+    private func label(for name: String) -> String {
+        guard let repository = repositories.first(where: { $0.fullName == name }) else { return name }
+        return repository.canPush ? name : name + String(localized: " (read-only)")
     }
 
     @ViewBuilder
@@ -399,16 +526,54 @@ private struct SyncSettings: View {
                     .onChange(of: settings.data.gitHubSyncEnabled) { workspace.restartAutoSync() }
 
                 let off = !settings.data.gitHubSyncEnabled
-                TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
-                    .disabled(off)
-                TextField("Branch", text: $settings.data.gitHubBranch, prompt: Text("main"))
-                    .disabled(off)
 
                 SecureField("Personal access token", text: $token, prompt: Text(
                     SyncCredentials.hasToken ? "Saved in Keychain" : "ghp_…"
                 ))
                 .onSubmit(saveToken)
                 .disabled(off)
+
+                // Chosen from a list once there is a token to ask with, typed
+                // when there is not. Both are kept: a fine-grained token without
+                // metadata permission cannot list anything and still syncs.
+                if repositories.isEmpty {
+                    TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
+                        .disabled(off)
+                } else {
+                    Picker("Repository", selection: $settings.data.gitHubRepository) {
+                        ForEach(repositoryOptions, id: \.self) { name in
+                            Text(label(for: name)).tag(name)
+                        }
+                    }
+                    .disabled(off)
+                    .onChange(of: settings.data.gitHubRepository) { _, name in
+                        // Follow the repository's own default branch rather than
+                        // leaving "main" pointing at a repository that uses
+                        // "master" — the failure it causes is a 404 at sync time.
+                        if let repository = repositories.first(where: { $0.fullName == name }) {
+                            settings.data.gitHubBranch = repository.defaultBranch
+                        }
+                        verification = nil
+                        Task { await loadBranches() }
+                    }
+                }
+
+                if branches.isEmpty {
+                    TextField("Branch", text: $settings.data.gitHubBranch, prompt: Text("main"))
+                        .disabled(off)
+                } else {
+                    Picker("Branch", selection: $settings.data.gitHubBranch) {
+                        ForEach(branchOptions, id: \.self) { Text($0).tag($0) }
+                    }
+                    .disabled(off)
+                    .onChange(of: settings.data.gitHubBranch) { verification = nil }
+                }
+
+                if let listError {
+                    Text(listError)
+                        .font(.footnote)
+                        .foregroundStyle(style.palette.unresolvedLink.color)
+                }
 
                 Toggle("Sync automatically", isOn: $settings.data.gitHubAutoSync)
                     .disabled(off)
@@ -428,22 +593,27 @@ private struct SyncSettings: View {
                     }
                 }
 
+                // Five actions in one row fits a 560pt settings window and does
+                // not fit a phone: on iOS they wrapped into two ragged lines with
+                // "Save token" split across them. A Form row each is the native
+                // answer there, and the Mac keeps its single row.
+                #if os(macOS)
                 HStack {
-                    Button("Save token", action: saveToken)
-                        .disabled(token.isEmpty || off)
-                    if SyncCredentials.hasToken {
-                        Button("Remove", role: .destructive) {
-                            SyncCredentials.setToken(nil)
-                            token = ""
-                        }
+                    ForEach(Array(actions(off: off).enumerated()), id: \.offset) { _, action in
+                        action.button
+                        if action.isLast { Spacer() }
                     }
-                    Spacer()
-                    Button(workspace.isSyncing ? "Syncing…" : "Sync now") {
-                        Task { await workspace.sync() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(off || workspace.isSyncing || workspace.root == nil
-                              || workspace.settings.data.gitHubRepository.isEmpty)
+                }
+                #else
+                ForEach(Array(actions(off: off).enumerated()), id: \.offset) { _, action in
+                    action.button
+                }
+                #endif
+
+                if let verification {
+                    Text(verification)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
 
                 syncStatusView
@@ -484,6 +654,12 @@ private struct SyncSettings: View {
             }
         }
         .formStyle(.grouped)
+        .task {
+            // A stored token means the list can be filled without being asked
+            // for. Someone opening this pane to change repository should find the
+            // choice already there.
+            if SyncCredentials.hasToken, repositories.isEmpty { await loadRepositories() }
+        }
     }
 
     private func syncBinding(for kind: AttachmentKind) -> Binding<Bool> {

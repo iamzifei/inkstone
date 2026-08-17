@@ -307,6 +307,76 @@ public struct GitHubClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data).full_name
     }
 
+    /// Repositories this token can reach, most recently pushed first.
+    ///
+    /// Not scoped to `configuration.repository` — it is what fills the picker
+    /// *before* a repository has been chosen, so it deliberately does not go
+    /// through `base()`.
+    ///
+    /// With a fine-grained token this returns only the repositories it was
+    /// granted, which is the right list rather than a truncated one: the picker
+    /// should offer exactly what the token can actually sync to.
+    ///
+    /// - Parameter limit: pages are 100; two is plenty to choose from and keeps
+    ///   an account with hundreds of repositories from spending a minute here.
+    public func listRepositories(pages limit: Int = 2) async throws -> [Repository] {
+        var found: [Repository] = []
+        for page in 1...max(1, limit) {
+            var components = URLComponents(string: "https://api.github.com/user/repos")!
+            components.queryItems = [
+                .init(name: "per_page", value: "100"),
+                .init(name: "page", value: String(page)),
+                .init(name: "sort", value: "pushed"),
+            ]
+            let data = try await send(request(components.url!), describing: "your repositories")
+            struct Response: Decodable {
+                let full_name: String
+                let default_branch: String?
+                let permissions: Permissions?
+                struct Permissions: Decodable { let push: Bool? }
+            }
+            let page = try JSONDecoder().decode([Response].self, from: data)
+            found += page.map {
+                Repository(
+                    fullName: $0.full_name,
+                    defaultBranch: $0.default_branch ?? "main",
+                    canPush: $0.permissions?.push ?? true
+                )
+            }
+            if page.count < 100 { break }
+        }
+        return found
+    }
+
+    /// Branch names on the configured repository, for the branch picker.
+    public func listBranches() async throws -> [String] {
+        var components = URLComponents(
+            url: try base().appending(path: "branches"), resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [.init(name: "per_page", value: "100")]
+        let data = try await send(request(components.url!), describing: configuration.repository)
+        struct Response: Decodable { let name: String }
+        return try JSONDecoder().decode([Response].self, from: data).map(\.name)
+    }
+
+    /// One repository as the picker needs it.
+    public struct Repository: Hashable, Sendable, Identifiable {
+        public let fullName: String
+        public let defaultBranch: String
+        /// Whether the token may write. Read-only repositories are still listed —
+        /// hiding them would leave someone hunting for a repository that is right
+        /// there — but sync would fail on the first upload, so the picker says so.
+        public let canPush: Bool
+
+        public var id: String { fullName }
+
+        public init(fullName: String, defaultBranch: String, canPush: Bool) {
+            self.fullName = fullName
+            self.defaultBranch = defaultBranch
+            self.canPush = canPush
+        }
+    }
+
     /// Contents-API URL for a vault path.
     ///
     /// The path is handed to `appending(path:)` raw. Percent-encoding it first

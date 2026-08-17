@@ -302,6 +302,26 @@ final class Workspace {
     /// hitting a conflict mid-sentence would cost the user's trust. That worry
     /// does not survive contact with how conflicts are actually handled: the
     /// remote copy is saved *alongside* the local one and nothing is
+    /// A client for the configured repository, or nil when no token is stored.
+    ///
+    /// Shared by sync and by the Settings pickers so they cannot disagree about
+    /// what "the configured repository" means — the pickers exist to stop a
+    /// mistyped repository being discovered at sync time, which they could not do
+    /// if they talked to a different one.
+    ///
+    /// - Parameter repository: overrides the configured value, for listing the
+    ///   branches of a repository the user is considering but has not chosen yet.
+    func gitHubClient(repository: String? = nil) -> GitHubClient? {
+        guard let token = SyncCredentials.token() else { return nil }
+        return GitHubClient(
+            configuration: .init(
+                repository: repository ?? settings.data.gitHubRepository,
+                branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch
+            ),
+            token: token
+        )
+    }
+
     /// overwritten, so the cost of a badly timed sync is an extra file, not lost
     /// work. Requiring someone to remember to press a button is the larger risk.
     func sync() async {
@@ -315,17 +335,12 @@ final class Workspace {
         // would upload a stale copy and then report success.
         saveAll()
 
-        let engine = SyncEngine(
-            client: GitHubClient(
-                configuration: .init(
-                    repository: settings.data.gitHubRepository,
-                    branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch
-                ),
-                token: token
-            ),
-            vaultRoot: root,
-            policy: settings.data.syncPolicy
-        )
+        _ = token
+        guard let client = gitHubClient() else {
+            syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
+            return
+        }
+        let engine = SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy)
 
         syncStatus = .running("Starting…")
         do {
