@@ -6,7 +6,9 @@ struct InkstoneApp: App {
     @State private var workspace = Workspace()
 
     init() {
-        #if DEBUG
+        // Debug hooks are macOS-only: they measure through AppKit text metrics
+        // and write images with AppKit imaging.
+        #if DEBUG && os(macOS)
         Self.runHighlightBenchmarkIfRequested()
         #endif
     }
@@ -56,6 +58,8 @@ struct InkstoneApp: App {
         exit(0)
     }
 
+    #if os(macOS)
+    // Debug hooks below use AppKit-only imaging and text metrics.
     @MainActor
     private static func dumpMathIfRequested() {
         guard let latex = ProcessInfo.processInfo.environment["INKSTONE_MATH_DUMP"],
@@ -324,6 +328,19 @@ struct InkstoneApp: App {
             if let vault = try? makeScratchVault() {
                 workspace.open(vault)
                 debugLog("opened scratch vault at \(vault.path)")
+                // On iOS the note list is a navigation stack, so nothing but the
+                // sidebar is on screen until something is tapped — and the
+                // simulator cannot be tapped from a script. Opening a note by
+                // name is the only way to see the editor at all.
+                if let name = ProcessInfo.processInfo.environment["INKSTONE_OPEN_NOTE"] {
+                    let url = vault.url.appending(path: name)
+                    if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+                        workspace.openNote(at: url)
+                        debugLog("opened note \(name)")
+                    } else {
+                        debugLog("note not found: \(name)")
+                    }
+                }
             } else {
                 debugLog("scratch vault creation failed")
             }
@@ -474,8 +491,10 @@ struct InkstoneApp: App {
                 .disabled(!workspace.canGoForward)
         }
     }
+    #endif
 }
 
+#if os(macOS)
 private extension NSTextStorage {
     /// First range in `line` carrying `key`. Debug helper for the dumps above.
     func range(of _: Any?, in line: NSRange, key: NSAttributedString.Key) -> NSRange? {
@@ -486,3 +505,4 @@ private extension NSTextStorage {
         return found
     }
 }
+#endif

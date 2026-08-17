@@ -13,6 +13,10 @@ struct RootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isInspectorPresented = true
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+
     var body: some View {
         @Bindable var workspace = workspace
 
@@ -20,17 +24,27 @@ struct RootView: View {
             if workspace.vault == nil {
                 WelcomeView()
             } else {
-                NavigationSplitView(columnVisibility: $columnVisibility) {
-                    SidebarView()
-                        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
-                } detail: {
-                    DetailView()
-                        .inspector(isPresented: $isInspectorPresented) {
-                            InspectorView()
-                                .inspectorColumnWidth(min: 240, ideal: 300, max: 420)
-                        }
+                #if os(iOS)
+                // A compact width — every iPhone, and an iPad in Slide Over —
+                // collapses `NavigationSplitView` to a single column, and the
+                // detail column is then only reachable by navigating to it.
+                // Selecting a note here changes workspace state rather than
+                // following a `NavigationLink`, so nothing pushed and the editor
+                // was unreachable: the note highlighted and the view stayed put.
+                if sizeClass == .compact {
+                    NavigationStack {
+                        SidebarView()
+                            .navigationDestination(isPresented: showingDetail) {
+                                DetailView()
+                                    .toolbar { toolbarContent }
+                            }
+                    }
+                } else {
+                    splitView
                 }
-                .toolbar { toolbarContent }
+                #else
+                splitView
+                #endif
             }
         }
         .tint(style.accent)
@@ -39,6 +53,37 @@ struct RootView: View {
             QuickSwitcherView()
         }
     }
+
+    @ViewBuilder
+    private var splitView: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            SidebarView()
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
+        } detail: {
+            DetailView()
+                .inspector(isPresented: $isInspectorPresented) {
+                    InspectorView()
+                        .inspectorColumnWidth(min: 240, ideal: 300, max: 420)
+                }
+        }
+        .toolbar { toolbarContent }
+    }
+
+    #if os(iOS)
+    /// Drives the push, and closes the tab again when the user swipes back — so
+    /// returning to the list actually deselects, rather than leaving a note
+    /// open that nothing on screen refers to.
+    private var showingDetail: Binding<Bool> {
+        Binding(
+            get: { workspace.activeTab != nil },
+            set: { presented in
+                if !presented, let tab = workspace.activeTab {
+                    workspace.closeTab(tab)
+                }
+            }
+        )
+    }
+    #endif
 
     private var syncSymbol: String {
         switch workspace.syncStatus {

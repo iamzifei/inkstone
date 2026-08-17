@@ -203,7 +203,11 @@ struct MarkdownHighlighter {
                 // Collapsed text must not be spell-checked. The squiggle is drawn
                 // at the run's width, and on a 0.01pt run that collapses to a
                 // single red dot floating under the rendered content.
+                #if os(macOS)
+                // AppKit only; UIKit has no equivalent attribute, and does not
+                // draw a misspelling underline on a zero-width run either.
                 storage.addAttribute(.spellingState, value: 0, range: range)
+                #endif
             }
         }
 
@@ -812,7 +816,8 @@ struct MarkdownHighlighter {
 
         let bounds = body.boundingRect(
             with: CGSize(width: availableWidth, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin]
+            options: [.usesLineFragmentOrigin],
+            context: nil
         )
         let canvas = CGSize(width: ceil(bounds.width) + 2, height: ceil(bounds.height) + 2)
         guard canvas.width > 1, canvas.height > 1 else { return nil }
@@ -825,7 +830,11 @@ struct MarkdownHighlighter {
         return image
         #else
         return UIGraphicsImageRenderer(size: canvas).image { _ in
-            body.draw(with: CGRect(origin: .zero, size: canvas), options: [.usesLineFragmentOrigin])
+            body.draw(
+                with: CGRect(origin: .zero, size: canvas),
+                options: [.usesLineFragmentOrigin],
+                context: nil
+            )
         }
         #endif
     }
