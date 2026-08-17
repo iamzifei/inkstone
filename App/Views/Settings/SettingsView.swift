@@ -5,6 +5,11 @@ import InkstoneCore
 struct SettingsView: View {
     @Environment(Workspace.self) private var workspace
 
+    /// Dismisses the sheet on iOS, where this is presented rather than being a
+    /// window of its own. nil on macOS, which closes it the way it closes any
+    /// window.
+    var onDone: (() -> Void)?
+
     var body: some View {
         #if os(macOS)
         TabView {
@@ -25,6 +30,13 @@ struct SettingsView: View {
                 NavigationLink { SyncSettings() } label: { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                if let onDone {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done", action: onDone)
+                    }
+                }
+            }
         }
         #endif
     }

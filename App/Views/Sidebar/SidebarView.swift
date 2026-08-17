@@ -6,11 +6,54 @@ struct SidebarView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
 
+    #if os(iOS)
+    #if DEBUG
+    /// Opens Settings at launch, so the sheet can be looked at without driving a
+    /// tap — the same reason the other debug hooks exist, and the only way to
+    /// check that a sheet inherits the workspace and the theme rather than
+    /// assuming it does.
+    ///
+    ///     SIMCTL_CHILD_INKSTONE_OPEN_SETTINGS=1 xcrun simctl launch <sim> com.orris.inkstone
+    @State private var isShowingSettings =
+        ProcessInfo.processInfo.environment["INKSTONE_OPEN_SETTINGS"] != nil
+    #else
+    @State private var isShowingSettings = false
+    #endif
+    #endif
+
     var body: some View {
         @Bindable var workspace = workspace
 
         VStack(spacing: 0) {
+            #if os(iOS)
+            // macOS gets Settings from the `Settings` scene and ⌘, — a scene
+            // type that does not exist on iOS. `SettingsView` has had an iOS
+            // form since it was written and nothing could ever open it, so
+            // themes, typography, editor behaviour and sync were all unreachable
+            // on the phone.
+            //
+            // In the sidebar's own header rather than in a `.toolbar`: on iPhone
+            // this view is the root of a `NavigationStack` with no title, so a
+            // toolbar item would summon an otherwise empty navigation bar and
+            // push the whole sidebar down to hold one button.
+            HStack(spacing: 0) {
+                VaultSwitcher()
+                Button {
+                    isShowingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(style.uiFont)
+                        .foregroundStyle(style.secondaryText)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Settings"))
+            }
+            #else
             VaultSwitcher()
+            #endif
             SectionPicker(selection: $workspace.sidebarSection)
 
             Divider().overlay(style.divider)
@@ -24,6 +67,11 @@ struct SidebarView: View {
             }
         }
         .background(style.secondaryBackground)
+        #if os(iOS)
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsView(onDone: { isShowingSettings = false })
+        }
+        #endif
     }
 }
 
