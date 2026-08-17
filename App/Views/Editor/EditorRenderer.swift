@@ -35,6 +35,7 @@ struct EditorRenderer {
     /// behind glyphs, and the checkbox after the bullet so a task in a bulleted
     /// list is not drawn twice.
     func draw(in rect: CGRect) {
+        drawBlockFills(in: rect)
         drawInlineFills(in: rect)
         drawBullets(in: rect)
         drawQuoteRules(in: rect)
@@ -43,6 +44,43 @@ struct EditorRenderer {
         drawInlineMath(in: rect)
     }
 
+
+    /// Paints one continuous panel behind a code fence or a table.
+    ///
+    /// `.backgroundColor` fills per glyph run, so a blank line inside a fence —
+    /// which has no glyphs — got no fill, and neither did the space between
+    /// paragraphs. A fenced block of prose came out as a stack of separate grey
+    /// stripes instead of one panel, which is not what any Markdown renderer
+    /// shows.
+    func drawBlockFills(in rect: CGRect) {
+        style.palette.codeBackground.platformColor.setFill()
+
+        storage.enumerateAttribute(
+            .inkstoneBlockFill,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+
+            // The union of the block's line fragments, which covers the blank
+            // lines and the leading between them; the bounding rect of the
+            // glyphs alone would not.
+            var panel = CGRect.null
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in
+                panel = panel.isNull ? fragment : panel.union(fragment)
+            }
+            guard !panel.isNull else { return }
+
+            panel = panel.offsetBy(dx: origin.x, dy: origin.y)
+            // Full width regardless of how far the text runs, so a short line
+            // does not narrow the panel.
+            panel.origin.x = origin.x
+            panel.size.width = container.size.width - container.lineFragmentPadding * 2
+            guard panel.intersects(rect) else { return }
+
+            PlatformBezierPath(roundedRect: panel, cornerRadius: 4).fill()
+        }
+    }
 
     /// Draws inline formulas into the space their kerning reserved.
     ///

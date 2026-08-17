@@ -636,8 +636,8 @@ struct MarkdownHighlighter {
             paragraph.lineBreakMode = .byClipping
             storage.addAttributes([
                 .font: typography.codeFont.platformFont(size: typography.codeFontSize),
-                .backgroundColor: palette.codeBackground.platformColor,
                 .foregroundColor: palette.text.platformColor,
+                .inkstoneBlockFill: true,
             ], range: token.range)
             // Typora sets `margin: 0.8em 0` on tables — around the table, not
             // around each row.
@@ -809,8 +809,8 @@ struct MarkdownHighlighter {
         paragraph.headIndent = 8
         storage.addAttributes([
             .font: typography.codeFont.platformFont(size: typography.codeFontSize),
-            .backgroundColor: style.palette.codeBackground.platformColor,
             .foregroundColor: style.palette.text.platformColor,
+            .inkstoneBlockFill: true,
         ], range: token.range)
         applyBlockStyle(
             paragraph, spacing: typography.paragraphSpacing * 0.6,
@@ -1222,6 +1222,14 @@ extension NSAttributedString.Key {
     static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
     /// A rounded fill hugging the text, drawn by the view. Value is a colour.
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
+
+    /// A fenced code block or table, drawn as one continuous panel.
+    ///
+    /// `.backgroundColor` cannot do this: it paints per glyph run, so a blank
+    /// line inside a fence gets no fill at all and the gaps between paragraphs
+    /// stay unpainted. A block of prose with blank lines between paragraphs came
+    /// out as a stack of separate grey stripes rather than one panel.
+    static let inkstoneBlockFill = NSAttributedString.Key("inkstoneBlockFill")
     /// A typeset formula to be drawn within a line of prose. Value is an image.
     static let inkstoneInlineMath = NSAttributedString.Key("inkstoneInlineMath")
     /// Attached to a footnote marker so clicking it can jump to its definition.

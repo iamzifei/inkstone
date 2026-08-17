@@ -48,6 +48,11 @@ xcodebuild -project Inkstone.xcodeproj -scheme Inkstone -configuration Release \
   -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" \
   -authenticationKeyIssuerID "$ISSUER_ID" \
   archive | grep -E '^\*\* ARCHIVE|error:'
+# A pipeline reports the *last* command's status, so `xcodebuild | grep` looked
+# successful whenever grep matched — including when what it matched was the
+# compiler error that failed the build. This once shipped a stale binary while
+# printing errors nobody read.
+[[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "Archive failed." >&2; exit 1; }
 
 # --- Export with Developer ID ----------------------------------------------
 # Manual signing, because automatic signing cannot mint a Developer ID profile
@@ -73,6 +78,7 @@ echo "==> Exporting"
 xcodebuild -exportArchive -archivePath "$BUILD/Inkstone.xcarchive" \
   -exportOptionsPlist "$BUILD/ExportOptions.plist" \
   -exportPath "$BUILD/export" | grep -E 'EXPORT SUCCEEDED|error:'
+[[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "Export failed." >&2; exit 1; }
 
 APP="$BUILD/export/Inkstone.app"
 VERSION=$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")

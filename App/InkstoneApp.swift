@@ -276,6 +276,7 @@ struct InkstoneApp: App {
         exit(0)
     }
     #endif
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -441,8 +442,12 @@ struct InkstoneApp: App {
 
             Inline maths $E = mc^2$ and a fence:
 
-            ```swift
-            let answer = 42
+            ```
+            有人问我，现在创业，是应该先做自媒体还是先做产品。
+
+            这个问题，光是这个月，我就被问了十几次。
+
+            但他们有一个共同点。
             ```
 
             [^1]: A footnote definition.
@@ -520,7 +525,6 @@ struct InkstoneApp: App {
                 .disabled(!workspace.canGoForward)
         }
     }
-    #endif
 }
 
 #if os(macOS)
