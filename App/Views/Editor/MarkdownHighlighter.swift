@@ -7,6 +7,48 @@ import AppKit
 import UIKit
 #endif
 
+/// Holds the editor's one cached scan.
+///
+/// The caching itself is `InkstoneCore.CachingScanner`, where it is tested. This
+/// is the main-actor home for it, plus the debug switches: the highlighter is a
+/// value recreated on every pass, so the cache cannot live inside it.
+@MainActor
+final class ScanCache {
+    static let shared = ScanCache()
+
+    /// `INKSTONE_SCANNER=legacy` runs the original regex scanner instead of the
+    /// parser, so the two can be compared through the *highlighter* — on the
+    /// attributes that reach the screen — and not only on the token stream,
+    /// which is what `EngineDiffTests` already covers. A token diff cannot tell
+    /// you that a paragraph ended up indented differently.
+    private var scanner: CachingScanner = {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["INKSTONE_SCANNER"] == "legacy" {
+            return CachingScanner(engine: .legacy)
+        }
+        #endif
+        return CachingScanner()
+    }()
+
+    /// Scans performed, for the benchmark hooks to report. Counts the bypass
+    /// path too — a diagnostic that under-reports is worse than none.
+    var scanCount: Int { scanner.scanCount + bypassScans }
+    private var bypassScans = 0
+
+    func tokens(for text: String) -> [SyntaxToken] {
+        #if DEBUG
+        // Reproduces the pre-cache behaviour in the same binary, so the two can
+        // be measured against each other without reverting anything.
+        if ProcessInfo.processInfo.environment["INKSTONE_NO_SCAN_CACHE"] != nil {
+            var uncached = CachingScanner()
+            bypassScans += 1
+            return uncached.tokens(for: text)
+        }
+        #endif
+        return scanner.tokens(for: text)
+    }
+}
+
 /// Turns scanner tokens into text attributes for the editor.
 ///
 /// This is the "live preview" engine. In live-preview mode the syntax characters
@@ -20,7 +62,6 @@ import UIKit
 struct MarkdownHighlighter {
     let style: Style
     let mode: EditorMode
-    let scanner = SyntaxScanner()
 
     /// Resolves an embed target to a file in the vault. Injected rather than
     /// reached for directly so the highlighter stays free of app state and can be
@@ -57,7 +98,7 @@ struct MarkdownHighlighter {
 
         applyBaseAttributes(to: storage, range: scope)
 
-        let tokens = scanner.scan(text)
+        let tokens = ScanCache.shared.tokens(for: text)
         // Table cells are laid out with a monospaced font so columns line up.
         // Inline runs inside a cell have to use the same metrics or a single bold
         // word would knock the whole column out of alignment, so the ranges are
@@ -111,7 +152,9 @@ struct MarkdownHighlighter {
         if mode != .source {
             for range in tableRanges
             where NSIntersectionRange(range, scope).length > 0 {
-                alignTableColumns(range, in: storage, text: text as NSString)
+                alignTableColumns(
+                    range, in: storage, text: text as NSString, caretLineRange: caretLineRange
+                )
             }
         }
     }
@@ -236,13 +279,17 @@ struct MarkdownHighlighter {
                 integersIn: token.range.location..<(token.range.location + token.range.length)
             )
 
-        /// The face an inline run should use, so runs inside a table keep the
-        /// monospaced metrics the surrounding cells were laid out with.
+        /// The face an inline run should use.
+        ///
+        /// Tables used to be laid out in the code font — the only way to get
+        /// columns to line up when the pipes were still on screen — and every
+        /// inline run inside a cell had to match or it knocked the column out.
+        /// Columns are now positioned by measured kerning instead, so a cell is
+        /// ordinary prose and `isInTable` no longer changes the face.
         func runFont(weight: PlatformFont.Weight? = nil) -> PlatformFont {
-            let family = isInTable ? typography.codeFont : typography.editorFont
-            let size = isInTable ? typography.codeFontSize : typography.editorFontSize
-            if let weight { return family.platformFont(size: size, weight: weight) }
-            return family.platformFont(size: size)
+            let size = typography.editorFontSize
+            if let weight { return typography.editorFont.platformFont(size: size, weight: weight) }
+            return typography.editorFont.platformFont(size: size)
         }
 
         func setFont(_ font: PlatformFont, range: NSRange) {
@@ -358,6 +405,43 @@ struct MarkdownHighlighter {
                 .paragraphStyle, value: headingParagraph, range: fullText.paragraphRange(for: token.range)
             )
 
+            // A setext heading — `Title` on one line over `=====` on the next —
+            // carries its underline inside the token, and the underline is
+            // syntax. Left alone it is drawn as part of the title, at title size:
+            // a row of giant equals signs under every such heading.
+            //
+            // Nothing needed doing here before the parser landed, because the old
+            // scanner's heading pattern was ATX-only and never saw these at all.
+            // The `---` form was matched as a horizontal rule instead, which
+            // happened to look right — so this is a regression the parser
+            // introduced, and it only became visible on a document that used the
+            // syntax. Applied last: it has to overwrite the paragraph style set
+            // just above.
+            if fullText.character(at: token.range.location) != 0x23 {  // not `#`
+                let underline = fullText.lineRange(
+                    for: NSRange(location: max(token.range.location, NSMaxRange(token.range) - 1), length: 0)
+                )
+                if underline.location > token.range.location { concealLines(underline) }
+            } else {
+                // A closed ATX heading — `## Title ##` — puts its trailing run of
+                // hashes *outside* the node cmark reports, so without this they
+                // are left behind as body text after the title.
+                let line = fullText.lineRange(for: token.range)
+                var tail = NSRange(
+                    location: NSMaxRange(token.range),
+                    length: max(0, NSMaxRange(line) - NSMaxRange(token.range))
+                )
+                while tail.length > 0,
+                      let scalar = Unicode.Scalar(fullText.character(at: NSMaxRange(tail) - 1)),
+                      CharacterSet.newlines.contains(scalar) {
+                    tail.length -= 1
+                }
+                if tail.length > 0,
+                   fullText.substring(with: tail).allSatisfy({ $0 == "#" || $0 == " " || $0 == "\t" }) {
+                    conceal([tail])
+                }
+            }
+
         case .bold:
             setFont(runFont(weight: .bold), range: token.contentRange)
             styleDelimiters(delimiters(of: token), in: storage, isBeingEdited: isBeingEdited, conceal: conceal)
@@ -465,8 +549,12 @@ struct MarkdownHighlighter {
             // still visible and clickable rather than silently disappearing.
             let resolved = resolveAttachment?(link.target)
             if let resolved, AttachmentKind(url: resolved) == .image, !isBeingEdited,
-               let image = AttachmentImageCache.shared.image(for: resolved, maxWidth: availableWidth) {
-                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+               let image = sizedEmbed(resolved, hint: link.embedSize) {
+                if isAloneOnItsLine(token.range, in: fullText) {
+                    inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                } else if !inlineThumbnail(image, to: storage, in: token.range) {
+                    inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                }
                 storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
                 break
             }
@@ -522,7 +610,11 @@ struct MarkdownHighlighter {
                let resolved = resolveAttachment?(destination),
                AttachmentKind(url: resolved) == .image,
                let image = AttachmentImageCache.shared.image(for: resolved, maxWidth: availableWidth) {
-                inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                if isAloneOnItsLine(token.range, in: fullText) {
+                    inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                } else if !inlineThumbnail(image, to: storage, in: token.range) {
+                    inlineImage(image, to: storage, in: token.range, fullText: fullText)
+                }
                 storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
                 break
             }
@@ -632,19 +724,40 @@ struct MarkdownHighlighter {
             storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
 
         case .table:
-            // Monospaced, so the pipes in the source line up into columns. This
-            // is what makes a Markdown table readable without a real table
-            // layout, which TextKit cannot give us without rewriting the text.
+            // A table is prose in a grid, not code.
+            //
+            // It used to be drawn in the code font on the code background with
+            // the `|` characters left visible, because that was the only way to
+            // make columns line up: monospaced glyphs and the pipes themselves
+            // as the column rules. It worked, and it read as a code block —
+            // which is what it looked like, because it was styled as one.
+            //
+            // Now the pipes are concealed like any other syntax and the columns
+            // are positioned by measured kerning, so the cells can use the body
+            // face and the block can be drawn with table chrome instead of a
+            // panel.
+            //
+            // Rows wrap rather than clip. `.byClipping` looks tidy until a table
+            // is wider than the column: the row is then cut off at the container
+            // edge — which is *outside* the border, since the panel is inset from
+            // it — so the text both escaped the box and lost its end. Wrapping
+            // costs the column alignment on that one row and keeps everything
+            // inside the frame, which is the better trade. By character, not by
+            // word: a Chinese row has no spaces to break on.
             let paragraph = paragraph(
-                lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
+                lineHeight: typography.lineHeightMultiple * 1.25, size: typography.editorFontSize
             )
-            paragraph.firstLineHeadIndent = 8
-            paragraph.headIndent = 8
-            paragraph.lineBreakMode = .byClipping
+            paragraph.firstLineHeadIndent = Self.tableCellPadding
+            paragraph.headIndent = Self.tableCellPadding
+            paragraph.lineBreakMode = .byCharWrapping
             storage.addAttributes([
-                .font: typography.codeFont.platformFont(size: typography.codeFontSize),
+                .font: typography.editorFont.platformFont(size: typography.editorFontSize),
                 .foregroundColor: palette.text.platformColor,
+                // Kept so the copy button and its hit test keep working; the
+                // renderer consults `.inkstoneTableBlock` to decide which of the
+                // two presentations to paint.
                 .inkstoneBlockFill: true,
+                .inkstoneTableBlock: true,
             ], range: token.range)
             // Typora sets `margin: 0.8em 0` on tables — around the table, not
             // around each row.
@@ -655,7 +768,7 @@ struct MarkdownHighlighter {
 
         case .tableHeaderRow:
             setFont(
-                typography.codeFont.platformFont(size: typography.codeFontSize, weight: .semibold),
+                typography.editorFont.platformFont(size: typography.editorFontSize, weight: .semibold),
                 range: token.range
             )
 
@@ -698,9 +811,18 @@ struct MarkdownHighlighter {
             // it the moment the caret lands on its line means you have to move
             // the caret away before you can tick the box you are looking at.
             hide([token.range])
-            storage.addAttribute(.inkstoneCheckbox, value: checked, range: token.range)
+            // The state *character*, not a yes/no. `contentRange` is exactly the
+            // one character between the brackets, so Obsidian's `[/]`, `[-]`,
+            // `[>]` and the rest reach the renderer intact instead of collapsing
+            // into "not blank, therefore finished".
+            let marker = token.contentRange.length == 1
+                ? fullText.substring(with: token.contentRange)
+                : (checked ? "x" : " ")
+            storage.addAttribute(.inkstoneCheckbox, value: marker, range: token.range)
 
-            if checked {
+            // Only finished states read as finished. An item in progress or
+            // deferred is still work, and striking it through said otherwise.
+            if EditorRenderer.TaskState(marker).isFinished {
                 // Strike through the task text, not the marker.
                 let line = fullText.paragraphRange(for: token.range)
                 let bodyStart = token.range.location + token.range.length
@@ -831,8 +953,10 @@ struct MarkdownHighlighter {
         let paragraph = paragraph(
             lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
         )
-        paragraph.firstLineHeadIndent = 8
-        paragraph.headIndent = 8
+        // The same inset a table cell gets, so a code block and a table sitting
+        // next to each other do not start their text at different places.
+        paragraph.firstLineHeadIndent = Self.tableCellPadding
+        paragraph.headIndent = Self.tableCellPadding
         storage.addAttributes([
             .font: typography.codeFont.platformFont(size: typography.codeFontSize),
             .foregroundColor: style.palette.text.platformColor,
@@ -1005,15 +1129,104 @@ struct MarkdownHighlighter {
         storage.addAttribute(.inkstoneImageCentred, value: centred, range: range)
     }
 
+    /// Loads an embedded picture at the size its `|300` or `|300x200` hint asks
+    /// for, or at the measure when there is no hint.
+    ///
+    /// The hint was parsed all along — `WikiLink` has carried it since the
+    /// scanner was written — and then thrown away here, so `![[photo.png|160]]`
+    /// rendered at exactly the same width as `![[photo.png]]`.
+    ///
+    /// Capped at the measure whatever the hint says: a note asking for 4000
+    /// points should not push the column open.
+    private func sizedEmbed(_ url: URL, hint: WikiLink.EmbedSize?) -> PlatformImage? {
+        guard let hint else {
+            return AttachmentImageCache.shared.image(for: url, maxWidth: availableWidth)
+        }
+        let width = min(CGFloat(hint.width), availableWidth)
+        guard let image = AttachmentImageCache.shared.image(for: url, maxWidth: width) else {
+            return nil
+        }
+        // The cache buckets by 32pt and never scales a picture up, so it answers
+        // "no wider than this" rather than "this wide". A hint is a size, so the
+        // result is resized to match it exactly.
+        let height: CGFloat
+        if let hinted = hint.height {
+            height = CGFloat(hinted)
+        } else if image.size.width > 0 {
+            height = image.size.height * width / image.size.width
+        } else {
+            return image
+        }
+        guard width > 1, height > 1 else { return image }
+        guard abs(image.size.width - width) > 0.5 || abs(image.size.height - height) > 0.5 else {
+            return image
+        }
+        return image.resizedForInline(to: CGSize(width: width, height: height))
+    }
+
+    /// Whether everything else on `range`'s line is whitespace.
+    ///
+    /// A block image takes the whole line's height and is painted centred in it;
+    /// if there are words on that line they keep their baseline and the picture
+    /// is drawn straight over them. So the two cases have to be told apart, and
+    /// this is the test: an embed on a line of its own is a block, an embed
+    /// among words is an inline thumbnail.
+    private func isAloneOnItsLine(_ range: NSRange, in text: NSString) -> Bool {
+        let line = text.lineRange(for: range)
+        let before = NSRange(location: line.location, length: range.location - line.location)
+        let after = NSRange(
+            location: NSMaxRange(range),
+            length: max(0, NSMaxRange(line) - NSMaxRange(range))
+        )
+        func isBlank(_ probe: NSRange) -> Bool {
+            probe.length == 0 || text.substring(with: probe)
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return isBlank(before) && isBlank(after)
+    }
+
+    /// Draws an embedded picture at text size, among the words on its line.
+    ///
+    /// The same reservation trick as an inline formula: collapse the markup, add
+    /// the picture's width as kerning on its last character so the following
+    /// words move along, and let the view paint into the gap. Nothing is written
+    /// to the file.
+    private func inlineThumbnail(
+        _ image: PlatformImage,
+        to storage: NSTextStorage,
+        in range: NSRange
+    ) -> Bool {
+        guard range.length > 0, image.size.height > 0 else { return false }
+        let target = style.typography.editorFontSize * 1.4
+        let scale = min(1, target / image.size.height)
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        guard size.width > 1 else { return false }
+
+        let scaled = image.resizedForInline(to: size)
+
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+        let last = NSRange(location: NSMaxRange(range) - 1, length: 1)
+        storage.addAttribute(.kern, value: size.width + 4, range: last)
+        storage.addAttribute(.inkstoneInlineThumbnail, value: scaled, range: range)
+        return true
+    }
+
     /// Breathing room above and below an inline image.
     static let inlineImagePadding: CGFloat = 8
 
-    /// Cached text measurements for table cells, keyed by the cell's text.
-    /// Bounded so a pathological document cannot grow it without limit.
-    private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
     /// Indent applied per list nesting level.
     /// Room reserved at the right of a block's first line for its copy button.
     static let copyButtonClearance: CGFloat = 38
+
+    /// Cached widths for plain table cells, keyed by their text. Only used for
+    /// cells that are a single run of the body face, so the font is implied.
+    /// Bounded so a pathological document cannot grow it without limit.
+    private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
+
+    /// Space between a table's cell text and its border, and between columns.
+    static let tableCellPadding: CGFloat = 12
 
     static let listIndent: CGFloat = 22
     /// Distance from the text's left edge to the centre of its list marker.
@@ -1086,8 +1299,15 @@ struct MarkdownHighlighter {
 
             // Never touch a blank line inside a fenced block or a table, where it
             // is content rather than a separator.
-            let existing = storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil)
-            if let style = existing as? NSParagraphStyle, style.lineBreakMode == .byClipping { continue }
+            //
+            // Keyed on the block attribute rather than on `.byClipping`, which is
+            // what this used to test. Only tables ever set that mode, so a blank
+            // line inside a code fence was being compressed all along — and when
+            // tables changed to wrapping, the test stopped matching anything at
+            // all. The attribute is what actually means "this is a block".
+            if storage.attribute(.inkstoneBlockFill, at: line.location, effectiveRange: nil) != nil {
+                continue
+            }
 
             let blank = NSMutableParagraphStyle()
             blank.minimumLineHeight = gap
@@ -1110,24 +1330,47 @@ struct MarkdownHighlighter {
     /// Known limitation: cell width is measured from the raw characters, so a cell
     /// whose `**markers**` get concealed measures slightly wide and its column can
     /// sit a fraction off. Plain-text cells — nearly all of them — are exact.
-    private func alignTableColumns(_ tableRange: NSRange, in storage: NSTextStorage, text: NSString) {
-        let font = style.typography.codeFont.platformFont(size: style.typography.codeFontSize)
+    private func alignTableColumns(
+        _ tableRange: NSRange,
+        in storage: NSTextStorage,
+        text: NSString,
+        caretLineRange: NSRange?
+    ) {
 
         /// Measures a cell as it will actually be drawn.
         ///
-        /// Counting characters and assuming "one Han character is two Latin ones"
-        /// is wrong in practice: a monospaced Latin font has no CJK glyphs, so
-        /// those fall back to a different family whose advance is not exactly
-        /// double. Measuring sidesteps the whole question.
+        /// From the storage, not from the raw characters. This pass runs last —
+        /// after every font, weight and concealment has been applied — so the
+        /// attributed substring is literally what TextKit will lay out: a bold
+        /// cell measures bold, an inline code span measures in the code face, and
+        /// a `**` collapsed to 0.01pt measures as the nothing it draws as.
         ///
-        /// Text measurement lays out glyphs and is by far the most expensive part
-        /// of highlighting a document full of tables — it accounted for more than
-        /// half the time on a 56KB note. Results are cached per (string, font):
-        /// table cells repeat heavily, so the hit rate is high.
+        /// Measuring the raw string in one font instead was the cause of the
+        /// drift: a row containing `**bold**` measured too narrow where the bold
+        /// draws wide and too wide where the markers vanish, and every cell after
+        /// it in that row was pushed out of its column.
+        ///
+        /// Measuring the attributed substring is several times dearer than
+        /// measuring a plain string, and on a document of 200 tables that showed
+        /// up as 55ms a pass. Most cells carry no inline formatting at all, so a
+        /// cell that is one run of the body face takes the old cached path and
+        /// only the ones that actually differ pay for the accurate measurement.
+        let bodyFont = style.typography.editorFont.platformFont(size: style.typography.editorFontSize)
+
         func width(of range: NSRange) -> CGFloat {
+            guard range.length > 0, NSMaxRange(range) <= storage.length else { return 0 }
+
+            var runRange = NSRange(location: 0, length: 0)
+            let font = storage.attribute(.font, at: range.location, effectiveRange: &runRange)
+                as? PlatformFont
+            let isPlain = font == bodyFont && NSMaxRange(runRange) >= NSMaxRange(range)
+            guard isPlain else {
+                return storage.attributedSubstring(from: range).size().width
+            }
+
             let key = text.substring(with: range)
             if let cached = Self.cellWidthCache[key] { return cached }
-            let measured = (key as NSString).size(withAttributes: [.font: font]).width
+            let measured = (key as NSString).size(withAttributes: [.font: bodyFont]).width
             if Self.cellWidthCache.count < 4096 { Self.cellWidthCache[key] = measured }
             return measured
         }
@@ -1135,6 +1378,10 @@ struct MarkdownHighlighter {
         // Cells per row, as ranges between the pipes. Delimiter rows are skipped:
         // they are concealed anyway, and their dashes would distort the widths.
         var rows: [[NSRange]] = []
+        // Every `|` in the table, so they can be concealed once the columns have
+        // been measured. The pipes are syntax: they are what made a table look
+        // like a code listing, and nothing else on screen needs them.
+        var pipePositions: [Int] = []
         var lineStart = tableRange.location
         let tableEnd = tableRange.location + tableRange.length
 
@@ -1147,23 +1394,69 @@ struct MarkdownHighlighter {
             guard content.length > 0 else { continue }
             let raw = text.substring(with: content)
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.hasPrefix("|") else { continue }
+            guard !trimmed.isEmpty else { continue }
             // A delimiter row is only pipes, dashes, colons and spaces.
             if trimmed.allSatisfy({ "|-: \t".contains($0) }) { continue }
 
-            var pipes: [Int] = []
-            for offset in 0..<content.length where text.character(at: content.location + offset) == 0x7C {
-                pipes.append(content.location + offset)
+            // Trailing newline excluded, so the last cell of a row does not
+            // swallow the line break and measure wide by a space.
+            var body = content
+            while body.length > 0,
+                  let scalar = Unicode.Scalar(text.character(at: NSMaxRange(body) - 1)),
+                  CharacterSet.newlines.contains(scalar) {
+                body.length -= 1
             }
-            guard pipes.count >= 2 else { continue }
+            guard body.length > 0 else { continue }
 
+            var pipes: [Int] = []
+            for offset in 0..<body.length where text.character(at: body.location + offset) == 0x7C {
+                pipes.append(body.location + offset)
+            }
+            guard !pipes.isEmpty else { continue }
+            // Collected even for rows that yield no usable cells, so a malformed
+            // row does not keep its pipes while its neighbours lose theirs.
+            pipePositions.append(contentsOf: pipes)
+
+            // Cells are the runs *between* the pipes, with the row's own edges
+            // standing in for the outer ones. Written this way because GFM makes
+            // the outer pipes optional: `A | B` is as valid a row as `| A | B |`,
+            // and the previous version required the leading pipe and so skipped
+            // the bare form entirely — leaving those tables unaligned with their
+            // pipes still showing.
+            let boundaries = [body.location - 1] + pipes + [NSMaxRange(body)]
             var cells: [NSRange] = []
-            for index in 0..<(pipes.count - 1) {
-                let start = pipes[index] + 1
-                let length = pipes[index + 1] - start
+            for index in 0..<(boundaries.count - 1) {
+                let start = boundaries[index] + 1
+                let length = boundaries[index + 1] - start
                 if length > 0 { cells.append(NSRange(location: start, length: length)) }
             }
             if !cells.isEmpty { rows.append(cells) }
+        }
+
+        // The delimiter row's pipes are collected separately: that line is
+        // concealed whole, so it never reaches the loop above.
+        do {
+            var location = tableRange.location
+            while location < NSMaxRange(tableRange) {
+                let line = text.lineRange(for: NSRange(location: location, length: 0))
+                defer { location = max(NSMaxRange(line), location + 1) }
+                let trimmed = text.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed.contains("|"), trimmed.allSatisfy({ "|-: \t".contains($0) }) else { continue }
+                for offset in 0..<line.length where text.character(at: line.location + offset) == 0x7C {
+                    pipePositions.append(line.location + offset)
+                }
+            }
+        }
+
+        // Hide the pipes, except on the row the caret is on — the same rule every
+        // other piece of syntax follows, so a table can still be edited as text.
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        for pipe in pipePositions {
+            let line = text.paragraphRange(for: NSRange(location: pipe, length: 0))
+            if let caretLineRange, NSIntersectionRange(caretLineRange, line).length > 0 { continue }
+            let range = NSRange(location: pipe, length: 1)
+            storage.addAttribute(.font, value: tiny, range: range)
+            storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
         }
 
         guard rows.count > 1 else { return }
@@ -1176,6 +1469,24 @@ struct MarkdownHighlighter {
             for column in row.indices {
                 widths[column] = max(widths[column], measured[rowIndex][column])
             }
+        }
+        // A gutter, because the pipes that used to separate the columns are now
+        // invisible and the source's single spaces either side of them are not
+        // enough to read as a column break.
+        for column in widths.indices { widths[column] += Self.tableCellPadding }
+
+        // Aligning columns makes every row as wide as the widest cell in each
+        // column, which can push a table past the measure it has to fit in. Now
+        // that rows wrap instead of being clipped, that costs a wrapped line
+        // rather than lost text — so the gutter is dropped to wrap less, and the
+        // alignment is kept either way.
+        //
+        // Refusing to align at all when the table was too wide was tried and was
+        // worse: the columns of a table that merely needed one wrapped row
+        // collapsed into a run of words separated by single spaces.
+        let available = availableWidth - Self.tableCellPadding * 2 - Self.copyButtonClearance
+        if widths.reduce(0, +) > available {
+            for column in widths.indices { widths[column] -= Self.tableCellPadding }
         }
 
         for (rowIndex, row) in rows.enumerated() {
@@ -1250,7 +1561,12 @@ extension NSAttributedString.Key {
     static let inkstoneBullet = NSAttributedString.Key("inkstoneBullet")
     /// Marks a quoted line so its left rule can be drawn.
     static let inkstoneQuoteDepth = NSAttributedString.Key("inkstoneQuoteDepth")
-    /// Marks a concealed task marker so a checkbox can be drawn there. Bool.
+    /// Marks a concealed task marker so a checkbox can be drawn there.
+    ///
+    /// Value is the state *character* — `" "`, `"x"`, `"/"`, `"-"`, `">"` — not a
+    /// Bool. Obsidian allows any single character and the box has to show which
+    /// one it is; a Bool could only say "not blank", which drew everything from
+    /// "in progress" to "cancelled" as finished.
     static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
     /// A rounded fill hugging the text, drawn by the view. Value is a colour.
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
@@ -1265,8 +1581,18 @@ extension NSAttributedString.Key {
     /// stay unpainted. A block of prose with blank lines between paragraphs came
     /// out as a stack of separate grey stripes rather than one panel.
     static let inkstoneBlockFill = NSAttributedString.Key("inkstoneBlockFill")
+
+    /// Marks a block that carries `.inkstoneBlockFill` as a *table*, so the
+    /// renderer draws a grid rather than a code panel. Both are set: the copy
+    /// button and its hit test key off the fill, and only the presentation
+    /// differs.
+    static let inkstoneTableBlock = NSAttributedString.Key("inkstoneTableBlock")
     /// A typeset formula to be drawn within a line of prose. Value is an image.
     static let inkstoneInlineMath = NSAttributedString.Key("inkstoneInlineMath")
+
+    /// A picture small enough to sit among words, for an embed that shares its
+    /// line with other text. Value is an image, already scaled.
+    static let inkstoneInlineThumbnail = NSAttributedString.Key("inkstoneInlineThumbnail")
     /// Attached to a footnote marker so clicking it can jump to its definition.
     static let inkstoneFootnote = NSAttributedString.Key("inkstoneFootnote")
     /// Whether a block image is centred. Value is a Bool.

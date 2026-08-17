@@ -62,3 +62,55 @@ extension PlatformImage {
         #endif
     }
 }
+
+extension PlatformImage {
+    /// A copy scaled to `size`, for drawing a picture among words.
+    ///
+    /// Scaling at draw time instead would work on macOS and be wrong on iOS,
+    /// where the renderer asks the image for its own `size` to place it.
+    func resizedForInline(to size: CGSize) -> PlatformImage {
+        #if os(macOS)
+        let copy = NSImage(size: size)
+        copy.lockFocus()
+        draw(in: CGRect(origin: .zero, size: size))
+        copy.unlockFocus()
+        return copy
+        #else
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
+        #endif
+    }
+}
+
+#if os(macOS)
+typealias PlatformTextView = NSTextView
+#else
+typealias PlatformTextView = UITextView
+#endif
+
+extension PlatformTextView {
+    /// The view's text, however the platform spells the property.
+    var inkstoneText: String {
+        #if os(macOS)
+        string
+        #else
+        text ?? ""
+        #endif
+    }
+
+    /// Scrolls `range` into view and puts the caret at its start.
+    func inkstoneReveal(_ range: NSRange) {
+        let caret = NSRange(location: range.location, length: 0)
+        #if os(macOS)
+        setSelectedRange(caret)
+        scrollRangeToVisible(range)
+        #else
+        selectedRange = caret
+        scrollRangeToVisible(range)
+        // Deliberately not `becomeFirstResponder()`: tapping an outline row to
+        // look at a section should not throw the keyboard up over the section
+        // you just jumped to.
+        #endif
+    }
+}

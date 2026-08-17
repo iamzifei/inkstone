@@ -91,6 +91,16 @@ struct InkstoneApp: App {
         let storage = NSTextStorage(string: text)
         var highlighter = MarkdownHighlighter(style: .fallback, mode: .livePreview)
         highlighter.availableWidth = 800
+        // Resolve embeds against the benchmarked file's own folder. Without this
+        // every `![[picture.png]]` rendered as an unresolved link, which made the
+        // hook useless for looking at anything involving an image — including
+        // whether a `|300` size hint was being honoured.
+        let folder = URL(fileURLWithPath: path).deletingLastPathComponent()
+        highlighter.resolveAttachment = { target in
+            let candidate = folder.appending(path: target)
+            return FileManager.default.fileExists(atPath: candidate.path(percentEncoded: false))
+                ? candidate : nil
+        }
 
         highlighter.highlight(storage, caretLineRange: nil)  // warm up
 
@@ -141,6 +151,113 @@ struct InkstoneApp: App {
                 )
             }
             FileHandle.standardOutput.write(Data(report.utf8))
+        }
+
+        // Button dump: renders the copy button in each of its states into PNGs.
+        //
+        // Offscreen on purpose. Verifying a hover state by driving the real
+        // pointer means moving the user's cursor and clicking wherever their
+        // focus happens to be, which is both unreliable — the events land in
+        // whatever window is frontmost — and rude. This draws the same code path
+        // into an image instead.
+        if let outputDirectory = ProcessInfo.processInfo.environment["INKSTONE_BUTTON_DUMP"] {
+            highlighter.highlight(storage, caretLineRange: nil)
+            let width = ProcessInfo.processInfo.environment["INKSTONE_BUTTON_DUMP_WIDTH"]
+                .flatMap(Double.init) ?? 520
+            let containerHeight = ProcessInfo.processInfo.environment["INKSTONE_BUTTON_DUMP_HEIGHT"]
+                .flatMap(Double.init) ?? 900
+            highlighter.availableWidth = CGFloat(width)
+            highlighter.highlight(storage, caretLineRange: nil)
+            let container = NSTextContainer(size: CGSize(width: width, height: containerHeight))
+            container.lineFragmentPadding = 5
+            let layoutManager = NSLayoutManager()
+            layoutManager.addTextContainer(container)
+            storage.addLayoutManager(layoutManager)
+            layoutManager.ensureLayout(for: container)
+
+            // The first block that carries a copy button.
+            var target: NSRange?
+            storage.enumerateAttribute(
+                .inkstoneBlockFill, in: NSRange(location: 0, length: storage.length)
+            ) { value, range, stop in
+                guard value != nil else { return }
+                target = range
+                stop.pointee = true
+            }
+
+            for (name, hovered, copied) in [
+                ("normal", nil as NSRange?, nil as NSRange?),
+                ("hover", target, nil as NSRange?),
+                ("copied", nil as NSRange?, target),
+            ] {
+                let size = CGSize(
+                    width: width + 20,
+                    height: ProcessInfo.processInfo.environment["INKSTONE_BUTTON_DUMP_HEIGHT"]
+                        .flatMap(Double.init) ?? 140
+                )
+                let image = NSImage(size: size)
+                // Flipped, because `NSTextView` is: an unflipped dump draws the
+                // tick upside down and would have sent me chasing a bug in the
+                // app that only existed in this harness.
+                image.lockFocusFlipped(true)
+                Style.fallback.palette.background.platformColor.setFill()
+                CGRect(origin: .zero, size: size).fill()
+                EditorRenderer(
+                    storage: storage, layoutManager: layoutManager, container: container,
+                    origin: CGPoint(x: 10, y: 10), style: .fallback,
+                    hoveredCopyBlock: hovered, copiedCopyBlock: copied
+                ).draw(in: CGRect(origin: .zero, size: size))
+                let glyphs = layoutManager.glyphRange(for: container)
+                layoutManager.drawGlyphs(forGlyphRange: glyphs, at: CGPoint(x: 10, y: 10))
+                image.unlockFocus()
+
+                let url = URL(fileURLWithPath: outputDirectory)
+                    .appending(path: "button-\(name).png")
+                if let tiff = image.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiff),
+                   let png = bitmap.representation(using: .png, properties: [:]) {
+                    try? png.write(to: url)
+                    FileHandle.standardOutput.write(Data("wrote \(url.path)\n".utf8))
+                }
+            }
+        }
+
+        // Table dump: the line fragment against the glyphs inside it. The row
+        // bands and separators are drawn from the fragments, and the text is
+        // positioned by TextKit inside them — if those two disagree the bands
+        // look offset from their own text.
+        if ProcessInfo.processInfo.environment["INKSTONE_TABLE_DUMP"] != nil {
+            highlighter.highlight(storage, caretLineRange: nil)
+            let layoutManager = NSLayoutManager()
+            let container = NSTextContainer(
+                size: CGSize(width: 800, height: CGFloat.greatestFiniteMagnitude)
+            )
+            container.lineFragmentPadding = 5
+            layoutManager.addTextContainer(container)
+            storage.addLayoutManager(layoutManager)
+            layoutManager.ensureLayout(for: container)
+
+            let ns = storage.string as NSString
+            var report = "\n"
+            var location = 0
+            while location < ns.length {
+                let line = ns.lineRange(for: NSRange(location: location, length: 0))
+                defer { location = max(line.location + line.length, location + 1) }
+                guard storage.attribute(.inkstoneTableBlock, at: line.location, effectiveRange: nil) != nil
+                else { continue }
+                let glyph = layoutManager.glyphIndexForCharacter(at: line.location)
+                guard glyph < layoutManager.numberOfGlyphs else { continue }
+                let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+                let used = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+                let text = ns.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                report += String(
+                    format: "  fragment=%7.2f..%7.2f (h%6.2f)  used=%7.2f..%7.2f (h%6.2f)  %@\n",
+                    fragment.minY, fragment.maxY, fragment.height,
+                    used.minY, used.maxY, used.height,
+                    text.prefix(24) as CVarArg
+                )
+            }
+            FileHandle.standardOutput.write(Data((report + "\n").utf8))
         }
 
         // Conceal dump: which marker-only lines are actually collapsed.

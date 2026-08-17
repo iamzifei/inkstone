@@ -29,6 +29,15 @@ struct EditorRenderer {
     let origin: CGPoint
     let style: Style
 
+    /// The copy button the pointer is over, if any. A control with no hover
+    /// state reads as decoration: there was nothing to tell you the corner of a
+    /// code block could be clicked at all.
+    var hoveredCopyBlock: NSRange?
+    /// The block whose copy button was just pressed. Drawn as a tick for a
+    /// moment afterwards, because a copy that gives no acknowledgement leaves
+    /// you wondering whether it happened.
+    var copiedCopyBlock: NSRange?
+
     /// Draws every hand-painted element that intersects `rect`.
     ///
     /// Order matters where things overlap: fills sit behind their text, rules
@@ -55,8 +64,6 @@ struct EditorRenderer {
     /// stripes instead of one panel, which is not what any Markdown renderer
     /// shows.
     func drawBlockFills(in rect: CGRect) {
-        style.palette.codeBackground.platformColor.setFill()
-
         storage.enumerateAttribute(
             .inkstoneBlockFill,
             in: NSRange(location: 0, length: storage.length)
@@ -66,9 +73,179 @@ struct EditorRenderer {
             // lines and the leading between them; the bounding rect of the
             // glyphs alone would not.
             guard let panel = blockPanel(for: range), panel.intersects(rect) else { return }
-            PlatformBezierPath(roundedRect: panel, cornerRadius: 4).fill()
+
+            if storage.attribute(.inkstoneTableBlock, at: range.location, effectiveRange: nil) != nil {
+                drawTableChrome(for: range, panel: panel)
+            } else {
+                // Same ink-based geometry as a table. Drawn from the line
+                // fragments, the panel inherited the block's outer margin at the
+                // top and almost nothing at the bottom, so the first line of code
+                // sat further from the edge than the last.
+                let inked = blockInkPanel(for: range, outer: panel, padding: Self.blockPadding)
+                    ?? panel
+                style.palette.codeBackground.platformColor.setFill()
+                PlatformBezierPath(roundedRect: inked, cornerRadius: 6).fill()
+            }
             drawCopyButton(for: range)
         }
+    }
+
+    /// Where a table's rows and its panel actually are.
+    ///
+    /// Two earlier attempts got this wrong by using a rect that looked like the
+    /// right one. The line *fragment* carries the block's outer margin — 9.6pt of
+    /// it — inside the first and last rows. The *used* rect drops that margin but
+    /// is still the line box, and with an explicit `maximumLineHeight` TextKit
+    /// puts all the extra leading above the text and sits the glyphs on the
+    /// bottom edge: measured on screen, 18px of empty band above the header text
+    /// and 5px below it.
+    ///
+    /// So the geometry is built from the baseline and the font's own ascender and
+    /// descender, which is the only pair of numbers that says where the glyphs
+    /// are. Shared with `copyButtonRect` so the button sits in the corner of the
+    /// border that is actually drawn, rather than the one the fragments imply.
+    struct TableRow { let top: CGFloat; let bottom: CGFloat }
+
+    /// Breathing room between a code block's text and its panel.
+    static let blockPadding: CGFloat = 10
+
+    /// The ink box of every visible line in a block, one entry per *source* line.
+    ///
+    /// Shared by tables and code blocks, and the reason both are drawn from it is
+    /// the same: a line fragment carries the block's outer margin in its first
+    /// and last rows, and the used rect is the line box with all its leading
+    /// above the glyphs. Neither says where the text is.
+    func blockRows(for range: NSRange) -> [TableRow] {
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        var rows: [TableRow] = []
+        // The source line each row belongs to. A row wider than the measure wraps
+        // onto a second line fragment, and drawing a separator between the two
+        // halves would cut a single row in two.
+        var lastSourceLine = NSRange(location: NSNotFound, length: 0)
+        let source = storage.string as NSString
+
+        layoutManager.enumerateLineFragments(
+            forGlyphRange: glyphRange
+        ) { fragment, used, _, lineGlyphs, _ in
+            guard used.height >= 1 else { return }
+            let characters = self.layoutManager.characterRange(
+                forGlyphRange: lineGlyphs, actualGlyphRange: nil
+            )
+            // Measured at the first *visible* character: a row starts with a
+            // concealed `|` collapsed to 0.01pt, whose metrics say nothing.
+            var probe = characters.location
+            var font: PlatformFont?
+            while probe < NSMaxRange(characters) {
+                if let candidate = self.storage.attribute(.font, at: probe, effectiveRange: nil)
+                    as? PlatformFont, candidate.pointSize >= 1 {
+                    font = candidate
+                    break
+                }
+                probe += 1
+            }
+            guard let font else { return }
+
+            let glyph = self.layoutManager.glyphIndexForCharacter(at: probe)
+            guard glyph < self.layoutManager.numberOfGlyphs else { return }
+            let baseline = fragment.minY + self.layoutManager.location(forGlyphAt: glyph).y + self.origin.y
+            let top = baseline - font.ascender
+            let bottom = baseline - font.descender
+
+            let sourceLine = source.lineRange(for: NSRange(location: characters.location, length: 0))
+            if NSEqualRanges(sourceLine, lastSourceLine), let previous = rows.last {
+                // A continuation of the row above: extend it rather than start one.
+                rows[rows.count - 1] = TableRow(top: previous.top, bottom: bottom)
+            } else {
+                rows.append(TableRow(top: top, bottom: bottom))
+                lastSourceLine = sourceLine
+            }
+        }
+        return rows
+    }
+
+    /// A panel that sits evenly around a block's text.
+    func blockInkPanel(for range: NSRange, outer: CGRect, padding: CGFloat) -> CGRect? {
+        let rows = blockRows(for: range)
+        guard let first = rows.first, let last = rows.last else { return nil }
+        let panel = CGRect(
+            x: outer.minX,
+            y: first.top - padding,
+            width: outer.width,
+            height: (last.bottom + padding) - (first.top - padding)
+        )
+        return panel.height > 0 ? panel : nil
+    }
+
+    func tableGeometry(
+        for range: NSRange, outer: CGRect
+    ) -> (panel: CGRect, rows: [TableRow], halfGap: CGFloat)? {
+        let rows = blockRows(for: range)
+        guard let header = rows.first, let last = rows.last else { return nil }
+
+        // Half the gap between one row's ink and the next's: the padding that
+        // makes every row's text sit centred between its separators. Applied on
+        // every edge with nothing added on top of it — an earlier version added
+        // 4pt at the panel's top only, which put 4pt more space above the header
+        // text than below it, measured as 23px against 15px on screen.
+        let halfGap: CGFloat = rows.count > 1
+            ? max(1, (rows[1].top - rows[0].bottom) / 2)
+            : 4
+        let panel = CGRect(
+            x: outer.minX,
+            y: header.top - halfGap,
+            width: outer.width,
+            height: (last.bottom + halfGap) - (header.top - halfGap)
+        )
+        guard panel.height > 0 else { return nil }
+        return (panel, rows, halfGap)
+    }
+
+    /// Draws a table as a grid rather than as a shaded panel.
+    ///
+    /// The text is still the source text — the cells are ordinary runs whose
+    /// columns are positioned by kerning, and the `|` characters are concealed
+    /// rather than removed. What was missing was everything that makes a reader
+    /// see a table instead of a listing: a header band, a rule under it,
+    /// hairlines between the rows, and a border round the whole thing.
+    ///
+    /// Geometry comes from the **used** rects, not the line fragments. A block's
+    /// outer margin lives inside the first and last fragments of that block —
+    /// measured at 9.6pt on each — so bands drawn from fragments put that margin
+    /// inside the header's tint and pushed the separator hard against the header
+    /// text, which is exactly what "the text and the background do not line up"
+    /// looked like. The used rect is the glyphs' own box and has no margin in it.
+    private func drawTableChrome(for range: NSRange, panel outer: CGRect) {
+        guard let geometry = tableGeometry(for: range, outer: outer) else { return }
+        let panel = geometry.panel
+        let rows = geometry.rows
+        let halfGap = geometry.halfGap
+        guard let header = rows.first else { return }
+
+        // The header band, tinted rather than ruled off on its own: it is the one
+        // row a reader looks for first. Clipped to the panel's rounded rectangle
+        // so its top corners follow the border instead of poking through it —
+        // neither `NSBezierPath` nor the shared wrapper has a per-corner radius.
+        let headerBottom = rows.count > 1 ? (header.bottom + halfGap) : panel.maxY
+        if let context = currentDrawingContext {
+            context.saveGState()
+            PlatformBezierPath(roundedRect: panel, cornerRadius: 6).addClip()
+            style.palette.codeBackground.platformColor.setFill()
+            CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: headerBottom - panel.minY)
+                .fillPlatform()
+            context.restoreGState()
+        }
+
+        style.palette.divider.platformColor.setFill()
+        // A hairline midway between each pair of rows, header included.
+        for index in 0..<max(0, rows.count - 1) {
+            let y = (rows[index].bottom + rows[index + 1].top) / 2
+            CGRect(x: panel.minX, y: y - 0.5, width: panel.width, height: 1).fillPlatform()
+        }
+
+        style.palette.divider.platformColor.setStroke()
+        let border = PlatformBezierPath(roundedRect: panel.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 6)
+        border.lineWidth = 1
+        border.stroke()
     }
 
     /// Paints inline attachment images into the space the highlighter reserved.
@@ -151,7 +328,18 @@ struct EditorRenderer {
 
     /// Where the copy button for a code block is drawn, in the panel's corner.
     func copyButtonRect(for range: NSRange) -> CGRect? {
-        guard let panel = blockPanel(for: range) else { return nil }
+        guard var panel = blockPanel(for: range) else { return nil }
+        // A table's border is drawn from its baselines, not from the line
+        // fragments, so the button has to be placed against the same rectangle or
+        // it floats outside the corner it is meant to sit in — and, because this
+        // is also the hit test, becomes unclickable where it appears.
+        if storage.length > range.location {
+            if storage.attribute(.inkstoneTableBlock, at: range.location, effectiveRange: nil) != nil {
+                if let geometry = tableGeometry(for: range, outer: panel) { panel = geometry.panel }
+            } else if let inked = blockInkPanel(for: range, outer: panel, padding: Self.blockPadding) {
+                panel = inked
+            }
+        }
         let side: CGFloat = 22
         let inset: CGFloat = 8
         return CGRect(
@@ -203,16 +391,42 @@ struct EditorRenderer {
     private func drawCopyButton(for range: NSRange) {
         guard let button = copyButtonRect(for: range) else { return }
 
-        // Two offset rounded rectangles: the universal "copy" mark, drawn rather
-        // than set from a font so it matches the panel at any text size.
-        let colour = style.palette.faintText.platformColor
+        let isCopied = copiedCopyBlock.map { NSEqualRanges($0, range) } ?? false
+        let isHovered = hoveredCopyBlock.map { NSEqualRanges($0, range) } ?? false
+
+        // Three states, because a button that looks identical whatever you do to
+        // it is indistinguishable from an icon.
+        let colour = isCopied
+            ? style.palette.accent.platformColor
+            : (isHovered ? style.palette.text.platformColor : style.palette.faintText.platformColor)
 
         // A solid ground first: the first line is kept clear of the button, but
         // a wrapped line or a wide table can still reach under it.
-        style.palette.codeBackground.platformColor.setFill()
+        if isHovered || isCopied {
+            style.palette.divider.platformColor.setFill()
+        } else {
+            style.palette.codeBackground.platformColor.setFill()
+        }
         PlatformBezierPath(roundedRect: button, cornerRadius: 5).fill()
-        colour.setStroke()
 
+        if isCopied {
+            // A tick, drawn rather than set from a font so it matches the mark it
+            // replaces at any text size.
+            let path = PlatformBezierPath()
+            path.move(to: CGPoint(x: button.minX + 5, y: button.midY))
+            path.addLine(to: CGPoint(x: button.minX + 9, y: button.midY + 4.5))
+            path.addLine(to: CGPoint(x: button.maxX - 5, y: button.midY - 5))
+            path.lineWidth = 2
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            colour.setStroke()
+            path.stroke()
+            return
+        }
+
+        // Two offset rounded rectangles: the universal "copy" mark, drawn rather
+        // than set from a font so it matches the panel at any text size.
+        colour.setStroke()
         let back = CGRect(x: button.minX + 5, y: button.minY + 2, width: 11, height: 13)
         let front = CGRect(x: button.minX + 2, y: button.minY + 6, width: 11, height: 13)
 
@@ -220,9 +434,13 @@ struct EditorRenderer {
         backPath.lineWidth = 1.2
         backPath.stroke()
 
-        // Punch the background through behind the front sheet so the two read as
+        // Punch the ground through behind the front sheet so the two read as
         // overlapping rather than as a grid.
-        style.palette.codeBackground.platformColor.setFill()
+        if isHovered {
+            style.palette.divider.platformColor.setFill()
+        } else {
+            style.palette.codeBackground.platformColor.setFill()
+        }
         PlatformBezierPath(roundedRect: front.insetBy(dx: -1, dy: -1), cornerRadius: 3).fill()
 
         colour.setStroke()
@@ -231,14 +449,22 @@ struct EditorRenderer {
         frontPath.stroke()
     }
 
+
     /// Draws inline formulas into the space their kerning reserved.
     ///
     /// Sat on the baseline rather than centred in the line box: an inline formula
     /// has to sit on the same line as the words around it, and a line box with a
     /// line-height multiple is much taller than the text.
     func drawInlineMath(in rect: CGRect) {
+        // Two keys, one behaviour: a typeset formula and a thumbnail of an
+        // embedded picture both have to sit on the baseline among the words.
+        drawOnBaseline(.inkstoneInlineMath, in: rect)
+        drawOnBaseline(.inkstoneInlineThumbnail, in: rect)
+    }
+
+    private func drawOnBaseline(_ key: NSAttributedString.Key, in rect: CGRect) {
         storage.enumerateAttribute(
-            .inkstoneInlineMath,
+            key,
             in: NSRange(location: 0, length: storage.length)
         ) { value, range, _ in
             guard let image = value as? PlatformImage else { return }
@@ -365,13 +591,48 @@ struct EditorRenderer {
     /// Same reasoning as the bullets: the brackets cannot be swapped for a real
     /// checkbox glyph without editing the note, so the marker is hidden and the
     /// box is painted into the space it left.
-    func drawCheckboxes(in rect: CGRect) {
+    /// How a task's state character is drawn, and whether its text reads as done.
+    ///
+    /// GFM has two states; Obsidian lets any single character sit between the
+    /// brackets and communities have settled on a handful of meanings. Every
+    /// non-blank state used to render as a ticked box with the text struck
+    /// through, so "in progress" and "cancelled" and "deferred" were all
+    /// indistinguishable from "finished" — the one thing a task list exists to
+    /// tell you apart.
+    enum TaskState {
+        case open
+        case done
+        case cancelled
+        /// Any other character Obsidian allows: drawn as itself inside the box,
+        /// which is honest about carrying a state we have no icon for.
+        case other(String)
 
+        init(_ marker: String) {
+            switch marker {
+            case " ", "": self = .open
+            case "x", "X", "✓", "✔": self = .done
+            case "-", "~": self = .cancelled
+            default: self = .other(marker)
+            }
+        }
+
+        /// Whether the item's text should read as finished with.
+        var isFinished: Bool {
+            switch self {
+            case .done, .cancelled: return true
+            case .open, .other: return false
+            }
+        }
+    }
+
+    func drawCheckboxes(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneCheckbox,
             in: NSRange(location: 0, length: storage.length)
         ) { value, range, _ in
-            guard let checked = value as? Bool else { return }
+            // A `String` now, not a `Bool`: the box has to show *which* state.
+            guard let marker = value as? String else { return }
+            let state = TaskState(marker)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
                 .offsetBy(dx: origin.x, dy: origin.y)
@@ -379,9 +640,15 @@ struct EditorRenderer {
 
             guard let box = checkboxBox(for: range) else { return }
             let side = box.width
-
             let path = PlatformBezierPath(roundedRect: box, cornerRadius: 3)
-            if checked {
+
+            switch state {
+            case .open:
+                style.palette.faintText.platformColor.setStroke()
+                path.lineWidth = 1.2
+                path.stroke()
+
+            case .done:
                 style.palette.accent.platformColor.setFill()
                 path.fill()
                 // A tick, drawn rather than set in a font so it scales with the box.
@@ -394,10 +661,37 @@ struct EditorRenderer {
                 tick.lineJoinStyle = .round
                 style.palette.background.platformColor.setStroke()
                 tick.stroke()
-            } else {
+
+            case .cancelled:
+                // An outlined box with a bar through it: struck out, not ticked.
                 style.palette.faintText.platformColor.setStroke()
                 path.lineWidth = 1.2
                 path.stroke()
+                let bar = PlatformBezierPath()
+                bar.move(to: CGPoint(x: box.minX + side * 0.24, y: box.midY))
+                bar.addLine(to: CGPoint(x: box.maxX - side * 0.24, y: box.midY))
+                bar.lineWidth = 1.8
+                bar.lineCapStyle = .round
+                style.palette.faintText.platformColor.setStroke()
+                bar.stroke()
+
+            case .other(let marker):
+                style.palette.accent.platformColor.setStroke()
+                path.lineWidth = 1.2
+                path.stroke()
+                // The character itself, centred. Sized to the box rather than to
+                // the text so `/` and `>` and `?` all sit the same.
+                let font = PlatformFont.systemFont(ofSize: side * 0.68, weight: .semibold)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: style.palette.accent.platformColor,
+                ]
+                let glyph = marker as NSString
+                let size = glyph.size(withAttributes: attributes)
+                glyph.draw(
+                    at: CGPoint(x: box.midX - size.width / 2, y: box.midY - size.height / 2),
+                    withAttributes: attributes
+                )
             }
         }
     }

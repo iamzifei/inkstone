@@ -36,10 +36,13 @@ struct MarkdownEditorView: View {
     let mode: EditorMode
     let actions: EditorActions
     var spellCheck: Bool = false
+    /// A range to scroll into view, set by the outline pane.
+    var reveal: Workspace.RevealTarget?
 
     var body: some View {
         TextViewRepresentable(
-            text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck
+            text: $text, style: style, mode: mode, actions: actions,
+            spellCheck: spellCheck, reveal: reveal
         )
         .background(style.background)
     }
@@ -102,6 +105,45 @@ class EditorCoordinator: NSObject {
         return nil
     }
     #endif
+
+    /// Whether the caret has moved to a different line since the last pass.
+    ///
+    /// The decision itself lives in `InkstoneCore.CaretLineTracker`, where it is
+    /// tested; this is only the wiring.
+    var caretTracker = CaretLineTracker()
+
+    /// Whether a selection change needs a new highlight pass.
+    func selectionNeedsRehighlight(_ caret: NSRange?) -> Bool {
+        #if DEBUG
+        // The pre-guard behaviour, for measuring against in the same binary.
+        if ProcessInfo.processInfo.environment["INKSTONE_NO_SELECTION_GUARD"] != nil { return true }
+        #endif
+        return caretTracker.needsPass(caretLine: caret)
+    }
+
+    /// The reveal request already acted on, so an unrelated SwiftUI update does
+    /// not scroll the reader back to a heading they have since scrolled away from.
+    private var handledRevealToken: Int?
+
+    /// Scrolls `range` into view and puts the caret at its start.
+    ///
+    /// Clamped to the current text: the ranges come from the index, which is
+    /// rebuilt on save, so a note with unsaved edits can hand back a range that
+    /// is past the end of what is on screen.
+    func applyReveal(_ target: Workspace.RevealTarget?, to textView: PlatformTextView) {
+        guard let target, handledRevealToken != target.token else { return }
+        handledRevealToken = target.token
+
+        let length = (textView.inkstoneText as NSString).length
+        guard target.range.location < length else { return }
+        let range = NSRange(
+            location: target.range.location,
+            length: min(target.range.length, length - target.range.location)
+        )
+        // No explicit re-highlight: moving the caret posts a selection change,
+        // and `CaretLineTracker` decides from there whether the pass is needed.
+        textView.inkstoneReveal(range)
+    }
 
     /// Paragraph range containing the caret, so live preview can reveal syntax
     /// on the line being edited.
@@ -393,6 +435,67 @@ final class InkstoneLayoutManager: NSLayoutManager {
 final class InkstoneTextView: NSTextView {
     weak var coordinator: EditorCoordinator?
 
+    /// The copy button under the pointer, and the one just pressed.
+    ///
+    /// Held on the view rather than in the highlighter's attributes: neither is
+    /// a property of the text, and putting them in the storage would mean an
+    /// attribute pass — and a document-wide re-highlight — every time the
+    /// pointer crossed a corner.
+    var hoveredCopyBlock: NSRange? {
+        didSet { if hoveredCopyBlock != oldValue { needsDisplay = true } }
+    }
+    var copiedCopyBlock: NSRange? {
+        didSet { if copiedCopyBlock != oldValue { needsDisplay = true } }
+    }
+    private var copiedResetTask: Task<Void, Never>?
+
+    /// Marks a block as just-copied, and clears the mark shortly after.
+    func flashCopied(_ range: NSRange) {
+        copiedCopyBlock = range
+        copiedResetTask?.cancel()
+        copiedResetTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1100))
+            guard !Task.isCancelled else { return }
+            self?.copiedCopyBlock = nil
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // A tracking area with `.mouseMoved` is documented to deliver without
+        // this, but setting it costs nothing and removes the doubt.
+        window?.acceptsMouseMovedEvents = true
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self
+        ))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        guard let coordinator, let storage = textStorage, let layoutManager,
+              let container = textContainer
+        else { return }
+        hoveredCopyBlock = MainActor.assumeIsolated {
+            EditorRenderer(
+                storage: storage, layoutManager: layoutManager, container: container,
+                origin: textContainerOrigin, style: coordinator.style
+            ).copyButtonHit(at: point)
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        hoveredCopyBlock = nil
+    }
+
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
 
@@ -420,6 +523,7 @@ final class InkstoneTextView: NSTextView {
                ).copyButtonHit(at: point)
            }),
            MainActor.assumeIsolated({ coordinator.copyBlock(range: range, in: storage) }) {
+            MainActor.assumeIsolated { flashCopied(range) }
             return
         }
 
@@ -504,7 +608,9 @@ final class InkstoneTextView: NSTextView {
             layoutManager: layoutManager,
             container: container,
             origin: textContainerOrigin,
-            style: MainActor.assumeIsolated { coordinator.style }
+            style: MainActor.assumeIsolated { coordinator.style },
+            hoveredCopyBlock: hoveredCopyBlock,
+            copiedCopyBlock: copiedCopyBlock
         ).draw(in: rect)
     }
 
@@ -528,6 +634,26 @@ final class InkstoneTextView: NSTextView {
         super.resetCursorRects()
         // Pointing hand over links, so they read as interactive.
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
+
+        // And over the copy button, which had no cursor change, no hover state
+        // and no confirmation — three separate reasons to think it was a picture
+        // rather than a control.
+        if let coordinator {
+            let renderer = MainActor.assumeIsolated {
+                EditorRenderer(
+                    storage: storage, layoutManager: layoutManager, container: container,
+                    origin: textContainerOrigin, style: coordinator.style
+                )
+            }
+            storage.enumerateAttribute(
+                .inkstoneBlockFill, in: NSRange(location: 0, length: storage.length)
+            ) { value, range, _ in
+                guard value != nil,
+                      let button = MainActor.assumeIsolated({ renderer.copyButtonRect(for: range) })
+                else { return }
+                addCursorRect(button, cursor: .pointingHand)
+            }
+        }
         storage.enumerateAttribute(
             .inkstoneWikiLink,
             in: NSRange(location: 0, length: storage.length)
@@ -547,6 +673,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
     let mode: EditorMode
     let actions: EditorActions
     let spellCheck: Bool
+    let reveal: Workspace.RevealTarget?
 
     func makeCoordinator() -> MacCoordinator {
         MacCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
@@ -629,6 +756,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
         coordinator.actions = actions
 
         guard let textView = coordinator.textView else { return }
+        defer { coordinator.applyReveal(reveal, to: textView) }
         if textView.string != text {
             let selection = textView.selectedRange()
             textView.string = text
@@ -755,13 +883,15 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let started = DispatchTime.now().uptimeNanoseconds
             defer {
                 let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
-                if ms > 8 {
+                let logAll = ProcessInfo.processInfo.environment["INKSTONE_LOG_HIGHLIGHTS"] != nil
+                if ms > 8 || logAll {
                     FileHandle.standardError.write(Data(
                         "[inkstone] highlight \(storage.length) chars in \(String(format: "%.1f", ms)) ms\n".utf8
                     ))
                     let url = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                         ?? URL(fileURLWithPath: NSTemporaryDirectory())).appending(path: "inkstone-debug.log")
-                    let line = "[perf] highlight \(storage.length) chars \(String(format: "%.1f", ms)) ms\n"
+                    let line = "[perf] highlight \(storage.length) chars "
+                        + "\(String(format: "%.1f", ms)) ms scans=\(ScanCache.shared.scanCount)\n"
                     if let handle = try? FileHandle(forWritingTo: url) {
                         handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
                     } else { try? Data(line.utf8).write(to: url) }
@@ -773,6 +903,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange())
             let scope = viewportScope()
             styledRange = scope
+            caretTracker.record(caretLine: caretRange)
             highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: scope)
         }
 
@@ -783,8 +914,12 @@ private struct TextViewRepresentable: NSViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard !isApplyingAttributes else { return }
-            // Live preview needs a re-run whenever the caret moves to a new line.
+            guard !isApplyingAttributes, let textView, let storage = textView.textStorage else { return }
+            // Live preview needs a re-run whenever the caret moves to a new line —
+            // and only then. Typing fires this *as well as* `textDidChange`, so
+            // without the guard every keystroke ran the pass twice.
+            let caret = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange())
+            guard selectionNeedsRehighlight(caret) else { return }
             rehighlight()
         }
 
@@ -989,6 +1124,24 @@ private extension UITextView {
 /// everything painted here lands behind it, which is what the fills and rules
 /// need.
 final class InkstonePhoneTextView: UITextView {
+    /// The block whose copy button was just tapped, drawn as a tick for a
+    /// moment. There is no hover on a touch screen, which makes the
+    /// confirmation the only feedback there is.
+    var copiedCopyBlock: NSRange? {
+        didSet { if copiedCopyBlock != oldValue { setNeedsDisplay() } }
+    }
+    private var copiedResetTask: Task<Void, Never>?
+
+    func flashCopied(_ range: NSRange) {
+        copiedCopyBlock = range
+        copiedResetTask?.cancel()
+        copiedResetTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1100))
+            guard !Task.isCancelled else { return }
+            self?.copiedCopyBlock = nil
+        }
+    }
+
     weak var coordinator: EditorCoordinator?
 
     override func draw(_ rect: CGRect) {
@@ -1005,7 +1158,9 @@ final class InkstonePhoneTextView: UITextView {
             container: container,
             // UIKit expresses the same offset as an inset rather than an origin.
             origin: CGPoint(x: textContainerInset.left, y: textContainerInset.top),
-            style: MainActor.assumeIsolated { coordinator.style }
+            style: MainActor.assumeIsolated { coordinator.style },
+            // No hover on a touch screen; the confirmation still matters.
+            copiedCopyBlock: copiedCopyBlock
         ).draw(in: rect)
     }
 }
@@ -1016,6 +1171,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
     let mode: EditorMode
     let actions: EditorActions
     let spellCheck: Bool
+    let reveal: Workspace.RevealTarget?
 
     func makeCoordinator() -> PhoneCoordinator {
         PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
@@ -1086,6 +1242,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.text = $text
         coordinator.actions = actions
+        defer { coordinator.applyReveal(reveal, to: textView) }
 
         if textView.text != text {
             let selection = textView.selectedRange
@@ -1140,6 +1297,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
             isApplyingAttributes = true
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange)
+            caretTracker.record(caretLine: caretRange)
             highlighter.highlight(storage, caretLineRange: caretRange)
 
             // Ask for a repaint of the hand-drawn layer.
@@ -1162,6 +1320,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard !isApplyingAttributes else { return }
+            // Same guard as AppKit: only a change of caret *line* can change what
+            // live preview shows. UIKit fires this while scrolling a selection
+            // into view too, which made it even hotter than on the Mac.
+            let caret = caretLineRange(
+                in: textView.textStorage.string as NSString, selection: textView.selectedRange
+            )
+            guard selectionNeedsRehighlight(caret) else { return }
             rehighlight()
         }
 
@@ -1209,6 +1374,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
             }
             if let range = renderer.copyButtonHit(at: viewPoint),
                copyBlock(range: range, in: storage) {
+                (textView as? InkstonePhoneTextView)?.flashCopied(range)
                 return
             }
 

@@ -63,6 +63,29 @@ final class Workspace {
     /// position and unsaved edits survive.
     private(set) var documents: [URL: NoteDocument] = [:]
 
+    /// A request from elsewhere in the UI — the outline, for now — to bring a
+    /// particular range of the open note into view.
+    ///
+    /// A value rather than a method call because the editor is a wrapped
+    /// `NSTextView`/`UITextView` several layers down, and SwiftUI's way to reach
+    /// it is to change something it observes. `token` makes repeated requests for
+    /// the *same* range distinct, so tapping one heading twice scrolls twice.
+    struct RevealTarget: Equatable {
+        let url: URL
+        let range: NSRange
+        let token: Int
+    }
+
+    private(set) var revealTarget: RevealTarget?
+    private var revealToken = 0
+
+    /// Scrolls the editor to `range` in `url`, opening the note first if needed.
+    func reveal(_ range: NSRange, in url: URL) {
+        if activeTab?.url != url { openNote(at: url) }
+        revealToken += 1
+        revealTarget = RevealTarget(url: url, range: range, token: revealToken)
+    }
+
     var tabs: [TabContent] = []
     var activeTab: TabContent? {
         didSet {

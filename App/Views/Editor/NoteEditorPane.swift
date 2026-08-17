@@ -45,7 +45,8 @@ struct NoteEditorPane: View {
                         },
                         openAttachment: { openURL($0) }
                     ),
-                    spellCheck: workspace.settings.data.spellCheck
+                    spellCheck: workspace.settings.data.spellCheck,
+                    reveal: workspace.revealTarget?.url == url ? workspace.revealTarget : nil
                 )
 
                 Divider().overlay(style.divider)
@@ -150,6 +151,30 @@ struct InspectorView: View {
                                     .background(Capsule().fill(style.tagColor.opacity(0.15)))
                                     .foregroundStyle(style.tagColor)
                             }
+                        }
+                    }
+                }
+
+                if !note.headings.isEmpty {
+                    Section(String(localized: "Outline")) {
+                        // Also reachable from the sidebar's outline tab. It lives
+                        // here too because this is the panel that answers
+                        // "what is in the note I am looking at", and that is
+                        // where James went looking for it.
+                        ForEach(note.headings, id: \.range.location) { heading in
+                            Button {
+                                workspace.reveal(heading.range, in: url)
+                            } label: {
+                                Text(heading.text)
+                                    .font(style.uiFont)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.leading, CGFloat(min(heading.level, 6) - 1) * 10)
+                                    .foregroundStyle(
+                                        heading.level <= 2 ? style.text : style.secondaryText
+                                    )
+                                    .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

@@ -393,16 +393,31 @@ struct OutlinePane: View {
     @Environment(\.style) private var style
 
     var body: some View {
-        if let url = workspace.activeTab?.url, let note = workspace.index.metadata(for: url) {
+        if let url = workspace.activeTab?.url,
+           let note = workspace.index.metadata(for: url),
+           !note.headings.isEmpty {
             List(note.headings, id: \.range.location) { heading in
-                Text(heading.text)
-                    .font(style.uiFont)
-                    .padding(.leading, CGFloat(heading.level - 1) * 12)
-                    .foregroundStyle(heading.level == 1 ? style.text : style.secondaryText)
+                // A button, not a label: an outline that cannot be jumped from is
+                // a list of headings, not a table of contents.
+                Button {
+                    workspace.reveal(heading.range, in: url)
+                } label: {
+                    Text(heading.text)
+                        .font(style.uiFont)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, CGFloat(heading.level - 1) * 12)
+                        .foregroundStyle(heading.level == 1 ? style.text : style.secondaryText)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
             }
             .listStyle(.sidebar)
         } else {
-            ContentUnavailableView("No outline", systemImage: "list.bullet.indent")
+            ContentUnavailableView(
+                "No outline",
+                systemImage: "list.bullet.indent",
+                description: Text("Headings in the open note appear here.")
+            )
         }
     }
 }
