@@ -396,7 +396,8 @@ struct MarkdownHighlighter {
             // and shows the source as an ordinary code block. When the image
             // lands the renderer asks the editor to run again and it appears.
             let body = mermaidBody(of: token.range, in: fullText)
-            if let image = MermaidRenderer.shared.image(for: body, isDark: style.isDark) {
+            let mermaidImage = MermaidRenderer.shared.image(for: body, isDark: style.isDark)
+            if let image = mermaidImage {
                 inlineImage(image, to: storage, in: token.range, fullText: fullText)
             } else {
                 applyCodeBlockStyle(to: storage, token: token, fullText: fullText, conceal: conceal, isBeingEdited: isBeingEdited)

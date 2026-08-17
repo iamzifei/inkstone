@@ -37,6 +37,7 @@ struct EditorRenderer {
     func draw(in rect: CGRect) {
         drawBlockFills(in: rect)
         drawHorizontalRules(in: rect)
+        drawInlineImages(in: rect)
         drawInlineFills(in: rect)
         drawBullets(in: rect)
         drawQuoteRules(in: rect)
@@ -67,6 +68,64 @@ struct EditorRenderer {
             guard let panel = blockPanel(for: range), panel.intersects(rect) else { return }
             PlatformBezierPath(roundedRect: panel, cornerRadius: 4).fill()
             drawCopyButton(for: range)
+        }
+    }
+
+    /// Paints inline attachment images into the space the highlighter reserved.
+    ///
+    /// See `MarkdownHighlighter.inlineImage` for why this is drawn by hand
+    /// rather than using a text attachment. This lived in the AppKit text view
+    /// until the rest of the drawing moved out, which left iOS silently painting
+    /// nothing for every embedded image and every rendered Mermaid diagram: the
+    /// source was concealed and its replacement never arrived.
+    func drawInlineImages(in rect: CGRect) {
+        storage.enumerateAttribute(
+            .inkstoneInlineImage,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let image = value as? PlatformImage else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard lineRect.intersects(rect) else { return }
+
+            let size = image.size
+            // The paragraph is centred, but the glyphs it contains are collapsed
+            // to nothing, so the line rect carries no useful x. Centre against
+            // the text container instead.
+            let centred = (storage.attribute(.inkstoneImageCentred, at: range.location, effectiveRange: nil)
+                as? Bool) ?? true
+            let available = container.size.width - container.lineFragmentPadding * 2
+            let x = centred ? origin.x + max(0, (available - size.width) / 2) : origin.x
+            let target = CGRect(
+                x: x,
+                y: lineRect.minY + MarkdownHighlighter.inlineImagePadding,
+                width: size.width,
+                height: size.height
+            )
+
+            // A text view uses flipped coordinates, so drawing an NSImage
+            // straight into it lands the picture upside down. Flip the CTM about
+            // the target rect and draw the CGImage into the corrected space.
+            #if os(macOS)
+            // A flipped text view draws a CGImage upside down, so the CTM is
+            // flipped about the target rect first.
+            guard let context = currentDrawingContext, let cgImage = image.platformCGImage
+            else { return }
+            context.saveGState()
+            context.translateBy(x: 0, y: target.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(
+                cgImage,
+                in: CGRect(x: target.minX, y: 0, width: target.width, height: target.height)
+            )
+            context.restoreGState()
+            #else
+            // UIKit's own draw already accounts for the orientation, and unlike
+            // the CGImage path it works whatever backing the image has — a
+            // WKWebView snapshot does not always carry a usable `cgImage`.
+            image.draw(in: target)
+            #endif
         }
     }
 

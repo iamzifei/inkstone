@@ -74,6 +74,16 @@ final class MermaidRenderer {
 
     private init() {}
 
+    #if !os(macOS)
+    /// A view to park offscreen web views in.
+    private static func hostView() -> UIView? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+    }
+    #endif
+
     /// Debug trace; the render path crosses a web view and three callbacks, so
     /// when nothing appears it is otherwise impossible to tell which step failed.
     private func trace(_ message: String) {
@@ -130,7 +140,17 @@ final class MermaidRenderer {
             frame: CGRect(x: 0, y: 0, width: 1400, height: 1400),
             configuration: configuration
         )
+        #if os(macOS)
+        // Private KVC, and AppKit-only: `drawsBackground` does not exist on a
+        // UIKit WKWebView, so this threw NSUnknownKeyException and took the app
+        // down with it. Any note containing a Mermaid diagram crashed iOS on
+        // open.
         webView.setValue(false, forKey: "drawsBackground")
+        #else
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        #endif
         // The page is a local string with no baseURL, so it cannot reach the
         // network; this stops it navigating anywhere either.
         webView.navigationDelegate = handler
@@ -138,6 +158,17 @@ final class MermaidRenderer {
         activeWebViews[key] = webView
         #if os(macOS)
         host.contentView?.addSubview(webView)
+        #else
+        // Same reason as the offscreen window on macOS: a WKWebView outside a
+        // hierarchy never lays out, so the JavaScript that waits on layout never
+        // finishes and the snapshot has nothing to capture. Parked off the edge
+        // of the key window rather than in one of its own, since UIKit has no
+        // equivalent of an invisible utility window.
+        if let host = Self.hostView() {
+            webView.frame.origin = CGPoint(x: -20_000, y: -20_000)
+            webView.isUserInteractionEnabled = false
+            host.addSubview(webView)
+        }
         #endif
 
         webView.loadHTMLString(html(for: key, library: library), baseURL: nil)
@@ -215,9 +246,7 @@ final class MermaidRenderer {
         webView.takeSnapshot(with: configuration) { [weak self] image, _ in
             guard let self else { return }
             self.inFlight.remove(key)
-            #if os(macOS)
             self.activeWebViews[key]?.removeFromSuperview()
-            #endif
             self.activeWebViews.removeValue(forKey: key)
 
             guard let image else {

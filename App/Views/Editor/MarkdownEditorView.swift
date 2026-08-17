@@ -498,48 +498,6 @@ final class InkstoneTextView: NSTextView {
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
 
         let origin = textContainerOrigin
-        storage.enumerateAttribute(
-            .inkstoneInlineImage,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let image = value as? NSImage else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard lineRect.intersects(rect) else { return }
-
-            let size = image.size
-            // The paragraph is centred, but the glyphs it contains are collapsed
-            // to nothing, so the line rect carries no useful x. Centre against
-            // the text container instead.
-            let centred = (storage.attribute(.inkstoneImageCentred, at: range.location, effectiveRange: nil)
-                as? Bool) ?? true
-            let available = container.size.width - container.lineFragmentPadding * 2
-            let x = centred ? origin.x + max(0, (available - size.width) / 2) : origin.x
-            let target = NSRect(
-                x: x,
-                y: lineRect.minY + MarkdownHighlighter.inlineImagePadding,
-                width: size.width,
-                height: size.height
-            )
-
-            // A text view uses flipped coordinates, so drawing an NSImage
-            // straight into it lands the picture upside down. Flip the CTM about
-            // the target rect and draw the CGImage into the corrected space.
-            guard let context = NSGraphicsContext.current?.cgContext,
-                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-            else { return }
-
-            context.saveGState()
-            context.translateBy(x: 0, y: target.maxY)
-            context.scaleBy(x: 1, y: -1)
-            context.draw(
-                cgImage,
-                in: CGRect(x: target.minX, y: 0, width: target.width, height: target.height)
-            )
-            context.restoreGState()
-        }
-
         guard let coordinator else { return }
         EditorRenderer(
             storage: storage,
@@ -1096,6 +1054,17 @@ private struct TextViewRepresentable: UIViewRepresentable {
             textView: textView, tint: style.palette.accent.platformColor
         )
 
+        // A Mermaid diagram renders asynchronously; when one lands, run again so
+        // it replaces its source. Guarded by the renderer's cache, so this
+        // settles rather than looping.
+        //
+        // This was set on macOS only, so on iOS the diagram rendered — the trace
+        // showed a 316x73 image — and then nothing asked the editor to redraw,
+        // leaving the source on screen forever.
+        MermaidRenderer.shared.onRendered = { [weak coordinator = context.coordinator] in
+            MainActor.assumeIsolated { coordinator?.rehighlight() }
+        }
+
         #if DEBUG
         // Brings the keyboard up so the accessory row can be seen in a
         // screenshot; the simulator otherwise uses the Mac's keyboard and never
@@ -1172,6 +1141,17 @@ private struct TextViewRepresentable: UIViewRepresentable {
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange)
             highlighter.highlight(storage, caretLineRange: caretRange)
+
+            // Ask for a repaint of the hand-drawn layer.
+            //
+            // Changing attributes makes UIKit redraw the *text*, but it does not
+            // call `draw(_:)` again, so bullets, checkboxes and inline images
+            // stayed at whatever the previous pass left. A Mermaid diagram made
+            // this visible: the render finished, the attribute was set, and the
+            // picture never appeared because nothing repainted. AppKit does not
+            // have this problem — `drawBackground(in:)` is part of the text
+            // drawing itself.
+            textView.setNeedsDisplay()
         }
 
         func textViewDidChange(_ textView: UITextView) {

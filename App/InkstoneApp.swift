@@ -479,13 +479,29 @@ struct InkstoneApp: App {
             但他们有一个共同点。
             ```
 
+            ```mermaid
+            graph LR
+              A[Note] --> B[Link]
+              B --> C[Graph]
+            ```
+
             ---
 
             [^1]: A footnote definition.
             """,
             to: root.appending(path: "Home.md")
         )
-        try store.write("# Second Note\n\nBack to [[Home]].\n", to: root.appending(path: "Second Note.md"))
+        try store.write("""
+            # Diagram
+
+            ```mermaid
+            graph LR
+              A[Note] --> B[Link]
+              B --> C[Graph]
+            ```
+
+            Back to [[Home]].
+            """, to: root.appending(path: "Second Note.md"))
 
         return try workspace.registry.register(folder: root, name: "Scratch")
     }
