@@ -175,7 +175,7 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
 | iCloud vault storage | ✅ container resolves, vault created, a note verified uploaded (§6) |
-| GitHub sync | ⚠️ built + unit tested; integration tests exist but are gated behind `INKSTONE_GITHUB_TOKEN` and were not run this session |
+| GitHub sync | ✅ integration tests run against a live repository 2026-08-18; found and fixed a remote-deletion bug and a missing retry (§7) |
 | Reading mode | ✅ read-only, no caret reveal |
 | **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
 | **Per-file-type sync filters** | ✅ applied by the GitHub sync engine |
@@ -386,6 +386,36 @@ under a different team.
 ---
 
 ## 7. Known defects (separate from the crash)
+
+### Sync, 2026-08-18 — what running the integration tests found
+
+Run for the first time against `iamzifei/inkstone`, with a token from
+`gh auth token` rather than a pasted PAT. Writes went to a throwaway branch,
+deleted afterwards; `main` was not written to.
+
+- **Fixed: an oversized attachment planned `deleteRemote`.** The vault scan
+  filters by size, the planner did not, and the planner sees only hashes — so
+  "not carried by this vault" and "the user deleted it" were the same thing to
+  it. Lowering `maximumFileSizeMB` in Settings would have deleted previously
+  synced files off GitHub.
+- **Fixed: no retry.** A single 503 failed a sync. Two live runs in five.
+  Bounded retry on 5xx/429 only; six runs after, none failed.
+- **Fixed: HTTP errors did not name the failing request.**
+
+**Unresolved, n=1: one pull run reported a change on an already-settled vault**
+(`changeCount == 1`), on the very first run and never since — 0 failures in 13
+subsequent runs. Cause not established, so it is not written down as one.
+`SyncReport.changeSummary` now names the offending file if it returns.
+
+**Worth knowing before pointing these tests anywhere:** an earlier run, against
+this repository, deleted six tracked files. `origin/main` is exactly local `main`
+plus six `Delete Samples/Inkstone Demo/… from Inkstone` commits. Nothing is lost
+— every file is present locally and in git history — but the remote branch is
+missing them until someone pushes. That is sync working as designed: the vault it
+was pointed at did not contain those files, so it removed them from the remote.
+It is an argument for pointing the tests at a scratch repository, not at this
+one.
+
 
 - ~~**The app has no icon.**~~ Fixed 2026-08-16. `Tools/generate-app-icon.py`
   builds every slot from `Tools/icon-artwork.png`; `Assets.car` now carries 11
