@@ -56,6 +56,11 @@ public enum TokenKind: Hashable, Sendable {
     /// source is concealed and the replacement drawn in the gap, because the
     /// buffer is the file and the file must keep the entity the user typed.
     case entity(String)
+    /// One inline HTML tag — `<b>` or `</b>` — lowercased, with whether it
+    /// closes. Emitted for every tag; it is the *highlighter* that decides which
+    /// names it can render, because that is a question about attributes rather
+    /// than about syntax.
+    case htmlTag(name: String, isClosing: Bool)
 }
 
 public struct SyntaxToken: Hashable, Sendable {

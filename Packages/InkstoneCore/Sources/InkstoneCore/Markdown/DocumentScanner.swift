@@ -22,6 +22,23 @@ import Markdown
 ///     code fence is.
 struct DocumentScanner {
 
+    /// The name of an inline HTML tag and whether it closes, or nil if what
+    /// cmark called inline HTML is not a plain tag — a comment, say, or a
+    /// processing instruction.
+    static func parseTag(_ raw: String) -> (name: String, isClosing: Bool)? {
+        var body = raw.trimmingCharacters(in: .whitespaces)
+        guard body.hasPrefix("<"), body.hasSuffix(">") else { return nil }
+        body = String(body.dropFirst().dropLast())
+        let isClosing = body.hasPrefix("/")
+        if isClosing { body = String(body.dropFirst()) }
+        // `<br/>` and `<img src=…>`: the name is everything up to the first
+        // space or slash.
+        let name = body.prefix { $0.isLetter || $0.isNumber }.lowercased()
+        guard !name.isEmpty else { return nil }
+        return (name, isClosing)
+    }
+
+
     func scan(_ text: String) -> [SyntaxToken] {
         let nsText = text as NSString
         guard nsText.length > 0 else { return [] }
@@ -403,7 +420,16 @@ struct DocumentScanner {
             descend(strikethrough)
         }
 
-        mutating func visitInlineCode(_ code: InlineCode) {
+        mutating func visitInlineHTML(_ html: InlineHTML) {
+        guard let range = nsRange(html.range),
+              let (name, isClosing) = DocumentScanner.parseTag(html.rawHTML)
+        else { return }
+        tokens.append(SyntaxToken(kind: .htmlTag(name: name, isClosing: isClosing), range: range))
+        // Not prose: `<b>` is markup, and a `#tag` cannot start inside it.
+        excluded.append(range)
+    }
+
+    mutating func visitInlineCode(_ code: InlineCode) {
             guard let range = nsRange(code.range) else { return }
             // An inline code span has no children, so its content is found by
             // stripping the backtick runs — which may be more than one backtick

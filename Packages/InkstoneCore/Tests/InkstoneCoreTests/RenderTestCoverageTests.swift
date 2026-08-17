@@ -44,6 +44,7 @@ struct RenderTestCoverageTests {
         case .footnoteReference: return "footnoteReference"
         case .footnoteDefinition: return "footnoteDefinition"
         case .entity: return "entity"
+        case .htmlTag: return "htmlTag"
         default: return String(describing: kind)
         }
     }
@@ -69,7 +70,7 @@ struct RenderTestCoverageTests {
             "footnoteReference", "footnoteDefinition",
             "tableOfContents", "superscript", "subscript",
             "table", "tableHeaderRow", "tableDelimiterRow",
-            "escape", "entity",
+            "escape", "entity", "htmlTag",
         ]
 
         let missing = required.filter { !found.contains($0) }

@@ -125,6 +125,11 @@ struct MarkdownHighlighter {
             return title.isEmpty ? nil : (level, title)
         }
 
+        // Inline HTML spans, paired before the loop because a tag on its own
+        // says nothing: it is `<b>` *and* its `</b>` that mean bold, and the two
+        // are separate tokens.
+        let html = Self.htmlSpans(in: tokens)
+
         for token in tokens {
             // Tokens wholly outside the styled scope cost nothing to skip.
             guard NSIntersectionRange(token.range, scope).length > 0
@@ -138,6 +143,25 @@ struct MarkdownHighlighter {
                 tableIndices: tableIndices,
                 headings: headings
             )
+        }
+
+        // Attributes first, then the tags are collapsed — in that order, because
+        // a span covers the tags nested inside it and setting a font across them
+        // would give back the width they had been collapsed out of.
+        for span in html.spans where NSIntersectionRange(span.content, scope).length > 0 {
+            applyHTML(span, to: storage, fullText: text as NSString)
+        }
+        if mode != .source {
+            let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+            for tag in html.tags where NSIntersectionRange(tag, scope).length > 0 {
+                let line = (text as NSString).paragraphRange(for: tag)
+                if let caretLineRange, NSIntersectionRange(caretLineRange, line).length > 0 { continue }
+                storage.addAttribute(.font, value: tiny, range: tag)
+                storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: tag)
+                #if os(macOS)
+                storage.addAttribute(.spellingState, value: 0, range: tag)
+                #endif
+            }
         }
 
         compressBlankLines(in: storage, text: text as NSString, within: scope)
@@ -720,6 +744,18 @@ struct MarkdownHighlighter {
                 )])
             }
 
+        case .htmlTag(let name, _):
+            // A tag we cannot express — `<span style=…>`, `<img>`, `<br>` — stays
+            // on screen, quietened. Hiding it would drop what the author wrote
+            // and put nothing in its place. The ones we *can* express are
+            // collapsed after the loop, once their pairs are known: an unclosed
+            // `<b>` styles nothing and so must not vanish either.
+            if Self.htmlAttribute(for: name) == nil {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
+                )
+            }
+
         case .escape:
             // Only the backslash goes. `\*` is written to get a literal `*`, and
             // the `*` is ordinary text sitting right after this range.
@@ -1202,6 +1238,120 @@ struct MarkdownHighlighter {
         return image.resizedForInline(to: CGSize(width: width, height: height))
     }
 
+    /// An inline HTML element: the tag name and the text between its tags.
+    struct HTMLSpan {
+        let name: String
+        let content: NSRange
+    }
+
+    /// Pairs `<b>` with `</b>`, and reports which tags actually paired.
+    ///
+    /// A stack per name, so nesting works and an unclosed tag never produces a
+    /// span. Its own range is not returned either, so it stays on screen: a tag
+    /// that styles nothing must not also disappear, or the author's text is gone
+    /// with nothing to show for it.
+    ///
+    /// Spans come back outermost first. `<b>bold <i>x</i></b>` closes the inner
+    /// tag first, so the natural order is inside-out — and applying it that way
+    /// let the outer span's font overwrite the inner one, losing the italic and
+    /// un-collapsing the concealed tags into blank gaps.
+    static func htmlSpans(in tokens: [SyntaxToken]) -> (spans: [HTMLSpan], tags: [NSRange]) {
+        var open: [String: [NSRange]] = [:]
+        var spans: [HTMLSpan] = []
+        var tags: [NSRange] = []
+        for token in tokens {
+            guard case .htmlTag(let name, let isClosing) = token.kind,
+                  htmlAttribute(for: name) != nil
+            else { continue }
+            if isClosing {
+                guard let opener = open[name]?.popLast() else { continue }
+                let start = NSMaxRange(opener)
+                guard token.range.location > start else { continue }
+                spans.append(HTMLSpan(
+                    name: name,
+                    content: NSRange(location: start, length: token.range.location - start)
+                ))
+                tags.append(opener)
+                tags.append(token.range)
+            } else {
+                open[name, default: []].append(token.range)
+            }
+        }
+        spans.sort {
+            $0.content.location == $1.content.location
+                ? $0.content.length > $1.content.length
+                : $0.content.location < $1.content.location
+        }
+        return (spans, tags)
+    }
+
+    /// What a tag means, or nil for one we cannot express.
+    ///
+    /// A whitelist, and deliberately a short one: these are the tags with a
+    /// direct equivalent in text attributes. Anything else — layout, colour,
+    /// images — would need a renderer rather than an attribute, and is left as
+    /// source, which at least shows the reader exactly what is in the file.
+    static func htmlAttribute(for name: String) -> String? {
+        switch name {
+        case "b", "strong", "i", "em", "u", "s", "del", "strike",
+             "mark", "code", "sub", "sup":
+            return name
+        default:
+            return nil
+        }
+    }
+
+    private func applyHTML(_ span: HTMLSpan, to storage: NSTextStorage, fullText: NSString) {
+        guard span.content.length > 0, NSMaxRange(span.content) <= storage.length else { return }
+        let typography = style.typography
+        let size = typography.editorFontSize
+        let existing = storage.attribute(.font, at: span.content.location, effectiveRange: nil)
+            as? PlatformFont
+
+        switch span.name {
+        case "b", "strong":
+            storage.addAttribute(
+                .font, value: typography.editorFont.platformFont(
+                    size: existing.map { Double($0.pointSize) } ?? size, weight: .bold
+                ),
+                range: span.content
+            )
+        case "i", "em":
+            storage.addAttribute(
+                .font, value: italicVariant(of: existing ?? typography.editorFont.platformFont(size: size)),
+                range: span.content
+            )
+        case "u":
+            storage.addAttribute(
+                .underlineStyle, value: NSUnderlineStyle.single.rawValue, range: span.content
+            )
+        case "s", "del", "strike":
+            storage.addAttribute(
+                .strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: span.content
+            )
+            storage.addAttribute(
+                .foregroundColor, value: style.palette.secondaryText.platformColor, range: span.content
+            )
+        case "mark":
+            storage.addAttribute(
+                .backgroundColor, value: style.palette.highlight.platformColor, range: span.content
+            )
+        case "code":
+            storage.addAttributes([
+                .font: typography.codeFont.platformFont(size: typography.codeFontSize),
+                .foregroundColor: style.palette.accent.platformColor,
+                .inkstoneInlineFill: style.palette.codeBackground.platformColor,
+            ], range: span.content)
+        case "sub", "sup":
+            storage.addAttributes([
+                .font: typography.editorFont.platformFont(size: size * 0.72),
+                .baselineOffset: span.name == "sup" ? size * 0.32 : -size * 0.16,
+            ], range: span.content)
+        default:
+            break
+        }
+    }
+
     /// Collapses `range` and reserves room for `replacement` to be drawn there.
     ///
     /// Used for HTML entities, where five characters of source stand for one
@@ -1536,6 +1686,7 @@ struct MarkdownHighlighter {
 
         guard rows.count > 1 else { return }
 
+        let alignments = columnAlignments(in: tableRange, text: text)
         let columnCount = rows.map(\.count).max() ?? 0
         var widths = [CGFloat](repeating: 0, count: columnCount)
         // Measure once and keep it; the second pass used to re-measure every cell.
@@ -1551,30 +1702,102 @@ struct MarkdownHighlighter {
         for column in widths.indices { widths[column] += Self.tableCellPadding }
 
         // Aligning columns makes every row as wide as the widest cell in each
-        // column, which can push a table past the measure it has to fit in. Now
-        // that rows wrap instead of being clipped, that costs a wrapped line
-        // rather than lost text — so the gutter is dropped to wrap less, and the
-        // alignment is kept either way.
-        //
-        // Refusing to align at all when the table was too wide was tried and was
-        // worse: the columns of a table that merely needed one wrapped row
-        // collapsed into a run of words separated by single spaces.
+        // column, which can push a table past the measure it has to fit in.
         let available = availableWidth - Self.tableCellPadding * 2 - Self.copyButtonClearance
         if widths.reduce(0, +) > available {
             for column in widths.indices { widths[column] -= Self.tableCellPadding }
         }
 
+        // When no arrangement can fit, stop aligning.
+        //
+        // The test is the widest row's *natural* width — what it takes with no
+        // padding at all. If even that is over the measure, columns cannot line
+        // up however the padding is distributed, and adding it only eats the
+        // width the row needs and forces more wrapping. That is the common case
+        // on a phone, where the measure is about half the desktop's: a table of
+        // four columns of prose has no fitting arrangement at 370pt, and padded
+        // it wrapped into three lines a row.
+        //
+        // An earlier attempt tested the *aligned* width instead and was reverted
+        // as worse. It fired on tables that merely needed one wrapped row —
+        // 700pt, where the natural rows fit and only the padded ones did not —
+        // and collapsed their columns into a run of words. Testing the natural
+        // width tells the two situations apart.
+        let widestNaturalRow = measured.map { $0.reduce(0, +) }.max() ?? 0
+        guard widestNaturalRow <= available else { return }
+
+        // Where a column's spare width goes, which is all that column alignment
+        // is: kerning applies *after* a glyph, so padding placed on the previous
+        // cell's last character pushes this one right.
         for (rowIndex, row) in rows.enumerated() {
             for (column, cell) in row.enumerated() {
                 let deficit = widths[column] - measured[rowIndex][column]
                 // Sub-point deficits are invisible and only add attribute churn.
                 guard deficit > 0.5, cell.length > 0 else { continue }
-                // Kerning applies *after* the glyph, so it goes on the final
-                // character of the cell and pushes the closing pipe rightwards.
-                let last = NSRange(location: cell.location + cell.length - 1, length: 1)
-                storage.addAttribute(.kern, value: deficit, range: last)
+                let alignment = column < alignments.count ? alignments[column] : .left
+                let (before, after) = alignment.split(deficit)
+
+                if after > 0.5 {
+                    let last = NSRange(location: NSMaxRange(cell) - 1, length: 1)
+                    storage.addAttribute(.kern, value: after, range: last)
+                }
+                // The padding that goes *before* a cell has to be hung on the
+                // character before it — the concealed pipe — because there is
+                // nothing else between the two cells to carry it.
+                if before > 0.5, cell.location > tableRange.location {
+                    let separator = NSRange(location: cell.location - 1, length: 1)
+                    let existing = (storage.attribute(.kern, at: separator.location, effectiveRange: nil)
+                        as? CGFloat) ?? 0
+                    storage.addAttribute(.kern, value: existing + before, range: separator)
+                }
             }
         }
+    }
+
+    /// Which way a column's contents sit in it, from the `|:--:|` row.
+    enum ColumnAlignment {
+        case left, centre, right
+
+        /// Splits a cell's spare width into what goes before it and after it.
+        func split(_ deficit: CGFloat) -> (before: CGFloat, after: CGFloat) {
+            switch self {
+            case .left: return (0, deficit)
+            case .right: return (deficit, 0)
+            case .centre: return (deficit / 2, deficit / 2)
+            }
+        }
+    }
+
+    /// Reads `|:---|:---:|---:|` — the row cmark consumes and reports nowhere.
+    ///
+    /// Parsed from the delimiter row's own token range rather than re-detecting
+    /// anything: the parser found the table and marked which line this is, and
+    /// this reads a value out of the line it identified. cmark does hold the
+    /// alignments on its `Table` node, but putting them on `TokenKind.table`
+    /// would make every table a difference in the engine diff harness — the
+    /// legacy scanner has no alignments to report — and that harness is worth
+    /// more than avoiding this.
+    private func columnAlignments(in tableRange: NSRange, text: NSString) -> [ColumnAlignment] {
+        var location = tableRange.location
+        while location < NSMaxRange(tableRange) {
+            let line = text.lineRange(for: NSRange(location: location, length: 0))
+            defer { location = max(NSMaxRange(line), location + 1) }
+            let trimmed = text.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.contains("-"), trimmed.allSatisfy({ "|-: \t".contains($0) }) else { continue }
+
+            return trimmed
+                .split(separator: "|", omittingEmptySubsequences: true)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { $0.contains("-") }
+                .map { spec in
+                    switch (spec.hasPrefix(":"), spec.hasSuffix(":")) {
+                    case (true, true): return .centre
+                    case (false, true): return .right
+                    default: return .left
+                    }
+                }
+        }
+        return []
     }
 
     // MARK: - CJK typography
