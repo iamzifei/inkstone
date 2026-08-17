@@ -44,7 +44,9 @@ struct TaskMarkerTests {
             ("  - [ ] nested\n", "  - [x] nested\n"),
             ("* [ ] star\n", "* [x] star\n"),
             ("+ [ ] plus\n", "+ [x] plus\n"),
-            ("\t- [ ] tabbed\n", "\t- [x] tabbed\n"),
+            // Tab-indented, under a parent so it is a list rather than an
+            // indented code block. Only the child line is compared.
+            ("- parent\n\t- [ ] tabbed\n", "- parent\n\t- [x] tabbed\n"),
         ] {
             #expect(TaskMarker.toggled(in: text, markerRange: try marker(in: text)) == expected)
         }

@@ -41,7 +41,11 @@ struct BlockTests {
 
     @Test("A tab indent counts as one level")
     func tabIndent() {
-        #expect(listMarkers("\t- indented").map(\.level) == [1])
+        // Under a parent item, not on its own. A tab-indented bullet with no list
+        // above it is an indented code block in CommonMark, and the parser is
+        // right to say so — see `EngineDiffTests.tabIndentedItem`, which pins
+        // that difference from the old regex scanner deliberately.
+        #expect(listMarkers("- parent\n\t- indented").map(\.level) == [0, 1])
     }
 
     @Test("Task items are not also bullets")
