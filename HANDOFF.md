@@ -191,7 +191,7 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 
 ---
 
-## 4. THE OPEN BUG — read this first
+## 4. A crash that has not returned — history, not a blocker
 
 **Symptom:** James clicked "Open Folder as Vault", picked a folder, app died
 instantly. `SIGABRT`.
@@ -240,7 +240,18 @@ failing under a headless/screen-shared display configuration fits every fact,
 including why **only Inkstone crashed** — of the 3 recent crash reports on that
 machine, only this one touches RenderBox, because most apps never hit that path.
 
-**Confidence: hypothesis, not proven.** It was never reproduced.
+**Confidence: hypothesis, not proven.** It was never reproduced — and as of
+2026-08-18 it still has not been, on a display that has been awake throughout.
+Step 1 below (the cheapest decisive test) has effectively been run many times
+since: the app has been launched, opened vaults and been used across several
+sessions on this machine with no RenderBox abort. The only two Inkstone crash
+reports on this Mac since are both `MermaidRenderer` on the **iOS Simulator**,
+from 2026-08-17 15:38, fixed by 4620eac seventeen minutes later.
+
+**So this section is history, not a live blocker, and should not be the first
+thing a new session reads.** It is kept because the hypothesis is still
+unverified and the timeline analysis is still the useful part if it ever
+returns.
 
 ### Why it couldn't be reproduced
 
@@ -291,11 +302,25 @@ to bypass it. In priority order:
 | --- | --- | --- |
 | Scratch vault | `INKSTONE_SCRATCH_VAULT=1`, or create the marker file at `Application Support/inkstone-scratch-vault` | ✅ yes — seeds a small vault inside the app's own container |
 | Explicit path | `echo /path/to/vault > /tmp/inkstone-test-vault` | ❌ no — sandbox blocks `/tmp` |
-| Env var | `INKSTONE_OPEN_VAULT=/path/to/vault` | ❌ no, and `open` doesn't forward env |
+| Env var | `INKSTONE_OPEN_VAULT=/path/to/vault` | ⚠️ not by inheritance, but `open --env` does forward it |
 
-Debug output goes to stderr **and** to
-`Application Support/inkstone-debug.log` inside the container, because `open`
-discards stderr.
+**Corrected 2026-08-18: `open` forwards environment and can redirect output.**
+This table said it could not, and §4 lists both as dead ends that blocked
+reproducing the crash. Both are wrong — `open --env VAR=value --stdout PATH
+--stderr PATH -W App.app` was used this session to run a debug hook in a
+LaunchServices-launched sandboxed build and read what it printed:
+
+```bash
+open --env INKSTONE_ICLOUD_CHECK=1 --stdout /tmp/out.txt -W .../Inkstone.app
+```
+
+Which matters beyond the flags: a hook that can only be reached by running the
+Mach-O directly is being measured in a process LaunchServices never registered,
+and that is not the app users run. `open --env` removes the reason to test the
+wrong thing.
+
+Debug output still goes to `Application Support/inkstone-debug.log` inside the
+container as well, which needs no flags and survives a crash.
 
 `VaultRegistry.register(folder:)` deliberately tolerates bookmark-creation
 failure (falls back to a path-only vault) so unsandboxed dev builds work.
