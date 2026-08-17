@@ -242,10 +242,51 @@ struct EditorRenderer {
             CGRect(x: panel.minX, y: y - 0.5, width: panel.width, height: 1).fillPlatform()
         }
 
+        drawColumnSeparators(for: range, panel: panel, rows: rows)
+
         style.palette.divider.platformColor.setStroke()
         let border = PlatformBezierPath(roundedRect: panel.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 6)
         border.lineWidth = 1
         border.stroke()
+    }
+
+    /// A hairline where each concealed cell-separating pipe was.
+    ///
+    /// Without these, a table whose columns cannot be aligned — which is what
+    /// happens whenever its content is wider than the measure, and so most of the
+    /// time on a phone — has no visible cell boundaries at all: its header reads
+    /// as a run of words rather than as column names. Drawn at the pipe's own
+    /// position, so they mark the boundary whether the columns line up or not.
+    private func drawColumnSeparators(for range: NSRange, panel: CGRect, rows: [TableRow]) {
+        style.palette.divider.platformColor.setFill()
+        storage.enumerateAttribute(.inkstoneTableSeparator, in: range) { value, pipe, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: pipe, actualCharacterRange: nil)
+            guard glyphRange.location < layoutManager.numberOfGlyphs else { return }
+            // The glyph's own box, the same way the checkbox hit test finds one.
+            // Computing an x from the fragment plus the glyph's offset was tried
+            // and put the rules above the table: the fragment had already been
+            // moved into view coordinates and the offset added the origin again.
+            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            let x = box.minX
+            guard x > panel.minX + 2, x < panel.maxX - 2 else { return }
+
+            // The row gives the vertical extent, the pipe's own line fragment
+            // clips it. The row alone would run a rule from a wrapped line's
+            // boundary straight up through the line above it, where that
+            // boundary is somewhere else entirely; the fragment alone would
+            // include the block's outer margin on the first and last rows.
+            guard let row = rows.first(where: { box.midY >= $0.top - 2 && box.midY <= $0.bottom + 2 })
+            else { return }
+            let fragment = layoutManager
+                .lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            let top = max(row.top, fragment.minY)
+            let bottom = min(row.bottom, fragment.maxY)
+            guard bottom > top else { return }
+            CGRect(x: x.rounded() - 0.5, y: top, width: 1, height: bottom - top).fillPlatform()
+        }
     }
 
     /// Paints inline attachment images into the space the highlighter reserved.

@@ -809,14 +809,18 @@ struct MarkdownHighlighter {
             // edge — which is *outside* the border, since the panel is inset from
             // it — so the text both escaped the box and lost its end. Wrapping
             // costs the column alignment on that one row and keeps everything
-            // inside the frame, which is the better trade. By character, not by
-            // word: a Chinese row has no spaces to break on.
+            // inside the frame, which is the better trade.
+            //
+            // By word, not by character. Chinese still breaks between characters
+            // — standard line breaking gives an opportunity at every one, no
+            // space required — while `1621` and `Claude` stay whole. Character
+            // wrapping was tried and split a four-digit number across two lines.
             let paragraph = paragraph(
                 lineHeight: typography.lineHeightMultiple * 1.25, size: typography.editorFontSize
             )
             paragraph.firstLineHeadIndent = Self.tableCellPadding
             paragraph.headIndent = Self.tableCellPadding
-            paragraph.lineBreakMode = .byCharWrapping
+            paragraph.lineBreakMode = .byWordWrapping
             storage.addAttributes([
                 .font: typography.editorFont.platformFont(size: typography.editorFontSize),
                 .foregroundColor: palette.text.platformColor,
@@ -1675,6 +1679,12 @@ struct MarkdownHighlighter {
 
         // Hide the pipes, except on the row the caret is on — the same rule every
         // other piece of syntax follows, so a table can still be edited as text.
+        //
+        // A pipe with text on both sides of it is a *boundary between cells*, and
+        // it is marked as one so the renderer can draw a hairline where it was.
+        // Concealing them and stopping there was tried and reported back: a table
+        // whose columns cannot be aligned then has no cell boundaries at all, and
+        // its header reads as a run of words rather than as four column names.
         let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
         for pipe in pipePositions {
             let line = text.paragraphRange(for: NSRange(location: pipe, length: 0))
@@ -1682,6 +1692,9 @@ struct MarkdownHighlighter {
             let range = NSRange(location: pipe, length: 1)
             storage.addAttribute(.font, value: tiny, range: range)
             storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+            if isInteriorPipe(at: pipe, in: text) {
+                storage.addAttribute(.inkstoneTableSeparator, value: true, range: range)
+            }
         }
 
         guard rows.count > 1 else { return }
@@ -1724,7 +1737,19 @@ struct MarkdownHighlighter {
         // and collapsed their columns into a run of words. Testing the natural
         // width tells the two situations apart.
         let widestNaturalRow = measured.map { $0.reduce(0, +) }.max() ?? 0
-        guard widestNaturalRow <= available else { return }
+        guard widestNaturalRow <= available else {
+            // Unaligned, but not unstructured: a fixed gap at every boundary so
+            // the cells are visibly separate. A constant, unlike the alignment
+            // padding, so it cannot grow a row by the width of the widest cell in
+            // every column — which is what forced every row to wrap.
+            for row in rows.dropLast(0) {
+                for cell in row.dropLast() where cell.length > 0 {
+                    let last = NSRange(location: NSMaxRange(cell) - 1, length: 1)
+                    storage.addAttribute(.kern, value: Self.tableCellPadding, range: last)
+                }
+            }
+            return
+        }
 
         // Where a column's spare width goes, which is all that column alignment
         // is: kerning applies *after* a glyph, so padding placed on the previous
@@ -1752,6 +1777,23 @@ struct MarkdownHighlighter {
                 }
             }
         }
+    }
+
+    /// Whether a pipe separates two cells rather than closing the row.
+    ///
+    /// GFM makes the outer pipes optional, so this is decided by what is on
+    /// either side rather than by counting: a boundary has text both ways, an
+    /// outer pipe has the row's edge on one of them.
+    private func isInteriorPipe(at location: Int, in text: NSString) -> Bool {
+        let line = text.lineRange(for: NSRange(location: location, length: 0))
+        func hasInk(_ range: NSRange) -> Bool {
+            guard range.length > 0 else { return false }
+            return !text.substring(with: range)
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let before = NSRange(location: line.location, length: location - line.location)
+        let after = NSRange(location: location + 1, length: max(0, NSMaxRange(line) - location - 1))
+        return hasInk(before) && hasInk(after)
     }
 
     /// Which way a column's contents sit in it, from the `|:--:|` row.
@@ -1855,6 +1897,10 @@ extension NSAttributedString.Key {
     static let inkstoneAttachment = NSAttributedString.Key("inkstoneAttachment")
     /// Carries the decoded image for an embed the text view should paint itself.
     static let inkstoneInlineImage = NSAttributedString.Key("inkstoneInlineImage")
+    /// Marks a concealed pipe that separates two cells, so a rule can be drawn
+    /// where it was. Value is a Bool.
+    static let inkstoneTableSeparator = NSAttributedString.Key("inkstoneTableSeparator")
+
     /// Marks a concealed list marker so a bullet can be drawn in its place.
     static let inkstoneBullet = NSAttributedString.Key("inkstoneBullet")
     /// Marks a quoted line so its left rule can be drawn.

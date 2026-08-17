@@ -221,6 +221,25 @@ evidence is two renders of the same table at 700pt: the old rule wrapped all fiv
 rows, the new one wraps only the row that is genuinely too long — ten lines
 against six.
 
+**Dropping the alignment on its own was not enough, and shipping it that way was
+a mistake.** With no padding, cells ran together separated by a single space and
+the header read as a run of words — James's report was that the table "no longer
+shows columns", which is exactly right. Losing the *columns* is a fair trade for
+a table that cannot have them; losing the visible *cell boundaries* is not, and
+the two are separate things.
+
+So an unaligned table now gets a fixed gap at every boundary — a constant, unlike
+the alignment padding, so it cannot grow a row by the widest cell in every
+column — and a **hairline is drawn wherever a cell-separating pipe was
+concealed**. That rule is drawn in both modes: aligned, the rules line up into
+real column separators; unaligned, they still say where one cell ends and the
+next begins. Clipped to the pipe's own line fragment, so a wrapped row's
+boundaries do not draw through the line above them.
+
+Rows also wrap by *word* rather than by character now. Chinese still breaks
+between characters — standard line breaking gives an opportunity at every one —
+while character wrapping had split `1621` across two lines.
+
 **It also removed most of the case for T2.** In-cell wrapping was wanted mainly
 so a table would survive a narrow measure. A phone-width table that fits keeps
 its columns, and one that cannot fit now reads as a list of records with its rows
