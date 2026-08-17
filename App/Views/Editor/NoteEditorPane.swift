@@ -33,6 +33,9 @@ struct NoteEditorPane: View {
                         resolveAttachment: { target in
                             workspace.resolveEmbed(target, from: url)
                         },
+                        resolveNoteEmbed: { link in
+                            workspace.embeddedNoteText(for: link, from: url)
+                        },
                         importAttachment: { source in
                             guard let imported = workspace.importAttachment(from: source) else { return nil }
                             return workspace.embedMarkup(for: imported)
@@ -46,7 +49,8 @@ struct NoteEditorPane: View {
                         openAttachment: { openURL($0) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,
-                    reveal: workspace.revealTarget?.url == url ? workspace.revealTarget : nil
+                    reveal: workspace.revealTarget?.url == url ? workspace.revealTarget : nil,
+                    indexGeneration: workspace.indexGeneration
                 )
 
                 Divider().overlay(style.divider)

@@ -101,6 +101,19 @@ struct InkstoneApp: App {
             return FileManager.default.fileExists(atPath: candidate.path(percentEncoded: false))
                 ? candidate : nil
         }
+        // And `![[Note]]`, resolved the same way, so a document containing an
+        // embed can be looked at without opening a vault.
+        highlighter.resolveNoteEmbed = { link in
+            guard !link.target.isEmpty else { return nil }
+            let candidate = folder.appending(path: link.target + ".md")
+            guard let embedded = try? String(
+                contentsOf: candidate, encoding: .utf8
+            ) else { return nil }
+            let range = NoteSlice.range(in: embedded, fragment: link.fragment)
+            guard range.length > 0 else { return nil }
+            let slice = (embedded as NSString).substring(with: range)
+            return slice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : slice
+        }
 
         highlighter.highlight(storage, caretLineRange: nil)  // warm up
 

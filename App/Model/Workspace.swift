@@ -53,6 +53,17 @@ final class Workspace {
     private(set) var store: NoteStore?
     private(set) var tree: FileNode?
     private(set) var index = IndexSnapshot()
+
+    /// Bumped whenever the index is replaced.
+    ///
+    /// The editor styles a link by asking the index whether its target exists,
+    /// and it does that once, when it highlights. Indexing is asynchronous, so
+    /// the first render of the first note after opening a vault asks an *empty*
+    /// index — every wikilink came out unresolved and every `![[Note]]` embed
+    /// failed to find its content, and nothing put it right until the next
+    /// keystroke. SwiftUI panes observe `index` directly; the editor is a wrapped
+    /// text view and needs to be told.
+    private(set) var indexGeneration = 0
     /// Non-note files, so `![[diagram.png]]` can resolve. Rebuilt with the tree.
     private(set) var attachments = AttachmentIndex()
     private(set) var isIndexing = false
@@ -62,6 +73,47 @@ final class Workspace {
     /// Open documents, keyed by URL. Kept alive across tab switches so scroll
     /// position and unsaved edits survive.
     private(set) var documents: [URL: NoteDocument] = [:]
+
+    /// The text `![[Note#fragment]]` should show, or nil if there is nothing to
+    /// show for it.
+    ///
+    /// Only Markdown: an `![[image.png]]` is an attachment and is resolved
+    /// elsewhere. Returning nil rather than an empty string matters — an embed
+    /// naming a heading the note does not have should read as unresolved, not as
+    /// an empty box.
+    func embeddedNoteText(for link: WikiLink, from source: URL) -> String? {
+        #if DEBUG
+        func trace(_ why: String) {
+            if ProcessInfo.processInfo.environment["INKSTONE_EMBED_TRACE"] != nil {
+                FileHandle.standardError.write(Data("[embed] \(link.target): \(why)\n".utf8))
+            }
+        }
+        #else
+        func trace(_ why: String) {}
+        #endif
+
+        guard let root, !link.target.isEmpty else { trace("no vault root"); return nil }
+        guard let destination = index.resolve(link.target, from: source, vaultRoot: root) else {
+            trace("index could not resolve it — index holds \(index.noteCount) notes, "
+                  + "names: \(index.namesToNotes.keys.sorted().prefix(6).joined(separator: ", "))")
+            return nil
+        }
+        guard destination.pathExtension.lowercased() == "md" else {
+            trace("resolved to \(destination.pathExtension), not markdown")
+            return nil
+        }
+        guard destination != source else { trace("embeds itself"); return nil }
+        guard let text = try? String(contentsOf: destination, encoding: .utf8) else {
+            trace("could not read \(destination.lastPathComponent)")
+            return nil
+        }
+        trace("resolved to \(destination.lastPathComponent), \(text.count) chars")
+
+        let range = NoteSlice.range(in: text, fragment: link.fragment)
+        guard range.length > 0 else { return nil }
+        let slice = (text as NSString).substring(with: range)
+        return slice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : slice
+    }
 
     /// A request from elsewhere in the UI — the outline, for now — to bring a
     /// particular range of the open note into view.
@@ -382,6 +434,7 @@ final class Workspace {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.index = snapshot
+                self.indexGeneration += 1
                 self.isIndexing = false
             }
         }

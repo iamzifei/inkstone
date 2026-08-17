@@ -15,6 +15,10 @@ struct EditorActions {
     var openExternal: (URL) -> Void = { _ in }
     /// Resolves an embed target to a file in the vault, for inline previews.
     var resolveAttachment: (String) -> URL? = { _ in nil }
+    /// Resolves `![[Note]]` — and `![[Note#Heading]]`, `![[Note#^block]]` — to
+    /// the text it should show. Nil when the note or the fragment is not there,
+    /// which is what leaves the embed styled as an unresolved link.
+    var resolveNoteEmbed: (WikiLink) -> String? = { _ in nil }
     /// Copies a dropped or pasted file into the vault and returns the markup to
     /// insert for it. Returns nil when the import fails.
     var importAttachment: (URL) -> String? = { _ in nil }
@@ -38,11 +42,13 @@ struct MarkdownEditorView: View {
     var spellCheck: Bool = false
     /// A range to scroll into view, set by the outline pane.
     var reveal: Workspace.RevealTarget?
+    /// Changes when the vault index is rebuilt, so link resolution can be redone.
+    var indexGeneration: Int = 0
 
     var body: some View {
         TextViewRepresentable(
             text: $text, style: style, mode: mode, actions: actions,
-            spellCheck: spellCheck, reveal: reveal
+            spellCheck: spellCheck, reveal: reveal, indexGeneration: indexGeneration
         )
         .background(style.background)
     }
@@ -74,6 +80,7 @@ class EditorCoordinator: NSObject {
     var highlighter: MarkdownHighlighter {
         var highlighter = MarkdownHighlighter(style: style, mode: mode)
         highlighter.resolveAttachment = actions.resolveAttachment
+        highlighter.resolveNoteEmbed = actions.resolveNoteEmbed
         highlighter.availableWidth = inlineImageWidth
         return highlighter
     }
@@ -105,6 +112,17 @@ class EditorCoordinator: NSObject {
         return nil
     }
     #endif
+
+    /// The index generation the current attributes were styled against.
+    private var styledIndexGeneration = 0
+
+    /// Whether the index has changed since the last pass, and records the new
+    /// generation so it is only acted on once.
+    func consumeIndexGeneration(_ generation: Int) -> Bool {
+        guard generation != styledIndexGeneration else { return false }
+        styledIndexGeneration = generation
+        return true
+    }
 
     /// Whether the caret has moved to a different line since the last pass.
     ///
@@ -674,6 +692,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
     let actions: EditorActions
     let spellCheck: Bool
     let reveal: Workspace.RevealTarget?
+    let indexGeneration: Int
 
     func makeCoordinator() -> MacCoordinator {
         MacCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
@@ -757,6 +776,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         guard let textView = coordinator.textView else { return }
         defer { coordinator.applyReveal(reveal, to: textView) }
+        if coordinator.consumeIndexGeneration(indexGeneration) { coordinator.rehighlight() }
         if textView.string != text {
             let selection = textView.selectedRange()
             textView.string = text
@@ -1124,6 +1144,22 @@ private extension UITextView {
 /// everything painted here lands behind it, which is what the fills and rules
 /// need.
 final class InkstonePhoneTextView: UITextView {
+    /// Called on every layout pass. A closure rather than a coordinator
+    /// reference because the coordinator type is nested in the representable and
+    /// not nameable from here.
+    var onLayout: (() -> Void)?
+
+    /// The measure changes when the view is first given bounds, and on rotation.
+    ///
+    /// AppKit gets this from a frame-change notification; UIKit had nothing, so
+    /// `updateInsets` ran once at setup — when the view was zero-wide — and never
+    /// again. Everything scaled to the measure was left at its default: an
+    /// embedded picture, and a transcluded note, drawn 680pt wide on a phone.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?()
+    }
+
     /// The block whose copy button was just tapped, drawn as a tick for a
     /// moment. There is no hover on a touch screen, which makes the
     /// confirmation the only feedback there is.
@@ -1172,6 +1208,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
     let actions: EditorActions
     let spellCheck: Bool
     let reveal: Workspace.RevealTarget?
+    let indexGeneration: Int
 
     func makeCoordinator() -> PhoneCoordinator {
         PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
@@ -1184,6 +1221,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
         let textView = InkstonePhoneTextView(usingTextLayoutManager: false)
         textView.coordinator = context.coordinator
         textView.delegate = context.coordinator
+        textView.onLayout = { [weak coordinator = context.coordinator] in
+            MainActor.assumeIsolated { coordinator?.updateInsets() }
+        }
         // The hand-drawn elements sit outside the glyphs' own rects, so the text
         // view has to repaint the whole visible area rather than just the runs
         // that changed.
@@ -1243,6 +1283,7 @@ private struct TextViewRepresentable: UIViewRepresentable {
         coordinator.text = $text
         coordinator.actions = actions
         defer { coordinator.applyReveal(reveal, to: textView) }
+        if coordinator.consumeIndexGeneration(indexGeneration) { coordinator.rehighlight() }
 
         if textView.text != text {
             let selection = textView.selectedRange
@@ -1289,6 +1330,22 @@ private struct TextViewRepresentable: UIViewRepresentable {
             let horizontal = max(16, (available - measure) / 2)
             textView.textContainerInset = UIEdgeInsets(top: 20, left: horizontal, bottom: 240, right: horizontal)
             textView.textContainer.lineFragmentPadding = 0
+
+            // The measure inline pictures are scaled to, which AppKit has always
+            // set and UIKit never did — so every embedded image and every
+            // transcluded note was drawn 680pt wide on a phone that is 370, and
+            // ran off the side. Bucketed like the Mac's, so a rotation does not
+            // re-render everything for a point or two.
+            //
+            // Guarded on a plausible width: this runs during layout, and it runs
+            // once before the view has any bounds at all. Taking that pass at
+            // face value set the measure to -32 and every transclusion silently
+            // refused to render.
+            guard measure > 80 else { return }
+            if abs(inlineImageWidth - measure) >= 32 {
+                inlineImageWidth = measure
+                rehighlight()
+            }
         }
 
         func rehighlight() {

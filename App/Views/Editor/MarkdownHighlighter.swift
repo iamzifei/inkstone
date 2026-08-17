@@ -67,6 +67,10 @@ struct MarkdownHighlighter {
     /// reached for directly so the highlighter stays free of app state and can be
     /// exercised without a vault.
     var resolveAttachment: ((String) -> URL?)?
+    /// Supplies the text an `![[Note]]` should show. Left nil when rendering an
+    /// embed's own content, which is what keeps one note embedding another from
+    /// recursing.
+    var resolveNoteEmbed: ((WikiLink) -> String?)?
     /// Text width available for inline images, so a photo is scaled to the
     /// measure rather than overflowing the column.
     var availableWidth: CGFloat = 680
@@ -580,6 +584,26 @@ struct MarkdownHighlighter {
                     inlineImage(image, to: storage, in: token.range, fullText: fullText)
                 }
                 storage.addAttribute(.inkstoneAttachment, value: resolved, range: token.range)
+                break
+            }
+
+            // A note, whose *content* the embed stands for. Rendered into a
+            // picture and placed where the markup was, since the buffer is this
+            // file and cannot hold another one's text.
+            //
+            // Tested on "is it Markdown", not on "did the attachment resolver
+            // fail": the vault resolver finds notes too, so keying on failure
+            // sent every `![[Note]]` down the attachment path and rendered it as
+            // a link. It looked right offscreen only because the benchmark hook's
+            // resolver does not append `.md`.
+            let isNoteTarget = resolved.map { $0.pathExtension.lowercased() == "md" } ?? true
+            if isNoteTarget, !isBeingEdited, isAloneOnItsLine(token.range, in: fullText),
+               let embedded = resolveNoteEmbed?(link),
+               let picture = TransclusionRenderer.shared.image(
+                   for: embedded, style: style, width: availableWidth
+               ) {
+                inlineImage(picture, to: storage, in: token.range, fullText: fullText, centred: false)
+                storage.addAttribute(.inkstoneWikiLink, value: link, range: token.range)
                 break
             }
 

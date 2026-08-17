@@ -147,11 +147,13 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
   run and screenshotted on a machine with real displays. Live preview, CJK
   typography and the inspector all render. Graph view is blank — see the defect
   list in `docs/plans/2026-08-16-ui-theming-and-icon.md`.
-- **iOS has never been run.** Typechecks only. The UIKit editor path
-  (tap-to-follow-link hit testing via `layoutManager.characterIndex`, keyboard
-  insets) has never executed a single line.
-- **Reading mode falls back to live preview.** No AST renderer yet, even though
-  `swift-markdown` is already a resolved dependency.
+- ~~**iOS has never been run.**~~ Superseded: iOS has been run and screenshotted
+  on the simulator repeatedly, most recently 2026-08-17.
+- ~~**Reading mode falls back to live preview.**~~ Corrected 2026-08-17 by
+  reading the code rather than the note: reading mode sets `isEditable = false`
+  and passes no caret line, so nothing ever reveals its source. That *is* "fully
+  rendered, read-only" — a separate AST renderer was never needed, because live
+  preview's rendering is the rendering.
 
 ### Feature matrix
 
@@ -172,13 +174,19 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Calendar + daily notes | ✅ seen working |
 | Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
-| iCloud vault storage | ⚠️ code done, entitlement deferred (§6) |
-| GitHub sync | ✅ built + unit tested; not yet run against a live repo |
-| Reading mode | ✅ read-only, block-level rendering |
+| iCloud vault storage | ⛔️ **blocked on the portal container** — the entitlement is live and shipped, the container is not reachable (§6) |
+| GitHub sync | ⚠️ built + unit tested; integration tests exist but are gated behind `INKSTONE_GITHUB_TOKEN` and were not run this session |
+| Reading mode | ✅ read-only, no caret reveal |
 | **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
 | **Per-file-type sync filters** | ✅ applied by the GitHub sync engine |
-| GFM tables | ✅ rendered, columns aligned by kerning |
-| Math, Mermaid, PDF embeds | ❌ not started |
+| GFM tables | ✅ drawn as a grid: header band, row and column rules, `:--:` alignment |
+| Math (inline + display) | ✅ SwiftMath, typeset in place |
+| Mermaid | ✅ WKWebView snapshot, cached |
+| Inline HTML | ✅ a whitelist of tags styled; the rest left as source |
+| Block HTML | ❌ shown as source (H3 in `docs/plans/2026-08-17-tables-and-html.md`) |
+| PDF embeds | ❌ click-to-open only, no inline preview |
+| `![[Note]]` transclusion | ❌ renders as a link, not as content |
+| Callout folding | ❌ `[!note]-` is parsed and the flag read by nothing |
 | Plugin API | ❌ not started |
 
 ---
@@ -304,13 +312,18 @@ shadowed Xcode's own copy, so `xcodebuild` couldn't load `IDESimulatorFoundation
 and refused to build *anything*. Fixed with `sudo xcodebuild -runFirstLaunch`.
 If the second machine shows the same symptom, that's the fix.
 
-**iCloud entitlement is deliberately disabled.** `iCloud.com.orris.inkstone`
-doesn't exist in the developer portal, and enabling the entitlement before the
-container exists makes every local build fail to sign with "requires a
-provisioning profile". The keys are commented in
-`App/Resources/Inkstone.entitlements` with restore instructions.
-`WelcomeView.createICloudVault()` shows an alert instead of failing silently.
-**Create the container in the portal first, then uncomment.**
+**iCloud is entitled but has no container.** Updated 2026-08-17: the keys are no
+longer commented out — `App/Resources/Inkstone.entitlements` carries them and the
+signed, notarised build ships them. What is missing is the container itself:
+
+```
+$ INKSTONE_ICLOUD_CHECK=1 .build-xcode/Build/Products/Debug/Inkstone.app/Contents/MacOS/Inkstone
+iCloud container: UNAVAILABLE for iCloud.com.orris.inkstone
+```
+
+**Create `iCloud.com.orris.inkstone` in the developer portal.** Nothing else is
+known to be missing, and nothing can be verified until it exists — this is the
+one item on the desktop that only James can unblock.
 
 **`DEVELOPMENT_TEAM: K9YT36SP4B`** (Orris Technology) is committed in
 `project.yml`. Team IDs aren't secret — they appear in every notarised app — and
@@ -324,8 +337,8 @@ under a different team.
 - ~~**The app has no icon.**~~ Fixed 2026-08-16. `Tools/generate-app-icon.py`
   builds every slot from `Tools/icon-artwork.png`; `Assets.car` now carries 11
   `AppIcon` entries.
-- **Reading mode silently behaves as live preview** — the picker offers a mode
-  that doesn't exist yet.
+- ~~**Reading mode silently behaves as live preview**~~ — no longer true; see
+  §3. It is read-only and never reveals syntax.
 - Graph `TimelineView`/`Canvas` mutates `@State` from inside the draw closure via
   `Task { @MainActor }`. It works, but it's an odd pattern worth revisiting if the
   graph misbehaves.
