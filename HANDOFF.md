@@ -348,9 +348,10 @@ shipped thing behaves changes the thing being tested.
 To run the check honestly, the hook and the entitlement have to be in the same
 binary — the doc comment on `checkICloudIfRequested` gives the commands.
 
-**Left to verify:** that the vault appears on a physical iPhone. The Simulator
-has no iCloud account, so it reports `notSignedIn`, correctly. A note called
-`Sync check.md` is sitting in the container waiting to be looked at.
+**Verified on device 2026-08-18.** `Sync check.md`, written into the container on
+the Mac, appeared in the "Inkstone (iCloud)" vault on the iPhone 15 Pro. iCloud
+sync is done end to end, Mac → phone. (The Simulator has no iCloud account and
+reports `notSignedIn`, correctly, so it can never stand in for this check.)
 
 **`DEVELOPMENT_TEAM: K9YT36SP4B`** (Orris Technology) is committed in
 `project.yml`. Team IDs aren't secret — they appear in every notarised app — and
