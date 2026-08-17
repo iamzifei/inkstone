@@ -721,7 +721,21 @@ struct MarkdownHighlighter {
             }
 
         case .comment:
-            storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
+            // `%%…%%` is a note to yourself, and the point of it is that it is
+            // not part of the note. Dimming it left it on screen taking up the
+            // space it was written to stay out of; it now collapses like every
+            // other piece of syntax, and comes back on the caret's line.
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.faintText.platformColor, range: token.range
+                )
+            } else if isAloneOnItsLine(token.range, in: fullText) {
+                // A block comment takes whole lines, so its lines go too —
+                // otherwise it leaves a run of blank ones behind.
+                concealLines(fullText.paragraphRange(for: token.range))
+            } else {
+                conceal([token.range])
+            }
 
         case .table:
             // A table is prose in a grid, not code.
@@ -795,6 +809,7 @@ struct MarkdownHighlighter {
             // Scaled by nesting depth, exactly as a bullet is, so a nested task
             // lines up with the nested bullets beside it.
             let taskIndent = Self.listIndent * CGFloat(level + 1)
+                + inheritedIndent(at: token.range.location, in: storage)
             paragraph.firstLineHeadIndent = taskIndent
             paragraph.headIndent = taskIndent
             paragraph.paragraphSpacing = typography.paragraphSpacing * 0.25
@@ -860,6 +875,7 @@ struct MarkdownHighlighter {
 
         case .listMarker(let level, let ordered):
             let indent = Self.listIndent * CGFloat(level + 1)
+                + inheritedIndent(at: token.range.location, in: storage)
             let paragraph = paragraph(
                 lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
             )
@@ -979,7 +995,12 @@ struct MarkdownHighlighter {
         var location = block.location
         while location < NSMaxRange(block), location < text.length {
             let line = text.lineRange(for: NSRange(location: location, length: 0))
-            let content = text.substring(with: line).trimmingCharacters(in: .whitespaces)
+            // Leading `>` dropped as well as whitespace: a fence inside a
+            // blockquote reads `> ```swift`, and testing the raw line left the
+            // fences of every quoted code block on screen.
+            let content = text.substring(with: line)
+                .drop { $0 == " " || $0 == "\t" || $0 == ">" }
+                .trimmingCharacters(in: .whitespaces)
             if content.hasPrefix("```") || content.hasPrefix("~~~") {
                 lines.append(NSRange(
                     location: line.location,
@@ -1162,6 +1183,22 @@ struct MarkdownHighlighter {
             return image
         }
         return image.resizedForInline(to: CGSize(width: width, height: height))
+    }
+
+    /// The head indent an enclosing block has already given this line.
+    ///
+    /// A list inside a blockquote used to *replace* the quote's indent rather
+    /// than add to it, so its bullets sat outside the quote's rule instead of
+    /// within it. Tokens are applied in source order and the quote's paragraph
+    /// style lands first, so reading it back is enough — and `applyBaseAttributes`
+    /// resets paragraph styles at the start of every pass, so this cannot
+    /// accumulate across passes.
+    private func inheritedIndent(at location: Int, in storage: NSTextStorage) -> CGFloat {
+        guard location < storage.length,
+              let paragraph = storage.attribute(.paragraphStyle, at: location, effectiveRange: nil)
+                as? NSParagraphStyle
+        else { return 0 }
+        return paragraph.headIndent
     }
 
     /// Whether everything else on `range`'s line is whitespace.

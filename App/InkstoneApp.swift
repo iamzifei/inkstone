@@ -208,6 +208,11 @@ struct InkstoneApp: App {
                     hoveredCopyBlock: hovered, copiedCopyBlock: copied
                 ).draw(in: CGRect(origin: .zero, size: size))
                 let glyphs = layoutManager.glyphRange(for: container)
+                // Backgrounds first, and separately: `drawGlyphs` paints glyphs
+                // only, so `.backgroundColor` — which is what `==highlight==`
+                // uses — was missing from every dump. That read as a rendering
+                // regression in the app, which it was not.
+                layoutManager.drawBackground(forGlyphRange: glyphs, at: CGPoint(x: 10, y: 10))
                 layoutManager.drawGlyphs(forGlyphRange: glyphs, at: CGPoint(x: 10, y: 10))
                 image.unlockFocus()
 

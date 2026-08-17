@@ -499,7 +499,11 @@ struct DocumentScanner {
             let line = map.lineRange(containing: range.location)
             for offset in 0..<line.length {
                 let unit = map.unit(at: line.location + offset)
-                if unit == 0x20 || unit == 0x09 { continue }        // leading indent
+                // Indent, and any `>` quoting the block. A fenced block inside a
+                // blockquote begins `> ```swift`, and stopping at the `>` made it
+                // look indented — so it was widened to whole lines, prefix and
+                // all, and its fences were never recognised as fences.
+                if unit == 0x20 || unit == 0x09 || unit == 0x3E { continue }
                 return unit == 0x60 || unit == 0x7E                 // ` or ~
             }
             return false
