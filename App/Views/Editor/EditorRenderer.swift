@@ -228,27 +228,8 @@ struct EditorRenderer {
                 .offsetBy(dx: origin.x, dy: origin.y)
             guard markerRect.intersects(rect) else { return }
 
-            // The font of the *task text*, not of the marker.
-            //
-            // The marker was collapsed to 0.01pt to hide it, so reading the font
-            // at `range.location` returns that hair-thin font and an x-height of
-            // effectively zero — which put the box half a line below the words it
-            // belongs to. The first character after the marker is the text the
-            // checkbox has to line up with.
-            let textLocation = min(range.location + range.length, storage.length - 1)
-            let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? PlatformFont
-            let side: CGFloat = 12
-            let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-            // Centred on the x-height rather than the baseline: a box centred on
-            // the baseline sits visibly low, because letters extend upward from
-            // it. Same gutter centre as a bullet, so bullets and checkboxes in
-            // one list share a vertical axis.
-            let box = CGRect(
-                x: markerRect.minX - MarkdownHighlighter.markerGutter - side / 2,
-                y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
-                width: side,
-                height: side
-            )
+            guard let box = checkboxBox(for: range) else { return }
+            let side = box.width
 
             let path = PlatformBezierPath(roundedRect: box, cornerRadius: 3)
             if checked {
@@ -270,6 +251,57 @@ struct EditorRenderer {
                 path.stroke()
             }
         }
+    }
+
+    /// Where the checkbox for a task marker is painted.
+    ///
+    /// Shared by the drawing and the hit test, so a tap can never land somewhere
+    /// other than the box the user is looking at.
+    func checkboxBox(for range: NSRange) -> CGRect? {
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+        let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+            .offsetBy(dx: origin.x, dy: origin.y)
+
+        // The font of the *task text*, not of the marker. The marker is
+        // collapsed to 0.01pt, whose x-height is effectively zero — measuring it
+        // put the box half a line below the words it belongs to.
+        let textLocation = min(range.location + range.length, storage.length - 1)
+        let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? PlatformFont
+        let side: CGFloat = 12
+        let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
+
+        // Centred on the x-height rather than the baseline: a box centred on the
+        // baseline sits visibly low, because letters extend upward from it. Same
+        // gutter centre as a bullet, so bullets and checkboxes in one list share
+        // a vertical axis.
+        return CGRect(
+            x: markerRect.minX - MarkdownHighlighter.markerGutter - side / 2,
+            y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
+            width: side,
+            height: side
+        )
+    }
+
+    /// The task marker whose checkbox was tapped at `point`, if any.
+    ///
+    /// The target is grown to 44pt — Apple's minimum — around a box that is
+    /// drawn at 12. A 12pt tap target is roughly a third of a fingertip, and on
+    /// iOS this is the only way to tick a box at all.
+    func checkboxHit(at point: CGPoint) -> NSRange? {
+        var hit: NSRange?
+        storage.enumerateAttribute(
+            .inkstoneCheckbox,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, stop in
+            guard value != nil, let box = checkboxBox(for: range) else { return }
+            let target = box.insetBy(dx: -(44 - box.width) / 2, dy: -(44 - box.height) / 2)
+            if target.contains(point) {
+                hit = range
+                stop.pointee = true
+            }
+        }
+        return hit
     }
 
     /// Paints a real bullet where the `-` of a list item was concealed.

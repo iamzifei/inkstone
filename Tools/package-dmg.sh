@@ -111,8 +111,36 @@ xcrun stapler validate "$APP"
 
 if $install_app; then
   echo "==> Installing to /Applications"
+
+  # Quit a running copy first. Replacing the bundle underneath a live process
+  # leaves it running the old code with nothing on screen to say so — the app
+  # looks updated, behaves like the previous build, and the next bug report is
+  # about a version that no longer exists.
+  if pgrep -f '/Applications/Inkstone.app' >/dev/null; then
+    echo "    quitting the running copy"
+    osascript -e 'tell application "Inkstone" to quit' >/dev/null 2>&1 || true
+    for _ in $(seq 1 30); do
+      pgrep -f '/Applications/Inkstone.app' >/dev/null || break
+      sleep 0.5
+    done
+    if pgrep -f '/Applications/Inkstone.app' >/dev/null; then
+      echo "Inkstone would not quit — install aborted rather than replacing a running app." >&2
+      exit 1
+    fi
+  fi
+
   rm -rf /Applications/Inkstone.app
   ditto "$APP" /Applications/Inkstone.app
+
+  # Confirm what is installed is what was just built, by code signature rather
+  # than by timestamp: a copy that silently failed would otherwise pass.
+  built=$(codesign -dvvv "$APP" 2>&1 | awk -F= '/^CDHash/ {print $2; exit}')
+  installed=$(codesign -dvvv /Applications/Inkstone.app 2>&1 | awk -F= '/^CDHash/ {print $2; exit}')
+  if [[ -z "$installed" || "$built" != "$installed" ]]; then
+    echo "Installed app does not match the build ($built vs $installed)." >&2
+    exit 1
+  fi
+  echo "    verified: /Applications/Inkstone.app matches this build"
 fi
 
 echo

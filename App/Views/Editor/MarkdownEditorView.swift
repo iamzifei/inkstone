@@ -111,6 +111,21 @@ class EditorCoordinator: NSObject {
         return string.paragraphRange(for: NSRange(location: selection.location, length: 0))
     }
 
+    /// Ticks or unticks the task whose marker is `range`.
+    ///
+    /// The state lives in the source text and nowhere else, so this is a text
+    /// edit, written through the binding so it saves and re-highlights like any
+    /// other. The string work itself is `TaskMarker`, which is tested.
+    ///
+    /// - Returns: whether a task was found and toggled.
+    func toggleTask(markerAt range: NSRange, in storage: NSTextStorage) -> Bool {
+        guard let updated = TaskMarker.toggled(in: storage.string, markerRange: range) else {
+            return false
+        }
+        text.wrappedValue = updated
+        return true
+    }
+
     /// Handles a click/tap at a character index; returns true when the editor
     /// should suppress its default caret placement.
     func handleActivation(at index: Int, in storage: NSTextStorage) -> Bool {
@@ -353,6 +368,22 @@ final class InkstoneTextView: NSTextView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+
+        // Checkboxes are hit-tested geometrically, before anything else. They
+        // are painted in the gutter beside a marker collapsed to 0.01pt, so
+        // there is no character under the pointer to dispatch on.
+        if let coordinator, let storage = textStorage, let layoutManager,
+           let container = textContainer,
+           let range = MainActor.assumeIsolated({
+               EditorRenderer(
+                   storage: storage, layoutManager: layoutManager, container: container,
+                   origin: textContainerOrigin, style: coordinator.style
+               ).checkboxHit(at: point)
+           }),
+           MainActor.assumeIsolated({ coordinator.toggleTask(markerAt: range, in: storage) }) {
+            return
+        }
+
         let index = characterIndexForInsertion(at: point)
         // Modifier-free clicks follow links; ⌥-click places the caret instead,
         // giving the user a way to edit link text in live preview.
@@ -984,7 +1015,25 @@ private struct TextViewRepresentable: UIViewRepresentable {
         @objc func handleTap(_ recognizer: UITapGestureRecognizer) {
             guard let textView else { return }
             let storage = textView.textStorage
-            var point = recognizer.location(in: textView)
+            let viewPoint = recognizer.location(in: textView)
+
+            // Checkboxes first, and in view coordinates: they are drawn in the
+            // gutter beside a marker collapsed to 0.01pt, so hit-testing by
+            // character index would never land on one.
+            let renderer = EditorRenderer(
+                storage: storage,
+                layoutManager: textView.layoutManager,
+                container: textView.textContainer,
+                origin: CGPoint(x: textView.textContainerInset.left,
+                                y: textView.textContainerInset.top),
+                style: style
+            )
+            if let range = renderer.checkboxHit(at: viewPoint),
+               toggleTask(markerAt: range, in: storage) {
+                return
+            }
+
+            var point = viewPoint
             point.x -= textView.textContainerInset.left
             point.y -= textView.textContainerInset.top
             let index = textView.layoutManager.characterIndex(
