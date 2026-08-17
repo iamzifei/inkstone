@@ -184,6 +184,16 @@ struct InkstoneApp: App {
                 let baseline = fragment.minY + layoutManager.location(forGlyphAt: glyph).y
                 let ascender = font?.ascender ?? 0
                 let textTop = baseline - ascender
+                // Where a heading rule would land, against where its glyphs end.
+                if storage.attribute(.inkstoneHeadingRule, at: probe, effectiveRange: nil) != nil {
+                    let gr = layoutManager.glyphRange(forCharacterRange: line, actualCharacterRange: nil)
+                    let box = layoutManager.boundingRect(forGlyphRange: gr, in: container)
+                    FileHandle.standardOutput.write(Data(String(
+                        format: "  [heading] box=%.1f..%.1f  glyphBottom=%.1f  ruleAt=%.1f  gap=%.1f\n",
+                        box.minY, box.maxY, baseline - (font?.descender ?? 0),
+                        box.maxY - 1, box.maxY - 1 - (baseline - (font?.descender ?? 0))
+                    ).utf8))
+                }
                 let m = CaretMetrics.metrics(in: storage, at: probe)
                 let top = baseline - (m?.aboveBaseline ?? 0)
                 report += String(
@@ -412,7 +422,7 @@ struct InkstoneApp: App {
             tags: [示例, demo]
             ---
 
-            # Home
+            # Home 中文标题
 
             中英文混排 typography test. Link to [[Second Note]] and a #标签.
 

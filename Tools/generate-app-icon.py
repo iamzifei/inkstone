@@ -158,17 +158,34 @@ PALETTES = {
     "dark": {
         # Deeper ground, lighter stone: on a dark home screen the mark has to
         # separate from the background rather than disappear into it.
-        "paper_top": (38, 36, 42), "paper_bottom": (22, 21, 26),
-        "stone_top": (96, 90, 104), "stone_bottom": (58, 54, 68),
-        "ink": (14, 13, 18), "seal": (224, 104, 92), "seal_mark": (30, 28, 34),
+        #
+        # Measured, not judged by eye. The first attempt at this palette gave the
+        # stone a 1.65:1 contrast against its ground — on the home screen the
+        # disc simply dissolved, and only a red seal floating in a dark square
+        # remained. 4.7:1 at the top of the gradient, 2.6:1 at the bottom where
+        # the ink pool takes over anyway.
+        "paper_top": (22, 21, 26), "paper_bottom": (12, 11, 15),
+        "stone_top": (134, 126, 148), "stone_bottom": (88, 82, 100),
+        # The ink pool is the one part that cannot simply be "darker" here. At
+        # (16,15,20) it matched the ground to within 1.05:1, so the pool merged
+        # with the background and the stone read as a crescent rather than a
+        # disc — a different shape from the light icon, not a darker version of
+        # it. Lifted until it separates from the ground (1.5:1) while staying
+        # clearly darker than the stone (1.7:1).
+        "ink": (52, 48, 60), "seal": (224, 104, 92), "seal_mark": (26, 24, 30),
         "shadow": False,
     },
     "tinted": {
         # Greyscale only. iOS recolours this with the user's tint, so every
-        # distinction has to survive in luminance alone.
-        "paper_top": (232, 232, 232), "paper_bottom": (232, 232, 232),
-        "stone_top": (122, 122, 122), "stone_bottom": (122, 122, 122),
-        "ink": (52, 52, 52), "seal": (168, 168, 168), "seal_mark": (232, 232, 232),
+        # distinction has to survive in luminance alone — a colour that carries a
+        # difference here carries nothing once the system flattens it.
+        #
+        # The seal was the weak point at 1.8:1 against the stone, which put the
+        # one piece of the mark that says "seal" on the edge of invisibility.
+        # Now 3.5:1.
+        "paper_top": (236, 236, 236), "paper_bottom": (236, 236, 236),
+        "stone_top": (105, 105, 105), "stone_bottom": (105, 105, 105),
+        "ink": (44, 44, 44), "seal": (205, 205, 205), "seal_mark": (72, 72, 72),
         "shadow": False,
     },
 }

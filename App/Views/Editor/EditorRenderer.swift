@@ -97,10 +97,37 @@ struct EditorRenderer {
             guard box.intersects(rect) else { return }
 
             colour.setFill()
-            // Sits just under the text, not at the bottom of the paragraph's
-            // trailing space, which would leave it floating.
-            CGRect(x: origin.x, y: box.maxY - 1, width: width, height: 1).fillPlatform()
+            // Below the line box, not inside it.
+            //
+            // `box.maxY - 1` looked right only because it was checked against
+            // Latin headings, whose lowercase letters stop well short of the
+            // descender line. A heading's line box is barely taller than its
+            // glyphs — 45.0 against 42.4 — so the rule was landing at 44.0 with
+            // the text reaching 44.6: on top of the letters, which Chinese
+            // headings show immediately since their glyphs fill the em box.
+            //
+            // The room is in the paragraph's trailing space, which is what a
+            // heading's margin is for. Scaled by the heading's own size so an h1
+            // is not given an h6's gap.
+            let padding = (headingFont(at: range)?.pointSize ?? 16) * 0.22
+            CGRect(x: origin.x, y: box.maxY + padding, width: width, height: 1).fillPlatform()
         }
+    }
+
+    /// The font of the heading's own text, skipping the collapsed `#` marker
+    /// whose 0.01pt size describes nothing on screen.
+    private func headingFont(at range: NSRange) -> PlatformFont? {
+        let text = storage.string as NSString
+        let line = text.lineRange(for: NSRange(location: range.location, length: 0))
+        var probe = line.location
+        while probe < NSMaxRange(line), probe < storage.length {
+            if let font = storage.attribute(.font, at: probe, effectiveRange: nil) as? PlatformFont,
+               font.pointSize >= 1 {
+                return font
+            }
+            probe += 1
+        }
+        return nil
     }
 
     /// Paints rounded fills behind inline code and attachment chips.
