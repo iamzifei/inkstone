@@ -11,6 +11,27 @@ public struct SyncReport: Sendable, Hashable {
     public var skipped: Int = 0
     public var failures: [(path: String, message: String)] = []
 
+    /// Every change, labelled by what happened to it.
+    ///
+    /// A count tells you a sync was not quiet; it does not tell you which file
+    /// would not settle, which is the only part worth knowing. Used by the
+    /// integration tests' failure messages, and cheap enough to be worth having
+    /// wherever a report is reported.
+    public var changeSummary: String {
+        var parts: [String] = []
+        func add(_ label: String, _ paths: [String]) {
+            guard !paths.isEmpty else { return }
+            parts.append("\(label): " + paths.sorted().joined(separator: ", "))
+        }
+        add("uploaded", uploaded)
+        add("downloaded", downloaded)
+        add("deleted locally", deletedLocally)
+        add("deleted remotely", deletedRemotely)
+        add("conflicted", conflicted)
+        add("failed", failures.map { "\($0.path) (\($0.message))" })
+        return parts.isEmpty ? "no changes" : parts.joined(separator: "; ")
+    }
+
     public var changeCount: Int {
         uploaded.count + downloaded.count + deletedLocally.count
             + deletedRemotely.count + conflicted.count
@@ -63,7 +84,7 @@ public struct SyncEngine: Sendable {
         let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
 
         progress?("Scanning vault…")
-        let local = localFiles()
+        let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
 
         let paths = Set(local.keys).union(remoteByPath.keys).union(state.blobs.keys)
@@ -77,7 +98,9 @@ public struct SyncEngine: Sendable {
         }
 
         var report = SyncReport()
-        let actions = SyncPlanner.plan(entries: entries, policy: policy)
+        let actions = SyncPlanner.plan(
+            entries: entries, policy: policy, excludedLocally: excludedLocally
+        )
         let stamp = timestamp()
 
         for action in actions {
@@ -149,14 +172,21 @@ public struct SyncEngine: Sendable {
 
     /// Every syncable file in the vault, keyed by relative path, valued by the
     /// git blob SHA of its current contents.
-    func localFiles() -> [String: String] {
+    ///
+    /// - Returns: the files, and separately the paths that are on disk but which
+    ///   the policy excludes. The two must not be conflated: "not carried by this
+    ///   vault" and "deleted by the user" look identical once a file is merely
+    ///   missing from the map, and only one of them should propagate to the
+    ///   remote.
+    func localFiles() -> (files: [String: String], excluded: Set<String>) {
         var result: [String: String] = [:]
+        var excluded: Set<String> = []
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey]
         guard let walker = FileManager.default.enumerator(
             at: vaultRoot,
             includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles]
-        ) else { return result }
+        ) else { return (result, excluded) }
 
         for case let url as URL in walker {
             let values = try? url.resourceValues(forKeys: Set(keys))
@@ -169,14 +199,20 @@ public struct SyncEngine: Sendable {
             let relative = url.path.hasPrefix(vaultRoot.path + "/")
                 ? String(url.path.dropFirst(vaultRoot.path.count + 1))
                 : url.lastPathComponent
-            guard !relative.split(separator: "/").contains(where: { Self.excludedComponents.contains(String($0)) }),
-                  policy.allows(url, sizeBytes: values?.fileSize),
-                  let data = try? Data(contentsOf: url)
+            guard !relative.split(separator: "/").contains(where: { Self.excludedComponents.contains(String($0)) })
             else { continue }
+
+            guard policy.allows(url, sizeBytes: values?.fileSize) else {
+                // On disk, deliberately not carried. Recorded rather than
+                // dropped, so the planner cannot mistake it for a deletion.
+                excluded.insert(relative)
+                continue
+            }
+            guard let data = try? Data(contentsOf: url) else { continue }
 
             result[relative] = gitBlobSHA(data)
         }
-        return result
+        return (result, excluded)
     }
 
     private func fileURL(_ path: String) -> URL {

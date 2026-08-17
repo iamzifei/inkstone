@@ -38,7 +38,12 @@ public enum GitHubError: LocalizedError, Sendable {
     case rateLimited(resetAt: Date?)
     case conflict(String)
     case tooLarge(path: String, size: Int)
-    case http(status: Int, message: String)
+    /// `path` is what the call was about — a file path, or the repository for
+    /// calls that are not about one file. Without it a 5xx says only that
+    /// something went wrong somewhere, which is the position an actual 503 left
+    /// this client in: every operation was individually fine when tried by hand,
+    /// and the failing one could not be identified from the error at all.
+    case http(status: Int, message: String, path: String)
 
     public var errorDescription: String? {
         switch self {
@@ -60,8 +65,9 @@ public enum GitHubError: LocalizedError, Sendable {
         case .tooLarge(let path, let size):
             let mb = Double(size) / 1_048_576
             return String(format: "%@ is %.1f MB. The GitHub Contents API cannot handle files over 100 MB.", path, mb)
-        case .http(let status, let message):
-            return "GitHub returned \(status). \(message)"
+        case .http(let status, let message, let path):
+            let detail = message.isEmpty ? "" : " \(message)"
+            return "GitHub returned \(status) for \(path).\(detail)"
         }
     }
 }
@@ -86,14 +92,45 @@ public struct GitHubClient: Sendable {
         var name: String? { repository.split(separator: "/").count == 2 ? String(repository.split(separator: "/")[1]) : nil }
     }
 
+    /// How a request that GitHub could not serve is retried.
+    ///
+    /// GitHub answers a 503 with "Please try resubmitting your request", and
+    /// this client did not. A single transient 5xx failed a whole sync — measured
+    /// rather than imagined: two runs in five failed this way against a real
+    /// repository, always on the same probe path, while every one of the four
+    /// operations was individually fine when tried by hand seconds later.
+    ///
+    /// Only 5xx and 429 are retried. A 4xx is an answer, and repeating a request
+    /// that GitHub understood and refused just refuses it again.
+    public struct RetryPolicy: Sendable {
+        public var attempts: Int
+        /// Doubled after each attempt.
+        public var initialDelay: Duration
+
+        public init(attempts: Int = 3, initialDelay: Duration = .milliseconds(600)) {
+            self.attempts = attempts
+            self.initialDelay = initialDelay
+        }
+
+        /// No waiting, for tests that would otherwise spend their time asleep.
+        public static let immediate = RetryPolicy(attempts: 3, initialDelay: .zero)
+    }
+
     public let configuration: Configuration
     private let token: String
     private let session: URLSession
+    private let retry: RetryPolicy
 
-    public init(configuration: Configuration, token: String, session: URLSession = .shared) {
+    public init(
+        configuration: Configuration,
+        token: String,
+        session: URLSession = .shared,
+        retry: RetryPolicy = RetryPolicy()
+    ) {
         self.configuration = configuration
         self.token = token
         self.session = session
+        self.retry = retry
     }
 
     // MARK: - Requests
@@ -128,6 +165,24 @@ public struct GitHubClient: Sendable {
     }
 
     private func send(_ request: URLRequest, describing path: String) async throws -> Data {
+        var delay = retry.initialDelay
+        for attempt in 1...max(1, retry.attempts) {
+            do {
+                return try await attemptSend(request, describing: path)
+            } catch let error as GitHubError {
+                guard case .http(let status, _, _) = error,
+                      status >= 500 || status == 429,
+                      attempt < retry.attempts
+                else { throw error }
+                if delay > .zero { try? await Task.sleep(for: delay) }
+                delay = delay * 2
+            }
+        }
+        // Unreachable: the loop either returns or throws on its last attempt.
+        throw GitHubError.http(status: 0, message: "no attempt was made", path: path)
+    }
+
+    private func attemptSend(_ request: URLRequest, describing path: String) async throws -> Data {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { return data }
 
@@ -151,7 +206,7 @@ public struct GitHubClient: Sendable {
         default:
             let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
                 .flatMap { $0?["message"] as? String } ?? ""
-            throw GitHubError.http(status: http.statusCode, message: message)
+            throw GitHubError.http(status: http.statusCode, message: message, path: path)
         }
     }
 

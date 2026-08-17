@@ -50,11 +50,26 @@ public enum SyncAction: Hashable, Sendable {
 /// makes the difference legible.
 public enum SyncPlanner {
 
+    /// - Parameter excludedLocally: paths the vault scan deliberately left out,
+    ///   which is **not** the same as paths that are not there. The scan can
+    ///   exclude a file by size; this function is given only hashes, so it cannot
+    ///   tell that apart from a deletion, and would read "no local hash" as "the
+    ///   user deleted it" and propose deleting the remote copy. Verified, not
+    ///   supposed: an oversized attachment that had synced cleanly planned
+    ///   `deleteRemote`. Lowering the size limit in Settings was therefore enough
+    ///   to delete previously-synced files off GitHub.
     public static func plan(
         entries: [SyncEntry],
-        policy: SyncFilePolicy = SyncFilePolicy()
+        policy: SyncFilePolicy = SyncFilePolicy(),
+        excludedLocally: Set<String> = []
     ) -> [SyncAction] {
         entries.map { entry in
+            // Before anything else: a file this vault is not carrying takes part
+            // in nothing, in either direction. Neither deleted from the remote
+            // nor fetched again on every run.
+            guard !excludedLocally.contains(entry.path) else {
+                return .skip(path: entry.path, reason: .filtered)
+            }
             // The policy governs whether a file participates at all. Notes always
             // do; attachments only if the user opted their kind in.
             guard policy.allows(URL(fileURLWithPath: entry.path)) else {

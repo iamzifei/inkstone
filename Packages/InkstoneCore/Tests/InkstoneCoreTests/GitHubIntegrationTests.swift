@@ -86,15 +86,25 @@ struct GitHubIntegrationTests {
         let sha = try await client.upload(path: path, contents: body, sha: nil, message: "Inkstone sync probe")
         #expect(sha == gitBlobSHA(body))
 
-        let listed = try await client.listFiles()
-        #expect(listed.contains { $0.path == path })
+        // Everything after the upload runs where a failure can still remove the
+        // probe. GitHub returned a 503 mid-test once and the file stayed in the
+        // repository — a test that writes to someone's repo has to clean up after
+        // itself on the path where it goes wrong, which is the only path where it
+        // matters. `defer` cannot be used: the cleanup is async.
+        do {
+            let listed = try await client.listFiles()
+            #expect(listed.contains { $0.path == path })
 
-        let fetched = try await client.download(sha: sha, path: path)
-        #expect(fetched == body)
+            let fetched = try await client.download(sha: sha, path: path)
+            #expect(fetched == body)
 
-        try await client.delete(path: path, sha: sha, message: "Remove Inkstone sync probe")
-        let after = try await client.listFiles()
-        #expect(!after.contains { $0.path == path })
+            try await client.delete(path: path, sha: sha, message: "Remove Inkstone sync probe")
+            let after = try await client.listFiles()
+            #expect(!after.contains { $0.path == path })
+        } catch {
+            try? await client.delete(path: path, sha: sha, message: "Remove Inkstone sync probe")
+            throw error
+        }
     }
 
     /// Pulls a whole repository into an empty vault against the live API.
@@ -182,7 +192,10 @@ struct GitHubIntegrationTests {
             #expect(!first.downloaded.isEmpty)
     
             let second = try await engine.run()
-            #expect(second.changeCount == 0, "a settled vault must be quiet, got \(second.changeCount) changes")
+            #expect(
+                second.changeCount == 0,
+                "a settled vault must be quiet, got: \(second.changeSummary)"
+            )
         }
     }
 }
