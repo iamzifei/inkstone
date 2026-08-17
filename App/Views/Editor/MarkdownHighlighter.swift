@@ -118,6 +118,60 @@ struct MarkdownHighlighter {
 
     // MARK: - Base
 
+    /// Whether the line above `line` is also quoted.
+    private func isQuoted(lineBefore line: NSRange, in text: NSString) -> Bool {
+        guard line.location > 0 else { return false }
+        let previous = text.paragraphRange(for: NSRange(location: line.location - 1, length: 0))
+        return isQuotedLine(previous, in: text)
+    }
+
+    /// Whether the line below `line` is also quoted.
+    private func isQuoted(lineAfter line: NSRange, in text: NSString) -> Bool {
+        let next = NSMaxRange(line)
+        guard next < text.length else { return false }
+        return isQuotedLine(text.paragraphRange(for: NSRange(location: next, length: 0)), in: text)
+    }
+
+    private func isQuotedLine(_ range: NSRange, in text: NSString) -> Bool {
+        let line = text.substring(with: range).trimmingCharacters(in: .whitespaces)
+        return line.hasPrefix(">")
+    }
+
+    /// Applies a paragraph style across a multi-line block, keeping the block's
+    /// outer spacing on its first and last lines only.
+    ///
+    /// A paragraph style's spacing applies to *every* paragraph it covers, and
+    /// each line of a table or a code fence is its own paragraph. Setting it once
+    /// for the whole block therefore inserted the block's margin between every
+    /// pair of rows: table rows measured 39.5pt apart where the line height is
+    /// 20.3.
+    private func applyBlockStyle(
+        _ base: NSMutableParagraphStyle,
+        spacing: CGFloat,
+        to range: NSRange,
+        in storage: NSTextStorage,
+        text: NSString
+    ) {
+        var lines: [NSRange] = []
+        var location = range.location
+        while location < NSMaxRange(range), location < text.length {
+            let line = text.lineRange(for: NSRange(location: location, length: 0))
+            lines.append(NSRange(
+                location: line.location,
+                length: min(line.length, NSMaxRange(range) - line.location)
+            ))
+            location = NSMaxRange(line)
+        }
+        guard !lines.isEmpty else { return }
+
+        for (index, line) in lines.enumerated() where line.length > 0 {
+            let style = base.mutableCopy() as? NSMutableParagraphStyle ?? base
+            style.paragraphSpacingBefore = index == 0 ? spacing : 0
+            style.paragraphSpacing = index == lines.count - 1 ? spacing : 0
+            storage.addAttribute(.paragraphStyle, value: style, range: line)
+        }
+    }
+
     /// Builds a paragraph style whose line height is a multiple of the *font
     /// size*, the way CSS `line-height` works.
     ///
@@ -346,20 +400,13 @@ struct MarkdownHighlighter {
             }
 
         case .codeBlock:
-            let paragraph = paragraph(
-                lineHeight: typography.codeLineHeightMultiple, size: typography.codeFontSize
+            // Shared with the Mermaid path above, which falls back to this while
+            // a diagram renders. Duplicating it here is how the fenced block
+            // kept its per-line paragraph spacing after the table lost it.
+            applyCodeBlockStyle(
+                to: storage, token: token, fullText: fullText,
+                conceal: conceal, isBeingEdited: isBeingEdited
             )
-            paragraph.firstLineHeadIndent = 8
-            paragraph.headIndent = 8
-            // Matches Typora's 15px margin around a fenced block.
-            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
-            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
-            storage.addAttributes([
-                .font: typography.codeFont.platformFont(size: typography.codeFontSize),
-                .backgroundColor: palette.codeBackground.platformColor,
-                .foregroundColor: palette.text.platformColor,
-                .paragraphStyle: paragraph,
-            ], range: token.range)
 
             // Collapse the ``` fences themselves: the shaded block already says
             // "this is code", so the backticks are pure noise once you stop
@@ -587,15 +634,17 @@ struct MarkdownHighlighter {
             paragraph.firstLineHeadIndent = 8
             paragraph.headIndent = 8
             paragraph.lineBreakMode = .byClipping
-            // Typora sets `margin: 0.8em 0` on tables.
-            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
-            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
             storage.addAttributes([
                 .font: typography.codeFont.platformFont(size: typography.codeFontSize),
                 .backgroundColor: palette.codeBackground.platformColor,
                 .foregroundColor: palette.text.platformColor,
-                .paragraphStyle: paragraph,
             ], range: token.range)
+            // Typora sets `margin: 0.8em 0` on tables — around the table, not
+            // around each row.
+            applyBlockStyle(
+                paragraph, spacing: typography.paragraphSpacing * 0.6,
+                to: token.range, in: storage, text: fullText
+            )
 
         case .tableHeaderRow:
             setFont(
@@ -706,12 +755,18 @@ struct MarkdownHighlighter {
             )
             paragraph.firstLineHeadIndent = indent
             paragraph.headIndent = indent
-            // Typora gives a blockquote `margin: 1rem 0`. Halved here because a
-            // blank line in the source already contributes part of the gap.
-            paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.5
-            paragraph.paragraphSpacing = typography.paragraphSpacing * 0.5
 
             let line = fullText.paragraphRange(for: token.range)
+
+            // Typora gives a blockquote `margin: 1rem 0` — around the *block*,
+            // not around each of its lines. Every quoted line is a paragraph as
+            // far as the text system is concerned, so applying the margin to all
+            // of them put a full blank line between consecutive quoted lines:
+            // 41.6pt apart where the line height is 25.6. Only the first and
+            // last line of a run of quoted lines get it.
+            let spacing = typography.paragraphSpacing * 0.5
+            paragraph.paragraphSpacingBefore = isQuoted(lineBefore: line, in: fullText) ? 0 : spacing
+            paragraph.paragraphSpacing = isQuoted(lineAfter: line, in: fullText) ? 0 : spacing
             storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
             storage.addAttribute(.foregroundColor, value: palette.secondaryText.platformColor, range: line)
             // The rule down the left edge is drawn by the text view.
@@ -752,14 +807,15 @@ struct MarkdownHighlighter {
         )
         paragraph.firstLineHeadIndent = 8
         paragraph.headIndent = 8
-        paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.6
-        paragraph.paragraphSpacing = typography.paragraphSpacing * 0.6
         storage.addAttributes([
             .font: typography.codeFont.platformFont(size: typography.codeFontSize),
             .backgroundColor: style.palette.codeBackground.platformColor,
             .foregroundColor: style.palette.text.platformColor,
-            .paragraphStyle: paragraph,
         ], range: token.range)
+        applyBlockStyle(
+            paragraph, spacing: typography.paragraphSpacing * 0.6,
+            to: token.range, in: storage, text: fullText
+        )
     }
 
     /// The opening and closing ``` lines of a fenced block, including the
