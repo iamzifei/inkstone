@@ -111,6 +111,33 @@ class EditorCoordinator: NSObject {
         return string.paragraphRange(for: NSRange(location: selection.location, length: 0))
     }
 
+    /// Copies a code block or table to the clipboard, without its fences.
+    ///
+    /// The fences are markup, not content: pasting ``` into a terminal is never
+    /// what the button was pressed for.
+    func copyBlock(range: NSRange, in storage: NSTextStorage) -> Bool {
+        let source = storage.string as NSString
+        guard range.location >= 0, range.location + range.length <= source.length else { return false }
+
+        let body = source.substring(with: range)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return !(trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~"))
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .newlines)
+        guard !body.isEmpty else { return false }
+
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(body, forType: .string)
+        #else
+        UIPasteboard.general.string = body
+        #endif
+        return true
+    }
+
     /// Ticks or unticks the task whose marker is `range`.
     ///
     /// The state lives in the source text and nowhere else, so this is a text
@@ -381,6 +408,18 @@ final class InkstoneTextView: NSTextView {
                ).checkboxHit(at: point)
            }),
            MainActor.assumeIsolated({ coordinator.toggleTask(markerAt: range, in: storage) }) {
+            return
+        }
+
+        if let coordinator, let storage = textStorage, let layoutManager,
+           let container = textContainer,
+           let range = MainActor.assumeIsolated({
+               EditorRenderer(
+                   storage: storage, layoutManager: layoutManager, container: container,
+                   origin: textContainerOrigin, style: coordinator.style
+               ).copyButtonHit(at: point)
+           }),
+           MainActor.assumeIsolated({ coordinator.copyBlock(range: range, in: storage) }) {
             return
         }
 
@@ -1030,6 +1069,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
             )
             if let range = renderer.checkboxHit(at: viewPoint),
                toggleTask(markerAt: range, in: storage) {
+                return
+            }
+            if let range = renderer.copyButtonHit(at: viewPoint),
+               copyBlock(range: range, in: storage) {
                 return
             }
 

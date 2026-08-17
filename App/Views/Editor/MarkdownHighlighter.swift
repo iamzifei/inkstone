@@ -168,6 +168,12 @@ struct MarkdownHighlighter {
             let style = base.mutableCopy() as? NSMutableParagraphStyle ?? base
             style.paragraphSpacingBefore = index == 0 ? spacing : 0
             style.paragraphSpacing = index == lines.count - 1 ? spacing : 0
+            // Every line keeps clear of the copy button, not just the first.
+            // Applying it to line 0 alone missed: in a fenced block line 0 is the
+            // collapsed ``` and the first *visible* line is the next one. Doing
+            // the whole block is simpler than tracking which line that is, and
+            // gives the panel an even right margin.
+            style.tailIndent = -Self.copyButtonClearance
             storage.addAttribute(.paragraphStyle, value: style, range: line)
         }
     }
@@ -708,7 +714,26 @@ struct MarkdownHighlighter {
             }
 
         case .horizontalRule:
-            storage.addAttribute(.foregroundColor, value: palette.divider.platformColor, range: token.range)
+            // Previously this only tinted the `---`, which left the source
+            // showing in preview: a thematic break rendered as three grey
+            // hyphens rather than as a line across the page.
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.divider.platformColor, range: token.range
+                )
+            } else {
+                let line = fullText.paragraphRange(for: token.range)
+                hide([line])
+                // The line itself is painted by the text view, in the space this
+                // paragraph keeps.
+                let paragraph = paragraph(
+                    lineHeight: typography.lineHeightMultiple, size: typography.editorFontSize
+                )
+                paragraph.paragraphSpacingBefore = typography.paragraphSpacing * 0.5
+                paragraph.paragraphSpacing = typography.paragraphSpacing * 0.5
+                storage.addAttribute(.paragraphStyle, value: paragraph, range: line)
+                storage.addAttribute(.inkstoneHorizontalRule, value: true, range: line)
+            }
 
         case .listMarker(let level, let ordered):
             let indent = Self.listIndent * CGFloat(level + 1)
@@ -821,19 +846,22 @@ struct MarkdownHighlighter {
     /// The opening and closing ``` lines of a fenced block, including the
     /// trailing newline of the opener so the collapsed line takes no height.
     private func fenceLines(of block: NSRange, in text: NSString) -> [NSRange] {
+        // Scans for the fence lines rather than deducing them from the block's
+        // bounds. Deriving the closer from the last character assumed the match
+        // ended exactly on it; when the pattern took a trailing newline with it,
+        // the closing ``` was left visible in the middle of a rendered block.
         var lines: [NSRange] = []
-        let opener = text.lineRange(for: NSRange(location: block.location, length: 0))
-        lines.append(NSRange(
-            location: opener.location,
-            length: min(opener.length, block.location + block.length - opener.location)
-        ))
-
-        let lastIndex = max(block.location, block.location + block.length - 1)
-        let closer = text.lineRange(for: NSRange(location: lastIndex, length: 0))
-        // A block that was never closed has only one fence.
-        if closer.location > opener.location {
-            let end = min(closer.location + closer.length, block.location + block.length)
-            lines.append(NSRange(location: closer.location, length: end - closer.location))
+        var location = block.location
+        while location < NSMaxRange(block), location < text.length {
+            let line = text.lineRange(for: NSRange(location: location, length: 0))
+            let content = text.substring(with: line).trimmingCharacters(in: .whitespaces)
+            if content.hasPrefix("```") || content.hasPrefix("~~~") {
+                lines.append(NSRange(
+                    location: line.location,
+                    length: min(line.length, NSMaxRange(block) - line.location)
+                ))
+            }
+            location = NSMaxRange(line)
         }
         return lines.filter { $0.length > 0 }
     }
@@ -983,6 +1011,9 @@ struct MarkdownHighlighter {
     /// Bounded so a pathological document cannot grow it without limit.
     private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
     /// Indent applied per list nesting level.
+    /// Room reserved at the right of a block's first line for its copy button.
+    static let copyButtonClearance: CGFloat = 38
+
     static let listIndent: CGFloat = 22
     /// Distance from the text's left edge to the centre of its list marker.
     /// Bullets and checkboxes share it so a mixed list lines up.
@@ -1222,6 +1253,9 @@ extension NSAttributedString.Key {
     static let inkstoneCheckbox = NSAttributedString.Key("inkstoneCheckbox")
     /// A rounded fill hugging the text, drawn by the view. Value is a colour.
     static let inkstoneInlineFill = NSAttributedString.Key("inkstoneInlineFill")
+
+    /// A thematic break, drawn as a line across the text width.
+    static let inkstoneHorizontalRule = NSAttributedString.Key("inkstoneHorizontalRule")
 
     /// A fenced code block or table, drawn as one continuous panel.
     ///

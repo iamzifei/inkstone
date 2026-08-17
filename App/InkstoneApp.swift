@@ -143,6 +143,35 @@ struct InkstoneApp: App {
             FileHandle.standardOutput.write(Data(report.utf8))
         }
 
+        // Conceal dump: which marker-only lines are actually collapsed.
+        if ProcessInfo.processInfo.environment["INKSTONE_CONCEAL_DUMP"] != nil {
+            highlighter.highlight(storage, caretLineRange: nil)
+            let ns = storage.string as NSString
+            var report = "\n"
+            var location = 0
+            while location < ns.length {
+                let line = ns.lineRange(for: NSRange(location: location, length: 0))
+                defer { location = max(line.location + line.length, location + 1) }
+                let text = ns.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard text.hasPrefix("```") || text == "---" || text.hasPrefix("|") else { continue }
+                var hidden = true
+                var height = -1.0
+                // Only the visible characters: a trailing newline keeps its own
+                // font and would make every collapsed line look uncollapsed.
+                let visible = NSRange(location: line.location,
+                                      length: max(0, line.length - (line.length > 0 ? 1 : 0)))
+                storage.enumerateAttributes(in: visible) { attributes, _, _ in
+                    if let f = attributes[.font] as? PlatformFont, f.pointSize >= 1 { hidden = false }
+                    if let p = attributes[.paragraphStyle] as? NSParagraphStyle {
+                        height = p.maximumLineHeight
+                    }
+                }
+                report += String(format: "  collapsed=%-5@ lineHeight=%5.1f  %@\n",
+                                 String(hidden) as NSString, height, text.prefix(24) as CVarArg)
+            }
+            FileHandle.standardOutput.write(Data((report + "\n").utf8))
+        }
+
         // Caret dump: the caret is drawn at the font's natural height while the
         // line is laid out at an explicit multiple of the font size, so the two
         // diverge. Measured through a real layout manager rather than derived.
@@ -449,6 +478,8 @@ struct InkstoneApp: App {
 
             但他们有一个共同点。
             ```
+
+            ---
 
             [^1]: A footnote definition.
             """,

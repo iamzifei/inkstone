@@ -36,6 +36,7 @@ struct EditorRenderer {
     /// list is not drawn twice.
     func draw(in rect: CGRect) {
         drawBlockFills(in: rect)
+        drawHorizontalRules(in: rect)
         drawInlineFills(in: rect)
         drawBullets(in: rect)
         drawQuoteRules(in: rect)
@@ -60,26 +61,115 @@ struct EditorRenderer {
             in: NSRange(location: 0, length: storage.length)
         ) { value, range, _ in
             guard value != nil else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-
             // The union of the block's line fragments, which covers the blank
             // lines and the leading between them; the bounding rect of the
             // glyphs alone would not.
-            var panel = CGRect.null
-            layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in
-                panel = panel.isNull ? fragment : panel.union(fragment)
-            }
-            guard !panel.isNull else { return }
-
-            panel = panel.offsetBy(dx: origin.x, dy: origin.y)
-            // Full width regardless of how far the text runs, so a short line
-            // does not narrow the panel.
-            panel.origin.x = origin.x
-            panel.size.width = container.size.width - container.lineFragmentPadding * 2
-            guard panel.intersects(rect) else { return }
-
+            guard let panel = blockPanel(for: range), panel.intersects(rect) else { return }
             PlatformBezierPath(roundedRect: panel, cornerRadius: 4).fill()
+            drawCopyButton(for: range)
         }
+    }
+
+    /// Draws a thematic break across the text width.
+    func drawHorizontalRules(in rect: CGRect) {
+        style.palette.divider.platformColor.setFill()
+        let width = container.size.width - container.lineFragmentPadding * 2
+
+        storage.enumerateAttribute(
+            .inkstoneHorizontalRule,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard value != nil else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            guard glyphRange.location < layoutManager.numberOfGlyphs else { return }
+            let box = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard box.intersects(rect) else { return }
+
+            CGRect(x: origin.x, y: box.midY, width: width, height: 1).fillPlatform()
+        }
+    }
+
+    /// Where the copy button for a code block is drawn, in the panel's corner.
+    func copyButtonRect(for range: NSRange) -> CGRect? {
+        guard let panel = blockPanel(for: range) else { return nil }
+        let side: CGFloat = 22
+        let inset: CGFloat = 8
+        return CGRect(
+            x: panel.maxX - side - inset,
+            y: panel.minY + inset,
+            width: side,
+            height: side
+        )
+    }
+
+    /// The block whose copy button was tapped at `point`, with the range of its
+    /// contents, if any.
+    func copyButtonHit(at point: CGPoint) -> NSRange? {
+        var hit: NSRange?
+        storage.enumerateAttribute(
+            .inkstoneBlockFill,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, stop in
+            guard value != nil, let button = copyButtonRect(for: range) else { return }
+            // Grown for touch, as with checkboxes: 22pt is a comfortable glyph
+            // and an uncomfortable target.
+            let target = button.insetBy(dx: -(44 - button.width) / 2, dy: -(44 - button.height) / 2)
+            if target.contains(point) {
+                hit = range
+                stop.pointee = true
+            }
+        }
+        return hit
+    }
+
+    /// The panel a block is painted into: the union of its line fragments.
+    private func blockPanel(for range: NSRange) -> CGRect? {
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+
+        var panel = CGRect.null
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in
+            panel = panel.isNull ? fragment : panel.union(fragment)
+        }
+        guard !panel.isNull else { return nil }
+
+        panel = panel.offsetBy(dx: origin.x, dy: origin.y)
+        panel.origin.x = origin.x
+        panel.size.width = container.size.width - container.lineFragmentPadding * 2
+        return panel
+    }
+
+    /// A copy affordance in the corner of a code block or table.
+    private func drawCopyButton(for range: NSRange) {
+        guard let button = copyButtonRect(for: range) else { return }
+
+        // Two offset rounded rectangles: the universal "copy" mark, drawn rather
+        // than set from a font so it matches the panel at any text size.
+        let colour = style.palette.faintText.platformColor
+
+        // A solid ground first: the first line is kept clear of the button, but
+        // a wrapped line or a wide table can still reach under it.
+        style.palette.codeBackground.platformColor.setFill()
+        PlatformBezierPath(roundedRect: button, cornerRadius: 5).fill()
+        colour.setStroke()
+
+        let back = CGRect(x: button.minX + 5, y: button.minY + 2, width: 11, height: 13)
+        let front = CGRect(x: button.minX + 2, y: button.minY + 6, width: 11, height: 13)
+
+        let backPath = PlatformBezierPath(roundedRect: back, cornerRadius: 2)
+        backPath.lineWidth = 1.2
+        backPath.stroke()
+
+        // Punch the background through behind the front sheet so the two read as
+        // overlapping rather than as a grid.
+        style.palette.codeBackground.platformColor.setFill()
+        PlatformBezierPath(roundedRect: front.insetBy(dx: -1, dy: -1), cornerRadius: 3).fill()
+
+        colour.setStroke()
+        let frontPath = PlatformBezierPath(roundedRect: front, cornerRadius: 2)
+        frontPath.lineWidth = 1.2
+        frontPath.stroke()
     }
 
     /// Draws inline formulas into the space their kerning reserved.
