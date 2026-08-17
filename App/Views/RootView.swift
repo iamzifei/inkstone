@@ -11,7 +11,16 @@ struct RootView: View {
     @Environment(\.style) private var style
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    // The inspector starts open on a Mac and closed everywhere else. On an iPad
+    // the sidebar and the inspector are both overlays at these widths, so
+    // opening both by default left the editor as a strip between two floating
+    // panels — three columns' worth of chrome on a screen that fits two.
+    #if os(macOS)
     @State private var isInspectorPresented = true
+    #else
+    @State private var isInspectorPresented = false
+    #endif
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass

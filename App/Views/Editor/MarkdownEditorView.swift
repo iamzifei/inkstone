@@ -879,6 +879,147 @@ private struct TextViewRepresentable: NSViewRepresentable {
 // MARK: - iOS
 
 
+
+/// The row of Markdown controls above the keyboard.
+///
+/// On a phone the syntax is the hard part: `#`, `` ` ``, `[`, `>` and `-` are
+/// each two taps away on the iOS keyboard, and `[[` for a wikilink is four.
+/// Typing a note is otherwise a constant round trip through the symbol plane.
+@MainActor
+final class MarkdownAccessoryView: UIInputView {
+
+    /// What a button does to the text.
+    private enum Action {
+        /// Puts the text at the start of the line, replacing any marker already
+        /// there — tapping "heading" twice should not give `## ##`.
+        case linePrefix(String)
+        /// Wraps the selection, or inserts the pair and puts the caret between.
+        case wrap(String, String)
+        case insert(String)
+    }
+
+    private struct Item {
+        let symbol: String
+        let label: String
+        let action: Action
+    }
+
+    private static let items: [Item] = [
+        Item(symbol: "number", label: "Heading", action: .linePrefix("# ")),
+        Item(symbol: "list.bullet", label: "List", action: .linePrefix("- ")),
+        Item(symbol: "checklist", label: "Task", action: .linePrefix("- [ ] ")),
+        Item(symbol: "text.quote", label: "Quote", action: .linePrefix("> ")),
+        Item(symbol: "bold", label: "Bold", action: .wrap("**", "**")),
+        Item(symbol: "italic", label: "Italic", action: .wrap("*", "*")),
+        Item(symbol: "chevron.left.forwardslash.chevron.right", label: "Code", action: .wrap("`", "`")),
+        Item(symbol: "link", label: "Link", action: .wrap("[[", "]]")),
+    ]
+
+    /// A marker already at the start of the line, so tapping "heading" twice
+    /// gives `# ` rather than `## # `.
+    ///
+    /// Built once: constructing it per tap would mean either a force-try or an
+    /// optional to unwrap on every keystroke.
+    private static let existingMarker: NSRegularExpression = {
+        // Safe to force here and nowhere else: the pattern is a literal, so a
+        // failure would be a programming error caught the first time this runs.
+        // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: "^[ \\t]*(?:#{1,6} |[-*+] (?:\\[.\\] )?|> )")
+    }()
+
+    private weak var textView: UITextView?
+
+    init(textView: UITextView, tint: UIColor) {
+        self.textView = textView
+        super.init(
+            frame: CGRect(x: 0, y: 0, width: 0, height: 44),
+            inputViewStyle: .keyboard
+        )
+
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.distribution = .fillEqually
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        for (index, item) in Self.items.enumerated() {
+            var configuration = UIButton.Configuration.plain()
+            configuration.image = UIImage(systemName: item.symbol)
+            let button = UIButton(configuration: configuration)
+            button.tag = index
+            button.tintColor = tint
+            button.accessibilityLabel = item.label
+            button.addTarget(self, action: #selector(tap(_:)), for: .touchUpInside)
+            stack.addArrangedSubview(button)
+        }
+
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -4),
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    @objc private func tap(_ sender: UIButton) {
+        guard let textView, Self.items.indices.contains(sender.tag) else { return }
+        let item = Self.items[sender.tag]
+        let text = textView.text as NSString
+        let selection = textView.selectedRange
+
+        switch item.action {
+        case .linePrefix(let prefix):
+            let line = text.lineRange(for: NSRange(location: selection.location, length: 0))
+            let existing = text.substring(with: line)
+            // Replace an existing marker rather than stacking a second one.
+            let stripped = Self.existingMarker.stringByReplacingMatches(
+                in: existing,
+                range: NSRange(location: 0, length: (existing as NSString).length),
+                withTemplate: ""
+            )
+            textView.replace(range: line, with: prefix + stripped)
+            let moved = prefix.utf16.count - (existing.utf16.count - stripped.utf16.count)
+            textView.selectedRange = NSRange(location: max(0, selection.location + moved), length: 0)
+
+        case .wrap(let open, let close):
+            if selection.length > 0 {
+                let selected = text.substring(with: selection)
+                textView.replace(range: selection, with: open + selected + close)
+                textView.selectedRange = NSRange(
+                    location: selection.location + open.utf16.count,
+                    length: selection.length
+                )
+            } else {
+                textView.replace(range: selection, with: open + close)
+                textView.selectedRange = NSRange(
+                    location: selection.location + open.utf16.count, length: 0
+                )
+            }
+
+        case .insert(let string):
+            textView.replace(range: selection, with: string)
+            textView.selectedRange = NSRange(
+                location: selection.location + string.utf16.count, length: 0
+            )
+        }
+    }
+}
+
+private extension UITextView {
+    /// Replaces a range and tells the delegate, so the edit saves and
+    /// re-highlights like a typed one.
+    func replace(range: NSRange, with string: String) {
+        guard let start = position(from: beginningOfDocument, offset: range.location),
+              let end = position(from: start, offset: range.length),
+              let textRange = textRange(from: start, to: end)
+        else { return }
+        replace(textRange, withText: string)
+    }
+}
+
 /// Paints the hand-drawn elements the highlighter reserved space for.
 ///
 /// Without this, iOS collapsed a task's `- [ ] ` marker to 0.01pt exactly as
@@ -950,6 +1091,21 @@ private struct TextViewRepresentable: UIViewRepresentable {
         // when the tap isn't on a link.
         tap.cancelsTouchesInView = false
         textView.addGestureRecognizer(tap)
+
+        textView.inputAccessoryView = MarkdownAccessoryView(
+            textView: textView, tint: style.palette.accent.platformColor
+        )
+
+        #if DEBUG
+        // Brings the keyboard up so the accessory row can be seen in a
+        // screenshot; the simulator otherwise uses the Mac's keyboard and never
+        // shows one.
+        if ProcessInfo.processInfo.environment["INKSTONE_FOCUS_EDITOR"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                textView.becomeFirstResponder()
+            }
+        }
+        #endif
 
         context.coordinator.textView = textView
         context.coordinator.applyStyle()
