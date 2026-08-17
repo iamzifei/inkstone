@@ -86,6 +86,14 @@ Embedded image with an exact box, deliberately not the picture's proportions:
 ![[test-image.png|200x40]]
 
 Embedded note: ![[Second Note]]
+
+An embedded note on its own line shows the note's content:
+
+![[Second Note]]
+
+An embedded PDF shows its first page:
+
+![[report.pdf]]
 Embed that does not resolve: ![[missing-file.png]]
 
 An image sharing its line with words is drawn as a thumbnail at text size,
@@ -195,7 +203,9 @@ Nested tasks mixed with bullets:
 > Body of the quote callout.
 
 > [!info]- Folded callout
-> This callout is marked folded with a trailing minus.
+> This body is hidden until the disclosure is clicked, and the minus is what
+> says so. Clicking writes the state back into the header, the way ticking a
+> checkbox writes into the line.
 
 > [!success]+ Expanded callout
 > This callout is marked expanded with a trailing plus.

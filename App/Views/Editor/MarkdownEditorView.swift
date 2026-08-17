@@ -213,6 +213,22 @@ class EditorCoordinator: NSObject {
         return true
     }
 
+    /// Folds or unfolds the callout whose header is `range`.
+    ///
+    /// A text edit, like ticking a checkbox: the state lives in the header's
+    /// `+`/`-` and nowhere else, so it survives editing, reindexing and being
+    /// opened on another device. See `CalloutMarker` for why a view-only fold
+    /// would need an identity a range cannot give it.
+    ///
+    /// - Returns: whether a callout was found and toggled.
+    func toggleCallout(headerAt range: NSRange, in storage: NSTextStorage) -> Bool {
+        guard let updated = CalloutMarker.toggled(in: storage.string, headerRange: range) else {
+            return false
+        }
+        text.wrappedValue = updated
+        return true
+    }
+
     /// Handles a click/tap at a character index; returns true when the editor
     /// should suppress its default caret placement.
     func handleActivation(at index: Int, in storage: NSTextStorage) -> Bool {
@@ -529,6 +545,18 @@ final class InkstoneTextView: NSTextView {
                ).checkboxHit(at: point)
            }),
            MainActor.assumeIsolated({ coordinator.toggleTask(markerAt: range, in: storage) }) {
+            return
+        }
+
+        if let coordinator, let storage = textStorage, let layoutManager,
+           let container = textContainer,
+           let range = MainActor.assumeIsolated({
+               EditorRenderer(
+                   storage: storage, layoutManager: layoutManager, container: container,
+                   origin: textContainerOrigin, style: coordinator.style
+               ).calloutDisclosureHit(at: point)
+           }),
+           MainActor.assumeIsolated({ coordinator.toggleCallout(headerAt: range, in: storage) }) {
             return
         }
 
@@ -1427,6 +1455,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
             )
             if let range = renderer.checkboxHit(at: viewPoint),
                toggleTask(markerAt: range, in: storage) {
+                return
+            }
+            if let range = renderer.calloutDisclosureHit(at: viewPoint),
+               toggleCallout(headerAt: range, in: storage) {
                 return
             }
             if let range = renderer.copyButtonHit(at: viewPoint),

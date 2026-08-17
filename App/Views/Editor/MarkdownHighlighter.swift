@@ -134,6 +134,19 @@ struct MarkdownHighlighter {
         // are separate tokens.
         let html = Self.htmlSpans(in: tokens)
 
+        // The body lines of every folded callout, collected before the loop and
+        // collapsed after it. Doing it while the callout's own token was being
+        // applied did not work: those lines carry `.blockquote` tokens of their
+        // own, they sort *after* the header, and their paragraph style replaced
+        // the collapsed one — so a folded callout hid its text and kept its
+        // height, leaving a quote rule down an empty column.
+        let foldedBodies: [NSRange] = tokens.compactMap { token in
+            guard case .callout(_, true, _) = token.kind else { return nil }
+            if let caretLineRange,
+               NSIntersectionRange(caretLineRange, token.range).length > 0 { return nil }
+            return calloutBody(after: token.range, in: text as NSString)
+        }
+
         for token in tokens {
             // Tokens wholly outside the styled scope cost nothing to skip.
             guard NSIntersectionRange(token.range, scope).length > 0
@@ -152,6 +165,12 @@ struct MarkdownHighlighter {
         // Attributes first, then the tags are collapsed — in that order, because
         // a span covers the tags nested inside it and setting a font across them
         // would give back the width they had been collapsed out of.
+        if mode != .source {
+            for body in foldedBodies where NSIntersectionRange(body, scope).length > 0 {
+                collapseLines(body, in: storage)
+            }
+        }
+
         for span in html.spans where NSIntersectionRange(span.content, scope).length > 0 {
             applyHTML(span, to: storage, fullText: text as NSString)
         }
@@ -576,7 +595,10 @@ struct MarkdownHighlighter {
             // (video, PDF, a note transclusion) keeps its link styling so it is
             // still visible and clickable rather than silently disappearing.
             let resolved = resolveAttachment?(link.target)
-            if let resolved, AttachmentKind(url: resolved) == .image, !isBeingEdited,
+            // A PDF joins the image path: its first page is a picture, and a
+            // document embedded into a note is embedded to be looked at.
+            let previewable: Set<AttachmentKind> = [.image, .pdf]
+            if let resolved, previewable.contains(AttachmentKind(url: resolved)), !isBeingEdited,
                let image = sizedEmbed(resolved, hint: link.embedSize) {
                 if isAloneOnItsLine(token.range, in: fullText) {
                     inlineImage(image, to: storage, in: token.range, fullText: fullText)
@@ -753,7 +775,7 @@ struct MarkdownHighlighter {
         case .blockIdentifier:
             storage.addAttribute(.foregroundColor, value: palette.faintText.platformColor, range: token.range)
 
-        case .callout(let type, _, _):
+        case .callout(let type, let folded, _):
             storage.addAttributes([
                 .foregroundColor: calloutColor(for: type).platformColor,
                 .font: typography.editorFont.platformFont(size: typography.editorFontSize, weight: .semibold),
@@ -767,6 +789,14 @@ struct MarkdownHighlighter {
                     length: token.contentRange.location - token.range.location
                 )])
             }
+
+            // The disclosure the renderer draws, and what a click on it does.
+            // Marked on the header even when expanded: a callout you cannot fold
+            // is a callout whose `-` does nothing, which is how this arrived —
+            // the flag was parsed and read by nobody.
+            storage.addAttribute(.inkstoneCalloutFold, value: folded, range: token.range)
+
+
 
         case .htmlTag(let name, _):
             // A tag we cannot express — `<span style=…>`, `<img>`, `<br>` — stays
@@ -1401,6 +1431,41 @@ struct MarkdownHighlighter {
         storage.addAttribute(.inkstoneInlineText, value: replacement, range: range)
     }
 
+    /// The quoted lines under a callout header — its body.
+    ///
+    /// Walked rather than taken from a token: a callout token is one line, and
+    /// the blockquote it heads is not.
+    private func calloutBody(after header: NSRange, in text: NSString) -> NSRange? {
+        var location = NSMaxRange(text.paragraphRange(for: header))
+        let start = location
+        while location < text.length {
+            let line = text.paragraphRange(for: NSRange(location: location, length: 0))
+            guard isQuotedLine(line, in: text) else { break }
+            location = max(NSMaxRange(line), location + 1)
+        }
+        guard location > start else { return nil }
+        return NSRange(location: start, length: location - start)
+    }
+
+    /// Hides a run of lines and takes away the height they would keep.
+    private func collapseLines(_ range: NSRange, in storage: NSTextStorage) {
+        guard range.length > 0, NSMaxRange(range) <= storage.length else { return }
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+        #if os(macOS)
+        storage.addAttribute(.spellingState, value: 0, range: range)
+        #endif
+        let collapsed = NSMutableParagraphStyle()
+        collapsed.minimumLineHeight = 0.01
+        collapsed.maximumLineHeight = 0.01
+        collapsed.paragraphSpacing = 0
+        collapsed.paragraphSpacingBefore = 0
+        storage.addAttribute(.paragraphStyle, value: collapsed, range: range)
+        // The quote rule is drawn from this, and a folded body has no rule.
+        storage.removeAttribute(.inkstoneQuoteDepth, range: range)
+    }
+
     /// The head indent an enclosing block has already given this line.
     ///
     /// A list inside a blockquote used to *replace* the quote's indent rather
@@ -1921,6 +1986,10 @@ extension NSAttributedString.Key {
     static let inkstoneAttachment = NSAttributedString.Key("inkstoneAttachment")
     /// Carries the decoded image for an embed the text view should paint itself.
     static let inkstoneInlineImage = NSAttributedString.Key("inkstoneInlineImage")
+    /// Marks a callout header so its disclosure can be drawn and clicked.
+    /// Value is a Bool: whether the callout is currently folded.
+    static let inkstoneCalloutFold = NSAttributedString.Key("inkstoneCalloutFold")
+
     /// Marks a concealed pipe that separates two cells, so a rule can be drawn
     /// where it was. Value is a Bool.
     static let inkstoneTableSeparator = NSAttributedString.Key("inkstoneTableSeparator")

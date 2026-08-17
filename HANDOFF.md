@@ -184,9 +184,9 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Mermaid | ✅ WKWebView snapshot, cached |
 | Inline HTML | ✅ a whitelist of tags styled; the rest left as source |
 | Block HTML | ❌ shown as source (H3 in `docs/plans/2026-08-17-tables-and-html.md`) |
-| PDF embeds | ❌ click-to-open only, no inline preview |
-| `![[Note]]` transclusion | ❌ renders as a link, not as content |
-| Callout folding | ❌ `[!note]-` is parsed and the flag read by nothing |
+| PDF embeds | ✅ first page rendered inline; click still opens the file |
+| `![[Note]]` transclusion | ✅ whole note, `#Heading` section or `#^block` |
+| Callout folding | ✅ `[!note]-` folds; the disclosure writes the state back |
 | Plugin API | ❌ not started |
 
 ---

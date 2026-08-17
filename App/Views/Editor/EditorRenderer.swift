@@ -53,6 +53,72 @@ struct EditorRenderer {
         drawCheckboxes(in: rect)
         drawHeadingRules(in: rect)
         drawInlineMath(in: rect)
+        drawCalloutDisclosures(in: rect)
+    }
+
+    /// Where a callout's disclosure triangle is drawn, and where a click on it
+    /// counts. Shared, so the two can never disagree.
+    func calloutDisclosureRect(for range: NSRange) -> CGRect? {
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+        let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+            .offsetBy(dx: origin.x, dy: origin.y)
+        let side: CGFloat = 12
+        // In the gutter the quote rule already reserves, so it takes no width
+        // from the title.
+        return CGRect(
+            x: origin.x + 4,
+            y: fragment.midY - side / 2,
+            width: side,
+            height: side
+        )
+    }
+
+    /// A chevron on a callout header: down when open, right when folded.
+    private func drawCalloutDisclosures(in rect: CGRect) {
+        storage.enumerateAttribute(
+            .inkstoneCalloutFold,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let folded = value as? Bool,
+                  let box = calloutDisclosureRect(for: range), box.intersects(rect)
+            else { return }
+
+            let path = PlatformBezierPath()
+            let inset: CGFloat = 3
+            if folded {
+                path.move(to: CGPoint(x: box.minX + inset + 1, y: box.minY + inset - 1))
+                path.addLine(to: CGPoint(x: box.maxX - inset - 1, y: box.midY))
+                path.addLine(to: CGPoint(x: box.minX + inset + 1, y: box.maxY - inset + 1))
+            } else {
+                path.move(to: CGPoint(x: box.minX + inset - 1, y: box.minY + inset + 1))
+                path.addLine(to: CGPoint(x: box.midX, y: box.maxY - inset - 1))
+                path.addLine(to: CGPoint(x: box.maxX - inset + 1, y: box.minY + inset + 1))
+            }
+            path.lineWidth = 1.6
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            style.palette.faintText.platformColor.setStroke()
+            path.stroke()
+        }
+    }
+
+    /// The callout header whose disclosure is under `point`.
+    func calloutDisclosureHit(at point: CGPoint) -> NSRange? {
+        var hit: NSRange?
+        storage.enumerateAttribute(
+            .inkstoneCalloutFold,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, stop in
+            guard value != nil, let box = calloutDisclosureRect(for: range) else { return }
+            // Grown for touch, as the checkbox and the copy button are.
+            let target = box.insetBy(dx: -(44 - box.width) / 2, dy: -(44 - box.height) / 2)
+            if target.contains(point) {
+                hit = range
+                stop.pointee = true
+            }
+        }
+        return hit
     }
 
 
