@@ -35,13 +35,38 @@ public enum FontChoice: Codable, Hashable, Sendable {
 /// renders Chinese beautifully is rarely a good code font, and vice versa — this
 /// is the single most requested typography control in note apps.
 public struct Typography: Codable, Hashable, Sendable {
+
+    /// Default text sizes, which are not the same number on both platforms.
+    ///
+    /// 13pt is `NSFont.systemFontSize` — the size every Mac sidebar, menu and
+    /// panel is drawn at. It was the only default, so the iPhone drew its file
+    /// list at Mac chrome size and the note titles came out visibly small
+    /// against everything else on the phone.
+    ///
+    /// A point is the same length on both, so the mistake is not arithmetic: the
+    /// platforms simply disagree about how big body text should be. iOS builds
+    /// its lists around the 17pt `.body` style, and a row of text at 13pt in the
+    /// middle of a phone reads as an app that was ported rather than written for
+    /// it. Held at arm's length rather than at desk distance, too.
+    enum Default {
+        #if os(macOS)
+        static let interfaceFontSize: Double = 13
+        static let editorFontSize: Double = 16
+        #else
+        /// `UIFont.preferredFont(forTextStyle: .body)` is 17pt at the default
+        /// Dynamic Type setting, which is what these match.
+        static let interfaceFontSize: Double = 17
+        static let editorFontSize: Double = 17
+        #endif
+    }
+
     // Interface chrome (sidebar, menus, panels).
     public var interfaceFont: FontChoice = .system
-    public var interfaceFontSize: Double = 13
+    public var interfaceFontSize: Double = Default.interfaceFontSize
 
     // Editor + preview body text.
     public var editorFont: FontChoice = .system
-    public var editorFontSize: Double = 16
+    public var editorFontSize: Double = Default.editorFontSize
     /// Multiple of the font size.
     ///
     /// 1.6 matches Typora's default theme. Earlier this was 1.75, which is a
