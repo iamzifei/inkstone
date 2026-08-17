@@ -21,15 +21,16 @@ struct SettingsView: View {
         }
         .frame(width: 560, height: 460)
         #else
-        NavigationStack {
+        NavigationStack(path: $path) {
             Form {
-                NavigationLink { AppearanceSettings() } label: { Label("Appearance", systemImage: "paintpalette") }
-                NavigationLink { TypographySettings() } label: { Label("Typography", systemImage: "textformat") }
-                NavigationLink { EditorSettings() } label: { Label("Editor", systemImage: "square.and.pencil") }
-                NavigationLink { FilesSettings() } label: { Label("Files & Links", systemImage: "folder") }
-                NavigationLink { SyncSettings() } label: { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+                ForEach(Pane.allCases) { pane in
+                    NavigationLink(value: pane) {
+                        Label(pane.title, systemImage: pane.symbol)
+                    }
+                }
             }
             .navigationTitle("Settings")
+            .navigationDestination(for: Pane.self) { $0.view }
             .toolbar {
                 if let onDone {
                     ToolbarItem(placement: .confirmationAction) {
@@ -40,6 +41,61 @@ struct SettingsView: View {
         }
         #endif
     }
+
+    #if !os(macOS)
+    /// A value-driven path rather than view-carrying links, so a pane can be
+    /// opened from code. Verifying a settings pane otherwise means driving a tap
+    /// on each one, which is exactly the kind of check that quietly stops being
+    /// done.
+    ///
+    ///     SIMCTL_CHILD_INKSTONE_OPEN_SETTINGS=typography xcrun simctl launch <sim> com.orris.inkstone
+    @State private var path: [Pane] = {
+        #if DEBUG
+        guard let name = ProcessInfo.processInfo.environment["INKSTONE_OPEN_SETTINGS"],
+              let pane = Pane(rawValue: name)
+        else { return [] }
+        return [pane]
+        #else
+        return []
+        #endif
+    }()
+
+    enum Pane: String, CaseIterable, Identifiable, Hashable {
+        case appearance, typography, editor, files, sync
+
+        var id: String { rawValue }
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .appearance: return "Appearance"
+            case .typography: return "Typography"
+            case .editor: return "Editor"
+            case .files: return "Files & Links"
+            case .sync: return "Sync"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .appearance: return "paintpalette"
+            case .typography: return "textformat"
+            case .editor: return "square.and.pencil"
+            case .files: return "folder"
+            case .sync: return "arrow.triangle.2.circlepath"
+            }
+        }
+
+        @ViewBuilder var view: some View {
+            switch self {
+            case .appearance: AppearanceSettings()
+            case .typography: TypographySettings()
+            case .editor: EditorSettings()
+            case .files: FilesSettings()
+            case .sync: SyncSettings()
+            }
+        }
+    }
+    #endif
 }
 
 private struct AppearanceSettings: View {
@@ -85,6 +141,30 @@ private struct TypographySettings: View {
         @Bindable var settings = workspace.settings
 
         Form {
+            // The chrome, which is a different thing from the notes and had no
+            // control at all — every other section on this page changes how a
+            // *file* looks, so someone finding the file list too small had
+            // nowhere to go. The setting existed and drove `style.uiFont`; it
+            // was simply never exposed.
+            Section {
+                FontPicker(
+                    title: String(localized: "Font"),
+                    selection: $settings.data.typography.interfaceFont,
+                    suggestions: Typography.recommendedCJKFonts
+                )
+                LabeledStepper(
+                    title: String(localized: "Size"),
+                    value: $settings.data.typography.interfaceFontSize,
+                    range: 10...24,
+                    step: 0.5,
+                    format: "%.1f pt"
+                )
+            } header: {
+                Text("Interface")
+            } footer: {
+                Text("The file list, sidebar and panels — not the text inside your notes.")
+            }
+
             Section("Body text") {
                 FontPicker(
                     title: String(localized: "Font"),

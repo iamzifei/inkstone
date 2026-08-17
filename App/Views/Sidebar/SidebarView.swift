@@ -136,7 +136,7 @@ private struct SectionPicker: View {
                     selection = section
                 } label: {
                     Image(systemName: icon(for: section))
-                        .font(.system(size: 13))
+                        .font(style.uiIcon(1.0))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                         .foregroundStyle(selection == section ? style.accent : style.secondaryText)
@@ -227,8 +227,10 @@ private struct FileRow: View {
             Image(systemName: node.isDirectory
                   ? (isExpanded ? "chevron.down" : "chevron.right")
                   : (node.isMarkdown ? "doc.text" : Self.icon(for: node.url)))
-                .font(.system(size: node.isDirectory ? 9 : 11, weight: .semibold))
-                .frame(width: 10)
+                // 9 and 11 against 13pt chrome, kept as ratios so they hold
+                // at any interface size.
+                .font(style.uiIcon(node.isDirectory ? 9.0/13 : 11.0/13, weight: .semibold))
+                .frame(width: style.uiFontSize * 10/13)
                 .foregroundStyle(style.faintText)
 
             if renaming == node.url {

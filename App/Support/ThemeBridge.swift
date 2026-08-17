@@ -101,6 +101,23 @@ struct Style: Sendable {
     var codeFont: Font { typography.codeFont.font(size: typography.codeFontSize) }
     var uiFont: Font { typography.interfaceFont.font(size: typography.interfaceFontSize) }
 
+    /// A glyph sized in proportion to the interface text it sits beside.
+    ///
+    /// Sidebar icons were written as fixed point sizes chosen against 13pt
+    /// chrome. That was invisible while 13 was the only size there had ever
+    /// been; once the interface size became a platform default and then a
+    /// setting, a fixed 11pt icon next to 17pt or 20pt text stops looking like
+    /// an icon and starts looking like a mistake.
+    ///
+    /// - Parameter ratio: the glyph's size as a fraction of the text size, so
+    ///   the proportions that were tuned against 13pt survive the move.
+    func uiIcon(_ ratio: Double, weight: Font.Weight = .regular) -> Font {
+        .system(size: typography.interfaceFontSize * ratio, weight: weight)
+    }
+
+    /// Point size of the interface text, for laying out beside it.
+    var uiFontSize: Double { typography.interfaceFontSize }
+
     func headingFont(level: Int) -> Font {
         typography.editorFont.font(size: typography.headingSize(level: level))
     }
