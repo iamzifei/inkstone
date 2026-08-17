@@ -110,6 +110,26 @@ enum ObsidianSyntax {
         addMatches(Patterns.mathInline) { match, _ in
             SyntaxToken(kind: .mathInline, range: match.range, contentRange: match.range(at: 1))
         }
+
+        // CommonMark rather than Obsidian, and here because of *where* the work
+        // has to happen rather than what defines it: cmark resolves escapes and
+        // entities into a `Text` node's value and does not report the position of
+        // either, so the only way to conceal the source is to find it again. The
+        // prose regions are what make that safe — a backslash inside a code span
+        // is a backslash.
+        //
+        // Last, so anything with a meaning of its own has already claimed its
+        // text: `\$` inside `$maths$` belongs to the formula.
+        addMatches(Patterns.escape, claiming: false) { match, _ in
+            // The backslash, not the character it protects: that character is
+            // ordinary text and concealing it would delete what was escaped.
+            SyntaxToken(kind: .escape, range: NSRange(location: match.range.location, length: 1))
+        }
+        addMatches(Patterns.entity, claiming: false) { match, text in
+            guard let replacement = HTMLEntity.character(for: text.substring(with: match.range))
+            else { return nil }
+            return SyntaxToken(kind: .entity(replacement), range: match.range)
+        }
     }
 
     /// Parses a matched `[[target#fragment|alias]]`.
@@ -142,7 +162,11 @@ enum ObsidianSyntax {
         /// A tag must contain at least one non-numeric character, otherwise `#1`
         /// in "issue #1" would be indexed as a tag. Unicode letters are allowed so
         /// `#中文标签` works.
-        static let tag = make(#"(?<![\p{L}\p{N}_/#])#([\p{L}\p{N}_/-]*[\p{L}_-][\p{L}\p{N}_/-]*)"#)
+        /// `&` is excluded as well as the rest: `&#x2014;` is an em dash, and
+        /// without it the `#x2014` was scanned as a tag — which then claimed the
+        /// text and stopped the entity being recognised at all. Found by a test
+        /// for entities, not by anyone noticing a stray tag.
+        static let tag = make(#"(?<![\p{L}\p{N}_/#&])#([\p{L}\p{N}_/-]*[\p{L}_-][\p{L}\p{N}_/-]*)"#)
 
         /// Block identifier anchored at end of line: `Some text ^my-block`.
         static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)
@@ -162,6 +186,13 @@ enum ObsidianSyntax {
         /// for two adjacent subscripts.
         static let `subscript` = make(#"(?<!~)~(?!~|\s)([^~\n]+?)(?<!\s)~(?!~)"#)
         static let highlight = make(#"==(?!\s)([^=\n]+?)(?<!\s)=="#)
+
+        /// A backslash escape. The character class is CommonMark's: a backslash
+        /// before anything else is a literal backslash, not an escape.
+        static let escape = make(#"\\([!-/:-@\[-`{-~])"#)
+
+        /// A named, decimal or hexadecimal HTML entity.
+        static let entity = make(#"&(?:#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});"#)
 
         private static func make(_ pattern: String) -> NSRegularExpression {
             // Patterns are compile-time constants; a failure here is a programmer

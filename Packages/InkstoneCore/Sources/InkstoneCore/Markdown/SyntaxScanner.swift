@@ -49,6 +49,13 @@ public enum TokenKind: Hashable, Sendable {
     /// The `|---|:--:|` alignment row, which is scaffolding rather than content
     /// and is hidden in live preview.
     case tableDelimiterRow
+    /// The backslash of a CommonMark escape — the `\` of `\*`. The character it
+    /// protects is already literal text; only the backslash needs to go.
+    case escape
+    /// An HTML entity, with the character it stands for: `&copy;` → `©`. The
+    /// source is concealed and the replacement drawn in the gap, because the
+    /// buffer is the file and the file must keep the entity the user typed.
+    case entity(String)
 }
 
 public struct SyntaxToken: Hashable, Sendable {

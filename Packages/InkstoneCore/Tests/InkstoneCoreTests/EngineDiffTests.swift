@@ -188,6 +188,23 @@ struct EngineDiffTests {
         #expect(legacy.scan(text).contains { $0.kind == .inlineCode })
     }
 
+    @Test("Escapes and entities are found only by the parser")
+    func escapesAndEntities() {
+        // Both are CommonMark, and the legacy scanner had no pattern for either:
+        // a `\*` kept its backslash on screen and `&copy;` stayed as five
+        // characters of source.
+        let text = #"An escape \*not italic\* and an entity &copy; here."#
+        #expect(parser.scan(text).contains { $0.kind == .escape })
+        #expect(!legacy.scan(text).contains { $0.kind == .escape })
+        #expect(parser.scan(text).contains { if case .entity = $0.kind { return true }; return false })
+        #expect(!legacy.scan(text).contains { if case .entity = $0.kind { return true }; return false })
+
+        // And the legacy scanner read the escaped asterisks as emphasis, which is
+        // exactly what escaping them was meant to prevent.
+        #expect(!parser.scan(text).contains { $0.kind == .italic })
+        #expect(legacy.scan(text).contains { $0.kind == .italic }, "legacy wrongly emphasises")
+    }
+
     @Test("Underscore emphasis is found only by the parser")
     func underscoreEmphasis() {
         // The legacy pattern matched `*` only, so `_italic_` rendered raw.

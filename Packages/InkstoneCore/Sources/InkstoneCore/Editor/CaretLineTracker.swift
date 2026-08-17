@@ -42,7 +42,19 @@ public struct CaretLineTracker: Sendable, Equatable {
         case (nil, nil):
             return false
         case let (new?, previous?):
-            return !NSEqualRanges(new, previous)
+            // Compared on where the line *starts*, not on the whole range.
+            //
+            // Typing lengthens the caret's paragraph by a character, so comparing
+            // ranges made every keystroke look like a move to a new line and ran
+            // the pass twice — once from the selection notification and again
+            // from the text one. The start only changes when the caret genuinely
+            // moves to another line.
+            //
+            // Safe without knowing which notification fires first, which is the
+            // reason it is done this way: a text change is *always* followed by
+            // an unconditional pass, so skipping the selection's is never the
+            // difference between styled and unstyled text.
+            return new.location != previous.location
         default:
             // One side has a caret and the other does not — the mode changed.
             return true

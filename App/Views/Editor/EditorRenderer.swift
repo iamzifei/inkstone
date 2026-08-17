@@ -460,6 +460,41 @@ struct EditorRenderer {
         // embedded picture both have to sit on the baseline among the words.
         drawOnBaseline(.inkstoneInlineMath, in: rect)
         drawOnBaseline(.inkstoneInlineThumbnail, in: rect)
+        drawInlineText(in: rect)
+    }
+
+    /// Draws the character an entity stands for, where its source was concealed.
+    private func drawInlineText(in rect: CGRect) {
+        storage.enumerateAttribute(
+            .inkstoneInlineText,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let replacement = value as? String else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard box.intersects(rect) else { return }
+
+            let baseline = box.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
+            // The face of the text it replaces, so an entity in a heading is
+            // drawn at heading size rather than at body size.
+            var font = style.typography.editorFont.platformFont(size: style.typography.editorFontSize)
+            let after = min(NSMaxRange(range), storage.length - 1)
+            if after >= 0, after < storage.length,
+               let neighbour = storage.attribute(.font, at: after, effectiveRange: nil) as? PlatformFont,
+               neighbour.pointSize >= 1 {
+                font = neighbour
+            }
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: (storage.attribute(.foregroundColor, at: after, effectiveRange: nil)
+                    as? PlatformColor) ?? style.palette.text.platformColor,
+            ]
+            (replacement as NSString).draw(
+                at: CGPoint(x: box.minX, y: baseline - font.ascender),
+                withAttributes: attributes
+            )
+        }
     }
 
     private func drawOnBaseline(_ key: NSAttributedString.Key, in rect: CGRect) {

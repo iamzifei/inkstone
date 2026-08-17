@@ -720,6 +720,23 @@ struct MarkdownHighlighter {
                 )])
             }
 
+        case .escape:
+            // Only the backslash goes. `\*` is written to get a literal `*`, and
+            // the `*` is ordinary text sitting right after this range.
+            conceal([token.range])
+
+        case .entity(let replacement):
+            // The source stays in the file — it is the file — so the entity is
+            // concealed and its character drawn in the gap it leaves, the same
+            // reservation trick an inline formula uses.
+            if isBeingEdited {
+                storage.addAttribute(
+                    .foregroundColor, value: palette.secondaryText.platformColor, range: token.range
+                )
+            } else {
+                inlineText(replacement, to: storage, in: token.range)
+            }
+
         case .comment:
             // `%%…%%` is a note to yourself, and the point of it is that it is
             // not part of the note. Dimming it left it on screen taking up the
@@ -1185,6 +1202,27 @@ struct MarkdownHighlighter {
         return image.resizedForInline(to: CGSize(width: width, height: height))
     }
 
+    /// Collapses `range` and reserves room for `replacement` to be drawn there.
+    ///
+    /// Used for HTML entities, where five characters of source stand for one
+    /// character of text. Same mechanism as an inline formula: hide the source,
+    /// add the replacement's width as kerning on the last character so the words
+    /// after it move along, and let the view paint into the gap. The buffer keeps
+    /// what the author typed.
+    private func inlineText(_ replacement: String, to storage: NSTextStorage, in range: NSRange) {
+        guard range.length > 0, !replacement.isEmpty else { return }
+        let font = style.typography.editorFont.platformFont(size: style.typography.editorFontSize)
+        let width = (replacement as NSString).size(withAttributes: [.font: font]).width
+        guard width > 0 else { return }
+
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+        let last = NSRange(location: NSMaxRange(range) - 1, length: 1)
+        storage.addAttribute(.kern, value: width, range: last)
+        storage.addAttribute(.inkstoneInlineText, value: replacement, range: range)
+    }
+
     /// The head indent an enclosing block has already given this line.
     ///
     /// A list inside a blockquote used to *replace* the quote's indent rather
@@ -1630,6 +1668,10 @@ extension NSAttributedString.Key {
     /// A picture small enough to sit among words, for an embed that shares its
     /// line with other text. Value is an image, already scaled.
     static let inkstoneInlineThumbnail = NSAttributedString.Key("inkstoneInlineThumbnail")
+
+    /// Text to draw in place of concealed source — the `©` an `&copy;` stands
+    /// for. Value is the replacement string.
+    static let inkstoneInlineText = NSAttributedString.Key("inkstoneInlineText")
     /// Attached to a footnote marker so clicking it can jump to its definition.
     static let inkstoneFootnote = NSAttributedString.Key("inkstoneFootnote")
     /// Whether a block image is centred. Value is a Bool.

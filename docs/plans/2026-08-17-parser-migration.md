@@ -564,6 +564,41 @@ worth stating twice: the function is both the drawing position *and* the hit
 test, so a panel moved without it produces a button drawn in one place and
 clickable in another.
 
+## Follow-up: escapes, entities, and the second pass per keystroke
+
+**`\*` kept its backslash and `&copy;` stayed as five characters of source.**
+Both are CommonMark, and cmark resolves them into a `Text` node's value without
+reporting where either came from — so they are found again by pattern, over the
+prose regions, where a backslash inside a code span is safely just a backslash.
+`TokenKind` gained `.escape` (the backslash alone; the character it protects is
+ordinary text) and `.entity(String)` (the source concealed, the character drawn
+in the gap it leaves, as an inline formula is).
+
+Named entities come from a table of the ones that appear in prose rather than
+HTML5's two thousand. Anything absent stays exactly as typed, which is what
+*every* entity did until now: the floor does not move, only the ceiling.
+
+Writing the tests found a bug that had nothing to do with entities: **`&#x2014;`
+was being scanned as a `#x2014` tag**, which then claimed the text and stopped
+the entity being recognised at all. The tag pattern's negative lookbehind now
+excludes `&`.
+
+**Typing ran the highlight pass twice.** Both platforms post a selection change
+*and* a text change for one keystroke, and typing lengthens the caret's
+paragraph — so comparing caret line *ranges* made every keystroke look like a
+move to another line. `CaretLineTracker` now compares where the line starts.
+
+This was deferred once as "the guard would depend on the ordering of two AppKit
+notifications". Comparing the start does not: a text change is always followed by
+an unconditional pass, so skipping the selection's can never be the difference
+between styled and unstyled text. The test asserts one pass per keystroke with
+the notifications in *both* orders, which is the part that makes it safe rather
+than lucky.
+
+Measured by unit test rather than by driving the keyboard. An attempt at the
+latter landed two keystrokes out of ten because window focus had moved, and n=2
+is not a measurement.
+
 ## What is still left
 
 **Typing latency is now dominated by attribute application, not scanning.** A
@@ -575,11 +610,6 @@ in. Neither is needed yet, and neither should be done speculatively.
 
 Smaller, still available:
 
-  - The second pass per keystroke could be eliminated by having the selection
-    callback defer to `textDidChange` when the text has changed. Worth ~2 ms in
-    release; not taken, because the guard would then depend on the ordering of
-    two AppKit notifications, and stale attributes are a worse failure than a
-    redundant pass.
   - ~~The `MarkupVisitor` refactor~~ — done, and worth 3.1 ms rather than the
     1.7 ms predicted.
 

@@ -46,7 +46,9 @@ this should be a new line inside the same paragraph.
 Soft line break — just a newline:
 this should flow into the line above.
 
-Entities: &copy; &amp; &lt; &gt; &hellip;
+Entities: &copy; &amp; &lt; &gt; &hellip; &mdash; &rarr; &#8212; &#x4E2D;
+
+Entities we do not decode stay exactly as written: &fjlig; &notreal;
 
 ---
 
