@@ -417,6 +417,25 @@ struct InkstoneApp: App {
             中英文混排 typography test. Link to [[Second Note]] and a #标签.
 
             - [ ] a task
+            - [x] a finished task
+            - a plain bullet
+              - a nested bullet
+
+            > A quote, with a second line
+            > that wraps.
+
+            | Column | Value |
+            |--------|-------|
+            | one    | 1     |
+            | 中文   | 2     |
+
+            Inline maths $E = mc^2$ and a fence:
+
+            ```swift
+            let answer = 42
+            ```
+
+            [^1]: A footnote definition.
             """,
             to: root.appending(path: "Home.md")
         )

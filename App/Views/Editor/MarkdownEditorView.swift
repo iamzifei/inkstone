@@ -427,9 +427,6 @@ final class InkstoneTextView: NSTextView {
         super.drawBackground(in: rect)
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
 
-        // Fills go down first so text and images sit on top of them.
-        drawInlineFills(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-
         let origin = textContainerOrigin
         storage.enumerateAttribute(
             .inkstoneInlineImage,
@@ -473,293 +470,14 @@ final class InkstoneTextView: NSTextView {
             context.restoreGState()
         }
 
-        drawBullets(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-        drawQuoteRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-        drawCheckboxes(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-        drawHeadingRules(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-        drawInlineMath(in: rect, storage: storage, layoutManager: layoutManager, container: container)
-    }
-
-    /// Draws inline formulas into the space their kerning reserved.
-    ///
-    /// Sat on the baseline rather than centred in the line box: an inline formula
-    /// has to sit on the same line as the words around it, and a line box with a
-    /// line-height multiple is much taller than the text.
-    private func drawInlineMath(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
-        let origin = textContainerOrigin
-        storage.enumerateAttribute(
-            .inkstoneInlineMath,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let image = value as? NSImage else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard box.intersects(rect) else { return }
-
-            let baseline = box.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-            let size = image.size
-            // Roughly centre the formula on the x-height, which is where a
-            // reader expects an inline expression to sit.
-            let target = NSRect(
-                x: box.minX,
-                y: baseline - size.height * 0.72,
-                width: size.width,
-                height: size.height
-            )
-
-            guard let context = NSGraphicsContext.current?.cgContext,
-                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-            else { return }
-            context.saveGState()
-            context.translateBy(x: 0, y: target.maxY)
-            context.scaleBy(x: 1, y: -1)
-            context.draw(cgImage, in: CGRect(x: target.minX, y: 0, width: target.width, height: target.height))
-            context.restoreGState()
-        }
-    }
-
-    /// Rules off h1 and h2, the way Typora's default theme does.
-    private func drawHeadingRules(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
         guard let coordinator else { return }
-        let colour = MainActor.assumeIsolated { coordinator.style.palette.divider.platformColor }
-        let origin = textContainerOrigin
-        let width = container.size.width - container.lineFragmentPadding * 2
-
-        storage.enumerateAttribute(
-            .inkstoneHeadingRule,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard value != nil else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let box = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard box.intersects(rect) else { return }
-
-            colour.setFill()
-            // Sits just under the text, not at the bottom of the paragraph's
-            // trailing space, which would leave it floating.
-            NSRect(x: origin.x, y: box.maxY - 1, width: width, height: 1).fill()
-        }
-    }
-
-    /// Paints rounded fills behind inline code and attachment chips.
-    ///
-    /// `NSAttributedString.backgroundColor` fills the entire line fragment, which
-    /// at a 1.75 line-height multiple is roughly twice the height of the glyphs —
-    /// the tint ends up looming above the text instead of hugging it. Drawing it
-    /// here allows a box sized to the font and rounded like a chip.
-    private func drawInlineFills(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
-        let origin = textContainerOrigin
-        storage.enumerateAttribute(
-            .inkstoneInlineFill,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let colour = value as? NSColor, range.length > 0 else { return }
-            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-
-            // A run can wrap, so each line fragment gets its own chip.
-            layoutManager.enumerateEnclosingRects(
-                forGlyphRange: glyphRange,
-                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
-                in: container
-            ) { fragment, _ in
-                let box = fragment.offsetBy(dx: origin.x, dy: origin.y)
-                guard box.intersects(rect) else { return }
-
-                // Positioned from the baseline, not the fragment's centre: with a
-                // line-height multiple the fragment is far taller than the text
-                // and sits above it, so centring on it floats the chip clear of
-                // the words.
-                let ascender = font?.ascender ?? 12
-                let descender = font?.descender ?? -3
-                let baseline = box.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-                let chip = NSRect(
-                    x: box.minX - 3,
-                    y: baseline - ascender - 2,
-                    width: box.width + 6,
-                    height: (ascender - descender) + 4
-                )
-                colour.setFill()
-                NSBezierPath(roundedRect: chip, xRadius: 4, yRadius: 4).fill()
-            }
-        }
-    }
-
-    /// Draws a checkbox where a `- [ ]` marker was concealed.
-    ///
-    /// Same reasoning as the bullets: the brackets cannot be swapped for a real
-    /// checkbox glyph without editing the note, so the marker is hidden and the
-    /// box is painted into the space it left.
-    private func drawCheckboxes(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
-        guard let coordinator else { return }
-        let palette = MainActor.assumeIsolated { coordinator.style.palette }
-        let origin = textContainerOrigin
-
-        storage.enumerateAttribute(
-            .inkstoneCheckbox,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let checked = value as? Bool else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard markerRect.intersects(rect) else { return }
-
-            // The font of the *task text*, not of the marker.
-            //
-            // The marker was collapsed to 0.01pt to hide it, so reading the font
-            // at `range.location` returns that hair-thin font and an x-height of
-            // effectively zero — which put the box half a line below the words it
-            // belongs to. The first character after the marker is the text the
-            // checkbox has to line up with.
-            let textLocation = min(range.location + range.length, storage.length - 1)
-            let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? NSFont
-            let side: CGFloat = 12
-            let baseline = markerRect.minY + layoutManager.location(forGlyphAt: glyphRange.location).y
-            // Centred on the x-height rather than the baseline: a box centred on
-            // the baseline sits visibly low, because letters extend upward from
-            // it. Same gutter centre as a bullet, so bullets and checkboxes in
-            // one list share a vertical axis.
-            let box = NSRect(
-                x: markerRect.minX - MarkdownHighlighter.markerGutter - side / 2,
-                y: baseline - (font?.xHeight ?? 8) / 2 - side / 2,
-                width: side,
-                height: side
-            )
-
-            let path = NSBezierPath(roundedRect: box, xRadius: 3, yRadius: 3)
-            if checked {
-                palette.accent.platformColor.setFill()
-                path.fill()
-                // A tick, drawn rather than set in a font so it scales with the box.
-                let tick = NSBezierPath()
-                tick.move(to: NSPoint(x: box.minX + side * 0.24, y: box.midY + side * 0.02))
-                tick.line(to: NSPoint(x: box.minX + side * 0.43, y: box.maxY - side * 0.26))
-                tick.line(to: NSPoint(x: box.maxX - side * 0.22, y: box.minY + side * 0.28))
-                tick.lineWidth = 1.8
-                tick.lineCapStyle = .round
-                tick.lineJoinStyle = .round
-                palette.background.platformColor.setStroke()
-                tick.stroke()
-            } else {
-                palette.faintText.platformColor.setStroke()
-                path.lineWidth = 1.2
-                path.stroke()
-            }
-        }
-    }
-
-    /// Paints a real bullet where the `-` of a list item was concealed.
-    ///
-    /// The marker cannot simply be swapped for "•" — that would edit the note.
-    /// Hiding it and drawing a dot in the space it occupied gives the rendered
-    /// look without touching a byte of the file.
-    private func drawBullets(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
-        guard let coordinator else { return }
-        let colour = MainActor.assumeIsolated { coordinator.style.palette.faintText.platformColor }
-        let origin = textContainerOrigin
-
-        storage.enumerateAttribute(
-            .inkstoneBullet,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let level = value as? Int else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard markerRect.intersects(rect) else { return }
-
-            // Nested levels get a smaller, hollow dot, the way outliners do.
-            let diameter: CGFloat = level == 0 ? 5 : 4
-            // Centre of the gutter the paragraph indent reserved. Checkboxes use
-            // the same centre, so a mixed list lines up down one axis.
-            let gutterCentre = markerRect.minX - MarkdownHighlighter.markerGutter
-            // Sit the dot on the text's optical centre, not the line box's. With
-            // a line-height multiple above 1 the box is much taller than the
-            // glyphs, so centring on it floats the bullet above the words.
-            //
-            // Measured on the text after the marker, not the marker: the marker
-            // is collapsed to 0.01pt, whose x-height is effectively zero and
-            // would drop the dot to the baseline. Checkboxes measure the same
-            // way, which is what keeps a mixed list on one axis.
-            let textLocation = min(range.location + range.length, storage.length - 1)
-            let font = storage.attribute(.font, at: max(0, textLocation), effectiveRange: nil) as? NSFont
-            let baseline = markerRect.minY
-                + layoutManager.location(forGlyphAt: glyphRange.location).y
-            let centre = baseline - (font?.xHeight ?? 8) / 2
-            let dot = NSRect(
-                x: gutterCentre - diameter / 2,
-                y: centre - diameter / 2,
-                width: diameter,
-                height: diameter
-            )
-            colour.setFill()
-            let path = NSBezierPath(ovalIn: dot)
-            if level == 0 {
-                path.fill()
-            } else {
-                colour.setStroke()
-                path.lineWidth = 1
-                path.stroke()
-            }
-        }
-    }
-
-    /// Draws the vertical rule down the left edge of quoted lines.
-    private func drawQuoteRules(
-        in rect: NSRect,
-        storage: NSTextStorage,
-        layoutManager: NSLayoutManager,
-        container: NSTextContainer
-    ) {
-        guard let coordinator else { return }
-        let colour = MainActor.assumeIsolated { coordinator.style.palette.divider.platformColor }
-        let origin = textContainerOrigin
-
-        storage.enumerateAttribute(
-            .inkstoneQuoteDepth,
-            in: NSRange(location: 0, length: storage.length)
-        ) { value, range, _ in
-            guard let depth = value as? Int else { return }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
-                .offsetBy(dx: origin.x, dy: origin.y)
-            guard lineRect.intersects(rect) else { return }
-
-            colour.setFill()
-            for level in 0..<depth {
-                // 4pt, matching Typora's `border-left: 4px`.
-                let x = origin.x + CGFloat(level) * MarkdownHighlighter.quoteIndent + 2
-                NSRect(x: x, y: lineRect.minY, width: 4, height: lineRect.height).fill()
-            }
-        }
+        EditorRenderer(
+            storage: storage,
+            layoutManager: layoutManager,
+            container: container,
+            origin: textContainerOrigin,
+            style: MainActor.assumeIsolated { coordinator.style }
+        ).draw(in: rect)
     }
 
     /// Single entry point for both drag-and-drop and paste — AppKit routes both
@@ -1090,6 +808,39 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
 // MARK: - iOS
 
+
+/// Paints the hand-drawn elements the highlighter reserved space for.
+///
+/// Without this, iOS collapsed a task's `- [ ] ` marker to 0.01pt exactly as
+/// macOS does — and then drew nothing in its place, so checkboxes and bullets
+/// were not merely unstyled but missing entirely.
+///
+/// `draw(_:)` rather than AppKit's `drawBackground(in:)`, which UIKit has no
+/// equivalent of. The text is drawn by the layout manager afterwards, so
+/// everything painted here lands behind it, which is what the fills and rules
+/// need.
+final class InkstonePhoneTextView: UITextView {
+    weak var coordinator: EditorCoordinator?
+
+    override func draw(_ rect: CGRect) {
+        super.draw(rect)
+
+        guard let coordinator, let container = textContainer as NSTextContainer?,
+              let storage = textStorage as NSTextStorage?
+        else { return }
+        let layoutManager = self.layoutManager
+
+        EditorRenderer(
+            storage: storage,
+            layoutManager: layoutManager,
+            container: container,
+            // UIKit expresses the same offset as an inset rather than an origin.
+            origin: CGPoint(x: textContainerInset.left, y: textContainerInset.top),
+            style: MainActor.assumeIsolated { coordinator.style }
+        ).draw(in: rect)
+    }
+}
+
 private struct TextViewRepresentable: UIViewRepresentable {
     @Binding var text: String
     let style: Style
@@ -1105,8 +856,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
         // TextKit 1 deliberately: we need `layoutManager.characterIndex(for:)`
         // to hit-test link taps, which has no direct TextKit 2 equivalent that
         // works as cleanly inside a `UITextView`.
-        let textView = UITextView(usingTextLayoutManager: false)
+        let textView = InkstonePhoneTextView(usingTextLayoutManager: false)
+        textView.coordinator = context.coordinator
         textView.delegate = context.coordinator
+        // The hand-drawn elements sit outside the glyphs' own rects, so the text
+        // view has to repaint the whole visible area rather than just the runs
+        // that changed.
+        textView.contentMode = .redraw
         textView.backgroundColor = .clear
         textView.alwaysBounceVertical = true
         textView.autocorrectionType = .default
