@@ -24,7 +24,16 @@ wanted="${1:-}"
 # --- Find a device -----------------------------------------------------------
 xcrun devicectl list devices --json-output /tmp/inkstone-devices.json >/dev/null 2>&1
 
-device=$(python3 - "$wanted" <<'PY'
+# Candidates, not the answer: a device paired over Wi-Fi sits at
+# `tunnelState: disconnected` whenever nothing is talking to it, and `devicectl`
+# raises the tunnel on demand when you address it. Requiring "connected" here
+# therefore rejected a phone that installs perfectly well — which is what it did
+# on 2026-08-18, reporting "No connected iPhone" about a device that answered a
+# `devicectl device info` call a second earlier.
+#
+# So the cached field only narrows the list. Reachability is then *measured*, by
+# asking each candidate something and seeing whether it replies.
+candidates=$(python3 - "$wanted" <<'PY'
 import json, sys
 wanted = sys.argv[1]
 try:
@@ -39,15 +48,28 @@ for d in devices:
         continue
     if wanted and wanted != name:
         continue
-    # "connected" covers both USB and a live wireless tunnel.
-    if state == "connected":
-        print(d["hardwareProperties"]["udid"])
-        break
+    # "unavailable" means no transport at all — powered off, or not on the
+    # network. Anything else is worth probing.
+    if state != "unavailable":
+        print(f'{d["hardwareProperties"]["udid"]}\t{name}')
 PY
 )
 
+device=""
+device_name=""
+while IFS=$'\t' read -r udid name; do
+  [[ -n "$udid" ]] || continue
+  echo "==> Reaching $name"
+  if xcrun devicectl device info details --device "$udid" >/dev/null 2>&1; then
+    device="$udid"
+    device_name="$name"
+    break
+  fi
+  echo "    no reply — skipping"
+done <<< "$candidates"
+
 if [[ -z "$device" ]]; then
-  echo "No connected iPhone or iPad." >&2
+  echo "No reachable iPhone or iPad." >&2
   echo "Connect one by cable (or over Wi-Fi if paired), unlock it, and re-run." >&2
   echo >&2
   echo "Visible devices:" >&2
@@ -55,7 +77,7 @@ if [[ -z "$device" ]]; then
   exit 1
 fi
 
-echo "==> Device $device"
+echo "==> Device $device_name ($device)"
 
 # --- Build -------------------------------------------------------------------
 # `generic/platform=iOS` rather than the specific device: it builds the same
