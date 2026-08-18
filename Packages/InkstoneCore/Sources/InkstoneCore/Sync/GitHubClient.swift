@@ -82,8 +82,14 @@ public enum GitHubError: LocalizedError, Sendable {
                 : " It has: " + available.prefix(6).joined(separator: ", ") + "."
             return "\(repository) has no branch called \"\(branch)\".\(known)"
         case .tooLarge(let path, let size):
-            let mb = Double(size) / 1_048_576
-            return String(format: "%@ is %.1f MB. The GitHub Contents API cannot handle files over 100 MB.", path, mb)
+            // Actionable, because there is something to do: exclude the type, or
+            // commit the file with git, which has no such limit.
+            let measured = "GitHub's file API refuses files this large — its limit is around 40 MB."
+            let advice = "Turn its file type off under Sync, or add it with git instead."
+            guard size >= 0 else { return "\(path): \(measured) \(advice)" }
+            return String(
+                format: "%@ is %.1f MB. %@ %@", path, Double(size) / 1_048_576, measured, advice
+            )
         case .http(let status, let message, let path):
             let detail = message.isEmpty ? "" : " \(message)"
             return "GitHub returned \(status) for \(path).\(detail)"
@@ -242,6 +248,15 @@ public struct GitHubClient: Sendable {
         case 404:
             throw GitHubError.notFound(path)
         case 409, 422:
+            // 422 is also how the Contents API refuses a file it considers too
+            // large, and that was reported as "changed on GitHub while syncing.
+            // Run sync again" — which is not what happened and asks the user to
+            // retry something that cannot ever succeed. The body says which it
+            // is; it was being thrown away.
+            let reason = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
+            if let reason, reason.lowercased().contains("too large") {
+                throw GitHubError.tooLarge(path: path, size: -1)
+            }
             throw GitHubError.conflict(path)
         default:
             let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -315,7 +330,7 @@ public struct GitHubClient: Sendable {
     /// or nil when creating.
     @discardableResult
     public func upload(path: String, contents: Data, sha: String?, message: String) async throws -> String {
-        guard contents.count <= 100 * 1_048_576 else {
+        guard contents.count <= Self.largestUploadableSize else {
             throw GitHubError.tooLarge(path: path, size: contents.count)
         }
         var payload: [String: Any] = [
@@ -373,6 +388,25 @@ public struct GitHubClient: Sendable {
         }
         return name
     }
+
+    /// The largest file this API will take, measured rather than looked up.
+    ///
+    /// The guard here used to be 100 MB, the figure for a git blob. The Contents
+    /// API is stricter, and it is stricter about the *request* rather than the
+    /// file: the bytes go up base64-encoded, four thirds their size. Probed
+    /// against a real repository —
+    ///
+    ///     26 MB file (34.7 MB encoded)  ->  201
+    ///     38 MB file (50.7 MB encoded)  ->  201
+    ///     44 MB file (58.7 MB encoded)  ->  422 "the file is too large to be processed"
+    ///     50 MB, 63 MB                  ->  422
+    ///
+    /// — so the wall sits between 38 and 44 MB, consistent with a cap on the
+    /// encoded body. 38 MB is the largest size proven to work, and a file above
+    /// it is refused here instead of being encoded, sent and rejected. That
+    /// matters on a schedule: a 63 MB PDF meant 84 MB uploaded every fifteen
+    /// minutes to be told no every time.
+    static let largestUploadableSize = 38 * 1_048_576
 
     /// Repositories this token can reach, most recently pushed first.
     ///
