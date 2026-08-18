@@ -148,7 +148,22 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
   typography and the inspector all render. Graph view is blank — see the defect
   list in `docs/plans/2026-08-16-ui-theming-and-icon.md`.
 - ~~**iOS has never been run.**~~ Superseded: iOS has been run and screenshotted
-  on the simulator repeatedly, most recently 2026-08-17.
+  on the simulator repeatedly, and since 2026-08-18 it is installed on a physical
+  iPhone 15 Pro (`Tools/install-ios.sh`).
+- **Editing on the phone works, confirmed on hardware 2026-08-18.** Tapping a
+  note's text did not raise the keyboard: the custom tap recogniser that handles
+  checkboxes, callouts, copy buttons and links was competing with the text view's
+  own — the one that places the caret and takes first responder. Fixed with a
+  gesture delegate allowing simultaneous recognition, plus taking first responder
+  explicitly when a tap activated nothing, so the outcome does not depend on
+  which recogniser wins.
+
+  Worth keeping: this could not be verified here. Synthetic clicks into the
+  Simulator never reached the simulated screen — the control experiment, clicking
+  the editor-mode button, did nothing either — so those runs said nothing about
+  the app. It was shipped as a hypothesis resting on the UIKit contract and
+  confirmed by James on the device. **Touch behaviour on iOS is not testable from
+  this machine; it needs the phone.**
 - ~~**Reading mode falls back to live preview.**~~ Corrected 2026-08-17 by
   reading the code rather than the note: reading mode sets `isEditable = false`
   and passes no caret line, so nothing ever reveals its source. That *is* "fully
