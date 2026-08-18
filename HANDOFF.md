@@ -402,6 +402,29 @@ deleted afterwards; `main` was not written to.
   Bounded retry on 5xx/429 only; six runs after, none failed.
 - **Fixed: HTTP errors did not name the failing request.**
 
+**Fixed 2026-08-18, found by James pointing sync at a real vault: a mistyped
+branch could have deleted every local note.** `listFiles` treated a 404 on
+`git/trees/<branch>` as "the repository is empty". A 404 there means *no such
+branch*, and the two lead opposite ways: empty means upload everything, missing
+means we cannot see the remote at all. Reported as an empty remote, the planner
+read every previously-synced file as deleted remotely — and its answer to a
+remote deletion is `deleteLocal`. Demonstrated, not deduced:
+
+```
+PLANNED: [deleteLocal(path: "Notes/Important.md")]
+```
+
+He got the harmless half — nothing had synced yet, so all 8,882 files looked new
+and produced 8,882 failed uploads — because the repository's only branch is
+`master` while the setting said `main`. Had that vault synced once before, the
+same wrong branch would have deleted 8,882 local files.
+
+Three changes: a 404 on the tree is now `branchNotFound`, naming the branch and
+listing what exists; `verify()` checks the branch as well as the repository,
+because a check that tests only the half that is usually right certifies the
+failure; and the engine refuses to run at all when the remote lists nothing while
+the recorded state holds files, whatever the cause.
+
 **Unresolved, n=1: one pull run reported a change on an already-settled vault**
 (`changeCount == 1`), on the very first run and never since — 0 failures in 13
 subsequent runs. Cause not established, so it is not written down as one.

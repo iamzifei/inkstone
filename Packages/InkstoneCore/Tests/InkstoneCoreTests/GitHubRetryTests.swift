@@ -47,6 +47,13 @@ extension GitHubClientTests {
         )
     }
 
+    /// One request per call, which is what makes the attempt counts below mean
+    /// what they say. `verify()` asks for the repository *and* its branches, so
+    /// counting its requests counts two things at once.
+    private func ok200(_ request: URLRequest) -> (HTTPURLResponse, Data) {
+        (response(200), Data(#"[{"name":"main"}]"#.utf8))
+    }
+
     private func response(_ status: Int) -> HTTPURLResponse {
         HTTPURLResponse(
             url: URL(string: "https://api.github.com")!,
@@ -57,25 +64,25 @@ extension GitHubClientTests {
     @Test("A 503 is retried and the request succeeds")
     func retriesTransientFailure() async throws {
         let counter = Counter()
-        let client = makeClient { [response] _ in
+        let client = makeClient { [response, ok200] request in
             if counter.next() == 1 {
                 return (response(503), Data(#"{"message":"No server is currently available"}"#.utf8))
             }
-            return (response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return ok200(request)
         }
-        let name = try await client.verify()
-        #expect(name == "iamzifei/notes")
+        let branches = try await client.listBranches()
+        #expect(branches == ["main"])
         #expect(counter.count == 2, "should have taken exactly one retry")
     }
 
     @Test("Retries are bounded, and the last failure is what surfaces")
     func givesUpEventually() async throws {
         let counter = Counter()
-        let client = makeClient { [response] _ in
+        let client = makeClient { [response, ok200] request in
             _ = counter.next()
             return (response(503), Data(#"{"message":"No server is currently available"}"#.utf8))
         }
-        await #expect(throws: GitHubError.self) { try await client.verify() }
+        await #expect(throws: GitHubError.self) { try await client.listBranches() }
         #expect(counter.count == 3, "three attempts, not an unbounded loop")
     }
 
@@ -85,22 +92,22 @@ extension GitHubClientTests {
     @Test("A 401 is not retried")
     func doesNotRetryUnauthorised() async throws {
         let counter = Counter()
-        let client = makeClient { [response] _ in
+        let client = makeClient { [response, ok200] request in
             _ = counter.next()
             return (response(401), Data(#"{"message":"Bad credentials"}"#.utf8))
         }
-        await #expect(throws: GitHubError.self) { try await client.verify() }
+        await #expect(throws: GitHubError.self) { try await client.listBranches() }
         #expect(counter.count == 1)
     }
 
     @Test("A 404 is not retried")
     func doesNotRetryNotFound() async throws {
         let counter = Counter()
-        let client = makeClient { [response] _ in
+        let client = makeClient { [response, ok200] request in
             _ = counter.next()
             return (response(404), Data(#"{"message":"Not Found"}"#.utf8))
         }
-        await #expect(throws: GitHubError.self) { try await client.verify() }
+        await #expect(throws: GitHubError.self) { try await client.listBranches() }
         #expect(counter.count == 1)
     }
 
@@ -110,13 +117,13 @@ extension GitHubClientTests {
     @Test("A 429 is retried")
     func retriesTooManyRequests() async throws {
         let counter = Counter()
-        let client = makeClient { [response] _ in
+        let client = makeClient { [response, ok200] request in
             if counter.next() < 3 {
                 return (response(429), Data(#"{"message":"Too many requests"}"#.utf8))
             }
-            return (response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return ok200(request)
         }
-        _ = try await client.verify()
+        _ = try await client.listBranches()
         #expect(counter.count == 3)
     }
 }

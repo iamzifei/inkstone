@@ -94,12 +94,24 @@ struct GitHubClientTests {
         #expect(try await client.listFiles().isEmpty)
     }
 
-    @Test("An empty repository lists no files rather than failing")
-    func emptyRepository() async throws {
-        // A repo with no commits has no tree. That is a valid starting point for
-        // a first sync, not an error to show the user.
-        let client = makeClient { _ in (self.response(404), Data("{}".utf8)) }
-        #expect(try await client.listFiles().isEmpty)
+    @Test("A 404 on the tree is a missing branch, not an empty repository")
+    func missingBranchIsNotAnEmptyRepository() async throws {
+        // This test asserted the opposite, and that assertion is what the bug was
+        // made of: a 404 here means "no such branch", and reporting it as an
+        // empty remote told the planner every synced file had been deleted
+        // remotely — whose answer is to delete the local copy. Found against a
+        // real repository whose only branch is `master` while the setting said
+        // `main`: 8,882 files, every one of them a failed upload, and every one
+        // of them a local deletion had the vault synced once before.
+        //
+        // The genuinely empty repository is the 409 above.
+        let client = makeClient { request in
+            if request.url?.path.contains("/branches") == true {
+                return (self.response(200), Data(#"[{"name":"master"}]"#.utf8))
+            }
+            return (self.response(404), Data("{}".utf8))
+        }
+        await #expect(throws: GitHubError.self) { _ = try await client.listFiles() }
     }
 
     @Test("Requests bypass the URL cache")
@@ -108,7 +120,12 @@ struct GitHubClientTests {
         // second sync within a minute sees a stale file list, misreads the file
         // it just uploaded as deleted on the remote, and deletes the local copy.
         // Found by running a real upload/list round trip.
-        let client = makeClient { _ in (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8)) }
+        let client = makeClient { request in
+            if request.url?.path.contains("/branches") == true {
+                return (self.response(200), Data(#"[{"name":"main"}]"#.utf8))
+            }
+            return (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+        }
         _ = try await client.verify()
 
         #expect(StubProtocol.lastRequest?.cachePolicy == .reloadIgnoringLocalAndRemoteCacheData)
@@ -116,7 +133,12 @@ struct GitHubClientTests {
 
     @Test("Requests carry the token and API version")
     func headers() async throws {
-        let client = makeClient { _ in (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8)) }
+        let client = makeClient { request in
+            if request.url?.path.contains("/branches") == true {
+                return (self.response(200), Data(#"[{"name":"main"}]"#.utf8))
+            }
+            return (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+        }
         _ = try await client.verify()
 
         let request = StubProtocol.lastRequest

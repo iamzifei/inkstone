@@ -38,6 +38,15 @@ public enum GitHubError: LocalizedError, Sendable {
     case rateLimited(resetAt: Date?)
     case conflict(String)
     case tooLarge(path: String, size: Int)
+    /// The configured branch is not in the repository.
+    ///
+    /// Its own case because it used to be indistinguishable from an empty
+    /// repository, and the two lead opposite ways: an empty repository means
+    /// "upload everything", a missing branch means "you cannot see the remote at
+    /// all". Treating the second as the first told the planner the remote had no
+    /// files, which is how a mistyped branch became an instruction to delete
+    /// every local note that had synced.
+    case branchNotFound(branch: String, repository: String, available: [String])
     /// `path` is what the call was about — a file path, or the repository for
     /// calls that are not about one file. Without it a 5xx says only that
     /// something went wrong somewhere, which is the position an actual 503 left
@@ -62,6 +71,11 @@ public enum GitHubError: LocalizedError, Sendable {
             return "GitHub rate limit reached. It resets at \(formatter.string(from: resetAt))."
         case .conflict(let path):
             return "\(path) changed on GitHub while syncing. Run sync again."
+        case .branchNotFound(let branch, let repository, let available):
+            let known = available.isEmpty
+                ? ""
+                : " It has: " + available.prefix(6).joined(separator: ", ") + "."
+            return "\(repository) has no branch called \"\(branch)\".\(known)"
         case .tooLarge(let path, let size):
             let mb = Double(size) / 1_048_576
             return String(format: "%@ is %.1f MB. The GitHub Contents API cannot handle files over 100 MB.", path, mb)
@@ -225,9 +239,20 @@ public struct GitHubClient: Sendable {
         do {
             data = try await send(request(url), describing: configuration.branch)
         } catch GitHubError.notFound {
-            // An empty repository has no tree yet. That is a legitimate starting
-            // point for a first sync, not an error.
-            return []
+            // A 404 here is "no such branch", and it used to be swallowed as "the
+            // repository is empty". Those lead opposite ways: empty means upload
+            // everything, missing means we cannot see the remote at all. Reported
+            // as an empty remote, a mistyped branch told the planner every synced
+            // file had been deleted remotely — and the planner's answer to that
+            // is to delete the local copy.
+            //
+            // The genuinely empty case is the 409 below, which is what a
+            // repository with no commits actually answers.
+            throw GitHubError.branchNotFound(
+                branch: configuration.branch,
+                repository: configuration.repository,
+                available: (try? await listBranches()) ?? []
+            )
         } catch GitHubError.conflict {
             // A repository with no commits at all answers 409 ("Git Repository
             // is empty"), not 404 — found by pointing this at a freshly created
@@ -301,10 +326,26 @@ public struct GitHubClient: Sendable {
     }
 
     /// Confirms the token and repository work before a sync writes anything.
+    /// Checks the repository *and* the branch.
+    ///
+    /// The branch was not checked, so "Verify" passed on a configuration that
+    /// could not sync a single file — the repository existed and the branch did
+    /// not. A check that only tests the half that is usually right is worse than
+    /// none: it certifies the failure.
     public func verify() async throws -> String {
         let data = try await send(request(try base()), describing: configuration.repository)
         struct Response: Decodable { let full_name: String }
-        return try JSONDecoder().decode(Response.self, from: data).full_name
+        let name = try JSONDecoder().decode(Response.self, from: data).full_name
+
+        let branches = try await listBranches()
+        // An empty list is a repository with no commits, where the branch cannot
+        // exist yet and its absence is not a mistake.
+        if !branches.isEmpty, !branches.contains(configuration.branch) {
+            throw GitHubError.branchNotFound(
+                branch: configuration.branch, repository: name, available: branches
+            )
+        }
+        return name
     }
 
     /// Repositories this token can reach, most recently pushed first.
@@ -354,7 +395,14 @@ public struct GitHubClient: Sendable {
             url: try base().appending(path: "branches"), resolvingAgainstBaseURL: false
         )!
         components.queryItems = [.init(name: "per_page", value: "100")]
-        let data = try await send(request(components.url!), describing: configuration.repository)
+        let data: Data
+        do {
+            data = try await send(request(components.url!), describing: configuration.repository)
+        } catch GitHubError.conflict {
+            // A repository with no commits has no branches; that is a starting
+            // point, not a failure.
+            return []
+        }
         struct Response: Decodable { let name: String }
         return try JSONDecoder().decode([Response].self, from: data).map(\.name)
     }

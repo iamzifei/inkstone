@@ -1,5 +1,22 @@
 import Foundation
 
+/// Refusals to sync, as opposed to failures of individual files.
+public enum SyncError: LocalizedError, Sendable {
+    /// The remote listed nothing while the recorded state says it held files.
+    case remoteUnexpectedlyEmpty(recorded: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case .remoteUnexpectedlyEmpty(let recorded):
+            return """
+                Stopped: GitHub reported no files, but \(recorded) were synced there \
+                before. Syncing now would delete them from this device. Check the \
+                repository and branch, then sync again.
+                """
+        }
+    }
+}
+
 /// Result of one sync run, for reporting back to the user.
 public struct SyncReport: Sendable, Hashable {
     public var uploaded: [String] = []
@@ -86,6 +103,20 @@ public struct SyncEngine: Sendable {
         progress?("Scanning vault…")
         let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
+
+        // A remote that has gone from "files we recorded" to "nothing at all" is
+        // either someone deliberately emptying the repository or, far more often,
+        // this side failing to see it — a wrong branch, a token that lost access,
+        // an API answering oddly. The planner cannot tell those apart: a file
+        // that is unchanged locally and absent remotely is a remote deletion, and
+        // the answer to a remote deletion is to delete the local copy.
+        //
+        // So the whole vault's worth of notes hangs on one listing being right.
+        // Stop instead, and say so. A sync that refuses to run is an annoyance; a
+        // sync that empties the vault is the end of the vault.
+        if remote.isEmpty, !state.blobs.isEmpty {
+            throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
+        }
 
         let paths = Set(local.keys).union(remoteByPath.keys).union(state.blobs.keys)
         let entries = paths.sorted().map { path in
