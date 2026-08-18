@@ -185,6 +185,23 @@ public struct SyncEngine: Sendable {
                     let data = try await client.download(sha: file.sha, path: path)
                     try write(data, to: SyncPlanner.conflictFilename(for: path, timestamp: stamp))
                     report.conflicted.append(path)
+
+                    // Record the remote's blob as the base, or this conflict is
+                    // resolved again on the next run and every run after it: the
+                    // two sides still differ, the base is still unset, and the
+                    // planner reaches the same conclusion. A vault on a
+                    // fifteen-minute schedule gained a copy of every conflicted
+                    // note four times an hour.
+                    //
+                    // Base = *remote* specifically. Next run, local differs from
+                    // base and the remote does not, which reads as a local edit
+                    // and uploads it — so the local version becomes the live one
+                    // and the remote's version survives as the copy just written,
+                    // which uploads alongside it. Both versions end up on both
+                    // sides, and it terminates. Base = local would invert that
+                    // and download the remote over the local file, undoing the
+                    // decision not to overwrite it.
+                    state.blobs[path] = file.sha
                 }
             } catch {
                 report.failures.append((path: pathOf(action), message: error.localizedDescription))

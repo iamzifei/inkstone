@@ -47,6 +47,8 @@ public enum GitHubError: LocalizedError, Sendable {
     /// files, which is how a mistyped branch became an instruction to delete
     /// every local note that had synced.
     case branchNotFound(branch: String, repository: String, available: [String])
+    /// GitHub refused this particular request, and it was not a rate limit.
+    case forbidden(path: String, message: String)
     /// `path` is what the call was about — a file path, or the repository for
     /// calls that are not about one file. Without it a 5xx says only that
     /// something went wrong somewhere, which is the position an actual 503 left
@@ -71,6 +73,9 @@ public enum GitHubError: LocalizedError, Sendable {
             return "GitHub rate limit reached. It resets at \(formatter.string(from: resetAt))."
         case .conflict(let path):
             return "\(path) changed on GitHub while syncing. Run sync again."
+        case .forbidden(let path, let message):
+            let detail = message.isEmpty ? "" : " \(message)"
+            return "GitHub would not let Inkstone write \(path).\(detail)"
         case .branchNotFound(let branch, let repository, let available):
             let known = available.isEmpty
                 ? ""
@@ -203,16 +208,37 @@ public struct GitHubClient: Sendable {
         switch http.statusCode {
         case 200..<300:
             return data
-        case 401, 403:
-            // 403 is also how GitHub reports a spent rate limit, distinguished by
-            // the remaining-requests header rather than the status code.
+        case 401:
+            // A credential answer, and the only status that actually is one.
+            throw GitHubError.unauthorised
+
+        case 403:
+            // 403 is GitHub's answer to three different things: a spent primary
+            // rate limit, a tripped *secondary* rate limit, and a token that may
+            // not do this. Only the header was checked, so the other two both
+            // came out as "GitHub rejected the token" — which, said about a token
+            // that had just written 8,151 files, is the least likely of the
+            // three and sends the user to reissue a credential that is fine.
+            //
+            // A secondary limit is what a burst of uploads trips, and it carries
+            // `retry-after` or says so in the body; primary exhaustion zeroes
+            // `x-ratelimit-remaining`.
             if http.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0" {
                 let reset = http.value(forHTTPHeaderField: "X-RateLimit-Reset")
                     .flatMap(Double.init)
                     .map { Date(timeIntervalSince1970: $0) }
                 throw GitHubError.rateLimited(resetAt: reset)
             }
-            throw GitHubError.unauthorised
+            if let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) {
+                throw GitHubError.rateLimited(resetAt: Date().addingTimeInterval(retryAfter))
+            }
+            let body = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
+            if let body, body.lowercased().contains("rate limit") || body.lowercased().contains("abuse") {
+                throw GitHubError.rateLimited(resetAt: nil)
+            }
+            // Genuinely refused. Name the file, because with 8,000 of them
+            // "forbidden" is not something you can act on.
+            throw GitHubError.forbidden(path: path, message: body ?? "")
         case 404:
             throw GitHubError.notFound(path)
         case 409, 422:
