@@ -302,6 +302,63 @@ final class Workspace {
     /// hitting a conflict mid-sentence would cost the user's trust. That worry
     /// does not survive contact with how conflicts are actually handled: the
     /// remote copy is saved *alongside* the local one and nothing is
+    // MARK: - Shared setup
+
+    private var sharedSyncObserver: Any?
+
+    /// The GitHub setup as this device currently has it.
+    var syncConfiguration: GitHubSyncConfiguration {
+        GitHubSyncConfiguration(
+            repository: settings.data.gitHubRepository,
+            branch: settings.data.gitHubBranch,
+            isEnabled: settings.data.gitHubSyncEnabled,
+            isAutomatic: settings.data.gitHubAutoSync,
+            intervalMinutes: settings.data.gitHubSyncIntervalMinutes,
+            updatedAt: settings.data.gitHubConfigurationUpdatedAt ?? .distantPast
+        )
+    }
+
+    /// Adopts another device's setup if it is newer, publishes this one if not,
+    /// and keeps listening.
+    ///
+    /// Called at launch rather than when the Sync pane opens: a second device is
+    /// configured by opening the app, and someone who has to find Settings before
+    /// their vault appears has not been saved any typing.
+    func startSharingSyncConfiguration() {
+        SharedSyncConfiguration.refresh()
+        applyShared(SharedSyncConfiguration.published())
+        sharedSyncObserver = SharedSyncConfiguration.observe { [weak self] configuration in
+            self?.applyShared(configuration)
+        }
+    }
+
+    private func applyShared(_ remote: GitHubSyncConfiguration?) {
+        switch SyncConfigurationMerge.resolve(local: syncConfiguration, remote: remote) {
+        case .keepLocal:
+            break
+        case .publishLocal:
+            // Nothing to publish from a device that has never been configured;
+            // it would only overwrite the other side with blanks.
+            guard !settings.data.gitHubRepository.isEmpty else { break }
+            SharedSyncConfiguration.publish(syncConfiguration)
+        case .adopt(let configuration):
+            settings.data.gitHubRepository = configuration.repository
+            settings.data.gitHubBranch = configuration.branch
+            settings.data.gitHubSyncEnabled = configuration.isEnabled
+            settings.data.gitHubAutoSync = configuration.isAutomatic
+            settings.data.gitHubSyncIntervalMinutes = configuration.intervalMinutes
+            settings.data.gitHubConfigurationUpdatedAt = configuration.updatedAt
+            restartAutoSync()
+        }
+    }
+
+    /// Records that this device changed the setup, and tells the others.
+    func publishSyncConfiguration() {
+        settings.data.gitHubConfigurationUpdatedAt = Date()
+        guard !settings.data.gitHubRepository.isEmpty else { return }
+        SharedSyncConfiguration.publish(syncConfiguration)
+    }
+
     /// A client for the configured repository, or nil when no token is stored.
     ///
     /// Shared by sync and by the Settings pickers so they cannot disagree about

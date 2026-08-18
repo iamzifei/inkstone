@@ -490,7 +490,13 @@ struct InkstoneApp: App {
                 .environment(workspace)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
-                .onAppear(perform: openLastVault)
+                .onAppear {
+                    openLastVault()
+                    // A token saved before it could travel; move it onto iCloud
+                    // Keychain so the other device does not ask for it again.
+                    SyncCredentials.migrateToICloudKeychain()
+                    workspace.startSharingSyncConfiguration()
+                }
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 560)
                 #endif

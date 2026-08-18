@@ -423,6 +423,18 @@ private struct SyncSettings: View {
         return names
     }
 
+    /// The fields that travel between devices, as one comparable value.
+    private var sharedFingerprint: String {
+        let data = workspace.settings.data
+        return [
+            data.gitHubRepository,
+            data.gitHubBranch,
+            String(data.gitHubSyncEnabled),
+            String(data.gitHubAutoSync),
+            String(data.gitHubSyncIntervalMinutes),
+        ].joined(separator: "\u{1}")
+    }
+
     /// Same rule as the repositories: whatever is configured stays selectable,
     /// so opening the picker cannot quietly move the branch.
     private var branchOptions: [String] {
@@ -660,6 +672,10 @@ private struct SyncSettings: View {
             // choice already there.
             if SyncCredentials.hasToken, repositories.isEmpty { await loadRepositories() }
         }
+        // One observer for the whole setup rather than five: every field here
+        // publishes the same shared value, and the timestamp that decides which
+        // device wins should move when any of them does.
+        .onChange(of: sharedFingerprint) { workspace.publishSyncConfiguration() }
     }
 
     private func syncBinding(for kind: AttachmentKind) -> Binding<Bool> {

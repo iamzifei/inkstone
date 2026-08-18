@@ -21,6 +21,11 @@
 	<array>
 		<string>iCloud.com.orris.inkstone</string>
 	</array>
+	<!-- Carries the GitHub repository, branch and schedule between the user's
+	     devices, so a second device is the same vault rather than a fresh
+	     setup. The token travels separately, in iCloud Keychain. -->
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudDocuments</string>

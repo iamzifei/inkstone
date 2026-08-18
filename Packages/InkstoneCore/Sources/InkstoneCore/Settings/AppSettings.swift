@@ -107,6 +107,9 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// here — this struct is a plain JSON blob in UserDefaults.
     public var gitHubRepository = ""
     public var gitHubBranch = "main"
+    /// When this device last changed the GitHub setup, so the copy shared
+    /// between devices can tell which side is newer. Bookkeeping, not a setting.
+    public var gitHubConfigurationUpdatedAt: Date?
 
     // Graph
     public var graphShowTags = true
@@ -170,6 +173,7 @@ public struct SettingsData: Codable, Hashable, Sendable {
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
         gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
         gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)
+        gitHubConfigurationUpdatedAt = value(.gitHubConfigurationUpdatedAt, defaults.gitHubConfigurationUpdatedAt)
 
         graphShowTags = value(.graphShowTags, defaults.graphShowTags)
         graphShowAttachments = value(.graphShowAttachments, defaults.graphShowAttachments)
