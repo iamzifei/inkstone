@@ -381,7 +381,11 @@ final class Workspace {
 
     /// overwritten, so the cost of a badly timed sync is an extra file, not lost
     /// work. Requiring someone to remember to press a button is the larger risk.
-    func sync() async {
+    /// Set when a first sync needs the user to say which side wins; the Sync
+    /// pane turns it into three buttons.
+    var pendingFirstSync: SyncError?
+
+    func sync(firstSyncDirection: FirstSyncDirection? = nil) async {
         guard let root else { return }
         guard !settings.data.gitHubRepository.isEmpty, let token = SyncCredentials.token() else {
             syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
@@ -400,8 +404,9 @@ final class Workspace {
         let engine = SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy)
 
         syncStatus = .running("Starting…")
+        pendingFirstSync = nil
         do {
-            let report = try await engine.run { message in
+            let report = try await engine.run(firstSyncDirection: firstSyncDirection) { message in
                 Task { @MainActor in self.syncStatus = .running(message) }
             }
             syncStatus = .finished(report)
@@ -409,6 +414,12 @@ final class Workspace {
             refreshTree()
             reindex()
             for document in documents.values { document.reloadIfUnchangedLocally() }
+        } catch let error as SyncError {
+            // A question, not a failure: it is waiting for an answer only the
+            // user has, and the pane offers it rather than burying it in a
+            // sentence that ends the run.
+            if case .firstSyncNeedsDirection = error { pendingFirstSync = error }
+            syncStatus = .failed(error.localizedDescription)
         } catch {
             syncStatus = .failed(error.localizedDescription)
         }

@@ -1,12 +1,32 @@
 import Foundation
 
+/// Which side a first sync should take when the two disagree.
+public enum FirstSyncDirection: Sendable, Hashable {
+    /// This device's copies win; the remote's are overwritten.
+    case preferLocal
+    /// The repository's copies win; the local ones are overwritten.
+    case preferRemote
+    /// Keep both, as a conflict copy beside each local file.
+    case keepBoth
+}
+
 /// Refusals to sync, as opposed to failures of individual files.
 public enum SyncError: LocalizedError, Sendable {
     /// The remote listed nothing while the recorded state says it held files.
     case remoteUnexpectedlyEmpty(recorded: Int)
+    /// A first sync found files that differ on the two sides, and there is no
+    /// basis for choosing between them.
+    case firstSyncNeedsDirection(differing: Int, localFiles: Int, remoteFiles: Int)
 
     public var errorDescription: String? {
         switch self {
+        case .firstSyncNeedsDirection(let differing, let localFiles, let remoteFiles):
+            return """
+                This vault has never synced with GitHub. It has \(localFiles) files \
+                and the repository has \(remoteFiles); \(differing) of them differ. \
+                There is no earlier sync to compare against, so neither side is \
+                known to be newer — choose which one to keep.
+                """
         case .remoteUnexpectedlyEmpty(let recorded):
             return """
                 Stopped: GitHub reported no files, but \(recorded) were synced there \
@@ -92,7 +112,14 @@ public struct SyncEngine: Sendable {
         self.policy = policy
     }
 
-    public func run(progress: (@Sendable (String) -> Void)? = nil) async throws -> SyncReport {
+    /// - Parameter firstSyncDirection: which side wins when a *first* sync finds
+    ///   files differing on both sides. Required in that situation and ignored in
+    ///   every other: once there is a recorded state, a difference on both sides
+    ///   is a real conflict with a real answer, and keeping both is it.
+    public func run(
+        firstSyncDirection: FirstSyncDirection? = nil,
+        progress: (@Sendable (String) -> Void)? = nil
+    ) async throws -> SyncReport {
         progress?("Checking repository…")
         _ = try await client.verify()
 
@@ -129,9 +156,54 @@ public struct SyncEngine: Sendable {
         }
 
         var report = SyncReport()
-        let actions = SyncPlanner.plan(
+        var actions = SyncPlanner.plan(
             entries: entries, policy: policy, excludedLocally: excludedLocally
         )
+
+        // A first sync has no base, so every file that differs looks like "both
+        // sides changed" — which is a category error. Neither side changed;
+        // there is simply no common ancestor to have changed from. Answering it
+        // with a conflict copy per file turned one unanswered question into 123
+        // of them in a real vault, and the answer was the same for all of them.
+        //
+        // Only on a first sync. After that a difference on both sides really is
+        // a conflict, and keeping both really is the answer.
+        let conflicts = actions.compactMap { action -> String? in
+            if case .conflict(let path) = action { return path }
+            return nil
+        }
+        if !conflicts.isEmpty, state.blobs.isEmpty {
+            guard let firstSyncDirection else {
+                throw SyncError.firstSyncNeedsDirection(
+                    differing: conflicts.count,
+                    localFiles: local.count,
+                    remoteFiles: remoteByPath.count
+                )
+            }
+            // Seeding the base is how a direction is expressed: set it to the
+            // side that is to *lose*, and the ordinary three-way rules carry the
+            // other one over. No special case in the planner.
+            for path in conflicts {
+                switch firstSyncDirection {
+                case .preferLocal: state.blobs[path] = remoteByPath[path]?.sha
+                case .preferRemote: state.blobs[path] = local[path]
+                case .keepBoth: break
+                }
+            }
+            if firstSyncDirection != .keepBoth {
+                let reseeded = paths.sorted().map { path in
+                    SyncEntry(
+                        path: path,
+                        local: local[path],
+                        remote: remoteByPath[path]?.sha,
+                        base: state.blobs[path]
+                    )
+                }
+                actions = SyncPlanner.plan(
+                    entries: reseeded, policy: policy, excludedLocally: excludedLocally
+                )
+            }
+        }
         let stamp = timestamp()
 
         for action in actions {

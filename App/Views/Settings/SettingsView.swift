@@ -423,6 +423,10 @@ private struct SyncSettings: View {
         return names
     }
 
+    private func runFirstSync(_ direction: FirstSyncDirection) {
+        Task { await workspace.sync(firstSyncDirection: direction) }
+    }
+
     /// The fields that travel between devices, as one comparable value.
     private var sharedFingerprint: String {
         let data = workspace.settings.data
@@ -621,6 +625,22 @@ private struct SyncSettings: View {
                     action.button
                 }
                 #endif
+
+                // Only a first sync can ask this, and only once. Three buttons
+                // rather than a sentence, because the answer is a choice and the
+                // alternative — a conflict copy per differing file — produced 369
+                // of them in a real vault before this existed.
+                if workspace.pendingFirstSync != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Which copy should win?")
+                            .font(.callout.weight(.medium))
+                        HStack {
+                            Button("Keep this Mac's") { runFirstSync(.preferLocal) }
+                            Button("Keep GitHub's") { runFirstSync(.preferRemote) }
+                            Button("Keep both") { runFirstSync(.keepBoth) }
+                        }
+                    }
+                }
 
                 if let verification {
                     Text(verification)

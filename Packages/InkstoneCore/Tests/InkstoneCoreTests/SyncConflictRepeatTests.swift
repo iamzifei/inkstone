@@ -61,7 +61,10 @@ extension GitHubClientTests {
             policy: SyncFilePolicy()
         )
 
-        let first = try await engine.run()
+        // Explicitly keeping both: a first sync now asks which side wins, and
+        // this test is about what happens *after* that answer, not about the
+        // question.
+        let first = try await engine.run(firstSyncDirection: .keepBoth)
         #expect(first.conflicted == ["Note.md"])
 
         let second = try await engine.run()
