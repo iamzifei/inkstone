@@ -120,7 +120,15 @@ public struct SyncFilePolicy: Codable, Hashable, Sendable {
     public var syncsVideos = false
     public var syncsOtherFiles = false
     /// Files larger than this are skipped regardless of kind. Zero means no limit.
-    public var maximumFileSizeMB = 100
+    /// 38 MB, which is what GitHub's API will actually accept — measured, not
+    /// looked up: a 38 MB file uploads and a 44 MB one is refused, by both the
+    /// Contents and the Git Data endpoints, because the bytes travel base64 at
+    /// four thirds their size.
+    ///
+    /// It was 100 MB, the figure for a git blob pushed over the wire. That
+    /// default guaranteed failure for every file between the two numbers, on
+    /// every run, forever — three of them in one real vault.
+    public var maximumFileSizeMB = 38
 
     public init() {}
 

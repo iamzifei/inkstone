@@ -301,7 +301,20 @@ public struct SyncEngine: Sendable {
     func localFiles() -> (files: [String: String], excluded: Set<String>) {
         var result: [String: String] = [:]
         var excluded: Set<String> = []
+        // The vault's own statement of what does not belong in this repository,
+        // written in the file made for saying it. Excluded rather than dropped,
+        // for the same reason an oversized file is: "this vault is not carrying
+        // it" must never be read as "the user deleted it".
+        let ignore = GitIgnore.load(from: vaultRoot)
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey]
+        // The enumerator hands back paths in whatever form the file system
+        // canonicalises to, which is not always the form the root was written
+        // in: a vault under `/var/…` comes back as `/private/var/…`. Comparing
+        // the two directly fails, and the fallback that used to catch that
+        // invented an answer. Both prefixes are kept, and the raw one is tried
+        // first so the ordinary case costs nothing.
+        let rawPrefix = vaultRoot.path + "/"
+        let canonicalPrefix = (vaultRoot.path as NSString).resolvingSymlinksInPath + "/"
         guard let walker = FileManager.default.enumerator(
             at: vaultRoot,
             includingPropertiesForKeys: keys,
@@ -316,11 +329,27 @@ public struct SyncEngine: Sendable {
                 }
                 continue
             }
-            let relative = url.path.hasPrefix(vaultRoot.path + "/")
-                ? String(url.path.dropFirst(vaultRoot.path.count + 1))
-                : url.lastPathComponent
+
+            // Skipped rather than guessed at. The fallback here was
+            // `url.lastPathComponent`, which invents a plausible answer: with a
+            // vault reached through a symlink every file in every folder came
+            // back as its bare filename, so the tree flattened onto the root and
+            // same-named notes overwrote one another in the map.
+            let relative: String
+            if url.path.hasPrefix(rawPrefix) {
+                relative = String(url.path.dropFirst(rawPrefix.count))
+            } else {
+                let canonical = (url.path as NSString).resolvingSymlinksInPath
+                guard canonical.hasPrefix(canonicalPrefix) else { continue }
+                relative = String(canonical.dropFirst(canonicalPrefix.count))
+            }
             guard !relative.split(separator: "/").contains(where: { Self.excludedComponents.contains(String($0)) })
             else { continue }
+
+            guard !ignore.ignores(relative) else {
+                excluded.insert(relative)
+                continue
+            }
 
             guard policy.allows(url, sizeBytes: values?.fileSize) else {
                 // On disk, deliberately not carried. Recorded rather than
