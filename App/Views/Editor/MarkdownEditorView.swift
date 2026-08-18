@@ -1271,7 +1271,14 @@ private struct TextViewRepresentable: UIViewRepresentable {
         )
         // Run alongside the text view's own gestures so the caret still moves
         // when the tap isn't on a link.
+        //
+        // `cancelsTouchesInView = false` lets the touches through, but it does
+        // not stop this recogniser competing with the text view's own tap — the
+        // one that places the caret and takes first responder, which is what
+        // raises the keyboard. Two tap recognisers on one view do not
+        // automatically both fire; a delegate saying so is what makes that true.
         tap.cancelsTouchesInView = false
+        tap.delegate = context.coordinator
         textView.addGestureRecognizer(tap)
 
         textView.inputAccessoryView = MarkdownAccessoryView(
@@ -1336,8 +1343,16 @@ private struct TextViewRepresentable: UIViewRepresentable {
     }
 
     @MainActor
-    final class PhoneCoordinator: EditorCoordinator, UITextViewDelegate {
+    final class PhoneCoordinator: EditorCoordinator, UITextViewDelegate, UIGestureRecognizerDelegate {
         weak var textView: UITextView?
+
+        /// Our tap recogniser must not exclude the text view's own.
+        nonisolated func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
 
         func applyStyle() {
             guard let textView else { return }
@@ -1475,7 +1490,17 @@ private struct TextViewRepresentable: UIViewRepresentable {
                 in: textView.textContainer,
                 fractionOfDistanceBetweenInsertionPoints: nil
             )
-            _ = handleActivation(at: index, in: storage)
+            // Nothing on this tap was a link, a checkbox or a button, so it was
+            // a tap into the text: put the caret where it landed and take focus.
+            //
+            // Done here rather than left to the text view's own recogniser, so
+            // that raising the keyboard does not depend on which of two
+            // recognisers wins. Harmless when the text view is already first
+            // responder.
+            if !handleActivation(at: index, in: storage), textView.isEditable {
+                textView.selectedRange = NSRange(location: index, length: 0)
+                if !textView.isFirstResponder { textView.becomeFirstResponder() }
+            }
         }
 
         private func textRange(_ textView: UITextView, _ range: NSRange) -> UITextRange {
