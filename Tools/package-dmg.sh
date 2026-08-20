@@ -109,6 +109,36 @@ echo "==> Verifying"
 spctl -a -vvv -t install "$APP" 2>&1 | head -3
 xcrun stapler validate "$APP"
 
+# Then actually run it. This exists because 0.1.0 shipped broken: adding Sparkle
+# gave the app a framework to load, one target serves both platforms, and the
+# macOS runpath was missing — so dyld looked in Contents/MacOS/Frameworks,
+# found nothing, and the app died at launch with "Library missing".
+#
+# Every check above passed on that build. The archive succeeded, the signature
+# was valid, `codesign --deep --strict` was happy, Apple notarised it twice and
+# Gatekeeper accepted it. None of them load a dylib, so none of them noticed
+# that the app could not start. The only check that catches this is starting it.
+echo "==> Launching it, which is the only check that catches a missing library"
+LAUNCH_LOG="$BUILD/launch-check.log"
+"$APP/Contents/MacOS/Inkstone" >"$LAUNCH_LOG" 2>&1 &
+launch_pid=$!
+sleep 8
+if ! kill -0 "$launch_pid" 2>/dev/null; then
+  echo "The app exited instead of staying up. Output:" >&2
+  sed 's/^/    /' "$LAUNCH_LOG" >&2
+  exit 1
+fi
+kill "$launch_pid" 2>/dev/null || true
+wait "$launch_pid" 2>/dev/null || true
+# dyld writes its complaint to stderr before aborting, so an empty log is part
+# of the pass condition rather than merely a nice-to-have.
+if grep -qiE "Library not loaded|Symbol not found|image not found" "$LAUNCH_LOG"; then
+  echo "The app started but dyld reported a problem:" >&2
+  sed 's/^/    /' "$LAUNCH_LOG" >&2
+  exit 1
+fi
+echo "    stayed up for 8s with no loader errors"
+
 if $install_app; then
   echo "==> Installing to /Applications"
 

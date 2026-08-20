@@ -612,6 +612,16 @@ def build(out: Path) -> None:
     if manifest.exists():
         manifest.unlink()
 
+    # Verbatim pages. These sit outside the eight-language system on purpose:
+    # build.py requires every *marketing* page to exist in every language so a
+    # dropped translation is a build error, and a privacy policy that Apple
+    # requires in one language should not be held hostage to that rule.
+    static = ROOT / "site" / "static"
+    if static.exists():
+        for item in sorted(static.iterdir()):
+            if item.is_file():
+                shutil.copyfile(item, out / item.name)
+
     # Sparkle's update feed. It lives at the repository root because that is
     # where Tools/release.sh writes it, and it is published from here because the
     # app's SUFeedURL points at https://inkslab.app/appcast.xml — the site is a

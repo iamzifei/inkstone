@@ -28,8 +28,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.1"
+    CURRENT_PROJECT_VERSION: "2"
     DEVELOPMENT_TEAM: K9YT36SP4B
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
@@ -61,6 +61,10 @@ targets:
         LSSupportsOpeningDocumentsInPlace: true
         UIFileSharingEnabled: true
         NSHumanReadableCopyright: ""
+        # The app uses HTTPS and the Keychain and nothing else, which is exempt
+        # encryption. Declaring it here stops App Store Connect asking the same
+        # question on every single upload — and the answer never changes.
+        ITSAppUsesNonExemptEncryption: false
         # Sparkle. The feed is served from the site rather than from
         # raw.githubusercontent.com/.../main like the sibling apps: main is not
         # this repository's trunk (see docs/plans/2026-08-20-website-and-domain.md),
@@ -88,9 +92,25 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: YES
         PRODUCT_NAME: Inkstone
         GENERATE_INFOPLIST_FILE: NO
+        # One target, two platforms, two entitlement files. The macOS one carries
+        # App Sandbox keys and Sparkle's temporary-exception mach-lookup, neither
+        # of which belongs on iOS — and the latter is rejected outright by App
+        # Store validation. The bracketed condition is how a single target picks
+        # per-SDK.
         CODE_SIGN_ENTITLEMENTS: App/Resources/Inkstone.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": App/Resources/Inkstone-iOS.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": App/Resources/Inkstone-iOS.entitlements
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_APPROACHABLE_CONCURRENCY: YES
+        # A framework sits at Contents/Frameworks on macOS and at
+        # Contents/Frameworks *relative to the executable* on iOS, and the
+        # executable is one level deeper on macOS. One target for both platforms
+        # gets only the iOS runpath by default, so a macOS build links fine,
+        # signs fine, notarises fine — and then dyld cannot find Sparkle and the
+        # app dies at launch with "Library missing". None of the packaging checks
+        # catch it, because none of them run the app.
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks
+        "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": $(inherited) @executable_path/../Frameworks
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
