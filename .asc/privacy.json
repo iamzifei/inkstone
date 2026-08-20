@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "dataUsages": [
+    { "dataProtections": ["DATA_NOT_COLLECTED"] }
+  ]
+}
