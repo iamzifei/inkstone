@@ -46,8 +46,8 @@ TestFlight needs the same app record.
 | 2 | macOS release | ✅ **v0.1.1 live.** 0.1.0 was published and withdrawn; it could not launch. |
 | 4 | iOS archive | ✅ App Store IPA built and signed with Apple Distribution: `get-task-allow=false`, iCloud environment Production, TestFlight enabled. |
 | 5a | iOS screenshots | ✅ Six iPhone 6.9" (1320×2868) and three iPad 13" (2064×2752), at Apple's exact sizes. `scripts/capture-ios-shots.sh` reproduces them. |
-| 5b | App Store submission | 🟡 **automated end to end; needs one 2FA code.** `fastlane create_app` creates the record, `fastlane release` uploads binary + metadata + screenshots and submits. `fastlane check` runs read-only today and confirms the key authenticates. |
-| 6 | iOS link on the site | 🔴 blocked on 5b |
+| 5b | App Store submission | ✅ **Submitted 2026-08-20, WAITING_FOR_REVIEW.** `fastlane create_app` creates the record, `fastlane release` uploads binary + metadata + screenshots and submits. `fastlane check` runs read-only today and confirms the key authenticates. |
+| 6 | iOS link on the site | 🟡 waiting on approval — then flip the site to show an App Store badge |
 
 ## 0.1.0 shipped broken, and why nothing caught it
 
@@ -225,7 +225,18 @@ App record `6803462651`, version 0.1.1, build 3 uploaded and attached.
 | Copyright | 2026 Orris Technology Pty Ltd |
 | Review contact | name, email, phone, notes; `demoAccountRequired` set false |
 
-**Blocked on one thing: App Privacy.** `asc review items-add` refuses the version
+**Submitted 2026-08-20 11:51 UTC.** Version 0.1.1, build 3 (VALID),
+submission `15181670-…` in `WAITING_FOR_REVIEW`.
+
+App Privacy was the last blocker, and it needed the unofficial web-session path.
+The failure mode is worth keeping: `asc web privacy pull` reported the
+declaration as already `DATA_NOT_COLLECTED`, so `publish` looked like the only
+remaining step — and returned a bare 409. `plan` revealed why: the pull was
+showing a *derived* state, and server-side the usage had never been created.
+Apply, then publish. **A read that shows the answer you wanted is not the same as
+the answer being stored.**
+
+The original blocker, for the record: `asc review items-add` refuses the version
 with "You must have published answers to your app's data usages", and the API
 cannot supply them — all four endpoints 404 with "does not exist":
 
