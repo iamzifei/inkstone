@@ -36,3 +36,4 @@ __pycache__/
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/test_output/
+.asc/metadata/
