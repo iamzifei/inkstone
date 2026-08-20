@@ -42,12 +42,77 @@ TestFlight needs the same app record.
 | # | Item | State |
 |---|---|---|
 | 3 | Nav primary button | ✅ **Fixed.** `.nav-links > a` is (0,1,1) and `.btn` is (0,1,0), so the hover-underline's `padding-block-end: 2px` was overwriting the button's 11.52px bottom padding while the top kept it — the label sat below centre in a box 9px taller at the top, plus a stray 1px transparent border. Scoped the rule with `:not(.btn)` and made `.btn` an `inline-flex` centred box so it cannot drift again. Measured after: 11.52/11.52, border 0. |
-| 1 | Sparkle auto-update | ⬜ |
-| 2 | macOS release | ⬜ |
-| 4 | iOS archive | ⬜ |
-| 5a | iOS screenshots | ⬜ |
-| 5b | App Store submission | 🔴 blocked on the app record |
+| 1 | Sparkle auto-update | ✅ **Shipped and verified end to end** — see below. |
+| 2 | macOS release | ✅ **v0.1.1 live.** 0.1.0 was published and withdrawn; it could not launch. |
+| 4 | iOS archive | ✅ App Store IPA built and signed with Apple Distribution: `get-task-allow=false`, iCloud environment Production, TestFlight enabled. |
+| 5a | iOS screenshots | ✅ Six iPhone 6.9" (1320×2868) and three iPad 13" (2064×2752), at Apple's exact sizes. `scripts/capture-ios-shots.sh` reproduces them. |
+| 5b | App Store submission | 🔴 **blocked on the app record**, confirmed twice — see below |
 | 6 | iOS link on the site | 🔴 blocked on 5b |
+
+## 0.1.0 shipped broken, and why nothing caught it
+
+Worth writing down because the lesson is about the pipeline, not the bug.
+
+Adding Sparkle gave the app a framework to load. One target serves macOS and
+iOS, so it got only the iOS runpath, `@executable_path/Frameworks`. On macOS the
+executable lives one directory deeper, so dyld looked in
+`Contents/MacOS/Frameworks`, found nothing, and aborted before any of the app's
+own code ran:
+
+    Library not loaded: @rpath/Sparkle.framework/Versions/B/Sparkle
+
+**Every gate passed on that build.** The archive succeeded. The signature was
+valid. `codesign --deep --strict` was happy. Apple notarised it twice — app and
+disk image. `stapler validate` agreed. Gatekeeper accepted it. It was published
+to GitHub and the site's button pointed at it.
+
+None of those checks load a dylib, so none of them could notice that the app
+could not start. The fix is therefore two things:
+
+1. `LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]` = `@executable_path/../Frameworks`.
+2. `Tools/package-dmg.sh` now **launches the app it just built**, holds it eight
+   seconds, and fails the release if it exits or if dyld writes a loader
+   complaint. It is the only check in the pipeline that would have caught this.
+
+0.1.0 was deleted rather than left in the releases list, tag included. A release
+that cannot launch has no users to protect and is a trap for anyone who finds it.
+
+## The updater, verified rather than assumed
+
+Sandboxed Sparkle needs three things that only work together, and none of which
+fails loudly on its own: `SUEnableInstallerLauncherService`, the two
+`-spks`/`-spki` mach-lookup exceptions, and the network-client entitlement the
+app already had. Rather than assume, the whole path was exercised against a local
+feed advertising a higher version and pointing at the real signed DMG:
+
+- the menu item is present and enabled (so `canCheckForUpdates` was true)
+- `SULastCheckTime` was written after a check against the live feed
+- Sparkle offered the update — "Inkstone 9.9.9 is now available—you have 0.1.1"
+- it downloaded, validated the EdDSA signature, installed through the XPC
+  service and relaunched the app
+- **and the bundle was still validly signed and Gatekeeper-accepted afterwards**
+
+## The App Store gate, confirmed twice
+
+Independently, from two directions:
+
+    POST /v1/apps  →  403
+      "The resource 'apps' does not allow 'CREATE'."
+
+    xcrun altool --validate-app  →
+      "Cannot determine the Apple ID from Bundle ID 'com.orris.inkstone'"
+
+The bundle ID is registered; the app record is not. It cannot be created by API.
+Metadata, screenshots, privacy policy and a signed IPA are all ready, so the step
+after the record exists is an upload, not a day of work.
+
+## An iOS app cannot be downloaded from a website
+
+Worth being plain about, since item 4 asked for "packaging and a download". There
+is no side-load path on iOS. The IPA is real and signed, but the only ways a
+person can install it are TestFlight or the App Store, and both need the app
+record. Until then the site says nothing about iOS rather than linking somewhere
+that does not work.
 
 ## What is already in place
 
