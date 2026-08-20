@@ -42,11 +42,11 @@ SITE = "https://inkslab.app"
 REPO = "https://github.com/iamzifei/inkstone"
 KOFI = "https://ko-fi.com/james_ai/tip"
 
-# No release has been cut yet, so a "Download" button would point at an empty
-# releases page — a 404 dressed up as a call to action. Until one exists the
-# primary action is the repository. Flip this to True on the first release and
-# the button, its note, and the JSON-LD download URL all follow.
-HAS_RELEASE = False
+# v0.1.0 shipped 2026-08-20: signed, notarised, stapled, and Gatekeeper-accepted.
+# The URL is the `latest` alias rather than a pinned tag, so cutting the next
+# release does not require touching the site. Every release must therefore keep
+# naming its asset `Inkstone.dmg`.
+HAS_RELEASE = True
 DOWNLOAD = f"{REPO}/releases/latest/download/Inkstone.dmg"
 
 # The other three macOS apps. Someone who liked one is the likeliest person to
