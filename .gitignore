@@ -30,3 +30,4 @@ Package.pins
 assets/footage/
 .playwright-mcp/
 __pycache__/
+.sparkle-tools/

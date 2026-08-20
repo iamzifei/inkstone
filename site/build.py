@@ -612,6 +612,14 @@ def build(out: Path) -> None:
     if manifest.exists():
         manifest.unlink()
 
+    # Sparkle's update feed. It lives at the repository root because that is
+    # where Tools/release.sh writes it, and it is published from here because the
+    # app's SUFeedURL points at https://inkslab.app/appcast.xml — the site is a
+    # stabler address than a branch on GitHub.
+    appcast = ROOT / "appcast.xml"
+    if appcast.exists():
+        shutil.copyfile(appcast, out / "appcast.xml")
+
     (out / "sitemap.xml").write_text(sitemap(pages), encoding="utf-8")
     (out / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n", encoding="utf-8")

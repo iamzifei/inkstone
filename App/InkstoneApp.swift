@@ -5,6 +5,13 @@ import InkstoneCore
 struct InkstoneApp: App {
     @State private var workspace = Workspace()
 
+    #if os(macOS)
+    /// Held here rather than created in the commands block, because Sparkle's
+    /// scheduled-check timer lives as long as this object does. Rebuilding it on
+    /// a view update would restart the cycle on every redraw.
+    @StateObject private var updater = Updater()
+    #endif
+
     init() {
         // Debug hooks are macOS-only: they measure through AppKit text metrics
         // and write images with AppKit imaging.
@@ -501,7 +508,12 @@ struct InkstoneApp: App {
                 .frame(minWidth: 900, minHeight: 560)
                 #endif
         }
-        .commands { commands }
+        .commands {
+            commands
+            #if os(macOS)
+            CheckForUpdatesCommand(updater: updater)
+            #endif
+        }
 
         #if os(macOS)
         Settings {

@@ -32,6 +32,12 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://inkslab.app/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>CHSkSUupddRglHt3C2quzHtit8LMB29BMI44/O9aItg=</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchScreen</key>

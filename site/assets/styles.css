@@ -250,7 +250,12 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   font-family: var(--sans);
   font-size: var(--t-small);
 }
-.nav-links > a {
+/* `:not(.btn)` is load-bearing. This selector is (0,1,1) and `.btn` is (0,1,0),
+ * so without it the hover-underline's `padding-block-end: 2px` overwrote the
+ * button's own 11.52px bottom padding while the top kept it — the label sat
+ * visibly below centre in a button that was 9px taller at the top than the
+ * bottom. The stray transparent border added another pixel underneath. */
+.nav-links > a:not(.btn) {
   color: var(--ink-2);
   text-decoration: none;
   /* Drawn as a border rather than an underline so its distance from the
@@ -259,7 +264,7 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   border-bottom: 1px solid transparent;
   transition: color .2s var(--ease), border-color .2s var(--ease);
 }
-.nav-links > a:hover { color: var(--ink); border-bottom-color: var(--cinnabar); }
+.nav-links > a:not(.btn):hover { color: var(--ink); border-bottom-color: var(--cinnabar); }
 
 /* On a phone the bar keeps the wordmark, the language menu and the one button
  * it exists for. The section anchors and GitHub go: the anchors are a table of
@@ -313,7 +318,11 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
 
 /* buttons */
 .btn {
-  display: inline-block;
+  /* inline-flex + center, so the label is centred by the box rather than by two
+   * padding values that anything more specific can knock out of step. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--sans);
   font-size: var(--t-small);
   font-weight: 500;

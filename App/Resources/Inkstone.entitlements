@@ -10,9 +10,20 @@
 	<!-- Required to restore vault access after relaunch via bookmarks. -->
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>
-	<!-- Outbound only: GitHub sync. No inbound server. -->
+	<!-- Outbound only: GitHub sync, and Sparkle's update downloads. Because the
+	     app has this, Sparkle's Downloader XPC service is unnecessary. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Lets the sandboxed app reach Sparkle's installer tools. Both names are
+	     required and both are derived from the bundle id; without them the
+	     updater fails silently rather than reporting anything. Accepted for
+	     Developer ID distribution, which is how this ships — the Mac App Store
+	     would reject them. -->
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.com.orris.inkstone</string>
