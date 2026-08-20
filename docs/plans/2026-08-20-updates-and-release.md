@@ -179,9 +179,42 @@ that does not work.
   because it builds with bare `swiftc`; Inkstone has XcodeGen and SwiftPM, so it
   takes the dependency properly instead.
 
+## Store listing images
+
+`scripts/make-store-shots.py` composes the marketing screenshots from the raw
+device captures: caption, subtitle, framed device, paper ground and the cinnabar
+hairline. Six iPhone, three iPad, at exactly 1320×2868 and 2064×2752, asserted
+per file. Rendered through headless Chrome so the captions are set in the real
+Source Serif and Source Han — the second slide is about mixed-script setting, and
+approximating it would have the listing arguing against itself.
+
+`assets/ios-shots/` stays the raw captures; `assets/store-shots/` is what gets
+uploaded.
+
+## Two toolchains, one source of truth
+
+Both are wired, deliberately:
+
+- `Tools/release-ios.sh` — the `asc` path that was asked for. Dry run by default.
+- `fastlane release` — the fallback, and the safer one for screenshots: it infers
+  the device from image dimensions instead of needing Apple's display-type enum.
+
+The listing copy lives once, in `fastlane/metadata/en-US`, and the asc script
+reads from there so the two cannot drift.
+
+**Marked unverified rather than asserted:** which display-type enum accepts a
+1320×2868 image. It cannot be checked without a record to upload against, so the
+screenshot step runs through asc's own `--dry-run` first.
+
 ## HUMAN QUEUE
 
-1. 🔴 **One command, one 2FA code.** In the repository:
+1. 🔴 **One command, one 2FA code.** Either works:
+
+       asc apps create --name "Inkstone" --bundle-id com.orris.inkstone \
+         --sku inkstone --platform IOS --primary-locale en-US \
+         --apple-id iamzifei@gmail.com
+
+   then `Tools/release-ios.sh --confirm`. Or the fastlane path:
 
        fastlane create_app
 
