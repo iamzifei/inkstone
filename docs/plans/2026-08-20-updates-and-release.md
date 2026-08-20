@@ -115,6 +115,50 @@ it. The cached Apple session in `~/.app-store` is from 2026-02-07 and returns
 
 Everything downstream of that one code is now automated, in `fastlane/`.
 
+## iOS background sync
+
+Added after the release work. The auto-sync was a `Task` with a sleep loop —
+fine on macOS, useless on iOS, where the app is suspended seconds after leaving
+the screen.
+
+| Mechanism | For |
+| --- | --- |
+| `BGAppRefreshTask` | the app is not running at all |
+| `BGProcessingTask` | more to move than a refresh window allows |
+| `beginBackgroundTask` | a sync already in flight when the user leaves |
+
+**The bug it uncovered.** `openLastVault()` ran from `.onAppear`, which never
+fires when iOS wakes an app for a background task — no scene is rendered. The
+handler would have found no vault, synced nothing, and reported success. It now
+lives on `Workspace` as `openMostRecentVaultIfNeeded()`.
+
+**Verified on an iPhone 15 Pro**, because the Simulator has no scheduler at all:
+registration ok for both identifiers, submission ok for both, and the scheduler
+held two pending requests. The handler body was then executed directly and
+reported exactly why it declined to start — a sync was already running.
+
+**A measurement worth keeping:** that sync took **over 90 seconds** on a real
+vault. An app-refresh window is roughly 30. So refresh runs will frequently
+expire and the processing task is what actually completes the work. Both are
+scheduled deliberately for that reason.
+
+**A correction.** The first version of the comment in `BackgroundSync.swift` said
+the engine "records what it has done as it goes". It does not — `SyncState` is
+written once, at the end of a successful run. An interrupted run therefore leaves
+state untouched; the next run re-derives its plan from the real local and remote
+file lists and at worst re-uploads identical content. Survivable, but not what
+was originally claimed.
+
+**Not used: `BGContinuedProcessingTask`** (new in iOS 26). It fits "tap Sync,
+then leave the app", with a progress display — a different feature from
+unattended periodic sync, and it must be submitted while foregrounded. Worth
+adding later.
+
+⚠️ **For App Review:** declaring `UIBackgroundModes` invites the question of
+whether they are used. They are, by the two task identifiers above. If the
+listing is rejected on that point, the answer is: GitHub vault sync while the
+app is not in the foreground.
+
 ## An iOS app cannot be downloaded from a website
 
 Worth being plain about, since item 4 asked for "packaging and a download". There
