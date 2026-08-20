@@ -46,7 +46,7 @@ TestFlight needs the same app record.
 | 2 | macOS release | ✅ **v0.1.1 live.** 0.1.0 was published and withdrawn; it could not launch. |
 | 4 | iOS archive | ✅ App Store IPA built and signed with Apple Distribution: `get-task-allow=false`, iCloud environment Production, TestFlight enabled. |
 | 5a | iOS screenshots | ✅ Six iPhone 6.9" (1320×2868) and three iPad 13" (2064×2752), at Apple's exact sizes. `scripts/capture-ios-shots.sh` reproduces them. |
-| 5b | App Store submission | 🔴 **blocked on the app record**, confirmed twice — see below |
+| 5b | App Store submission | 🟡 **automated end to end; needs one 2FA code.** `fastlane create_app` creates the record, `fastlane release` uploads binary + metadata + screenshots and submits. `fastlane check` runs read-only today and confirms the key authenticates. |
 | 6 | iOS link on the site | 🔴 blocked on 5b |
 
 ## 0.1.0 shipped broken, and why nothing caught it
@@ -102,9 +102,18 @@ Independently, from two directions:
     xcrun altool --validate-app  →
       "Cannot determine the Apple ID from Bundle ID 'com.orris.inkstone'"
 
-The bundle ID is registered; the app record is not. It cannot be created by API.
-Metadata, screenshots, privacy policy and a signed IPA are all ready, so the step
-after the record exists is an upload, not a day of work.
+The bundle ID is registered; the app record is not.
+
+**Correction to what this file said earlier.** It claimed there was "no scripted
+way around it". That is true of the *official* API and false in general.
+fastlane's `produce` drives the same private endpoints the App Store Connect
+website uses, authenticated with an Apple ID session rather than an API key, and
+it can create the record. What it cannot do is skip the 2FA code — which is why
+`username` is a required parameter of that action and no API key substitutes for
+it. The cached Apple session in `~/.app-store` is from 2026-02-07 and returns
+401, so it has to be a fresh login.
+
+Everything downstream of that one code is now automated, in `fastlane/`.
 
 ## An iOS app cannot be downloaded from a website
 
@@ -128,10 +137,17 @@ that does not work.
 
 ## HUMAN QUEUE
 
-1. 🔴 **Create the Inkstone app record** at appstoreconnect.apple.com → Apps → +
-   → New App. Platform iOS, name **Inkstone**, primary language English (U.S.),
-   bundle ID `com.orris.inkstone`, SKU `inkstone`. That is the whole manual step;
-   everything after it is scripted.
+1. 🔴 **One command, one 2FA code.** In the repository:
+
+       fastlane create_app
+
+   It asks for the Apple ID password for `iamzifei@gmail.com` and a verification
+   code, then creates the record. The session is cached in `~/.app-store` for
+   about a month, so later releases need nothing.
+
+   Doing it by hand in the web UI works too — Apps → + → New App, iOS, name
+   **Inkstone**, English (U.S.), bundle `com.orris.inkstone`, SKU `inkstone` —
+   and `fastlane release` picks up from there either way.
 2. 🟡 Decide whether the interim iOS link on the site is **TestFlight public** or
    nothing until App Store approval.
 3. 🟡 The LICENSE and `main`-branch items from the website plan are still open.
