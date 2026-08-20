@@ -56,13 +56,22 @@ IPHONE = [
      "Open it in any other editor, on any device, forever."),
 ]
 
+# The iPad set is its own argument, not a resized iPhone one: the split view
+# keeps the whole vault beside the note, which is the thing a bigger screen
+# actually buys. Six slides, to match iPhone.
 IPAD = [
-    ("ipad/01-live-preview", "Write on the big screen.",
-     "The same vault, the same files, a wider measure."),
+    ("ipad/01-live-preview", "The whole vault, beside the note.",
+     "A split view that keeps your files where you can see them."),
     ("ipad/02-typography", "中英文混排，终于排对了。",
-     "Body font and code font, set independently."),
+     "The gap between Han and Latin, set the way the standard asks for."),
     ("ipad/03-measure", "Every note knows what points at it.",
      "Backlinks and outgoing links, always in view."),
+    ("ipad/04-project", "Diagrams and maths, in place.",
+     "Mermaid and LaTeX render as you type — no plugin, no preview pane."),
+    ("ipad/05-callout", "Callouts, quotes, tasks.",
+     "GitHub Flavored Markdown, plus the Obsidian syntax you already use."),
+    ("ipad/06-reading", "Reading mode, when you want the page.",
+     "The same file, without the scaffolding."),
 ]
 
 

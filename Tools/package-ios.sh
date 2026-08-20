@@ -101,6 +101,37 @@ if echo "$ENTS" | grep -q "temporary-exception"; then
   exit 1
 fi
 
+# Two checks that exist because App Store upload found them and this script did
+# not — and upload failure arrives minutes later, by email, after everything
+# looks like it worked:
+#
+#   90474  no orientations declared. Not optional once the app ships for iPad:
+#          multitasking requires all four.
+#   90717  the large app icon contains an alpha channel. iOS masks corners
+#          itself, so the marketing icon must be a fully opaque square.
+ORIENT="$(/usr/libexec/PlistBuddy -c "Print :UISupportedInterfaceOrientations" "$APP/Info.plist" 2>/dev/null | grep -c UIInterfaceOrientation || true)"
+IPAD_ORIENT="$(/usr/libexec/PlistBuddy -c "Print :UISupportedInterfaceOrientations~ipad" "$APP/Info.plist" 2>/dev/null | grep -c UIInterfaceOrientation || true)"
+FAMILIES="$(/usr/libexec/PlistBuddy -c "Print :UIDeviceFamily" "$APP/Info.plist" 2>/dev/null | grep -c 2 || true)"
+printf "    orientations         iphone=%s ipad=%s\n" "$ORIENT" "$IPAD_ORIENT"
+[[ "$ORIENT" -ge 1 ]] || { echo "No UISupportedInterfaceOrientations — upload fails with 90474." >&2; exit 1; }
+if [[ "$FAMILIES" -ge 1 && "$IPAD_ORIENT" -lt 4 ]]; then
+  echo "Ships for iPad but declares $IPAD_ORIENT iPad orientations; multitasking needs 4." >&2
+  exit 1
+fi
+
+# Checked at the source, not in the bundle: the 1024 marketing icon is compiled
+# into Assets.car and is not a loose file, so inspecting $APP/AppIcon*.png reads
+# the small icons and always passes. This reads the file the catalog points at.
+SOURCE_ICON="App/Resources/Assets.xcassets/AppIcon.appiconset/icon-ios-light.png"
+if [[ -f "$SOURCE_ICON" ]]; then
+  A="$(magick identify -format '%A' "$SOURCE_ICON")"
+  printf "    marketing icon alpha %s\n" "$A"
+  [[ "$A" == "Undefined" || "$A" == "False" ]] || {
+    echo "$SOURCE_ICON has an alpha channel — upload fails with 90717." >&2
+    echo "Regenerate with Tools/generate-app-icon.py, which flattens the light one." >&2
+    exit 1; }
+fi
+
 VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist")"
 BUILD_NO="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")"
 echo

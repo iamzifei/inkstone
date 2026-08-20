@@ -225,7 +225,24 @@ def main() -> None:
     masters = {name: render(palette) for name, palette in PALETTES.items()}
 
     for name, image in masters.items():
-        image.save(ICONSET / f"icon-ios-{name}.png")
+        if name == "light":
+            # The iOS marketing icon must be fully opaque. App Store upload
+            # rejects it otherwise, with error 90717 — "the large app icon ...
+            # can't be transparent or contain an alpha channel" — and the
+            # rejection arrives minutes after the upload, not during the build.
+            #
+            # Flattening onto the artwork's own top-of-gradient paper rather
+            # than onto white, so the rounded corners blend into the icon's
+            # background instead of showing a bright halo. iOS masks the corners
+            # itself, so nothing is lost by filling them.
+            backdrop = Image.new("RGB", image.size, PALETTES["light"]["paper_top"])
+            backdrop.paste(image, mask=image.split()[-1])
+            backdrop.save(ICONSET / "icon-ios-light.png")
+        else:
+            # Dark and tinted keep their alpha on purpose: the system composites
+            # those over its own background, so a flattened one would show a
+            # rectangle of the wrong colour behind the artwork.
+            image.save(ICONSET / f"icon-ios-{name}.png")
 
     # macOS uses the light artwork; the system handles its own dark treatment.
     light = masters["light"]
