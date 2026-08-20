@@ -727,7 +727,11 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
 
 /* The three sibling apps get a name and one line of what they do. A bare list
  * of product names is a list of words nobody clicks. */
-.footer-siblings a { display: block; border-bottom: none; }
+/* Icon beside the name, so the four sites' footers read as one family rather
+ * than as three text links and a different-looking fourth. */
+.footer-siblings a { display: flex; align-items: center; gap: .6rem; border-bottom: none; }
+.footer-siblings img { border-radius: 6px; flex: none; }
+.sib-text { display: block; }
 .footer-siblings a:hover .sib-name { border-bottom-color: var(--cinnabar); color: var(--ink); }
 .sib-name {
   display: inline-block;

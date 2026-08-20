@@ -273,8 +273,11 @@ def nav(page: Page, by_slug: dict) -> str:
 def footer(page: Page, by_slug: dict) -> str:
     d = page.data
     sibs = "".join(
-        f'<li><a href="{url}" rel="noopener"><span class="sib-name">{name}</span>'
-        f'<span class="sib-note">{e(get(d, f"siblings.{name.lower()}"))}</span></a></li>'
+        f'<li><a href="{url}" rel="noopener">'
+        f'<img src="{page.up}assets/{name.lower()}.png" alt="" width="28" height="28" '
+        f'loading="lazy" decoding="async">'
+        f'<span class="sib-text"><span class="sib-name">{name}</span>'
+        f'<span class="sib-note">{e(get(d, f"siblings.{name.lower()}"))}</span></span></a></li>'
         for name, url in SIBLINGS
     )
     return f"""<footer class="site-footer">

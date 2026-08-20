@@ -141,3 +141,14 @@ requested and are not started.
   GitHub Contents API with a local shadow index rather than real git.
 - **Phase 4** — the plugin surface: templates, dataview-style queries, kanban,
   excalidraw-style drawing on canvas.
+
+## Also from the same hand
+
+Four small native Mac apps, each doing one thing. Someone who liked one is
+the likeliest person to want another.
+
+| App | | |
+| --- | --- | --- |
+| **[Candela](https://getcandela.app)** | Every display control macOS hides, in one menu bar panel — real brightness over DDC, HiDPI scaling, and brightness keys that work on every monitor. | [source](https://github.com/iamzifei/Candela) |
+| **[AudioSwitch](https://audioswitch.dev)** | Switch audio input and output from the menu bar, with volume, mute and a live mic level meter. | [source](https://github.com/iamzifei/audioswitch) |
+| **[ClipStack](https://getclipstack.app)** | Everything you copied is still there — a searchable clipboard history on ⇧⌘V, kept on this Mac. | [source](https://github.com/iamzifei/clipstack) |
