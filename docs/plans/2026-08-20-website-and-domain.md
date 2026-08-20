@@ -22,12 +22,27 @@ mixed setting treated as a first-class problem rather than a fallback.
 
 ## Phases
 
-- [ ] **P0 Domain.** Quoted at **$9.99/yr, auto-renew on, non-refundable** (Vercel, team orris, 2026-08-20). **Blocked on James: registrant contact (name, phone, postal address) and an explicit go-ahead.** Vercel keeps no reusable WHOIS profile, and I will not invent one.
+- [x] **P0 Domain.** James registered `inkslab.app` himself on 2026-08-20 (Vercel, team orris, $9.99/yr, auto-renew on, expires 2027-08-20). Registrant contact stayed with him — Vercel keeps no reusable WHOIS profile and inventing one is not on.
 - [x] **P1 Demo footage.** 12-note demo vault at `assets/demo-vault`, five scripted segments, encoded to `site/assets/video/hero.{mp4,webm}` + poster. 39 s, 503 KB / 543 KB.
 - [x] **P2 Screenshots.** Six, all captured 2026-08-20 from the current build, WebP at 640/960/1280 plus intrinsic, sizes in a manifest the build reads.
 - [x] **P3 Site.** `site/build.py`, `site/typeset.py`, `site/assets/styles.css`, `site/assets/site.js`, content as per-language YAML.
 - [x] **P4 Translate.** Eight languages. Structure lives in the template, so a dropped key is a build error rather than a missing section.
-- [ ] **P5 Deploy.** Workflow written (`.github/workflows/site.yml`, Pages via artifact so `docs/` stays private). Waiting on the domain.
+- [x] **P5 Deploy.** Live at <https://inkslab.app>. DNS on Vercel (four A + four AAAA to GitHub Pages, `www` CNAME to `iamzifei.github.io`), mirroring getcandela.app record for record — the IPs were read off the two sibling domains that already work rather than recalled. Pages is `build_type: workflow`, so `docs/` is never published. Certificate approved, `https_enforced: true`, `www` 301s to the apex. All eight pages and every asset return 200; verified in a real browser that Source Serif loads, the video autoplays muted on scroll into view, and all twelve reveal elements resolve.
+
+## Open: what should `main` be?
+
+The site is published from `feat/website`, not `main`, and that is deliberate.
+
+`main` is **78 commits behind** `feat/ui-theming-icon`, where all the real work
+lives. It has no `docs/`, no `scripts/`, no `Tools/`. Its last twelve commits
+were written by Inkstone's own GitHub sync while the feature was being tested:
+they added `Note.md`, `Sync check.md`, `Meeting notes.md` and `中文笔记.md` to
+the root of a **public** repository and deleted `Samples/Inkstone Demo/`.
+
+Merging into that is a decision about what the repository's trunk is, which is
+not a decision to make in passing while wiring up a domain. So `feat/website` is
+allow-listed in the `github-pages` environment and named in the workflow's push
+trigger. Both are one line; remove them once `main` is sorted.
 
 ## What the recording rig learned, so it is not re-derived
 
