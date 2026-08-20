@@ -31,3 +31,8 @@ assets/footage/
 .playwright-mcp/
 __pycache__/
 .sparkle-tools/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/

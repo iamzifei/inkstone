@@ -1,0 +1,1 @@
+markdown,notes,wiki,zettelkasten,backlink,graph,canvas,plain text,writing,editor,obsidian,vault

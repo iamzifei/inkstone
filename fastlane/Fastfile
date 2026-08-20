@@ -1,0 +1,128 @@
+# Inkstone — App Store automation.
+#
+# The work is split across two lanes for one reason: **only app creation needs a
+# human.**
+#
+# Creating an App Store Connect app record does not go through the official App
+# Store Connect API. Confirmed from both ends before building this:
+#
+#     POST https://api.appstoreconnect.apple.com/v1/apps  →  403
+#       "The resource 'apps' does not allow 'CREATE'."
+#
+#     xcrun altool --validate-app  →
+#       "Cannot determine the Apple ID from Bundle ID 'com.orris.inkstone'"
+#
+# fastlane's `produce` gets around it by driving the same private endpoints the
+# App Store Connect website uses, authenticated with an Apple ID session rather
+# than an API key — which is why `username` is a required parameter and why this
+# one step needs a 2FA code typed in. Everything after it takes the API key and
+# needs nobody.
+#
+#   fastlane create_app   — once, interactive, asks for a 2FA code
+#   fastlane release      — repeatable, non-interactive, no human
+#   fastlane ship         — both, for the first run
+#
+# The session that `create_app` establishes is cached in ~/.app-store and lasts
+# about a month, so subsequent releases are `release` alone.
+
+default_platform(:ios)
+
+APP_ID       = "com.orris.inkstone"
+# Absolute, resolved from this file. fastlane does not guarantee the working
+# directory a lane runs in, and a relative path here reported a perfectly
+# present IPA as missing.
+IPA_PATH     = File.expand_path("../.build-ios-release/export/Inkstone.ipa", __dir__)
+ASC_KEY_ID   = "UYGG95M882"
+ASC_ISSUER   = "ea36e3b8-3c0a-4a03-819f-24061a386eb4"
+ASC_KEY_PATH = File.expand_path("~/.private_keys/AuthKey_UYGG95M882.p8")
+
+def asc_key
+  # The same key the DMG pipeline notarises with. Read from outside the
+  # repository so it is never at risk of being committed.
+  app_store_connect_api_key(
+    key_id: ASC_KEY_ID,
+    issuer_id: ASC_ISSUER,
+    key_filepath: ASC_KEY_PATH,
+    in_house: false
+  )
+end
+
+platform :ios do
+  desc "Create the App Store Connect app record. Interactive: needs a 2FA code."
+  lane :create_app do
+    produce(
+      username: "iamzifei@gmail.com",
+      app_identifier: APP_ID,
+      app_name: "Inkstone",
+      language: "English (U.S.)",
+      sku: "inkstone",
+      platforms: ["ios"],
+      # The bundle ID and its capabilities already exist in the Developer Portal
+      # — the Xcode archive created them. Touching the portal again here would
+      # risk resetting the iCloud container that iOS sync depends on.
+      skip_devcenter: true
+    )
+  end
+
+  desc "Upload the build, metadata and screenshots, then submit for review."
+  lane :release do
+    unless File.exist?(IPA_PATH)
+      UI.user_error!("No IPA at #{IPA_PATH}. Build one with Tools/package-ios.sh")
+    end
+
+    deliver(
+      api_key: asc_key,
+      ipa: IPA_PATH,
+      app_identifier: APP_ID,
+
+      metadata_path: "./fastlane/metadata",
+      screenshots_path: "./fastlane/screenshots",
+      app_rating_config_path: "./fastlane/metadata/app_store_rating_config.json",
+
+      submit_for_review: true,
+      # Approved is not the same as released. This holds the build until it is
+      # released by hand, so the listing is never live before anyone has looked
+      # at how it reads on the store.
+      automatic_release: false,
+
+      # Declared in Info.plist as ITSAppUsesNonExemptEncryption=false — HTTPS and
+      # the Keychain only, which is exempt. Repeating it here stops the upload
+      # pausing to ask.
+      submission_information: {
+        export_compliance_uses_encryption: false,
+        add_id_info_uses_idfa: false,
+        content_rights_contains_third_party_content: false
+      },
+
+      # No prompts: this lane is meant to run unattended.
+      force: true,
+      run_precheck_before_submit: true,
+      precheck_include_in_app_purchases: false,
+      skip_binary_upload: false,
+      skip_screenshots: false,
+      skip_metadata: false,
+      overwrite_screenshots: true
+    )
+  end
+
+  desc "Read-only: does the API key work, and does the app record exist yet?"
+  lane :check do
+    key = asc_key
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(**key)
+    app = Spaceship::ConnectAPI::App.find(APP_ID)
+    if app
+      UI.success("App record exists: #{app.name} (#{app.id})")
+      UI.message("`fastlane release` can run unattended.")
+    else
+      UI.important("No App Store Connect record for #{APP_ID} yet.")
+      UI.important("Run `fastlane create_app` — it needs an Apple ID 2FA code once.")
+    end
+    UI.message("IPA present: #{File.exist?(IPA_PATH)} (#{IPA_PATH})")
+  end
+
+  desc "First run: create the record, then ship it."
+  lane :ship do
+    create_app
+    release
+  end
+end

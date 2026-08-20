@@ -1,0 +1,1 @@
+Your notes stay plain Markdown files in a folder you choose — openable by any other editor, on any other device, long after this app is gone.

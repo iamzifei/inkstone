@@ -1,0 +1,11 @@
+# Team and identifiers. The bundle ID is already registered in the Developer
+# Portal; what does not exist yet is the App Store Connect *app record*, which
+# is what `fastlane create_app` makes.
+app_identifier("com.orris.inkstone")
+apple_id("iamzifei@gmail.com")
+team_id("K9YT36SP4B")          # Developer Portal team
+
+# No itc_team_id on purpose. This account has a single App Store Connect team,
+# so fastlane resolves it by itself; a hardcoded one that turned out to be wrong
+# would fail in the middle of an interactive 2FA login, which is the worst place
+# to discover a typo. Add it here only if fastlane ever asks which team to use.
