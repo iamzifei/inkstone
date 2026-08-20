@@ -22,3 +22,11 @@ Package.pins
 
 # Local-only test harness marker
 /tmp-inkstone-*
+
+# Website
+# The raw screen recordings: ~15 MB per take, and every one is reproducible by
+# running scripts/record-demo.sh. Only the encoded hero (site/assets/video) is
+# committed, because that is what gets served.
+assets/footage/
+.playwright-mcp/
+__pycache__/

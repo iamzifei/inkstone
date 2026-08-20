@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="de" data-lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkstone — eine Markdown-Notizapp für macOS und iOS</title>
+<meta name="description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://inkslab.app/de/">
+<link rel="alternate" hreflang="de" href="https://inkslab.app/de/">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/">
+<link rel="alternate" hreflang="es" href="https://inkslab.app/es/">
+<link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/">
+<link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/">
+<link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Inkstone">
+<meta property="og:title" content="Inkstone — eine Markdown-Notizapp für macOS und iOS">
+<meta property="og:description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<meta property="og:url" content="https://inkslab.app/de/">
+<meta property="og:image" content="https://inkslab.app/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="de_DE">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inkstone — eine Markdown-Notizapp für macOS und iOS">
+<meta name="twitter:description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<meta name="twitter:image" content="https://inkslab.app/assets/og-card.png">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=8d346d93">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26, iOS 26","url":"https://inkslab.app/de/","description":"Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.","inLanguage":"de","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James Gong","url":"https://github.com/iamzifei"}}</script>
+
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="../">
+      <img src="../assets/icon.png" alt="" width="28" height="28">
+      <span class="wordmark-name">Inkstone</span>
+      <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
+    </a>
+    <nav class="nav-links" aria-label="Abschnitte">
+      <a href="#features">Funktionen</a>
+      <a href="#typography">Typografie</a>
+      <a href="#specs">Technische Daten</a>
+      <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
+      <details class="lang-menu">
+        <summary aria-label="Language">Deutsch</summary>
+        <nav class="lang-menu-list" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><span class="lang-current" aria-current="true">Deutsch</span><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+      </details>
+      <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">Quelltext lesen</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main">
+<section class="hero">
+  <p class="eyebrow">macOS 26 · iOS 26 · Natives SwiftUI</p>
+  <h1 class="hero-title">Ihre Notizen sind Dateien. Das sollen sie bleiben.</h1>
+  <p class="hero-lede">Inkstone arbeitet direkt mit reinem Markdown in einem Ordner Ihrer Wahl. Es liest den Tresor, den Sie schon haben, schreibt nichts, was sich nicht in jedem anderen Editor öffnen ließe, und legt seinen eigenen Zustand in einem versteckten Ordner ab, den Sie jederzeit löschen dürfen.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">Quelltext lesen</a>
+    <a class="btn btn-quiet" href="#features">Ansehen, was sie kann</a>
+  </div>
+  <p class="hero-note">Kostenlos · Apple Silicon · English · 简体中文 · 繁體中文</p>
+  <figure class="film">
+    <div class="film-mat">
+      <video class="film-frame" poster="../assets/video/poster.webp" autoplay muted loop playsinline
+             preload="metadata" aria-label="Eine Bildschirmaufnahme von Inkstone unter macOS: ein Tresor wird geöffnet, eine Zeile aus chinesischer und lateinischer Schrift getippt, einem Wikilink gefolgt und der Graph geöffnet.">
+        <source src="../assets/video/hero.webm" type="video/webm">
+        <source src="../assets/video/hero.mp4" type="video/mp4">
+      </video>
+    </div>
+    <figcaption>Aufgenommen unter macOS 26. Ungeschnitten, bis auf die Blenden zwischen den Abschnitten.</figcaption>
+  </figure>
+</section>
+<section class="creed" aria-labelledby="creed-h">
+  <div class="rule-head">
+    <h2 id="creed-h">Drei Entscheidungen, aus denen alles Übrige folgt</h2>
+    <p class="rule-sub">Sie sind tragend, und sie erklären, warum sich die App so verhält.</p>
+  </div>
+  <div class="creed-cols"><div class="creed-col reveal"><h3>Die Dateien sind die Wahrheit</h3><p>Keine Datenbank, kein Importschritt, kein proprietäres Format. Ein von Obsidian angelegter Tresor öffnet sich hier, einer von hier dort. Wäre Inkstone morgen verschwunden, hätten Sie immer noch einen Ordner voller Markdown.</p></div><div class="creed-col reveal"><h3>Ein toter Link bleibt tot</h3><p>Weil es keine Datenbank gibt, die ihn reparieren könnte, schreibt das Umbenennen einer Notiz jeden Wikilink, der auf sie zeigte, im selben Zug im ganzen Tresor um. Das ist die direkte Folge der Entscheidung darüber, keine nachträglich angebaute Funktion.</p></div><div class="creed-col reveal"><h3>Die Engine weiß nichts von Bildschirmen</h3><p>Parsen, Indizieren, Suche und Graph liegen in einem Paket, das überhaupt kein UI-Framework importiert. Deshalb sind sie von echten Tests gedeckt statt von einem Simulator, und deshalb könnte dieselbe Engine später auch ein Kommandozeilenwerkzeug tragen.</p></div></div>
+</section>
+<section class="features" id="features" aria-labelledby="features-h">
+  <div class="rule-head">
+    <h2 id="features-h">Was drin ist</h2>
+    <p class="rule-sub">Alles Folgende ist gebaut und läuft. Es ist keine Roadmap.</p>
+  </div>
+  <article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">Schreiben</p>
+    <h3>Live-Vorschau statt geteiltem Fenster</h3>
+    <p>Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/live-preview.webp" srcset="../assets/shots/live-preview-640.webp 640w, ../assets/shots/live-preview-960.webp 960w, ../assets/shots/live-preview-1280.webp 1280w, ../assets/shots/live-preview.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Der Editor von Inkstone mit Live-Vorschau: Überschrift, ein Absatz aus gemischt chinesischer und lateinischer Schrift, eine Checkliste, ein Zitat, ein Callout, eine ausgerichtete Tabelle und ein Codeblock." loading="eager" fetchpriority="high" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">Verknüpfen</p>
+    <h3>Wikilinks, Aliase, Blöcke, Backlinks</h3>
+    <p>[[Notiz]], [[Notiz#Überschrift]], [[Notiz^Block]], ![[Einbettungen]] und im Frontmatter deklarierte Aliase laufen alle in einen Index. Jede Notiz zeigt, was auf sie zeigt, worauf sie zeigt und welche ihrer Links noch kein Ziel haben.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/backlinks.webp" srcset="../assets/shots/backlinks-640.webp 640w, ../assets/shots/backlinks-960.webp 960w, ../assets/shots/backlinks-1280.webp 1280w, ../assets/shots/backlinks.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Eine Notiz, deren Backlinks und ausgehende Links in der rechten Seitenleiste stehen, darunter ein kleiner lokaler Graph der Nachbarn." loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">Die Form sehen</p>
+    <h3>Ein Graph, der sich zweimal gleich legt</h3>
+    <p>Die Kräftesimulation ist deterministisch: derselbe Tresor zeichnet jedes Mal dasselbe Bild. Man kann sich seine Anordnung merken, statt sie bei jedem Öffnen neu zu lesen. Der lokale Graph zeigt eine Notiz und ihre Nachbarn.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/graph.webp" srcset="../assets/shots/graph-640.webp 640w, ../assets/shots/graph-960.webp 960w, ../assets/shots/graph-1280.webp 1280w, ../assets/shots/graph.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Die Graphansicht: Notizen als Knoten, verbunden durch ihre Wikilinks und geballt nach der Dichte ihrer Verweise." loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">Räumliche Notizen</p>
+    <h3>Canvas, im offenen Format JSON Canvas</h3>
+    <p>Karten, Dateien und Verbindungen auf einem unendlichen Blatt, gespeichert als JSON Canvas 1.0 — dieselbe Datei, die auch die anderen Implementierungen des Formats lesen und schreiben. Ihre Canvas sind so portabel wie Ihre Notizen.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/canvas.webp" srcset="../assets/shots/canvas-640.webp 640w, ../assets/shots/canvas-960.webp 960w, ../assets/shots/canvas-1280.webp 1280w, ../assets/shots/canvas.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Ein Canvas mit Notizkarten und Verbindungen, räumlich auf einem unendlichen Blatt angeordnet." loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">Finden</p>
+    <h3>Unscharfer Umschalter, und Suche mit Operatoren</h3>
+    <p>Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #<span class="ac"></span>项目/进行中 wird genau wie #project/active indiziert.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/quickswitcher.webp" srcset="../assets/shots/quickswitcher-640.webp 640w, ../assets/shots/quickswitcher-960.webp 960w, ../assets/shots/quickswitcher-1280.webp 1280w, ../assets/shots/quickswitcher.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Der Schnellumschalter über einer Notiz, der den Tresor beim Tippen Zeichen für Zeichen filtert." loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">Zwei Geräte</p>
+    <h3>iCloud oder GitHub, und Sie bestimmen, was mitreist</h3>
+    <p>Synchronisieren Sie über iCloud, oder schieben Sie den Tresor in ein GitHub-Repository — Konflikte werden einmal entschieden, statt als zwei Kopien liegen zu bleiben. Filter je Dateityp entscheiden, ob Anhänge und Medien mitkommen, und die .gitignore des Tresors wird respektiert.</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/sync.webp" srcset="../assets/shots/sync-640.webp 640w, ../assets/shots/sync-960.webp 960w, ../assets/shots/sync.webp 1120w" sizes="(max-width: 900px) 92vw, 620px" width="1120" height="1096" alt="Die Einstellungen der GitHub-Synchronisierung: Auswahl von Repository und Branch sowie Schalter je Dateityp." loading="lazy" decoding="async"></figure>
+</article>
+</section>
+<section class="typo" id="typography" aria-labelledby="typo-h">
+  <div class="rule-head">
+    <h2 id="typo-h">Chinesisch und Lateinisch auf einer Zeile</h2>
+    <p class="rule-sub">Der schwierige Fall ist ein lateinisches Wort mitten im chinesischen Satz. Fast jede App macht das falsch, und zwar auf eine Weise, die man nach dem ersten Mal nicht mehr übersehen kann.</p>
+  </div>
+  <div class="specimen reveal">
+    <p class="specimen-folio">Schriftprobe · Source Serif 4 mit Source Han Serif</p>
+    <h3 class="specimen-h">中英文混排 und das Viertelgeviert</h3>
+    <p class="specimen-lead">Chinesisch wird kompress gesetzt. Es gibt keine Wortzwischenräume, also liest das Auge die Gleichmäßigkeit der Zeile. Fällt typography hinein, stoßen die beiden Schriften aneinander.</p>
+    <p class="specimen-body">正文里出现<span class="ac"></span>Latin<span class="ac"></span>单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C<span class="ac"></span>的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与<span class="ac"></span>Latin<span class="ac"></span>的交界都由构建时插入的空元素撑开，在支持<span class="ac"></span>text-autospace<span class="ac"></span>的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。</p>
+    <blockquote class="specimen-quote">
+      <p>Typografie ist dazu da, dem Inhalt Ehre zu erweisen. Sie ist eine Dienerin, und ihre Manieren sollten unsichtbar sein.</p>
+      <cite>Robert Bringhurst, The Elements of Typographic Style</cite>
+    </blockquote>
+  </div>
+  <dl class="spec-notes"><div class="spec-note"><dt>Das Satzmaß</dt><dd>Der Fließtext bleibt bei rund 66 Zeichen je Zeile, der Breite, die Bringhurst als einspaltiges Ideal nennt. Jenseits von etwa 75 verliert das Auge den Rücksprung.</dd></div><div class="spec-note"><dt>Eine Schriftfamilie</dt><dd>Lateinisch ist Source Serif 4, Chinesisch ist Source Han Serif, dessen lateinischer Begleiter wiederum Source Serif ist. Die gemischte Zeile ist die Antiqua eines Gestalters, nicht der Streit zweier.</dd></div><div class="spec-note"><dt>Farbe bedeutet etwas</dt><dd>Ein einziges Zinnoberrot — die Farbe eines in Papier gedrückten Siegels — kennzeichnet Links, Schlagwörter und die aktuelle Aktion. Sonst ist nichts farbig.</dd></div><div class="spec-note"><dt>Bewegung ist Interpunktion</dt><dd>Elemente steigen bei ihrem Erscheinen um acht Pixel, sonst bewegt sich nichts. Wer „Bewegung reduzieren“ aktiviert hat, bekommt auch das nicht.</dd></div></dl>
+</section>
+<section class="specs" id="specs" aria-labelledby="specs-h">
+  <div class="rule-head">
+    <h2 id="specs-h">Technische Daten</h2>
+    <p class="rule-sub">Was zu wissen sich lohnt, bevor Sie irgendetwas herunterladen.</p>
+  </div>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">Plattformen</th><td>macOS 26 und iOS 26, eine SwiftUI-Codebasis, Apple Silicon</td></tr><tr><th scope="row">Speicherung</th><td>Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import</td></tr><tr><th scope="row">Kompatibilität</th><td>Obsidian-Tresore öffnen sich unverändert, in beide Richtungen. Canvas ist JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown, dazu Wikilinks, Einbettungen, Blockreferenzen, Callouts, Fußnoten, Formelsatz und Mermaid</td></tr><tr><th scope="row">Synchronisierung</th><td>iCloud oder ein GitHub-Repository, mit Filtern je Dateityp</td></tr><tr><th scope="row">Oberflächensprachen</th><td>English, 简体中文, 繁體中文</td></tr><tr><th scope="row">Quelltext</th><td>Öffentlich auf GitHub. Eine Lizenz ist noch nicht gewählt.</td></tr><tr><th scope="row">Datenschutz</th><td>Kein Konto, keine Telemetrie, kein Netzaufruf, um den Sie nicht gebeten haben</td></tr></tbody></table>
+  <div class="closer reveal">
+    <p class="closer-line">Sie ist kostenlos, sie hält Ihnen nichts vor, und die Dateien, die sie schreibt, sind die Dateien, die Sie ohnehin schon hatten.</p>
+    <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">Quelltext lesen</a>
+      <a class="btn btn-quiet" href="https://ko-fi.com/james_ai/tip" rel="noopener">Auf Ko-fi unterstützen</a></div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="../assets/icon.png" alt="" width="32" height="32">
+      <p class="footer-tagline">Eine Notizapp, die Ihre Dateien in Ruhe lässt.</p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">Projekt</h2>
+      <ul>
+        <li><a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/iamzifei/inkstone/issues" rel="noopener">Issues</a></li>
+        <li><a href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi</a></li>
+      </ul>
+    </div>
+    <div class="footer-col footer-siblings">
+      <h2 class="footer-h">Ebenfalls von derselben Hand</h2>
+      <ul><li><a href="https://audioswitch.dev" rel="noopener"><span class="sib-name">AudioSwitch</span><span class="sib-note">Audiogeräte aus der Menüleiste umschalten</span></a></li><li><a href="https://getcandela.app" rel="noopener"><span class="sib-name">Candela</span><span class="sib-note">Die Helligkeit externer Displays steuern</span></a></li><li><a href="https://getclipstack.app" rel="noopener"><span class="sib-name">ClipStack</span><span class="sib-note">Zwischenablage-Verlauf, der nicht im Weg steht</span></a></li></ul>
+    </div>
+  </div>
+  <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><span class="lang-current" aria-current="true">Deutsch</span><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+  <p class="colophon">Gesetzt in Source Serif 4 und Source Han Serif. Als statische Dateien gebaut, von GitHub Pages ausgeliefert, ohne jede Analytik.</p>
+</footer>
+<script src="../assets/site.js?v=aa4b4a1b" defer></script>
+</body>
+</html>

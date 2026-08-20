@@ -75,6 +75,18 @@ hidden `.inkstone/` folder you can gitignore. This is also why rename rewrites
 and Yams only, so parsing and indexing are unit-testable without a simulator, and
 the same engine could back a CLI or a share extension later.
 
+## Website
+
+`inkslab.app` — source in [`site/`](site), built by `python3 site/build.py` into
+`site/_site` and published to GitHub Pages by `.github/workflows/site.yml`. Eight
+languages; the page structure lives in the generator and only the copy is
+translated, so a missing key fails the build instead of dropping a section.
+
+The hero recording and the screenshots are reproducible: `scripts/record-demo.sh`
+drives a Debug build against `assets/demo-vault`, and `scripts/encode-demo.sh`
+cuts it. Read the comment at the top of each — the constraints they work around
+are not guessable.
+
 ## Building
 
 ```bash

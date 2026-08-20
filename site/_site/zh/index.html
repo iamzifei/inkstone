@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-Hans" data-lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkstone墨砚 —— 一个把笔记留成文件的macOS / iOS应用</title>
+<meta name="description" content="纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。">
+<meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://inkslab.app/zh/">
+<link rel="alternate" hreflang="de" href="https://inkslab.app/de/">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/">
+<link rel="alternate" hreflang="es" href="https://inkslab.app/es/">
+<link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/">
+<link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/">
+<link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Inkstone">
+<meta property="og:title" content="Inkstone墨砚 —— 一个把笔记留成文件的macOS / iOS应用">
+<meta property="og:description" content="纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。">
+<meta property="og:url" content="https://inkslab.app/zh/">
+<meta property="og:image" content="https://inkslab.app/assets/og-card-zh.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inkstone墨砚 —— 一个把笔记留成文件的macOS / iOS应用">
+<meta name="twitter:description" content="纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。">
+<meta name="twitter:image" content="https://inkslab.app/assets/og-card-zh.png">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+SC:wght@300;400;600&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=8d346d93">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26, iOS 26","url":"https://inkslab.app/zh/","description":"纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。","inLanguage":"zh-Hans","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James Gong","url":"https://github.com/iamzifei"}}</script>
+
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="../">
+      <img src="../assets/icon.png" alt="" width="28" height="28">
+      <span class="wordmark-name">Inkstone</span>
+      <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
+    </a>
+    <nav class="nav-links" aria-label="章节">
+      <a href="#features">功能</a>
+      <a href="#typography">排版</a>
+      <a href="#specs">规格</a>
+      <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
+      <details class="lang-menu">
+        <summary aria-label="Language">简体中文</summary>
+        <nav class="lang-menu-list" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><span class="lang-current" aria-current="true">简体中文</span><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+      </details>
+      <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">看源码</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main">
+<section class="hero">
+  <p class="eyebrow">macOS 26 · iOS 26 · 原生<span class="ac"></span>SwiftUI</p>
+  <h1 class="hero-title">笔记本来就是文件，它就该一直是文件。</h1>
+  <p class="hero-lede">Inkstone<span class="ac"></span>直接读写你指定文件夹里的<span class="ac"></span>Markdown。它能打开你现有的库， 不会写下任何别的编辑器打不开的东西，自己的状态则放在一个隐藏文件夹里， 你随时可以删掉。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">看源码</a>
+    <a class="btn btn-quiet" href="#features">看它能做什么</a>
+  </div>
+  <p class="hero-note">免费 · Apple<span class="ac"></span>芯片 · English · 简体中文 · 繁體中文</p>
+  <figure class="film">
+    <div class="film-mat">
+      <video class="film-frame" poster="../assets/video/poster.webp" autoplay muted loop playsinline
+             preload="metadata" aria-label="Inkstone在macOS上的屏幕录制：打开一个库、输入一行中英混排的文字、 点开一个双链、再打开关系图谱。">
+        <source src="../assets/video/hero.webm" type="video/webm">
+        <source src="../assets/video/hero.mp4" type="video/mp4">
+      </video>
+    </div>
+    <figcaption>录于<span class="ac"></span>macOS 26。除了段落之间的淡入淡出，没有别的剪辑。</figcaption>
+  </figure>
+</section>
+<section class="creed" aria-labelledby="creed-h">
+  <div class="rule-head">
+    <h2 id="creed-h">三个决定，其余一切都是它们的结果</h2>
+    <p class="rule-sub">它们是承重的。这个应用为什么这样表现，答案都在这里。</p>
+  </div>
+  <div class="creed-cols"><div class="creed-col reveal"><h3>文件才是事实</h3><p>没有数据库，没有导入步骤，没有私有格式。Obsidian<span class="ac"></span>建的库在这里能打开， 这里建的库在那边也能打开。就算<span class="ac"></span>Inkstone<span class="ac"></span>明天消失，你手上仍然是一个装着<span class="ac"></span>Markdown<span class="ac"></span>的文件夹。</p></div><div class="creed-col reveal"><h3>断掉的链接是永久的</h3><p>既然没有数据库可以事后修，重命名一篇笔记时，指向它的每一处双链都会在同一个动作里被改写，覆盖整个库。这是上一条的直接后果，不是外挂上去的功能。</p></div><div class="creed-col reveal"><h3>引擎不知道屏幕的存在</h3><p>解析、索引、搜索和图谱都住在一个完全不<span class="ac"></span>import<span class="ac"></span>任何<span class="ac"></span>UI<span class="ac"></span>框架的包里。 所以它们由真正的测试覆盖，而不是靠模拟器；也所以同一套引擎日后可以拿去撑起一个命令行工具。</p></div></div>
+</section>
+<section class="features" id="features" aria-labelledby="features-h">
+  <div class="rule-head">
+    <h2 id="features-h">里面有什么</h2>
+    <p class="rule-sub">下面每一条都已经实现并在跑，不是路线图。</p>
+  </div>
+  <article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">编辑</p>
+    <h3>所见即所得，而不是左右分栏</h3>
+    <p>标题、粗体、引用、callout、待办、表格、代码块都随打随渲染， 只有光标所在的那一行会露出语法。阅读模式是独立的只读视图， 想看没有脚手架的成品时再切过去。正文字体、代码字体和各自的字号分开设置。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/live-preview.webp" srcset="../assets/shots/live-preview-640.webp 640w, ../assets/shots/live-preview-960.webp 960w, ../assets/shots/live-preview-1280.webp 1280w, ../assets/shots/live-preview.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Inkstone的编辑器：标题、一段中英混排的正文、待办清单、引用、callout、 对齐的表格和代码块，全部在原位渲染。" loading="eager" fetchpriority="high" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">链接</p>
+    <h3>双链、别名、块引用、反向链接</h3>
+    <p>[[笔记]]、[[笔记<span class="ac"></span>#<span class="ac"></span>标题]]、[[笔记^块]]、![[嵌入]]，以及在<span class="ac"></span>frontmatter<span class="ac"></span>里声明的别名，全部汇进同一个索引。每篇笔记都会显示谁指向它、它指向谁， 以及它的哪些链接还没有落点。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/backlinks.webp" srcset="../assets/shots/backlinks-640.webp 640w, ../assets/shots/backlinks-960.webp 960w, ../assets/shots/backlinks-1280.webp 1280w, ../assets/shots/backlinks.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="一篇笔记，右侧栏列出它的反向链接与出链，下方是一张邻居节点的局部图谱。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">看清形状</p>
+    <h3>两次打开，图谱落在同一个地方</h3>
+    <p>力导向模拟是确定性的，所以同一个库每次都画出同一张图。 你可以记住它的布局，而不是每次打开都重新辨认一遍。局部图谱只看一篇笔记和它的邻居。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/graph.webp" srcset="../assets/shots/graph-640.webp 640w, ../assets/shots/graph-960.webp 960w, ../assets/shots/graph-1280.webp 1280w, ../assets/shots/graph.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="关系图谱视图：笔记是节点，双链是连线，引用越密集的越聚在一起。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">空间化的笔记</p>
+    <h3>白板，用的是开放的<span class="ac"></span>JSON Canvas<span class="ac"></span>格式</h3>
+    <p>卡片、文件和连线摆在一张无限大的纸上，存成<span class="ac"></span>JSON Canvas 1.0—— 和这个格式的其他实现读写的是同一个文件。你的白板和你的笔记一样可以带走。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/canvas.webp" srcset="../assets/shots/canvas-640.webp 640w, ../assets/shots/canvas-960.webp 960w, ../assets/shots/canvas-1280.webp 1280w, ../assets/shots/canvas.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="一张白板：笔记卡片和它们之间的连线，在无限画布上按空间关系摆放。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">找东西</p>
+    <h3>模糊切换器，以及支持运算符的搜索</h3>
+    <p>一个快捷键唤起覆盖全库的模糊切换器。全文搜索认识<span class="ac"></span>tag: 和<span class="ac"></span>path:； 标签写在行内或<span class="ac"></span>frontmatter<span class="ac"></span>里都行，支持多级嵌套，也不挑文种—— #<span class="ac"></span>项目/进行中和 #project/active<span class="ac"></span>建索引的方式完全一样。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/quickswitcher.webp" srcset="../assets/shots/quickswitcher-640.webp 640w, ../assets/shots/quickswitcher-960.webp 960w, ../assets/shots/quickswitcher-1280.webp 1280w, ../assets/shots/quickswitcher.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="快速切换器浮在笔记上方，随着输入逐字过滤整个库。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">两台机器</p>
+    <h3>iCloud<span class="ac"></span>或<span class="ac"></span>GitHub，而且由你决定什么跟着走</h3>
+    <p>走<span class="ac"></span>iCloud<span class="ac"></span>同步，或者把整个库推到一个<span class="ac"></span>GitHub<span class="ac"></span>仓库——冲突会被解决一次， 而不是留下两份副本。按文件类型的开关决定附件和多媒体要不要跟着走， 库自己的 .gitignore<span class="ac"></span>会被尊重。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/sync.webp" srcset="../assets/shots/sync-640.webp 640w, ../assets/shots/sync-960.webp 960w, ../assets/shots/sync.webp 1120w" sizes="(max-width: 900px) 92vw, 620px" width="1120" height="1096" alt="GitHub同步设置：仓库与分支选择器，以及决定同步范围的分文件类型开关。" loading="lazy" decoding="async"></figure>
+</article>
+</section>
+<section class="typo" id="typography" aria-labelledby="typo-h">
+  <div class="rule-head">
+    <h2 id="typo-h">把中文和英文排在同一行里</h2>
+    <p class="rule-sub">难的是汉字句子里嵌一个拉丁词。几乎所有应用都排错，而且是那种看见一次就再也无法忽视的错法。</p>
+  </div>
+  <div class="specimen reveal">
+    <p class="specimen-folio">字样 · Source Serif 4<span class="ac"></span>配思源宋体</p>
+    <h3 class="specimen-h">中英文混排与那四分之一字宽</h3>
+    <p class="specimen-lead">中文是密排的。字与字之间没有空格，所以一行是否匀净，眼睛一看就知道。 往这样一行里丢进一个<span class="ac"></span>typography，两种文字就撞在一起了。</p>
+    <p class="specimen-body">正文里出现<span class="ac"></span>Latin<span class="ac"></span>单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C<span class="ac"></span>的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与<span class="ac"></span>Latin<span class="ac"></span>的交界都由构建时插入的空元素撑开，在支持<span class="ac"></span>text-autospace<span class="ac"></span>的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。</p>
+    <blockquote class="specimen-quote">
+      <p>排版的存在是为了让内容体面。它是仆人，而仆人的举止应当让人看不见。</p>
+      <cite>Robert Bringhurst《字体排印风格要素》</cite>
+    </blockquote>
+  </div>
+  <dl class="spec-notes"><div class="spec-note"><dt>行长</dt><dd>正文一行约<span class="ac"></span>66<span class="ac"></span>个字符，Bringhurst<span class="ac"></span>给出的单栏理想宽度。超过<span class="ac"></span>75， 眼睛就找不回下一行的行首了。</dd></div><div class="spec-note"><dt>同一个字族</dt><dd>拉丁用<span class="ac"></span>Source Serif 4，汉字用思源宋体——而思源宋体的拉丁伴随字体正是 Source Serif。混排的那一行出自同一位设计师的衬线，不是两套字在打架。</dd></div><div class="spec-note"><dt>颜色即语义</dt><dd>只有一种朱砂红——印章压在纸上的那种红——用来标记链接、标签和当前动作。 除此之外没有任何东西是彩色的。</dd></div><div class="spec-note"><dt>动效是标点</dt><dd>元素出现时上移八个像素，此外什么都不动。打开「减弱动态效果」， 这一切一次都不会发生。</dd></div></dl>
+</section>
+<section class="specs" id="specs" aria-labelledby="specs-h">
+  <div class="rule-head">
+    <h2 id="specs-h">规格</h2>
+    <p class="rule-sub">在你下载任何东西之前，值得先知道的部分。</p>
+  </div>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">平台</th><td>macOS 26<span class="ac"></span>与<span class="ac"></span>iOS 26，一套<span class="ac"></span>SwiftUI<span class="ac"></span>代码，Apple<span class="ac"></span>芯片</td></tr><tr><th scope="row">存储</th><td>你自己选的文件夹里的纯<span class="ac"></span>Markdown<span class="ac"></span>文件。没有数据库，不需要导入</td></tr><tr><th scope="row">兼容性</th><td>Obsidian<span class="ac"></span>库原样打开，双向都行。白板是<span class="ac"></span>JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown，另加双链、嵌入、块引用、callout、脚注、数学公式与<span class="ac"></span>Mermaid</td></tr><tr><th scope="row">同步</th><td>iCloud<span class="ac"></span>或<span class="ac"></span>GitHub<span class="ac"></span>仓库，可按文件类型过滤</td></tr><tr><th scope="row">界面语言</th><td>English、简体中文、繁體中文</td></tr><tr><th scope="row">源码</th><td>在<span class="ac"></span>GitHub<span class="ac"></span>上公开。尚未选定许可证。</td></tr><tr><th scope="row">隐私</th><td>不需要账号，没有遥测，不会发起你没要求过的网络请求</td></tr></tbody></table>
+  <div class="closer reveal">
+    <p class="closer-line">它是免费的，它不扣着你的任何东西，而它写下的文件就是你本来就有的那些文件。</p>
+    <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone">看源码</a>
+      <a class="btn btn-quiet" href="https://ko-fi.com/james_ai/tip" rel="noopener">请我喝杯咖啡</a></div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="../assets/icon.png" alt="" width="32" height="32">
+      <p class="footer-tagline">一个不动你文件的笔记应用。</p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">项目</h2>
+      <ul>
+        <li><a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/iamzifei/inkstone/issues" rel="noopener">问题反馈</a></li>
+        <li><a href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi</a></li>
+      </ul>
+    </div>
+    <div class="footer-col footer-siblings">
+      <h2 class="footer-h">同一双手做的其他东西</h2>
+      <ul><li><a href="https://audioswitch.dev" rel="noopener"><span class="sib-name">AudioSwitch</span><span class="sib-note">在菜单栏里切换音频设备</span></a></li><li><a href="https://getcandela.app" rel="noopener"><span class="sib-name">Candela</span><span class="sib-note">控制外接显示器的亮度</span></a></li><li><a href="https://getclipstack.app" rel="noopener"><span class="sib-name">ClipStack</span><span class="sib-note">不碍事的剪贴板历史</span></a></li></ul>
+    </div>
+  </div>
+  <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><span class="lang-current" aria-current="true">简体中文</span><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+  <p class="colophon">正文用Source Serif 4与思源宋体排版。整站是静态文件，由GitHub Pages提供， 没有任何形式的统计代码。</p>
+</footer>
+<script src="../assets/site.js?v=aa4b4a1b" defer></script>
+</body>
+</html>

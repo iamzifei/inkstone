@@ -1,0 +1,77 @@
+{
+  "edges" : [
+    {
+      "fromNode" : "n1",
+      "id" : "e1",
+      "toEnd" : "arrow",
+      "toNode" : "n2"
+    },
+    {
+      "fromNode" : "n2",
+      "id" : "e2",
+      "toEnd" : "arrow",
+      "toNode" : "n3"
+    },
+    {
+      "fromNode" : "n4",
+      "id" : "e3",
+      "toEnd" : "arrow",
+      "toNode" : "n3"
+    },
+    {
+      "fromNode" : "n3",
+      "id" : "e4",
+      "toEnd" : "arrow",
+      "toNode" : "n5"
+    }
+  ],
+  "nodes" : [
+    {
+      "color" : "1",
+      "height" : 140,
+      "id" : "n1",
+      "text" : "# 一个原则\n\n文件才是事实。\n其余都是它的后果。",
+      "type" : "text",
+      "width" : 300,
+      "x" : -460,
+      "y" : -260
+    },
+    {
+      "file" : "Notes/Files as Truth.md",
+      "height" : 180,
+      "id" : "n2",
+      "type" : "file",
+      "width" : 300,
+      "x" : -60,
+      "y" : -280
+    },
+    {
+      "file" : "Typography Notes.md",
+      "height" : 180,
+      "id" : "n3",
+      "type" : "file",
+      "width" : 300,
+      "x" : -60,
+      "y" : -40
+    },
+    {
+      "color" : "4",
+      "height" : 120,
+      "id" : "n4",
+      "text" : "重命名 → 全库改写\n\n没有第二真相源。",
+      "type" : "text",
+      "width" : 300,
+      "x" : -460,
+      "y" : -40
+    },
+    {
+      "file" : "The Measure.md",
+      "height" : 180,
+      "id" : "n5",
+      "type" : "file",
+      "width" : 300,
+      "x" : 340,
+      "y" : -160
+    }
+  ]
+}

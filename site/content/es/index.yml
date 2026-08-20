@@ -1,0 +1,113 @@
+title: Inkstone — una app de notas en Markdown para macOS e iOS
+description: Archivos Markdown sin más, en tu propio disco. Wikienlaces, retroenlaces, un grafo, un lienzo y notas diarias, en una app nativa para macOS 26 e iOS 26. Sin base de datos, sin Electron, sin cuenta.
+nav:
+  label: Secciones
+  skip: Saltar al contenido
+  features: Funciones
+  typography: Tipografía
+  specs: Especificaciones
+cta:
+  download: Descargar para macOS
+  source: Leer el código
+  tour: Ver qué hace
+  kofi: Apoyar en Ko-fi
+hero:
+  eyebrow: macOS 26 · iOS 26 · SwiftUI nativo
+  title: Tus notas son archivos. Deberían seguir siéndolo.
+  lede: Inkstone trabaja directamente sobre Markdown corriente, en una carpeta que eliges tú. Abre la bóveda que ya tienes, no escribe nada que no puedas abrir en cualquier otro editor, y guarda su propio estado en una carpeta oculta que eres libre de borrar.
+  note: Gratis · Apple silicon · English · 简体中文 · 繁體中文
+  video_alt: 'Una grabación de pantalla de Inkstone en macOS: se abre una bóveda, se escribe una línea que mezcla chino y alfabeto latino, se sigue un wikienlace y se abre el grafo.'
+  video_caption: Grabado en macOS 26. Sin edición, salvo las transiciones entre secciones.
+creed:
+  title: Tres decisiones de las que se sigue todo lo demás
+  sub: Son estructurales, y explican por qué la app se comporta como se comporta.
+  columns:
+  - title: Los archivos son la verdad
+    body: No hay base de datos, ni paso de importación, ni formato propietario. Una bóveda creada por Obsidian se abre aquí; una creada aquí se abre allí. Si Inkstone desapareciera mañana, seguirías teniendo una carpeta llena de Markdown.
+  - title: Un enlace roto lo está para siempre
+    body: Como no hay base de datos que lo repare, renombrar una nota reescribe en el mismo gesto cada wikienlace que apuntaba a ella, en toda la bóveda. Es la consecuencia directa de la decisión anterior, no una función añadida después.
+  - title: El motor no sabe que existen las pantallas
+    body: El análisis, el índice, la búsqueda y el grafo viven en un paquete que no importa ningún framework de interfaz. Por eso los cubren pruebas de verdad y no un simulador, y por eso el mismo motor podría sostener más adelante una herramienta de línea de comandos.
+features:
+  title: Qué trae dentro
+  sub: Todo lo que sigue está hecho y funcionando. No es una hoja de ruta.
+  items:
+    live_preview:
+      kicker: Escribir
+      title: Vista viva, no una pantalla partida
+      body: Títulos, negritas, citas, avisos, casillas, tablas y código se componen sobre la marcha mientras escribes; la sintaxis solo se asoma en la línea donde está el cursor. El modo lectura es una vista aparte, de solo lectura. La letra del texto, la del código y sus cuerpos se ajustan por separado.
+      alt: 'El editor de Inkstone en vista viva: un título, un párrafo que mezcla chino y latín, una lista de tareas, una cita, un aviso, una tabla alineada y un bloque de código.'
+    links:
+      kicker: Enlazar
+      title: Wikienlaces, alias, bloques, retroenlaces
+      body: '[[Nota]], [[Nota#Título]], [[Nota^bloque]], ![[Incrustaciones]] y los alias declarados en el frontmatter se resuelven todos en un mismo índice. Cada nota muestra qué apunta a ella, a qué apunta, y cuáles de sus enlaces todavía no tienen destino.'
+      alt: Una nota con sus retroenlaces y enlaces salientes en la barra lateral derecha, y debajo un pequeño grafo local de sus vecinas.
+    graph:
+      kicker: Ver la forma
+      title: Un grafo que cae dos veces en el mismo sitio
+      body: La simulación de fuerzas es determinista, así que una misma bóveda dibuja cada vez la misma imagen. Puedes aprenderte su disposición en lugar de releerla en cada apertura. El grafo local muestra una nota y sus vecinas.
+      alt: 'La vista de grafo: las notas como nodos, unidas por sus wikienlaces y agrupadas según la densidad de sus referencias.'
+    canvas:
+      kicker: Notas en el espacio
+      title: Lienzo, en el formato abierto JSON Canvas
+      body: 'Tarjetas, archivos y conexiones sobre una hoja infinita, guardados como JSON Canvas 1.0: el mismo archivo que leen y escriben las demás implementaciones del formato. Tus lienzos son tan portátiles como tus notas.'
+      alt: Un lienzo con tarjetas de notas y sus conexiones dispuestas espacialmente sobre una hoja infinita.
+    search:
+      kicker: Encontrar
+      title: Selector difuso, y búsqueda con operadores
+      body: 'Una tecla abre un selector difuso sobre todas las notas. La búsqueda de texto completo entiende tag: y path:, y las etiquetas funcionan en el cuerpo o en el frontmatter, anidadas, en cualquier escritura: #项目/进行中 se indexa exactamente igual que #project/active.'
+      alt: El selector rápido abierto sobre una nota, filtrando la bóveda carácter a carácter.
+    sync:
+      kicker: Dos máquinas
+      title: iCloud o GitHub, y tú decides qué viaja
+      body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub: los conflictos se resuelven una vez, en lugar de quedarse como dos copias. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
+      alt: 'Los ajustes de sincronización con GitHub: selectores de repositorio y rama, e interruptores por tipo de archivo.'
+typography:
+  title: Componer chino y latín en un mismo renglón
+  sub: El caso difícil es una palabra latina dentro de una frase en han. Casi todas las apps lo hacen mal, de una manera que ya no puedes pasar por alto una vez que la has visto.
+  folio: Espécimen · Source Serif 4 con Source Han Serif
+  specimen_title: 中英文混排 y el cuarto de cuadratín
+  specimen_lead: El chino se compone apretado. Al no haber espacios entre palabras, lo que lee el ojo es la uniformidad del renglón. Deja caer ahí typography y las dos escrituras chocan.
+  specimen_body: 正文里出现Latin单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与Latin的交界都由构建时插入的空元素撑开，在支持text-autospace的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。
+  specimen_quote: La tipografía existe para honrar al contenido. Es una sirvienta, y sus modales deberían ser invisibles.
+  specimen_cite: Robert Bringhurst, The Elements of Typographic Style
+  notes:
+  - term: La medida
+    def: El texto corrido se mantiene en unos 66 caracteres por renglón, el ancho que Bringhurst da como ideal a una columna. Pasados los 75, el ojo pierde el regreso al margen.
+  - term: Una sola familia
+    def: El latín es Source Serif 4; el han, Source Han Serif, cuyo acompañante latino es justamente Source Serif. El renglón mezclado es la romana de un solo diseñador, no la pelea de dos.
+  - term: El color significa algo
+    def: Un único rojo cinabrio — el de un sello prensado contra el papel — marca los enlaces, las etiquetas y la acción en curso. Nada más lleva color.
+  - term: El movimiento es puntuación
+    def: Los elementos suben ocho píxeles al llegar y nada más se mueve. Con «Reducir movimiento» activado, ni siquiera eso ocurre.
+specs:
+  title: Especificaciones
+  sub: Lo que conviene saber antes de descargar nada.
+  rows:
+  - k: Plataformas
+    v: macOS 26 e iOS 26, una sola base de código SwiftUI, Apple silicon
+  - k: Almacenamiento
+    v: Archivos Markdown corrientes en una carpeta que eliges tú. Sin base de datos y sin importar nada
+  - k: Compatibilidad
+    v: Las bóvedas de Obsidian se abren tal cual, en ambos sentidos. El lienzo es JSON Canvas 1.0
+  - k: Markdown
+    v: GitHub Flavored Markdown, más wikienlaces, incrustaciones, referencias de bloque, avisos, notas al pie, matemáticas y Mermaid
+  - k: Sincronización
+    v: iCloud o un repositorio de GitHub, con filtros por tipo de archivo
+  - k: Idiomas de la interfaz
+    v: English, 简体中文, 繁體中文
+  - k: Código
+    v: Público en GitHub. Todavía no se ha elegido una licencia.
+  - k: Privacidad
+    v: Sin cuenta, sin telemetría, sin ninguna llamada de red que no hayas pedido
+  closer: Es gratis, no te retiene nada, y los archivos que escribe son los archivos que ya tenías.
+siblings:
+  audioswitch: Cambiar de dispositivo de audio desde la barra de menús
+  candela: Controlar el brillo de las pantallas externas
+  clipstack: Un historial del portapapeles que no estorba
+footer:
+  tagline: Una app de notas que deja tus archivos en paz.
+  project: Proyecto
+  issues: Incidencias
+  also: También de la misma mano
+  colophon: Compuesto en Source Serif 4 y Source Han Serif. Construido como archivos estáticos, servido desde GitHub Pages, y sin analítica de ningún tipo.
