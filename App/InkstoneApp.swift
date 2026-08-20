@@ -5,6 +5,10 @@ import InkstoneCore
 struct InkstoneApp: App {
     @State private var workspace = Workspace()
 
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
+
     #if os(macOS)
     /// Held here rather than created in the commands block, because Sparkle's
     /// scheduled-check timer lives as long as this object does. Rebuilding it on
@@ -13,6 +17,24 @@ struct InkstoneApp: App {
     #endif
 
     init() {
+        #if os(iOS) && DEBUG
+        // On-device check of the background wiring. Prints what the scheduler
+        // actually accepted, which a successful build says nothing about.
+        if ProcessInfo.processInfo.environment["INKSTONE_BG_CHECK"] != nil {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                await BackgroundSync.diagnose()
+            }
+        }
+        #endif
+
+        #if os(iOS)
+        // Must happen before the app finishes launching, and exactly once per
+        // identifier — a second registration of the same identifier terminates
+        // the app. A view is too late and too often.
+        BackgroundSync.register(workspace: workspace)
+        #endif
+
         // Debug hooks are macOS-only: they measure through AppKit text metrics
         // and write images with AppKit imaging.
         #if DEBUG && os(macOS)
@@ -497,6 +519,26 @@ struct InkstoneApp: App {
                 .environment(workspace)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
+                #if os(iOS)
+                .onChange(of: scenePhase) { _, phase in
+                    switch phase {
+                    case .background:
+                        // Two different things, both needed. Queue the next
+                        // unattended run, and keep this process alive long
+                        // enough to finish a sync that is already going.
+                        BackgroundSync.schedule(workspace: workspace)
+                        Task { await BackgroundSync.finishInFlightWork(workspace: workspace) }
+                    case .active:
+                        // Coming back to the foreground: the in-app timer takes
+                        // over, so pending background requests are just wake-ups
+                        // that would find nothing to do.
+                        BackgroundSync.cancelAll()
+                        workspace.restartAutoSync()
+                    default:
+                        break
+                    }
+                }
+                #endif
                 .onAppear {
                     openLastVault()
                     // A token saved before it could travel; move it onto iCloud
@@ -618,9 +660,7 @@ struct InkstoneApp: App {
         }
         #endif
 
-        guard workspace.vault == nil,
-              let latest = workspace.registry.vaults.max(by: { $0.lastOpened < $1.lastOpened }) else { return }
-        workspace.open(latest)
+        workspace.openMostRecentVaultIfNeeded()
     }
 
     #if DEBUG

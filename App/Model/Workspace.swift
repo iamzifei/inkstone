@@ -198,6 +198,20 @@ final class Workspace {
         }
     }
 
+    /// Reopens the most recently used vault, if none is open.
+    ///
+    /// Lives here rather than in the App struct because a background launch
+    /// needs it too. `InkstoneApp` opened the last vault from `.onAppear`, which
+    /// only fires when a scene is actually rendered — and iOS waking the app for
+    /// a background task renders nothing. Sync would then find no vault, do
+    /// nothing, and report success.
+    func openMostRecentVaultIfNeeded() {
+        guard vault == nil,
+              let latest = registry.vaults.max(by: { $0.lastOpened < $1.lastOpened })
+        else { return }
+        open(latest)
+    }
+
     /// Syncs only if it is configured and switched on, and stays quiet
     /// otherwise. Used by the automatic paths, which must not surface a "not
     /// configured" error to someone who never asked for GitHub sync.
