@@ -206,6 +206,63 @@ reads from there so the two cannot drift.
 1320×2868 image. It cannot be checked without a record to upload against, so the
 screenshot step runs through asc's own `--dry-run` first.
 
+## iOS submission — where it actually stands
+
+App record `6803462651`, version 0.1.1, build 3 uploaded and attached.
+
+| Done | |
+| --- | --- |
+| App record | `asc apps create` (2FA, done by James) |
+| Name | **Inkstone Notes** — "Inkstone" is taken by another account, confirmed by a 409 `DUPLICATE.DIFFERENT_ACCOUNT`. asc's `--auto-rename` had silently produced "Inkstone - inkstone". |
+| Build | 0.1.1 build 3, uploaded and attached |
+| Screenshots | 6 iPhone (`APP_IPHONE_67`) + 6 iPad (`APP_IPAD_PRO_3GEN_129`), all COMPLETE |
+| Listing copy | description, keywords, promotional text, three URLs |
+| Categories | Productivity / Utilities |
+| Age rating | 16 frequency attributes NONE, 11 booleans false |
+| Content rights | no third-party content |
+| Availability | 175 territories, plus new ones automatically |
+| Pricing | free |
+| Copyright | 2026 Orris Technology Pty Ltd |
+| Review contact | name, email, phone, notes; `demoAccountRequired` set false |
+
+**Blocked on one thing: App Privacy.** `asc review items-add` refuses the version
+with "You must have published answers to your app's data usages", and the API
+cannot supply them — all four endpoints 404 with "does not exist":
+
+    /v1/appDataUsages · /v1/appDataUsageCategories
+    /v1/appDataUsageDataProtections · /v1/apps/{id}/appDataUsagesPublishState
+
+This matches fastlane's own documentation for the same task: *"Because the
+underlying functionality does not utilize the official App Store Connect API,
+App Store Connect API Keys are not supported for this specific task."* It is the
+same class of gap as app creation — Apple ID auth only.
+
+Two ways through, both needing James once:
+
+1. `asc web auth login --apple-id iamzifei@gmail.com`, then
+   `asc web privacy pull/apply/publish` (experimental, but scripted)
+2. App Store Connect → App Privacy → Get Started → **No, we do not collect data
+   from this app** → Publish. Four clicks, because the app genuinely collects
+   nothing.
+
+After either, submission is `asc review items-add --submission <id> --item-type
+appStoreVersions --item-id <version>` then `asc review submissions-submit --id
+<id> --confirm`. Submission `15181670-2a08-48f8-9ff7-03ee40dde74a` is already
+created and waiting.
+
+## Two upload failures worth remembering
+
+The first upload was **rejected**, with two errors no local check had caught:
+
+    90474  no UISupportedInterfaceOrientations. Not optional once the app ships
+           for iPad — multitasking requires all four.
+    90717  the 1024 marketing icon contained an alpha channel.
+
+Both are now asserted in `Tools/package-ios.sh`. The icon check reads the
+asset-catalog **source**, not the built bundle: the marketing icon is compiled
+into `Assets.car` and is not a loose file, so a check against
+`$APP/AppIcon*.png` inspects the small icons and passes every time.
+
 ## HUMAN QUEUE
 
 1. 🔴 **One command, one 2FA code.** Either works:
