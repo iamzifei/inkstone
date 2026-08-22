@@ -164,7 +164,7 @@ struct RootView: View {
 
             // Only present once GitHub sync is switched on: a sync button that
             // can never do anything is worse than no button.
-            if workspace.settings.data.gitHubSyncEnabled {
+            if workspace.syncBinding.isEnabled {
                 Button {
                     Task { await workspace.sync() }
                 } label: {

@@ -429,6 +429,20 @@ public struct SyncEngine: Sendable {
 
             result[relative] = gitBlobSHA(data)
         }
+
+        // `.gitignore` again, by hand, because `.skipsHiddenFiles` above means
+        // the enumerator never offered it. Root only — that is the only one
+        // `GitIgnore.load` reads, so syncing nested ones would ship rules this
+        // engine does not itself apply.
+        //
+        // A vault whose `.gitignore` names `.gitignore` is telling us not to
+        // share it, and that is respected rather than overridden.
+        let ignoreFile = vaultRoot.appending(path: SyncFilePolicy.ignoreFileName)
+        if !ignore.ignores(SyncFilePolicy.ignoreFileName),
+           let data = try? Data(contentsOf: ignoreFile) {
+            result[SyncFilePolicy.ignoreFileName] = gitBlobSHA(data)
+        }
+
         return (result, excluded)
     }
 

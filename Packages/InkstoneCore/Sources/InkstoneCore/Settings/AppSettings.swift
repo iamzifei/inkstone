@@ -46,6 +46,29 @@ public enum EditorMode: String, Codable, CaseIterable, Sendable, Identifiable {
 ///
 /// A single serialised value keeps migration simple and makes it trivial to
 /// export/import settings or sync them alongside the vault later.
+/// Which repository a single vault syncs with.
+///
+/// Deliberately not `SyncFilePolicy` or the interval: those are preferences and
+/// sharing them across vaults is harmless. A *repository* is an identity. The
+/// three fields here are the ones that decide which bytes go where.
+public struct VaultSyncBinding: Codable, Hashable, Sendable {
+    /// "owner/repository".
+    public var repository: String
+    public var branch: String
+    /// Whether this vault syncs at all. A vault with no binding does not sync,
+    /// rather than borrowing another vault's.
+    public var isEnabled: Bool
+
+    public init(repository: String = "", branch: String = "main", isEnabled: Bool = false) {
+        self.repository = repository
+        self.branch = branch
+        self.isEnabled = isEnabled
+    }
+
+    /// Whether this binding names somewhere to sync to.
+    public var isConfigured: Bool { !repository.isEmpty }
+}
+
 public struct SettingsData: Codable, Hashable, Sendable {
     public var language: AppLanguage = .system
     public var appearance: AppearanceMode = .system
@@ -91,9 +114,29 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// is what you want on a machine short of disk space.
     public var iCloudSyncEnabled = true
 
-    /// Whether GitHub sync is active. Off by default — it needs a repository and
-    /// a token before it can do anything, so it stays out of the way until asked
-    /// for.
+    /// Which repository each vault syncs with, keyed by vault id.
+    ///
+    /// **This used to be one global repository shared by every vault, and that
+    /// was the bug.** Opening a second vault made it inherit the first one's
+    /// repository and immediately start making that repository look like itself.
+    /// It cost content twice: `Samples/Inkstone Demo/` was deleted out of
+    /// this repository on 2026-08-18 by a vault that did not contain it, and
+    /// a phone vault pointed at `a private notes repository` spent four days fighting
+    /// the Mac copy of that vault — 1409 commits, conflict copies every hour,
+    /// renamed notes reappearing under their old names.
+    ///
+    /// A binding is per vault and per device. Vault ids are generated where the
+    /// vault is added, so two devices holding the same folder use different
+    /// keys; that is fine, because this map never leaves the device it belongs
+    /// to. What crosses devices is `GitHubSyncConfiguration`, and it may no
+    /// longer introduce a repository to a vault that has none.
+    public var vaultSync: [String: VaultSyncBinding] = [:]
+
+    /// Whether GitHub sync is active.
+    ///
+    /// - Warning: **Legacy.** Read once, by the migration onto `vaultSync`, and
+    ///   never again. Kept because removing a key would silently discard it
+    ///   before the migration has run. Use `Workspace.syncBinding`.
     public var gitHubSyncEnabled = false
 
     /// Sync with GitHub on its own, rather than only when asked.
@@ -105,8 +148,22 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var syncPolicy = SyncFilePolicy()
     /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
     /// here — this struct is a plain JSON blob in UserDefaults.
+    ///
+    /// - Warning: **Legacy**, as `gitHubSyncEnabled` above. Use
+    ///   `Workspace.syncBinding`.
     public var gitHubRepository = ""
+    /// - Warning: **Legacy.** Use `Workspace.syncBinding`.
     public var gitHubBranch = "main"
+
+    /// Vault ids the user has explicitly allowed to sync despite being a git
+    /// working copy. Empty by default: the guard protects, this respects.
+    public var syncOverridesGit: Set<String> = []
+
+    /// Retained so settings written by the version that had it still decode
+    /// their other keys. The migration is now per vault and decided by that
+    /// vault's own `.inkstone/sync.json`, so there is no single moment it is
+    /// "done" and nothing reads this.
+    public var didMigrateSyncBindings = false
     /// When this device last changed the GitHub setup, so the copy shared
     /// between devices can tell which side is newer. Bookkeeping, not a setting.
     public var gitHubConfigurationUpdatedAt: Date?
@@ -173,6 +230,14 @@ public struct SettingsData: Codable, Hashable, Sendable {
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
         gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
         gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)
+        // Every stored property needs a line here. The synthesised `CodingKeys`
+        // picks new properties up automatically and this hand-written decoder
+        // does not — a property added above and forgotten below silently decodes
+        // as its default forever, which for these three would mean every vault
+        // losing the repository it is bound to on the next launch.
+        vaultSync = value(.vaultSync, defaults.vaultSync)
+        syncOverridesGit = value(.syncOverridesGit, defaults.syncOverridesGit)
+        didMigrateSyncBindings = value(.didMigrateSyncBindings, defaults.didMigrateSyncBindings)
         gitHubConfigurationUpdatedAt = value(.gitHubConfigurationUpdatedAt, defaults.gitHubConfigurationUpdatedAt)
 
         graphShowTags = value(.graphShowTags, defaults.graphShowTags)

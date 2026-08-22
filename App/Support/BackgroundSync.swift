@@ -185,7 +185,8 @@ enum BackgroundSync {
     /// foreground and again after each background run completes — a request is
     /// consumed when it fires, so nothing here is periodic by itself.
     static func schedule(workspace: Workspace) {
-        guard workspace.settings.data.gitHubSyncEnabled,
+        guard workspace.syncBinding.isEnabled,
+              !workspace.isBlockedByGitWorkingCopy,
               workspace.settings.data.gitHubAutoSync else {
             // Settings may have been turned off since the last request was
             // queued. Leaving it pending would wake the app to do nothing.
@@ -463,8 +464,9 @@ enum BackgroundSync {
     /// looked up.
     private static func skipReason(_ workspace: Workspace) -> String {
         var missing: [String] = []
-        if !workspace.settings.data.gitHubSyncEnabled { missing.append("sync off") }
-        if workspace.settings.data.gitHubRepository.isEmpty { missing.append("no repo") }
+        if !workspace.syncBinding.isEnabled { missing.append("sync off for this vault") }
+        if !workspace.syncBinding.isConfigured { missing.append("no repo bound to this vault") }
+        if workspace.isBlockedByGitWorkingCopy { missing.append("git working copy") }
         if !SyncCredentials.hasToken { missing.append("no token") }
         if workspace.root == nil { missing.append("no vault") }
         if workspace.isSyncing { missing.append("already syncing") }
@@ -546,8 +548,9 @@ enum BackgroundSync {
         } else {
             // Every term of `canSync`, so a false answer names its own cause
             // instead of leaving three candidates and a guess.
-            emit("[bg]   not syncing: gitHubSyncEnabled=\(workspaceRef?.settings.data.gitHubSyncEnabled == true)"
-                         + " repo=\(workspaceRef?.settings.data.gitHubRepository.isEmpty == false)"
+            emit("[bg]   not syncing: enabled=\(workspaceRef?.syncBinding.isEnabled == true)"
+                         + " repo=\(workspaceRef?.syncBinding.repository ?? "none")"
+                         + " git=\(workspaceRef?.isBlockedByGitWorkingCopy == true)"
                          + " token=\(SyncCredentials.hasToken)"
                          + " root=\(workspaceRef?.root != nil)"
                          + " isSyncing=\(workspaceRef?.isSyncing == true)")

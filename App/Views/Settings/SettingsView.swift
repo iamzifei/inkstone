@@ -340,7 +340,7 @@ private struct SyncSettings: View {
     }
 
     private func loadBranches() async {
-        let repository = workspace.settings.data.gitHubRepository
+        let repository = workspace.syncBinding.repository
         guard !repository.isEmpty, let client = workspace.gitHubClient() else { return }
         branches = (try? await client.listBranches()) ?? []
     }
@@ -387,7 +387,7 @@ private struct SyncSettings: View {
             )))
             list.append(SyncAction(button: AnyView(
                 Button(isVerifying ? "Checking…" : "Verify") { Task { await verify() } }
-                    .disabled(off || isVerifying || workspace.settings.data.gitHubRepository.isEmpty)
+                    .disabled(off || isVerifying || !workspace.syncBinding.isConfigured)
             )))
         }
         list[list.count - 1].isLast = true
@@ -397,7 +397,7 @@ private struct SyncSettings: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(off || workspace.isSyncing || workspace.root == nil
-                      || workspace.settings.data.gitHubRepository.isEmpty)
+                      || !workspace.syncBinding.isConfigured)
         )))
         if SyncCredentials.hasToken {
             list.append(SyncAction(button: AnyView(
@@ -417,10 +417,36 @@ private struct SyncSettings: View {
     /// The chosen repository is always offered, even if listing did not return
     /// it — otherwise opening the picker would silently change the setting.
     private var repositoryOptions: [String] {
-        let chosen = workspace.settings.data.gitHubRepository
+        let chosen = workspace.syncBinding.repository
         var names = repositories.map(\.fullName)
         if !chosen.isEmpty, !names.contains(chosen) { names.insert(chosen, at: 0) }
         return names
+    }
+
+    /// SwiftUI bindings onto the open vault's own sync binding.
+    ///
+    /// The pane used to edit `settings.data.gitHubRepository` directly — one
+    /// global field every vault shared. Editing it here while a different vault
+    /// was open is how an unrelated folder ended up bound to someone's
+    /// repository.
+    private var repositoryBinding: Binding<String> {
+        Binding(get: { workspace.syncBinding.repository },
+                set: { workspace.syncBinding.repository = $0 })
+    }
+
+    private var branchBinding: Binding<String> {
+        Binding(get: { workspace.syncBinding.branch },
+                set: { workspace.syncBinding.branch = $0 })
+    }
+
+    private var syncEnabledBinding: Binding<Bool> {
+        Binding(get: { workspace.syncBinding.isEnabled },
+                set: { workspace.syncBinding.isEnabled = $0 })
+    }
+
+    private var gitOverrideBinding: Binding<Bool> {
+        Binding(get: { workspace.overridesGitWorkingCopyGuard },
+                set: { workspace.overridesGitWorkingCopyGuard = $0 })
     }
 
     private func runFirstSync(_ direction: FirstSyncDirection) {
@@ -451,9 +477,9 @@ private struct SyncSettings: View {
     private var sharedFingerprint: String {
         let data = workspace.settings.data
         return [
-            data.gitHubRepository,
-            data.gitHubBranch,
-            String(data.gitHubSyncEnabled),
+            workspace.syncBinding.repository,
+            workspace.syncBinding.branch,
+            String(workspace.syncBinding.isEnabled),
             String(data.gitHubAutoSync),
             String(data.gitHubSyncIntervalMinutes),
         ].joined(separator: "\u{1}")
@@ -462,7 +488,7 @@ private struct SyncSettings: View {
     /// Same rule as the repositories: whatever is configured stays selectable,
     /// so opening the picker cannot quietly move the branch.
     private var branchOptions: [String] {
-        let chosen = workspace.settings.data.gitHubBranch
+        let chosen = workspace.syncBinding.branch
         var names = branches
         if !chosen.isEmpty, !names.contains(chosen) { names.insert(chosen, at: 0) }
         return names
@@ -584,10 +610,54 @@ private struct SyncSettings: View {
             }
             Section {
                 @Bindable var settings = workspace.settings
-                Toggle("Sync this vault with GitHub", isOn: $settings.data.gitHubSyncEnabled)
-                    .onChange(of: settings.data.gitHubSyncEnabled) { workspace.restartAutoSync() }
+                // Said before the toggle, because it explains why the toggle
+                // is off and cannot be turned on. Git is not a lesser sync to
+                // be worked around — it is the better one for this folder, and
+                // Inkstone's would overwrite the merges it produces.
+                if workspace.vaultIsGitWorkingCopy {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(
+                            "This vault is a git working copy.",
+                            systemImage: "arrow.triangle.branch"
+                        )
+                        .font(.callout.weight(.medium))
+                        Text("Git already syncs this folder, and it merges — Inkstone's sync overwrites file by file and answers a conflict with a second copy of the file. Running both leaves the two undoing each other. Use git here, and let other devices sync the same repository through Inkstone.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Toggle("Sync it anyway", isOn: gitOverrideBinding)
+                            .font(.footnote)
+                            .onChange(of: workspace.overridesGitWorkingCopyGuard) {
+                                workspace.restartAutoSync()
+                            }
+                    }
+                }
 
-                let off = !settings.data.gitHubSyncEnabled
+                // Offered, never applied. Adopting this is what binds *this*
+                // vault to that repository, and it is the user's call because
+                // only they know whether this folder is a copy of that vault.
+                if let shared = workspace.pendingSharedConfiguration {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(
+                            "Another device syncs \(shared.repository)",
+                            systemImage: "iphone.and.arrow.forward"
+                        )
+                        .font(.callout.weight(.medium))
+                        Text("Use it for this vault only if this folder holds the same notes. Pointing two different folders at one repository makes them overwrite each other.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Button("Use this repository") { workspace.adoptSharedConfiguration() }
+                            Button("Ignore") { workspace.pendingSharedConfiguration = nil }
+                        }
+                        .font(.footnote)
+                    }
+                }
+
+                Toggle("Sync this vault with GitHub", isOn: syncEnabledBinding)
+                    .disabled(workspace.root == nil || workspace.isBlockedByGitWorkingCopy)
+                    .onChange(of: workspace.syncBinding.isEnabled) { workspace.restartAutoSync() }
+
+                let off = !workspace.syncBinding.isEnabled || workspace.isBlockedByGitWorkingCopy
 
                 SecureField("Personal access token", text: $token, prompt: Text(
                     SyncCredentials.hasToken ? "Saved in Keychain" : "ghp_…"
@@ -599,21 +669,21 @@ private struct SyncSettings: View {
                 // when there is not. Both are kept: a fine-grained token without
                 // metadata permission cannot list anything and still syncs.
                 if repositories.isEmpty {
-                    TextField("Repository", text: $settings.data.gitHubRepository, prompt: Text("owner/repository"))
+                    TextField("Repository", text: repositoryBinding, prompt: Text("owner/repository"))
                         .disabled(off)
                 } else {
-                    Picker("Repository", selection: $settings.data.gitHubRepository) {
+                    Picker("Repository", selection: repositoryBinding) {
                         ForEach(repositoryOptions, id: \.self) { name in
                             Text(label(for: name)).tag(name)
                         }
                     }
                     .disabled(off)
-                    .onChange(of: settings.data.gitHubRepository) { _, name in
+                    .onChange(of: workspace.syncBinding.repository) { _, name in
                         // Follow the repository's own default branch rather than
                         // leaving "main" pointing at a repository that uses
                         // "master" — the failure it causes is a 404 at sync time.
                         if let repository = repositories.first(where: { $0.fullName == name }) {
-                            settings.data.gitHubBranch = repository.defaultBranch
+                            workspace.syncBinding.branch = repository.defaultBranch
                         }
                         verification = nil
                         Task { await loadBranches() }
@@ -621,14 +691,14 @@ private struct SyncSettings: View {
                 }
 
                 if branches.isEmpty {
-                    TextField("Branch", text: $settings.data.gitHubBranch, prompt: Text("main"))
+                    TextField("Branch", text: branchBinding, prompt: Text("main"))
                         .disabled(off)
                 } else {
-                    Picker("Branch", selection: $settings.data.gitHubBranch) {
+                    Picker("Branch", selection: branchBinding) {
                         ForEach(branchOptions, id: \.self) { Text($0).tag($0) }
                     }
                     .disabled(off)
-                    .onChange(of: settings.data.gitHubBranch) { verification = nil }
+                    .onChange(of: workspace.syncBinding.branch) { verification = nil }
                 }
 
                 if let listError {

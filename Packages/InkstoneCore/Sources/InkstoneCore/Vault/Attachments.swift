@@ -154,7 +154,21 @@ public struct SyncFilePolicy: Codable, Hashable, Sendable {
 
     /// Whether a file should be included in a sync run.
     /// - Parameter sizeBytes: pass `nil` when the size is not known yet.
+    /// The file whose whole job is saying what this vault does not carry.
+    public static let ignoreFileName = ".gitignore"
+
     public func allows(_ url: URL, sizeBytes: Int? = nil) -> Bool {
+        // The vault's own rules travel with the vault.
+        //
+        // Without this the file is invisible twice over: it is hidden, so the
+        // enumerator skips it, and it has no extension, so the policy files it
+        // under "other" — which is off by default. The result is a second device
+        // holding the same notes and none of the rules about which of them to
+        // carry, so it happily uploads everything the first device deliberately
+        // excludes. Not a hypothetical: one vault's `.gitignore` excludes a
+        // folder of source recordings, and they sit in its repository anyway.
+        if url.lastPathComponent == SyncFilePolicy.ignoreFileName { return true }
+
         let ext = url.pathExtension.lowercased()
         // Notes, canvases and the app's own state always sync.
         if ["md", "markdown", "canvas"].contains(ext) { return true }

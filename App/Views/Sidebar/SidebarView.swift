@@ -93,6 +93,23 @@ private struct VaultSwitcher: View {
             Button("Open Folder as Vault…", systemImage: "folder.badge.plus") {
                 isPickingFolder = true
             }
+            // A vault added by mistake was previously permanent: `forget` existed
+            // on the registry and nothing called it. Its own submenu rather than
+            // a row action, so opening a vault stays one tap and removing one
+            // takes a deliberate second.
+            if workspace.registry.vaults.count > 1 {
+                Menu("Remove from Inkstone…", systemImage: "minus.circle") {
+                    ForEach(workspace.registry.vaults) { vault in
+                        Button(role: .destructive) {
+                            workspace.forget(vault)
+                        } label: {
+                            Label(vault.name, systemImage: "minus.circle")
+                        }
+                    }
+                    Divider()
+                    Text("The folder and its files are left exactly where they are.")
+                }
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: workspace.vault?.isCloudBacked == true ? "icloud" : "folder")

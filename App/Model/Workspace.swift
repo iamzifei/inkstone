@@ -190,6 +190,9 @@ final class Workspace {
                 Task.detached(priority: .utility) { ICloudFiles.requestDownloads(in: url) }
             }
 
+            // Before the auto-sync below can read a binding.
+            migrateSyncBindingIfNeeded(for: vault, root: url)
+
             refreshTree()
             reindex()
             startWatching(url)
@@ -234,7 +237,8 @@ final class Workspace {
         autoSyncTask?.cancel()
         autoSyncTask = nil
 
-        guard settings.data.gitHubSyncEnabled, settings.data.gitHubAutoSync else { return }
+        guard syncBinding.isEnabled, !isBlockedByGitWorkingCopy,
+              settings.data.gitHubAutoSync else { return }
         let minutes = settings.data.gitHubSyncIntervalMinutes
         guard minutes > 0 else { return }
 
@@ -245,6 +249,24 @@ final class Workspace {
                 await self?.syncIfEnabled()
             }
         }
+    }
+
+    /// Removes a vault from Inkstone's list, leaving the folder on disk alone.
+    ///
+    /// The registry has had `forget` since the beginning and nothing ever called
+    /// it, so a vault added by mistake could not be got rid of. That is how a
+    /// folder belonging to another app — picked once through the document
+    /// picker — stayed in the list and kept syncing.
+    ///
+    /// Takes the vault's sync binding with it. Leaving one behind would mean a
+    /// folder re-added later silently inheriting a repository it was bound to in
+    /// some forgotten session, which is the class of bug this whole change is
+    /// about.
+    func forget(_ vault: Vault) {
+        if self.vault?.id == vault.id { closeCurrentVault() }
+        settings.data.vaultSync.removeValue(forKey: vault.id.uuidString)
+        settings.data.syncOverridesGit.remove(vault.id.uuidString)
+        registry.forget(vault)
     }
 
     func closeCurrentVault() {
@@ -330,13 +352,98 @@ final class Workspace {
         return SyncState.load(from: root).lastSyncedAt == nil
     }
 
-    /// Whether a sync could run right now — enabled, configured, and idle.
+    /// Which repository the open vault syncs with.
+    ///
+    /// Reads and writes `settings.data.vaultSync` under the open vault's id. An
+    /// unopened or unbound vault reads as an empty binding, which is not
+    /// configured and therefore does not sync — the whole point of the change:
+    /// a vault now has to be told where it syncs, instead of inheriting whatever
+    /// the last one used.
+    var syncBinding: VaultSyncBinding {
+        get {
+            guard let vault else { return VaultSyncBinding() }
+            return settings.data.vaultSync[vault.id.uuidString] ?? VaultSyncBinding()
+        }
+        set {
+            guard let vault else { return }
+            settings.data.vaultSync[vault.id.uuidString] = newValue
+        }
+    }
+
+    /// Whether the open vault is a git working copy.
+    ///
+    /// If it is, git is already syncing this folder, and it does it properly:
+    /// three-way merges, a history, conflict markers a person resolves.
+    /// Inkstone's sync is file-level and last-write-wins — it has no merge base
+    /// and answers a conflict by writing a second copy of the file. Running both
+    /// over one folder is not redundancy, it is two mechanisms overwriting each
+    /// other's results, which is what happened to a user's vault: 1409 API
+    /// commits landed on `master` over four days while the local branch, 71
+    /// commits of real work, knew nothing about any of them.
+    ///
+    /// Note this can only ever be true where git exists. On iOS it is always
+    /// false, so a phone still syncs the repository normally — which is the
+    /// arrangement that works: git on the desktop, the API on the phone, one
+    /// writer each.
+    var vaultIsGitWorkingCopy: Bool {
+        guard let root else { return false }
+        return FileManager.default.fileExists(atPath: root.appending(path: ".git").path)
+    }
+
+    /// Set by the user to sync a git working copy anyway. Per vault, and off
+    /// unless asked for: the default protects, the escape hatch respects.
+    var overridesGitWorkingCopyGuard: Bool {
+        get { vault.map { settings.data.syncOverridesGit.contains($0.id.uuidString) } ?? false }
+        set {
+            guard let vault else { return }
+            if newValue { settings.data.syncOverridesGit.insert(vault.id.uuidString) }
+            else { settings.data.syncOverridesGit.remove(vault.id.uuidString) }
+        }
+    }
+
+    /// Whether sync is being held back because git owns this folder.
+    var isBlockedByGitWorkingCopy: Bool {
+        vaultIsGitWorkingCopy && !overridesGitWorkingCopyGuard
+    }
+
+    /// Whether a sync could run right now — bound, permitted, configured, idle.
     var canSync: Bool {
-        settings.data.gitHubSyncEnabled
-            && !settings.data.gitHubRepository.isEmpty
+        syncBinding.isEnabled
+            && syncBinding.isConfigured
+            && !isBlockedByGitWorkingCopy
             && SyncCredentials.hasToken
             && root != nil
             && !isSyncing
+    }
+
+    /// Moves the old single global repository onto a vault, if that vault can
+    /// show it was the one using it.
+    ///
+    /// The proof is the vault's own `.inkstone/sync.json`, which records the
+    /// repository of its last run. A vault that never synced to that repository
+    /// has no such record and gets no binding.
+    ///
+    /// An earlier version of this attached the legacy repository to whichever
+    /// vault was opened most recently. That is wrong in exactly the case this
+    /// whole change exists for: on the phone, the most recently opened vault was
+    /// the root of **On My iPhone**, picked once through the document picker —
+    /// not a copy of the notes at all. Migrating onto it would have carried the
+    /// broken setup into the new model unchanged.
+    ///
+    /// Runs on open rather than at launch because it needs the vault's files,
+    /// and a vault's files are only reachable once its security-scoped bookmark
+    /// has been resolved.
+    private func migrateSyncBindingIfNeeded(for vault: Vault, root: URL) {
+        guard settings.data.vaultSync[vault.id.uuidString] == nil else { return }
+        let legacy = settings.data.gitHubRepository
+        guard !legacy.isEmpty else { return }
+        guard SyncState.load(from: root).repository == legacy else { return }
+
+        settings.data.vaultSync[vault.id.uuidString] = VaultSyncBinding(
+            repository: legacy,
+            branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch,
+            isEnabled: settings.data.gitHubSyncEnabled
+        )
     }
 
     /// Pushes and pulls the vault against the configured GitHub repository.
@@ -349,12 +456,12 @@ final class Workspace {
 
     private var sharedSyncObserver: Any?
 
-    /// The GitHub setup as this device currently has it.
+    /// The GitHub setup as this device currently has it, for the open vault.
     var syncConfiguration: GitHubSyncConfiguration {
         GitHubSyncConfiguration(
-            repository: settings.data.gitHubRepository,
-            branch: settings.data.gitHubBranch,
-            isEnabled: settings.data.gitHubSyncEnabled,
+            repository: syncBinding.repository,
+            branch: syncBinding.branch,
+            isEnabled: syncBinding.isEnabled,
             isAutomatic: settings.data.gitHubAutoSync,
             intervalMinutes: settings.data.gitHubSyncIntervalMinutes,
             updatedAt: settings.data.gitHubConfigurationUpdatedAt ?? .distantPast
@@ -382,12 +489,27 @@ final class Workspace {
         case .publishLocal:
             // Nothing to publish from a device that has never been configured;
             // it would only overwrite the other side with blanks.
-            guard !settings.data.gitHubRepository.isEmpty else { break }
+            guard syncBinding.isConfigured else { break }
             SharedSyncConfiguration.publish(syncConfiguration)
         case .adopt(let configuration):
-            settings.data.gitHubRepository = configuration.repository
-            settings.data.gitHubBranch = configuration.branch
-            settings.data.gitHubSyncEnabled = configuration.isEnabled
+            // **This is the line that spread the damage.** It used to write the
+            // repository straight into the global settings, so a repository
+            // configured for one device's vault was applied to whatever vault
+            // the other device happened to have open — a different folder
+            // entirely, which then started making the repository look like
+            // itself.
+            //
+            // Now a shared configuration can only ever *confirm* a binding the
+            // open vault already has. Anything else is held as a suggestion for
+            // the Sync pane to offer, because "this is the repository your other
+            // device uses" is useful and "so I applied it to this unrelated
+            // folder" is not.
+            guard syncBinding.repository == configuration.repository else {
+                pendingSharedConfiguration = configuration
+                break
+            }
+            syncBinding.branch = configuration.branch
+            syncBinding.isEnabled = configuration.isEnabled
             settings.data.gitHubAutoSync = configuration.isAutomatic
             settings.data.gitHubSyncIntervalMinutes = configuration.intervalMinutes
             settings.data.gitHubConfigurationUpdatedAt = configuration.updatedAt
@@ -395,10 +517,27 @@ final class Workspace {
         }
     }
 
+    /// Another device's setup, offered rather than applied. `nil` when there is
+    /// nothing to offer or the open vault already matches it.
+    var pendingSharedConfiguration: GitHubSyncConfiguration?
+
+    /// Accepts the offer above, binding the open vault to that repository.
+    func adoptSharedConfiguration() {
+        guard let configuration = pendingSharedConfiguration else { return }
+        syncBinding = VaultSyncBinding(
+            repository: configuration.repository,
+            branch: configuration.branch,
+            isEnabled: configuration.isEnabled
+        )
+        settings.data.gitHubConfigurationUpdatedAt = configuration.updatedAt
+        pendingSharedConfiguration = nil
+        restartAutoSync()
+    }
+
     /// Records that this device changed the setup, and tells the others.
     func publishSyncConfiguration() {
         settings.data.gitHubConfigurationUpdatedAt = Date()
-        guard !settings.data.gitHubRepository.isEmpty else { return }
+        guard syncBinding.isConfigured else { return }
         SharedSyncConfiguration.publish(syncConfiguration)
     }
 
@@ -415,8 +554,8 @@ final class Workspace {
         guard let token = SyncCredentials.token() else { return nil }
         return GitHubClient(
             configuration: .init(
-                repository: repository ?? settings.data.gitHubRepository,
-                branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch
+                repository: repository ?? syncBinding.repository,
+                branch: syncBinding.branch.isEmpty ? "main" : syncBinding.branch
             ),
             token: token
         )
@@ -430,7 +569,7 @@ final class Workspace {
 
     func sync(firstSyncDirection: FirstSyncDirection? = nil) async {
         guard let root else { return }
-        guard !settings.data.gitHubRepository.isEmpty, let token = SyncCredentials.token() else {
+        guard syncBinding.isConfigured, let token = SyncCredentials.token() else {
             syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
             return
         }
