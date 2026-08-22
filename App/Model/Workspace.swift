@@ -53,6 +53,19 @@ final class Workspace {
     private(set) var store: NoteStore?
     private(set) var tree: FileNode?
     private(set) var index = IndexSnapshot()
+
+    /// Bumped whenever the index is replaced.
+    ///
+    /// The editor styles a link by asking the index whether its target exists,
+    /// and it does that once, when it highlights. Indexing is asynchronous, so
+    /// the first render of the first note after opening a vault asks an *empty*
+    /// index — every wikilink came out unresolved and every `![[Note]]` embed
+    /// failed to find its content, and nothing put it right until the next
+    /// keystroke. SwiftUI panes observe `index` directly; the editor is a wrapped
+    /// text view and needs to be told.
+    private(set) var indexGeneration = 0
+    /// Non-note files, so `![[diagram.png]]` can resolve. Rebuilt with the tree.
+    private(set) var attachments = AttachmentIndex()
     private(set) var isIndexing = false
 
     // MARK: - Editing state
@@ -60,6 +73,70 @@ final class Workspace {
     /// Open documents, keyed by URL. Kept alive across tab switches so scroll
     /// position and unsaved edits survive.
     private(set) var documents: [URL: NoteDocument] = [:]
+
+    /// The text `![[Note#fragment]]` should show, or nil if there is nothing to
+    /// show for it.
+    ///
+    /// Only Markdown: an `![[image.png]]` is an attachment and is resolved
+    /// elsewhere. Returning nil rather than an empty string matters — an embed
+    /// naming a heading the note does not have should read as unresolved, not as
+    /// an empty box.
+    func embeddedNoteText(for link: WikiLink, from source: URL) -> String? {
+        #if DEBUG
+        func trace(_ why: String) {
+            if ProcessInfo.processInfo.environment["INKSTONE_EMBED_TRACE"] != nil {
+                FileHandle.standardError.write(Data("[embed] \(link.target): \(why)\n".utf8))
+            }
+        }
+        #else
+        func trace(_ why: String) {}
+        #endif
+
+        guard let root, !link.target.isEmpty else { trace("no vault root"); return nil }
+        guard let destination = index.resolve(link.target, from: source, vaultRoot: root) else {
+            trace("index could not resolve it — index holds \(index.noteCount) notes, "
+                  + "names: \(index.namesToNotes.keys.sorted().prefix(6).joined(separator: ", "))")
+            return nil
+        }
+        guard destination.pathExtension.lowercased() == "md" else {
+            trace("resolved to \(destination.pathExtension), not markdown")
+            return nil
+        }
+        guard destination != source else { trace("embeds itself"); return nil }
+        guard let text = try? String(contentsOf: destination, encoding: .utf8) else {
+            trace("could not read \(destination.lastPathComponent)")
+            return nil
+        }
+        trace("resolved to \(destination.lastPathComponent), \(text.count) chars")
+
+        let range = NoteSlice.range(in: text, fragment: link.fragment)
+        guard range.length > 0 else { return nil }
+        let slice = (text as NSString).substring(with: range)
+        return slice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : slice
+    }
+
+    /// A request from elsewhere in the UI — the outline, for now — to bring a
+    /// particular range of the open note into view.
+    ///
+    /// A value rather than a method call because the editor is a wrapped
+    /// `NSTextView`/`UITextView` several layers down, and SwiftUI's way to reach
+    /// it is to change something it observes. `token` makes repeated requests for
+    /// the *same* range distinct, so tapping one heading twice scrolls twice.
+    struct RevealTarget: Equatable {
+        let url: URL
+        let range: NSRange
+        let token: Int
+    }
+
+    private(set) var revealTarget: RevealTarget?
+    private var revealToken = 0
+
+    /// Scrolls the editor to `range` in `url`, opening the note first if needed.
+    func reveal(_ range: NSRange, in url: URL) {
+        if activeTab?.url != url { openNote(at: url) }
+        revealToken += 1
+        revealTarget = RevealTarget(url: url, range: range, token: revealToken)
+    }
 
     var tabs: [TabContent] = []
     var activeTab: TabContent? {
@@ -90,7 +167,14 @@ final class Workspace {
 
     // MARK: - Vault lifecycle
 
-    func open(_ vault: Vault) {
+    /// Opens a vault.
+    ///
+    /// `startingBackgroundWork` exists for the one caller that is not a person:
+    /// the iOS background task handler. Opening normally starts a sync and the
+    /// repeat timer, which is right when someone has just picked a vault and
+    /// wrong when the OS woke a scene-less process to do exactly one sync — that
+    /// combination gave two `sync()` runs racing over the same working tree.
+    func open(_ vault: Vault, startingBackgroundWork: Bool = true) {
         closeCurrentVault()
         do {
             let url = try registry.beginAccess(to: vault)
@@ -98,9 +182,24 @@ final class Workspace {
             root = url
             store = NoteStore(root: url)
             settings.loadThemes(fromVault: url)
+
+            // A vault in iCloud may have had notes evicted to save disk space,
+            // leaving hidden placeholders in their place. Ask for them back, off
+            // the main thread — the watcher rescans as they land.
+            if settings.data.iCloudSyncEnabled && vault.isCloudBacked {
+                Task.detached(priority: .utility) { ICloudFiles.requestDownloads(in: url) }
+            }
+
             refreshTree()
             reindex()
             startWatching(url)
+
+            if startingBackgroundWork {
+                if settings.data.gitHubAutoSync {
+                    Task { await syncIfEnabled() }
+                }
+                restartAutoSync()
+            }
         } catch {
             self.vault = nil
             root = nil
@@ -108,8 +207,50 @@ final class Workspace {
         }
     }
 
+    /// Reopens the most recently used vault, if none is open.
+    ///
+    /// Lives here rather than in the App struct because a background launch
+    /// needs it too. `InkstoneApp` opened the last vault from `.onAppear`, which
+    /// only fires when a scene is actually rendered — and iOS waking the app for
+    /// a background task renders nothing. Sync would then find no vault, do
+    /// nothing, and report success.
+    func openMostRecentVaultIfNeeded(startingBackgroundWork: Bool = true) {
+        guard vault == nil,
+              let latest = registry.vaults.max(by: { $0.lastOpened < $1.lastOpened })
+        else { return }
+        open(latest, startingBackgroundWork: startingBackgroundWork)
+    }
+
+    /// Syncs only if it is configured and switched on, and stays quiet
+    /// otherwise. Used by the automatic paths, which must not surface a "not
+    /// configured" error to someone who never asked for GitHub sync.
+    func syncIfEnabled() async {
+        guard canSync else { return }
+        await sync()
+    }
+
+    /// Restarts the periodic sync to match the current settings.
+    func restartAutoSync() {
+        autoSyncTask?.cancel()
+        autoSyncTask = nil
+
+        guard settings.data.gitHubSyncEnabled, settings.data.gitHubAutoSync else { return }
+        let minutes = settings.data.gitHubSyncIntervalMinutes
+        guard minutes > 0 else { return }
+
+        autoSyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Double(minutes) * 60))
+                guard !Task.isCancelled else { return }
+                await self?.syncIfEnabled()
+            }
+        }
+    }
+
     func closeCurrentVault() {
         saveAll()
+        autoSyncTask?.cancel()
+        autoSyncTask = nil
         watcher?.stop()
         watcher = nil
         if let vault { registry.endAccess(to: vault) }
@@ -147,7 +288,279 @@ final class Workspace {
 
     func refreshTree() {
         guard let root else { return }
-        tree = VaultScanner().scan(root)
+        let scanned = VaultScanner().scan(root)
+        tree = scanned
+        attachments = AttachmentIndex(tree: scanned)
+    }
+
+    // MARK: - Sync
+
+    /// Where a sync run has got to, for the settings pane to display.
+    enum SyncStatus: Equatable {
+        case idle
+        case running(String)
+        case finished(SyncReport)
+        case failed(String)
+        /// Cut short rather than broken. Distinct from `failed` because the
+        /// honest thing to tell someone is different: nothing went wrong, the
+        /// run simply ran out of time, what it managed is kept, and the next run
+        /// picks up from there. Reporting that as a failure is what makes a
+        /// working background sync look like a broken one.
+        case interrupted
+    }
+
+    private(set) var syncStatus: SyncStatus = .idle
+
+    /// How far the running sync has got. `nil` when nothing is running, and
+    /// present with a `nil` fraction during the phases before the plan exists.
+    private(set) var syncProgress: SyncProgress?
+
+    /// The repeating background sync, cancelled when the vault closes or the
+    /// interval changes.
+    @ObservationIgnored private var autoSyncTask: Task<Void, Never>?
+    var isSyncing: Bool { if case .running = syncStatus { return true }; return false }
+
+    /// Whether the vault has never completed a sync against this repository.
+    ///
+    /// The expensive case, and the one worth treating differently: a first sync
+    /// moves the whole vault, takes minutes rather than seconds, and is exactly
+    /// the run that a thirty-second app-refresh window cannot finish.
+    var needsFirstSync: Bool {
+        guard let root else { return false }
+        return SyncState.load(from: root).lastSyncedAt == nil
+    }
+
+    /// Whether a sync could run right now — enabled, configured, and idle.
+    var canSync: Bool {
+        settings.data.gitHubSyncEnabled
+            && !settings.data.gitHubRepository.isEmpty
+            && SyncCredentials.hasToken
+            && root != nil
+            && !isSyncing
+    }
+
+    /// Pushes and pulls the vault against the configured GitHub repository.
+    ///
+    /// This used to be manual only, on the reasoning that a background sync
+    /// hitting a conflict mid-sentence would cost the user's trust. That worry
+    /// does not survive contact with how conflicts are actually handled: the
+    /// remote copy is saved *alongside* the local one and nothing is
+    // MARK: - Shared setup
+
+    private var sharedSyncObserver: Any?
+
+    /// The GitHub setup as this device currently has it.
+    var syncConfiguration: GitHubSyncConfiguration {
+        GitHubSyncConfiguration(
+            repository: settings.data.gitHubRepository,
+            branch: settings.data.gitHubBranch,
+            isEnabled: settings.data.gitHubSyncEnabled,
+            isAutomatic: settings.data.gitHubAutoSync,
+            intervalMinutes: settings.data.gitHubSyncIntervalMinutes,
+            updatedAt: settings.data.gitHubConfigurationUpdatedAt ?? .distantPast
+        )
+    }
+
+    /// Adopts another device's setup if it is newer, publishes this one if not,
+    /// and keeps listening.
+    ///
+    /// Called at launch rather than when the Sync pane opens: a second device is
+    /// configured by opening the app, and someone who has to find Settings before
+    /// their vault appears has not been saved any typing.
+    func startSharingSyncConfiguration() {
+        SharedSyncConfiguration.refresh()
+        applyShared(SharedSyncConfiguration.published())
+        sharedSyncObserver = SharedSyncConfiguration.observe { [weak self] configuration in
+            self?.applyShared(configuration)
+        }
+    }
+
+    private func applyShared(_ remote: GitHubSyncConfiguration?) {
+        switch SyncConfigurationMerge.resolve(local: syncConfiguration, remote: remote) {
+        case .keepLocal:
+            break
+        case .publishLocal:
+            // Nothing to publish from a device that has never been configured;
+            // it would only overwrite the other side with blanks.
+            guard !settings.data.gitHubRepository.isEmpty else { break }
+            SharedSyncConfiguration.publish(syncConfiguration)
+        case .adopt(let configuration):
+            settings.data.gitHubRepository = configuration.repository
+            settings.data.gitHubBranch = configuration.branch
+            settings.data.gitHubSyncEnabled = configuration.isEnabled
+            settings.data.gitHubAutoSync = configuration.isAutomatic
+            settings.data.gitHubSyncIntervalMinutes = configuration.intervalMinutes
+            settings.data.gitHubConfigurationUpdatedAt = configuration.updatedAt
+            restartAutoSync()
+        }
+    }
+
+    /// Records that this device changed the setup, and tells the others.
+    func publishSyncConfiguration() {
+        settings.data.gitHubConfigurationUpdatedAt = Date()
+        guard !settings.data.gitHubRepository.isEmpty else { return }
+        SharedSyncConfiguration.publish(syncConfiguration)
+    }
+
+    /// A client for the configured repository, or nil when no token is stored.
+    ///
+    /// Shared by sync and by the Settings pickers so they cannot disagree about
+    /// what "the configured repository" means — the pickers exist to stop a
+    /// mistyped repository being discovered at sync time, which they could not do
+    /// if they talked to a different one.
+    ///
+    /// - Parameter repository: overrides the configured value, for listing the
+    ///   branches of a repository the user is considering but has not chosen yet.
+    func gitHubClient(repository: String? = nil) -> GitHubClient? {
+        guard let token = SyncCredentials.token() else { return nil }
+        return GitHubClient(
+            configuration: .init(
+                repository: repository ?? settings.data.gitHubRepository,
+                branch: settings.data.gitHubBranch.isEmpty ? "main" : settings.data.gitHubBranch
+            ),
+            token: token
+        )
+    }
+
+    /// overwritten, so the cost of a badly timed sync is an extra file, not lost
+    /// work. Requiring someone to remember to press a button is the larger risk.
+    /// Set when a first sync needs the user to say which side wins; the Sync
+    /// pane turns it into three buttons.
+    var pendingFirstSync: SyncError?
+
+    func sync(firstSyncDirection: FirstSyncDirection? = nil) async {
+        guard let root else { return }
+        guard !settings.data.gitHubRepository.isEmpty, let token = SyncCredentials.token() else {
+            syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
+            return
+        }
+
+        // Flush anything the user has typed but not yet auto-saved, or sync
+        // would upload a stale copy and then report success.
+        saveAll()
+
+        _ = token
+        guard let client = gitHubClient() else {
+            syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
+            return
+        }
+        let engine = SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy)
+
+        syncStatus = .running("Starting…")
+        syncProgress = SyncProgress(message: "Starting…")
+        pendingFirstSync = nil
+        do {
+            let report = try await engine.run(firstSyncDirection: firstSyncDirection) { update in
+                Task { @MainActor in
+                    self.syncStatus = .running(update.message)
+                    self.syncProgress = update
+                }
+            }
+            syncProgress = nil
+            syncStatus = .finished(report)
+            // Files may have arrived or vanished underneath us.
+            refreshTree()
+            reindex()
+            for document in documents.values { document.reloadIfUnchangedLocally() }
+        } catch is CancellationError {
+            // Not a failure. The engine saved what it moved before rethrowing,
+            // so the next run resumes rather than restarts.
+            syncProgress = nil
+            syncStatus = .interrupted
+        } catch let error as SyncError {
+            // A question, not a failure: it is waiting for an answer only the
+            // user has, and the pane offers it rather than burying it in a
+            // sentence that ends the run.
+            if case .firstSyncNeedsDirection = error { pendingFirstSync = error }
+            syncProgress = nil
+            syncStatus = .failed(error.localizedDescription)
+        } catch {
+            syncProgress = nil
+            syncStatus = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Attachments
+
+    /// Where a newly imported file should live: the configured attachment folder,
+    /// created on demand, falling back to the vault root if it cannot be made.
+    private func attachmentDestination(for root: URL) -> URL {
+        let folder = settings.data.attachmentFolder.trimmingCharacters(in: .whitespaces)
+        guard !folder.isEmpty else { return root }
+        let url = root.appending(path: folder)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+        return FileManager.default.fileExists(atPath: url.path) ? url : root
+    }
+
+    /// Copies a file into the vault and returns its new location.
+    ///
+    /// The file is *copied*, never moved or referenced in place: a vault has to
+    /// stay self-contained, or the note breaks as soon as the original is moved
+    /// or the external volume is unplugged. Name collisions get a numeric suffix
+    /// rather than overwriting someone's existing attachment.
+    @discardableResult
+    func importAttachment(from source: URL, preferredName: String? = nil) -> URL? {
+        guard let root else { return nil }
+        let folder = attachmentDestination(for: root)
+        let name = preferredName ?? source.lastPathComponent
+        let destination = uniqueURL(in: folder, name: name)
+
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            return nil
+        }
+        refreshTree()
+        return destination
+    }
+
+    /// Writes raw data — a pasted image, say — into the attachment folder.
+    @discardableResult
+    func importAttachment(data: Data, name: String) -> URL? {
+        guard let root else { return nil }
+        let destination = uniqueURL(in: attachmentDestination(for: root), name: name)
+        guard (try? data.write(to: destination)) != nil else { return nil }
+        refreshTree()
+        return destination
+    }
+
+    private func uniqueURL(in folder: URL, name: String) -> URL {
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var candidate = folder.appending(path: name)
+        var counter = 1
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            let suffixed = ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)"
+            candidate = folder.appending(path: suffixed)
+            counter += 1
+        }
+        return candidate
+    }
+
+    /// The embed text to insert for a file that now lives inside the vault.
+    ///
+    /// Uses a path relative to the vault root when the file sits in a subfolder,
+    /// so the link keeps working if two attachments ever share a name.
+    func embedMarkup(for url: URL) -> String {
+        guard let root else { return "![[\(url.lastPathComponent)]]" }
+        let relative = url.path.hasPrefix(root.path + "/")
+            ? String(url.path.dropFirst(root.path.count + 1))
+            : url.lastPathComponent
+        return "![[\(relative)]]"
+    }
+
+    /// Resolves an embed target to a file on disk, note or attachment.
+    func resolveEmbed(_ target: String, from source: URL) -> URL? {
+        guard let root else { return nil }
+        if let attachment = attachments.resolve(target, from: source, vaultRoot: root) {
+            return attachment
+        }
+        return index.resolve(target, from: source, vaultRoot: root)
     }
 
     func reindex() {
@@ -159,6 +572,7 @@ final class Workspace {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.index = snapshot
+                self.indexGeneration += 1
                 self.isIndexing = false
             }
         }
@@ -196,6 +610,12 @@ final class Workspace {
     }
 
     func openNote(at url: URL, inNewTab: Bool = false) {
+        // Opening an evicted note has to wait for its bytes, or it opens blank
+        // and an empty buffer then overwrites the real note on the next save.
+        // Costs nothing in the normal case, where the file is already on disk.
+        if settings.data.iCloudSyncEnabled, vault?.isCloudBacked == true {
+            _ = ICloudFiles.ensureDownloaded(url, timeout: 2)
+        }
         if url.pathExtension.lowercased() == "canvas" {
             open(.canvas(url), inNewTab: inNewTab)
         } else {

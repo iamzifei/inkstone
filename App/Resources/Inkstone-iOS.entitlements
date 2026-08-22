@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	iOS entitlements. Separate from Inkstone.entitlements because that file is
+	now specific to the Mac in two ways that matter here:
+
+	  * The App Sandbox keys (`app-sandbox`, `files.user-selected.read-write`,
+	    `files.bookmarks.app-scope`) describe a macOS sandbox. iOS apps are
+	    always sandboxed and grant file access through the document picker, so
+	    the keys are meaningless on this platform.
+	  * `com.apple.security.temporary-exception.mach-lookup.global-name`, which
+	    Sparkle needs on macOS, is a temporary-exception entitlement. Those are
+	    accepted for Developer ID distribution and **rejected by the App Store**.
+	    Shipping it here would fail upload validation, and Sparkle does not exist
+	    on iOS anyway.
+
+	What is left is what iOS actually uses: iCloud Documents for the vault, and
+	the key-value store that carries the GitHub sync setup between devices.
+	-->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.orris.inkstone</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.com.orris.inkstone</string>
+	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
+</dict>
+</plist>

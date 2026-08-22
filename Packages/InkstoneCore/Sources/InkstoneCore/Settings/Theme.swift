@@ -98,35 +98,39 @@ extension Theme {
         id: "inkstone",
         name: "Inkstone",
         author: "Orris",
+        // Cinnabar (朱砂) — the red of a carved seal pressed onto paper. Ink black,
+        // paper white, one point of red. Every foreground below is checked against
+        // its own background for WCAG AA (4.5:1 body, 3:1 large/non-text); see
+        // ContrastTests.
         light: ThemePalette(
-            accent: ThemeColor("#7A5C3E"),
+            accent: ThemeColor("#C0453B"),
             background: ThemeColor("#FCFBF8"),
             secondaryBackground: ThemeColor("#F4F2EC"),
             text: ThemeColor("#1F1D1A"),
-            secondaryText: ThemeColor("#5C5850"),
-            faintText: ThemeColor("#9A948A"),
+            secondaryText: ThemeColor("#57534B"),
+            faintText: ThemeColor("#78736A"),
             divider: ThemeColor("#E4E0D6"),
-            link: ThemeColor("#3F6B5B"),
-            unresolvedLink: ThemeColor("#B0A99C"),
-            tag: ThemeColor("#7A5C3E"),
+            link: ThemeColor("#B03A30"),
+            unresolvedLink: ThemeColor("#8C8579"),
+            tag: ThemeColor("#8A5A44"),
             highlight: ThemeColor("#F6E7A8"),
             codeBackground: ThemeColor("#F1EFE8"),
-            selection: ThemeColor("#DCE8E2")
+            selection: ThemeColor("#F5DAD6")
         ),
         dark: ThemePalette(
-            accent: ThemeColor("#C9A87C"),
+            accent: ThemeColor("#E0685C"),
             background: ThemeColor("#16161A"),
             secondaryBackground: ThemeColor("#1D1D22"),
             text: ThemeColor("#E8E6E1"),
-            secondaryText: ThemeColor("#A7A39B"),
-            faintText: ThemeColor("#6E6A63"),
+            secondaryText: ThemeColor("#ADA89F"),
+            faintText: ThemeColor("#8A857D"),
             divider: ThemeColor("#2C2C32"),
-            link: ThemeColor("#8FC5AC"),
-            unresolvedLink: ThemeColor("#5E5A53"),
-            tag: ThemeColor("#C9A87C"),
+            link: ThemeColor("#E87F74"),
+            unresolvedLink: ThemeColor("#7E7871"),
+            tag: ThemeColor("#D9A38C"),
             highlight: ThemeColor("#5C5326"),
             codeBackground: ThemeColor("#1F1F25"),
-            selection: ThemeColor("#2F4238")
+            selection: ThemeColor("#4A2B27")
         )
     )
 
@@ -141,10 +145,10 @@ extension Theme {
             secondaryBackground: ThemeColor("#F4F6F8"),
             text: ThemeColor("#15181C"),
             secondaryText: ThemeColor("#525960"),
-            faintText: ThemeColor("#8D949C"),
+            faintText: ThemeColor("#828990"),
             divider: ThemeColor("#E2E6EA"),
             link: ThemeColor("#3A6EA5"),
-            unresolvedLink: ThemeColor("#A9B2BB"),
+            unresolvedLink: ThemeColor("#8A939C"),
             tag: ThemeColor("#7A4FA3"),
             highlight: ThemeColor("#FFF1A8"),
             codeBackground: ThemeColor("#F2F4F7"),
@@ -159,7 +163,7 @@ extension Theme {
             faintText: ThemeColor("#666E77"),
             divider: ThemeColor("#242A31"),
             link: ThemeColor("#7FB2E5"),
-            unresolvedLink: ThemeColor("#565E66"),
+            unresolvedLink: ThemeColor("#6A727C"),
             tag: ThemeColor("#C6A0E8"),
             highlight: ThemeColor("#4E4620"),
             codeBackground: ThemeColor("#191D23"),

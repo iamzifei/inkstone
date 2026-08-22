@@ -20,8 +20,28 @@ struct CanvasPane: View {
     @State private var editingNode: String?
     /// Node the user started dragging a new edge from.
     @State private var connectingFrom: String?
+    /// Viewport size, needed to centre the content; see fitToContent().
+    @State private var viewportSize: CGSize = .zero
 
     var body: some View {
+        GeometryReader { geometry in
+            content
+                .onAppear {
+                    viewportSize = geometry.size
+                    load()
+                }
+                .onChange(of: geometry.size) { _, size in
+                    let wasUnsized = viewportSize == .zero
+                    viewportSize = size
+                    // The first real size arrives after onAppear, so the initial
+                    // fit has to be redone once the viewport is actually known.
+                    if wasUnsized { fitToContent() }
+                }
+                .onDisappear(perform: save)
+        }
+    }
+
+    private var content: some View {
         ZStack {
             style.background.ignoresSafeArea()
 
@@ -56,8 +76,6 @@ struct CanvasPane: View {
         .contentShape(.rect)
         .gesture(panGesture)
         .overlay(alignment: .bottom) { toolbar }
-        .onAppear(perform: load)
-        .onDisappear(perform: save)
     }
 
     // MARK: - Nodes
@@ -251,10 +269,34 @@ struct CanvasPane: View {
         save()
     }
 
+    /// Frames the whole canvas in the viewport.
+    ///
+    /// The previous version set `pan` to the negated content centre, which put
+    /// that centre at the *origin* — the top-left corner of the view, not the
+    /// middle of it. Opening a canvas therefore showed one corner of one card
+    /// and acres of empty space. Centring needs the viewport size, so the pane
+    /// now tracks it.
     private func fitToContent() {
-        guard let bounds = document.bounds else { return }
-        zoom = 1
-        pan = CGSize(width: -(bounds.minX + bounds.maxX) / 2, height: -(bounds.minY + bounds.maxY) / 2)
+        guard let bounds = document.bounds,
+              viewportSize.width > 0, viewportSize.height > 0
+        else { return }
+
+        let padding: CGFloat = 64
+        let usableWidth = max(viewportSize.width - padding * 2, 1)
+        let usableHeight = max(viewportSize.height - padding * 2, 1)
+        let contentWidth = max(bounds.maxX - bounds.minX, 1)
+        let contentHeight = max(bounds.maxY - bounds.minY, 1)
+        // Never zoom *in* past 1: a two-card canvas blown up to fill a 27-inch
+        // display looks broken rather than helpful.
+        let fitted = min(usableWidth / contentWidth, usableHeight / contentHeight)
+        zoom = min(1, max(0.15, fitted))
+
+        let midX = (bounds.minX + bounds.maxX) / 2
+        let midY = (bounds.minY + bounds.maxY) / 2
+        pan = CGSize(
+            width: viewportSize.width / 2 - midX * zoom,
+            height: viewportSize.height / 2 - midY * zoom
+        )
         panStart = pan
     }
 

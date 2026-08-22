@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-Hant" data-lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkstone墨硯 —— 一個把筆記留成檔案的macOS / iOS應用程式</title>
+<meta name="description" content="純Markdown檔案，放在你自己選的資料夾裡。雙向連結、反向連結、關聯圖譜、白板與日記， 原生SwiftUI，為macOS 26與iOS 26而寫。沒有資料庫，沒有Electron，不必註冊。">
+<meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://inkslab.app/zh-Hant/">
+<link rel="alternate" hreflang="de" href="https://inkslab.app/de/">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/">
+<link rel="alternate" hreflang="es" href="https://inkslab.app/es/">
+<link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/">
+<link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/">
+<link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Inkstone">
+<meta property="og:title" content="Inkstone墨硯 —— 一個把筆記留成檔案的macOS / iOS應用程式">
+<meta property="og:description" content="純Markdown檔案，放在你自己選的資料夾裡。雙向連結、反向連結、關聯圖譜、白板與日記， 原生SwiftUI，為macOS 26與iOS 26而寫。沒有資料庫，沒有Electron，不必註冊。">
+<meta property="og:url" content="https://inkslab.app/zh-Hant/">
+<meta property="og:image" content="https://inkslab.app/assets/og-card-zh.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inkstone墨硯 —— 一個把筆記留成檔案的macOS / iOS應用程式">
+<meta name="twitter:description" content="純Markdown檔案，放在你自己選的資料夾裡。雙向連結、反向連結、關聯圖譜、白板與日記， 原生SwiftUI，為macOS 26與iOS 26而寫。沒有資料庫，沒有Electron，不必註冊。">
+<meta name="twitter:image" content="https://inkslab.app/assets/og-card-zh.png">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+TC:wght@300;400;600&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=f8db207b">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26, iOS 26","url":"https://inkslab.app/zh-Hant/","description":"純Markdown檔案，放在你自己選的資料夾裡。雙向連結、反向連結、關聯圖譜、白板與日記， 原生SwiftUI，為macOS 26與iOS 26而寫。沒有資料庫，沒有Electron，不必註冊。","inLanguage":"zh-Hant","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James Gong","url":"https://github.com/iamzifei"},"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg"}</script>
+
+</head>
+<body>
+<a class="skip" href="#main">跳到內文</a>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="../">
+      <img src="../assets/icon.png" alt="" width="28" height="28">
+      <span class="wordmark-name">Inkstone</span>
+      <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
+    </a>
+    <nav class="nav-links" aria-label="章節">
+      <a href="#features">功能</a>
+      <a href="#typography">排版</a>
+      <a href="#specs">規格</a>
+      <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
+      <details class="lang-menu">
+        <summary aria-label="Language">繁體中文</summary>
+        <nav class="lang-menu-list" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><span class="lang-current" aria-current="true">繁體中文</span><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+      </details>
+      <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">下載macOS版</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main">
+<section class="hero">
+  <p class="eyebrow">macOS 26 · iOS 26 · 原生<span class="ac"></span>SwiftUI</p>
+  <h1 class="hero-title">筆記本來就是檔案，它就該一直是檔案。</h1>
+  <p class="hero-lede">Inkstone<span class="ac"></span>直接讀寫你指定資料夾裡的<span class="ac"></span>Markdown。它能打開你現有的儲存庫， 不會寫下任何別的編輯器打不開的東西，自己的狀態則放在一個隱藏資料夾裡， 你隨時可以刪掉。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">下載<span class="ac"></span>macOS<span class="ac"></span>版</a>
+    <a class="btn btn-quiet" href="#features">看它能做什麼</a>
+  </div>
+  <p class="hero-note">免費 · Apple<span class="ac"></span>晶片 · English · 简体中文 · 繁體中文</p>
+  <figure class="film">
+    <div class="film-mat">
+      <video class="film-frame" poster="../assets/video/poster.webp" autoplay muted loop playsinline
+             preload="metadata" aria-label="Inkstone在macOS上的螢幕錄影：打開一個儲存庫、輸入一行中英混排的文字、 點開一個雙向連結、再打開關聯圖譜。">
+        <source src="../assets/video/hero.webm" type="video/webm">
+        <source src="../assets/video/hero.mp4" type="video/mp4">
+      </video>
+    </div>
+    <figcaption>錄於<span class="ac"></span>macOS 26。除了段落之間的淡入淡出，沒有別的剪接。</figcaption>
+  </figure>
+</section>
+<section class="creed" aria-labelledby="creed-h">
+  <div class="rule-head">
+    <h2 id="creed-h">三個決定，其餘一切都是它們的結果</h2>
+    <p class="rule-sub">它們是承重的。這個應用程式為什麼這樣表現，答案都在這裡。</p>
+  </div>
+  <div class="creed-cols"><div class="creed-col reveal"><h3>檔案才是事實</h3><p>沒有資料庫，沒有匯入步驟，沒有專有格式。Obsidian<span class="ac"></span>建的儲存庫在這裡能打開， 這裡建的儲存庫在那邊也能打開。就算<span class="ac"></span>Inkstone<span class="ac"></span>明天消失，你手上仍然是一個裝著<span class="ac"></span>Markdown<span class="ac"></span>的資料夾。</p></div><div class="creed-col reveal"><h3>斷掉的連結是永久的</h3><p>既然沒有資料庫可以事後修，重新命名一篇筆記時，指向它的每一處雙向連結都會在同一個動作裡被改寫，涵蓋整個儲存庫。這是上一條的直接後果，不是外掛上去的功能。</p></div><div class="creed-col reveal"><h3>引擎不知道螢幕的存在</h3><p>解析、索引、搜尋和圖譜都住在一個完全不<span class="ac"></span>import<span class="ac"></span>任何<span class="ac"></span>UI<span class="ac"></span>框架的套件裡。 所以它們由真正的測試涵蓋，而不是靠模擬器；也所以同一套引擎日後可以拿去撐起一個命令列工具。</p></div></div>
+</section>
+<section class="features" id="features" aria-labelledby="features-h">
+  <div class="rule-head">
+    <h2 id="features-h">裡面有什麼</h2>
+    <p class="rule-sub">下面每一條都已經實作並在跑，不是路線圖。</p>
+  </div>
+  <article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">編輯</p>
+    <h3>即時預覽，而不是左右分割</h3>
+    <p>標題、粗體、引用、callout、待辦、表格、程式碼區塊都隨打隨算繪， 只有游標所在的那一行會露出語法。閱讀模式是獨立的唯讀檢視， 想看沒有鷹架的成品時再切過去。內文字型、程式碼字型和各自的級數分開設定。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/live-preview.webp" srcset="../assets/shots/live-preview-640.webp 640w, ../assets/shots/live-preview-960.webp 960w, ../assets/shots/live-preview-1280.webp 1280w, ../assets/shots/live-preview.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Inkstone的編輯器：標題、一段中英混排的內文、待辦清單、引用、callout、 對齊的表格和程式碼區塊，全部在原位算繪。" loading="eager" fetchpriority="high" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">連結</p>
+    <h3>雙向連結、別名、區塊引用、反向連結</h3>
+    <p>[[筆記]]、[[筆記<span class="ac"></span>#<span class="ac"></span>標題]]、[[筆記^區塊]]、![[嵌入]]，以及在<span class="ac"></span>frontmatter<span class="ac"></span>裡宣告的別名，全部匯進同一個索引。每篇筆記都會顯示誰指向它、它指向誰， 以及它的哪些連結還沒有落點。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/backlinks.webp" srcset="../assets/shots/backlinks-640.webp 640w, ../assets/shots/backlinks-960.webp 960w, ../assets/shots/backlinks-1280.webp 1280w, ../assets/shots/backlinks.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="一篇筆記，右側欄列出它的反向連結與出向連結，下方是一張鄰居節點的區域圖譜。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">看清形狀</p>
+    <h3>兩次打開，圖譜落在同一個地方</h3>
+    <p>力導向模擬是決定性的，所以同一個儲存庫每次都畫出同一張圖。 你可以記住它的版面，而不是每次打開都重新辨認一遍。區域圖譜只看一篇筆記和它的鄰居。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/graph.webp" srcset="../assets/shots/graph-640.webp 640w, ../assets/shots/graph-960.webp 960w, ../assets/shots/graph-1280.webp 1280w, ../assets/shots/graph.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="關聯圖譜檢視：筆記是節點，雙向連結是連線，引用越密集的越聚在一起。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">空間化的筆記</p>
+    <h3>白板，用的是開放的<span class="ac"></span>JSON Canvas<span class="ac"></span>格式</h3>
+    <p>卡片、檔案和連線擺在一張無限大的紙上，存成<span class="ac"></span>JSON Canvas 1.0—— 和這個格式的其他實作讀寫的是同一個檔案。你的白板和你的筆記一樣可以帶走。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/canvas.webp" srcset="../assets/shots/canvas-640.webp 640w, ../assets/shots/canvas-960.webp 960w, ../assets/shots/canvas-1280.webp 1280w, ../assets/shots/canvas.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="一張白板：筆記卡片和它們之間的連線，在無限畫布上按空間關係擺放。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">找東西</p>
+    <h3>模糊切換器，以及支援運算子的搜尋</h3>
+    <p>一個快速鍵喚起涵蓋整個儲存庫的模糊切換器。全文搜尋認得<span class="ac"></span>tag: 和<span class="ac"></span>path:； 標籤寫在行內或<span class="ac"></span>frontmatter<span class="ac"></span>裡都行，支援多層巢狀，也不挑文種—— #<span class="ac"></span>專案/進行中和 #project/active<span class="ac"></span>建索引的方式完全一樣。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/quickswitcher.webp" srcset="../assets/shots/quickswitcher-640.webp 640w, ../assets/shots/quickswitcher-960.webp 960w, ../assets/shots/quickswitcher-1280.webp 1280w, ../assets/shots/quickswitcher.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="快速切換器浮在筆記上方，隨著輸入逐字篩選整個儲存庫。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">兩台機器</p>
+    <h3>iCloud<span class="ac"></span>或<span class="ac"></span>GitHub，而且由你決定什麼跟著走</h3>
+    <p>走<span class="ac"></span>iCloud<span class="ac"></span>同步，或者把整個儲存庫推到一個<span class="ac"></span>GitHub<span class="ac"></span>儲存庫——衝突會被解決一次， 而不是留下兩份副本。按檔案類型的開關決定附件和多媒體要不要跟著走， 儲存庫自己的 .gitignore<span class="ac"></span>會被尊重。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/sync.webp" srcset="../assets/shots/sync-640.webp 640w, ../assets/shots/sync-960.webp 960w, ../assets/shots/sync.webp 1120w" sizes="(max-width: 900px) 92vw, 620px" width="1120" height="1096" alt="GitHub同步設定：儲存庫與分支選擇器，以及決定同步範圍的分檔案類型開關。" loading="lazy" decoding="async"></figure>
+</article>
+</section>
+<section class="typo" id="typography" aria-labelledby="typo-h">
+  <div class="rule-head">
+    <h2 id="typo-h">把中文和英文排在同一行裡</h2>
+    <p class="rule-sub">難的是漢字句子裡嵌一個拉丁詞。幾乎所有應用程式都排錯，而且是那種看見一次就再也無法忽視的錯法。</p>
+  </div>
+  <div class="specimen reveal">
+    <p class="specimen-folio">字樣 · Source Serif 4<span class="ac"></span>配思源宋體</p>
+    <h3 class="specimen-h">中英文混排與那四分之一字寬</h3>
+    <p class="specimen-lead">中文是密排的。字與字之間沒有空格，所以一行是否勻淨，眼睛一看就知道。 往這樣一行裡丟進一個<span class="ac"></span>typography，兩種文字就撞在一起了。</p>
+    <p class="specimen-body">內文裡出現<span class="ac"></span>Latin<span class="ac"></span>單字時，漢字與拉丁字母之間應當有一段約四分之一字寬的間隙——W3C<span class="ac"></span>的中文排版需求稱之為文字間隙。這一段文字本身就在示範它：每一處漢字與<span class="ac"></span>Latin<span class="ac"></span>的交界都由建置時插入的空元素撐開，在支援<span class="ac"></span>text-autospace<span class="ac"></span>的瀏覽器上則交還給瀏覽器處理，兩者永遠只生效一個。全形標點（，。；：）自帶二分空，因此一律不加。</p>
+    <blockquote class="specimen-quote">
+      <p>排版的存在是為了讓內容體面。它是僕人，而僕人的舉止應當讓人看不見。</p>
+      <cite>Robert Bringhurst《字體排印風格要素》</cite>
+    </blockquote>
+  </div>
+  <dl class="spec-notes"><div class="spec-note"><dt>行長</dt><dd>內文一行約<span class="ac"></span>66<span class="ac"></span>個字元，Bringhurst<span class="ac"></span>給出的單欄理想寬度。超過<span class="ac"></span>75， 眼睛就找不回下一行的行首了。</dd></div><div class="spec-note"><dt>同一個字族</dt><dd>拉丁用<span class="ac"></span>Source Serif 4，漢字用思源宋體——而思源宋體的拉丁伴隨字體正是 Source Serif。混排的那一行出自同一位設計師的襯線，不是兩套字在打架。</dd></div><div class="spec-note"><dt>顏色即語意</dt><dd>只有一種硃砂紅——印章壓在紙上的那種紅——用來標記連結、標籤和目前動作。 除此之外沒有任何東西是彩色的。</dd></div><div class="spec-note"><dt>動態效果是標點</dt><dd>元素出現時上移八個像素，此外什麼都不動。打開「減少動態效果」， 這一切一次都不會發生。</dd></div></dl>
+</section>
+<section class="specs" id="specs" aria-labelledby="specs-h">
+  <div class="rule-head">
+    <h2 id="specs-h">規格</h2>
+    <p class="rule-sub">在你下載任何東西之前，值得先知道的部分。</p>
+  </div>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">平台</th><td>macOS 26<span class="ac"></span>與<span class="ac"></span>iOS 26，一套<span class="ac"></span>SwiftUI<span class="ac"></span>程式碼，Apple<span class="ac"></span>晶片</td></tr><tr><th scope="row">儲存</th><td>你自己選的資料夾裡的純<span class="ac"></span>Markdown<span class="ac"></span>檔案。沒有資料庫，不必匯入</td></tr><tr><th scope="row">相容性</th><td>Obsidian<span class="ac"></span>儲存庫原樣打開，雙向都行。白板是<span class="ac"></span>JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown，另加雙向連結、嵌入、區塊引用、callout、註腳、數學公式與<span class="ac"></span>Mermaid</td></tr><tr><th scope="row">同步</th><td>iCloud<span class="ac"></span>或<span class="ac"></span>GitHub<span class="ac"></span>儲存庫，可按檔案類型篩選</td></tr><tr><th scope="row">介面語言</th><td>English、简体中文、繁體中文</td></tr><tr><th scope="row">原始碼</th><td>在<span class="ac"></span>GitHub<span class="ac"></span>上公開。尚未選定授權條款。</td></tr><tr><th scope="row">隱私</th><td>不必帳號，沒有遙測，不會發起你沒要求過的網路請求</td></tr></tbody></table>
+  <div class="closer reveal">
+    <p class="closer-line">它是免費的，它不扣著你的任何東西，而它寫下的檔案就是你本來就有的那些檔案。</p>
+    <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">下載<span class="ac"></span>macOS<span class="ac"></span>版</a>
+      <a class="btn btn-quiet" href="https://ko-fi.com/james_ai/tip" rel="noopener">請我喝杯咖啡</a></div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="../assets/icon.png" alt="" width="32" height="32">
+      <p class="footer-tagline">一個不動你檔案的筆記應用程式。</p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">專案</h2>
+      <ul>
+        <li><a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/iamzifei/inkstone/issues" rel="noopener">問題回報</a></li>
+        <li><a href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi</a></li>
+      </ul>
+    </div>
+    <div class="footer-col footer-siblings">
+      <h2 class="footer-h">同一雙手做的其他東西</h2>
+      <ul><li><a href="https://audioswitch.dev" rel="noopener"><img src="../assets/audioswitch.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">AudioSwitch</span><span class="sib-note">在選單列裡切換音訊裝置</span></span></a></li><li><a href="https://getcandela.app" rel="noopener"><img src="../assets/candela.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">Candela</span><span class="sib-note">控制外接顯示器的亮度</span></span></a></li><li><a href="https://getclipstack.app" rel="noopener"><img src="../assets/clipstack.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">ClipStack</span><span class="sib-note">不礙事的剪貼簿歷史</span></span></a></li></ul>
+    </div>
+  </div>
+  <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><span class="lang-current" aria-current="true">繁體中文</span><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+  <p class="colophon">內文用Source Serif 4與思源宋體排版。整站是靜態檔案，由GitHub Pages提供， 沒有任何形式的統計程式碼。</p>
+</footer>
+<script src="../assets/site.js?v=aa4b4a1b" defer></script>
+</body>
+</html>

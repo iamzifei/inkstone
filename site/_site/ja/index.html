@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ja" data-lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkstone 墨硯 — ノートをファイルのまま置いておく macOS / iOS アプリ</title>
+<meta name="description" content="自分で選んだフォルダに置かれた素の Markdown ファイル。ウィキリンク、バックリンク、 グラフ、キャンバス、デイリーノート。macOS 26 と iOS 26 のためのネイティブ SwiftUI。 データベースなし、Electron なし、アカウント不要。">
+<meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://inkslab.app/ja/">
+<link rel="alternate" hreflang="de" href="https://inkslab.app/de/">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/">
+<link rel="alternate" hreflang="es" href="https://inkslab.app/es/">
+<link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/">
+<link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/">
+<link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Inkstone">
+<meta property="og:title" content="Inkstone 墨硯 — ノートをファイルのまま置いておく macOS / iOS アプリ">
+<meta property="og:description" content="自分で選んだフォルダに置かれた素の Markdown ファイル。ウィキリンク、バックリンク、 グラフ、キャンバス、デイリーノート。macOS 26 と iOS 26 のためのネイティブ SwiftUI。 データベースなし、Electron なし、アカウント不要。">
+<meta property="og:url" content="https://inkslab.app/ja/">
+<meta property="og:image" content="https://inkslab.app/assets/og-card-zh.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inkstone 墨硯 — ノートをファイルのまま置いておく macOS / iOS アプリ">
+<meta name="twitter:description" content="自分で選んだフォルダに置かれた素の Markdown ファイル。ウィキリンク、バックリンク、 グラフ、キャンバス、デイリーノート。macOS 26 と iOS 26 のためのネイティブ SwiftUI。 データベースなし、Electron なし、アカウント不要。">
+<meta name="twitter:image" content="https://inkslab.app/assets/og-card-zh.png">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+JP:wght@300;400;600&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=f8db207b">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26, iOS 26","url":"https://inkslab.app/ja/","description":"自分で選んだフォルダに置かれた素の Markdown ファイル。ウィキリンク、バックリンク、 グラフ、キャンバス、デイリーノート。macOS 26 と iOS 26 のためのネイティブ SwiftUI。 データベースなし、Electron なし、アカウント不要。","inLanguage":"ja","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James Gong","url":"https://github.com/iamzifei"},"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg"}</script>
+
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="../">
+      <img src="../assets/icon.png" alt="" width="28" height="28">
+      <span class="wordmark-name">Inkstone</span>
+      <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
+    </a>
+    <nav class="nav-links" aria-label="セクション">
+      <a href="#features">機能</a>
+      <a href="#typography">組版</a>
+      <a href="#specs">仕様</a>
+      <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
+      <details class="lang-menu">
+        <summary aria-label="Language">日本語</summary>
+        <nav class="lang-menu-list" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><span class="lang-current" aria-current="true">日本語</span><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+      </details>
+      <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main">
+<section class="hero">
+  <p class="eyebrow">macOS 26 · iOS 26 · ネイティブ SwiftUI</p>
+  <h1 class="hero-title">ノートはもともとファイルだ。そのままでいい。</h1>
+  <p class="hero-lede">Inkstone は、あなたが指定したフォルダの Markdown をそのまま読み書きします。 いま持っている保管庫をそのまま開き、他のエディタで開けないものは何も書きません。 アプリ自身の状態は隠しフォルダに置かれ、いつ消してもかまいません。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a>
+    <a class="btn btn-quiet" href="#features">何ができるか見る</a>
+  </div>
+  <p class="hero-note">無料 · Apple シリコン · English · 简体中文 · 繁體中文</p>
+  <figure class="film">
+    <div class="film-mat">
+      <video class="film-frame" poster="../assets/video/poster.webp" autoplay muted loop playsinline
+             preload="metadata" aria-label="macOS 上の Inkstone の画面収録：保管庫を開き、漢字とラテン文字が混ざった一行を打ち、 ウィキリンクをたどり、グラフを開くまで。">
+        <source src="../assets/video/hero.webm" type="video/webm">
+        <source src="../assets/video/hero.mp4" type="video/mp4">
+      </video>
+    </div>
+    <figcaption>macOS 26 で収録。区切りのディゾルブ以外、編集はしていません。</figcaption>
+  </figure>
+</section>
+<section class="creed" aria-labelledby="creed-h">
+  <div class="rule-head">
+    <h2 id="creed-h">三つの決定、そこから残りすべてが出てくる</h2>
+    <p class="rule-sub">どれも構造材です。このアプリがこう振る舞う理由はここにあります。</p>
+  </div>
+  <div class="creed-cols"><div class="creed-col reveal"><h3>ファイルが事実である</h3><p>データベースも、取り込み手順も、独自形式もありません。Obsidian が作った保管庫はここで開き、ここで作った保管庫は向こうで開きます。Inkstone が明日消えても、 手元に残るのは Markdown の入ったフォルダです。</p></div><div class="creed-col reveal"><h3>壊れたリンクは元に戻らない</h3><p>直してくれるデータベースがない以上、ノートの名前を変えると、それを指していたウィキリンクは同じ操作の中で保管庫全体にわたって書き換えられます。上の決定の直接の帰結であって、後から付けた機能ではありません。</p></div><div class="creed-col reveal"><h3>エンジンは画面を知らない</h3><p>解析、索引、検索、グラフは、UI フレームワークを一切 import しないパッケージに住んでいます。だからシミュレータではなく本物のテストで覆われていますし、 同じエンジンを後からコマンドラインツールの土台にもできます。</p></div></div>
+</section>
+<section class="features" id="features" aria-labelledby="features-h">
+  <div class="rule-head">
+    <h2 id="features-h">入っているもの</h2>
+    <p class="rule-sub">以下はすべて実装され動いています。ロードマップではありません。</p>
+  </div>
+  <article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">編集</p>
+    <h3>分割画面ではなく、その場で組まれる</h3>
+    <p>見出し、太字、引用、コールアウト、チェックボックス、表、コードが打ちながらその場で組まれ、記法が見えるのはカーソルのある行だけです。読書モードは独立した読み取り専用ビュー。本文書体、コード書体、それぞれのサイズは別々に設定できます。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/live-preview.webp" srcset="../assets/shots/live-preview-640.webp 640w, ../assets/shots/live-preview-960.webp 960w, ../assets/shots/live-preview-1280.webp 1280w, ../assets/shots/live-preview.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="Inkstone のエディタ：見出し、日中英の混植された段落、チェックリスト、引用、 コールアウト、桁の揃った表、コードブロックがその場で組まれている。" loading="eager" fetchpriority="high" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">リンク</p>
+    <h3>ウィキリンク、別名、ブロック、バックリンク</h3>
+    <p>[[ノート]]、[[ノート<span class="ac"></span>#<span class="ac"></span>見出し]]、[[ノート^ブロック]]、![[埋め込み]]、そしてフロントマターで宣言した別名が、ひとつの索引にまとまります。各ノートは、 何が自分を指し、自分が何を指し、どのリンクがまだ行き先を持たないかを示します。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/backlinks.webp" srcset="../assets/shots/backlinks-640.webp 640w, ../assets/shots/backlinks-960.webp 960w, ../assets/shots/backlinks-1280.webp 1280w, ../assets/shots/backlinks.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="ノートの右サイドバーにバックリンクと発リンクが並び、その下に近傍のローカルグラフ。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">形を見る</p>
+    <h3>二度開いても同じ場所に落ち着くグラフ</h3>
+    <p>力学シミュレーションは決定的なので、同じ保管庫は毎回同じ絵を描きます。 開くたびに読み直すのではなく、配置そのものを覚えられます。ローカルグラフは一つのノートとその隣人だけを映します。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/graph.webp" srcset="../assets/shots/graph-640.webp 640w, ../assets/shots/graph-960.webp 960w, ../assets/shots/graph-1280.webp 1280w, ../assets/shots/graph.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="グラフビュー：ノードとしてのノートが、ウィキリンクで結ばれ、参照の密度で寄り集まる。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">空間に置くノート</p>
+    <h3>キャンバス、オープンな JSON Canvas 形式で</h3>
+    <p>カード、ファイル、線を無限の紙の上に置き、JSON Canvas 1.0 として保存します。 この形式の他の実装が読み書きするのと同じファイルです。キャンバスもノートと同じように持ち出せます。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/canvas.webp" srcset="../assets/shots/canvas-640.webp 640w, ../assets/shots/canvas-960.webp 960w, ../assets/shots/canvas-1280.webp 1280w, ../assets/shots/canvas.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="無限のキャンバス上に、ノートカードとその接続が空間的に配置されている。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-left reveal">
+  <div class="feat-text">
+    <p class="kicker">見つける</p>
+    <h3>あいまい検索と、演算子の使える全文検索</h3>
+    <p>ひと押しで保管庫全体を対象にしたあいまい検索が開きます。全文検索は tag: と path: を解釈し、タグは本文中でもフロントマターでも、入れ子でも、どの文字体系でも機能します。#<span class="ac"></span>プロジェクト/進行中は #project/active とまったく同じに索引されます。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/quickswitcher.webp" srcset="../assets/shots/quickswitcher-640.webp 640w, ../assets/shots/quickswitcher-960.webp 960w, ../assets/shots/quickswitcher-1280.webp 1280w, ../assets/shots/quickswitcher.webp 3600w" sizes="(max-width: 900px) 92vw, 620px" width="3600" height="2260" alt="ノートの上に開いたクイックスイッチャーが、入力に従って保管庫を絞り込んでいく。" loading="lazy" decoding="async"></figure>
+</article><article class="feat feat-right reveal">
+  <div class="feat-text">
+    <p class="kicker">二台目のために</p>
+    <h3>iCloud か GitHub、そして何を運ぶかはあなたが決める</h3>
+    <p>iCloud で同期するか、保管庫を GitHub のリポジトリへ push します。衝突は一度決着させ、両方を残したりしません。種類ごとのフィルタで添付やメディアを運ぶか決められ、保管庫自身の .gitignore は尊重されます。</p>
+  </div>
+  <figure class="feat-shot"><img src="../assets/shots/sync.webp" srcset="../assets/shots/sync-640.webp 640w, ../assets/shots/sync-960.webp 960w, ../assets/shots/sync.webp 1120w" sizes="(max-width: 900px) 92vw, 620px" width="1120" height="1096" alt="GitHub 同期の設定：リポジトリとブランチの選択、および同期対象をファイル種別で決めるスイッチ。" loading="lazy" decoding="async"></figure>
+</article>
+</section>
+<section class="typo" id="typography" aria-labelledby="typo-h">
+  <div class="rule-head">
+    <h2 id="typo-h">漢字とラテン文字を一行に組む</h2>
+    <p class="rule-sub">難しいのは、和文の中に欧文の単語が入る場合です。ほとんどのアプリはこれを外し、 しかも一度気づくと二度と見過ごせない外し方をします。</p>
+  </div>
+  <div class="specimen reveal">
+    <p class="specimen-folio">見本 · Source Serif 4 と源ノ明朝</p>
+    <h3 class="specimen-h">和欧混植と四分アキ</h3>
+    <p class="specimen-lead">和文はベタ組みです。単語間に空きがないぶん、行の均一さがそのまま読みやすさになります。 そこに typography と入れば、二つの文字体系はぶつかります。</p>
+    <p class="specimen-body">本文中に<span class="ac"></span>Latin<span class="ac"></span>の語が現れるとき、漢字とラテン文字のあいだには四分ほどのアキが要ります。 日本語組版処理の要件がいう和欧文間の空きであり、W3C<span class="ac"></span>の中文排版需求では文字間隙と呼ばれます。この段落自体がその実演です。漢字と<span class="ac"></span>Latin<span class="ac"></span>の境目はすべて、ビルド時に挿入された空の要素で開かれ、text-autospace<span class="ac"></span>に対応したブラウザではブラウザ側に委ねられます。二つが同時に効くことはありません。全角約物（、。；：）はもともと二分アキを持つので、そこには何も足しません。</p>
+    <blockquote class="specimen-quote">
+      <p>組版は内容に敬意を払うために存在する。それは従者であり、従者の作法は目に見えないほうがよい。</p>
+      <cite>Robert Bringhurst『The Elements of Typographic Style』</cite>
+    </blockquote>
+  </div>
+  <dl class="spec-notes"><div class="spec-note"><dt>行長</dt><dd>本文は一行およそ 66 字。Bringhurst が一段組の理想とした幅です。75 を超えると目が次の行頭を見失います。</dd></div><div class="spec-note"><dt>ひとつの書体族</dt><dd>欧文は Source Serif 4、和文は源ノ明朝。源ノ明朝の欧文部分はそもそも Source Serif なので、混植された行は一人の設計者の明朝であり、二つの書体の衝突ではありません。</dd></div><div class="spec-note"><dt>色は意味である</dt><dd>朱の一色だけ — 印を紙に押したときのあの赤 — がリンク、タグ、現在の操作を示します。 ほかに色のついたものはありません。</dd></div><div class="spec-note"><dt>動きは句読点である</dt><dd>要素は現れるときに 8 ピクセル上がり、それ以外は何も動きません。「視差効果を減らす」を入れていれば、それも一度も起きません。</dd></div></dl>
+</section>
+<section class="specs" id="specs" aria-labelledby="specs-h">
+  <div class="rule-head">
+    <h2 id="specs-h">仕様</h2>
+    <p class="rule-sub">何かをダウンロードする前に知っておく価値のある部分。</p>
+  </div>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">対応環境</th><td>macOS 26 と iOS 26、ひとつの SwiftUI コードベース、Apple シリコン</td></tr><tr><th scope="row">保存</th><td>自分で選んだフォルダの素の Markdown ファイル。データベースも取り込みもなし</td></tr><tr><th scope="row">互換性</th><td>Obsidian の保管庫をそのまま双方向に開けます。キャンバスは JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown に加え、ウィキリンク、埋め込み、ブロック参照、コールアウト、脚注、数式、Mermaid</td></tr><tr><th scope="row">同期</th><td>iCloud または GitHub リポジトリ、ファイル種別ごとのフィルタ付き</td></tr><tr><th scope="row">表示言語</th><td>English、简体中文、繁體中文</td></tr><tr><th scope="row">ソース</th><td>GitHub で公開。ライセンスはまだ決めていません。</td></tr><tr><th scope="row">プライバシー</th><td>アカウント不要、テレメトリなし、頼んでいない通信もなし</td></tr></tbody></table>
+  <div class="closer reveal">
+    <p class="closer-line">無料で、何も囲い込まず、書き出されるファイルはあなたがもともと持っていたファイルです。</p>
+    <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a>
+      <a class="btn btn-quiet" href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi で支援</a></div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="../assets/icon.png" alt="" width="32" height="32">
+      <p class="footer-tagline">あなたのファイルに手を出さないノートアプリ。</p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">プロジェクト</h2>
+      <ul>
+        <li><a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/iamzifei/inkstone/issues" rel="noopener">課題</a></li>
+        <li><a href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi</a></li>
+      </ul>
+    </div>
+    <div class="footer-col footer-siblings">
+      <h2 class="footer-h">同じ作り手の別のもの</h2>
+      <ul><li><a href="https://audioswitch.dev" rel="noopener"><img src="../assets/audioswitch.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">AudioSwitch</span><span class="sib-note">メニューバーからオーディオ機器を切り替える</span></span></a></li><li><a href="https://getcandela.app" rel="noopener"><img src="../assets/candela.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">Candela</span><span class="sib-note">外付けディスプレイの明るさを操作する</span></span></a></li><li><a href="https://getclipstack.app" rel="noopener"><img src="../assets/clipstack.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">ClipStack</span><span class="sib-note">邪魔をしないクリップボード履歴</span></span></a></li></ul>
+    </div>
+  </div>
+  <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><span class="lang-current" aria-current="true">日本語</span><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
+  <p class="colophon">Source Serif 4 と源ノ明朝で組んでいます。静的ファイルとして生成し GitHub Pages から配信、解析ツールの類は一切入れていません。</p>
+</footer>
+<script src="../assets/site.js?v=aa4b4a1b" defer></script>
+</body>
+</html>

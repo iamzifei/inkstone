@@ -1,0 +1,113 @@
+title: Inkstone墨砚 —— 一个把笔记留成文件的macOS / iOS应用
+description: 纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。
+nav:
+  label: 章节
+  skip: 跳到正文
+  features: 功能
+  typography: 排版
+  specs: 规格
+cta:
+  download: 下载macOS版
+  source: 看源码
+  tour: 看它能做什么
+  kofi: 请我喝杯咖啡
+hero:
+  eyebrow: macOS 26 · iOS 26 · 原生SwiftUI
+  title: 笔记本来就是文件，它就该一直是文件。
+  lede: Inkstone直接读写你指定文件夹里的Markdown。它能打开你现有的库， 不会写下任何别的编辑器打不开的东西，自己的状态则放在一个隐藏文件夹里， 你随时可以删掉。
+  note: 免费 · Apple芯片 · English · 简体中文 · 繁體中文
+  video_alt: Inkstone在macOS上的屏幕录制：打开一个库、输入一行中英混排的文字、 点开一个双链、再打开关系图谱。
+  video_caption: 录于macOS 26。除了段落之间的淡入淡出，没有别的剪辑。
+creed:
+  title: 三个决定，其余一切都是它们的结果
+  sub: 它们是承重的。这个应用为什么这样表现，答案都在这里。
+  columns:
+  - title: 文件才是事实
+    body: 没有数据库，没有导入步骤，没有私有格式。Obsidian建的库在这里能打开， 这里建的库在那边也能打开。就算Inkstone明天消失，你手上仍然是一个装着Markdown的文件夹。
+  - title: 断掉的链接是永久的
+    body: 既然没有数据库可以事后修，重命名一篇笔记时，指向它的每一处双链都会在同一个动作里被改写，覆盖整个库。这是上一条的直接后果，不是外挂上去的功能。
+  - title: 引擎不知道屏幕的存在
+    body: 解析、索引、搜索和图谱都住在一个完全不import任何UI框架的包里。 所以它们由真正的测试覆盖，而不是靠模拟器；也所以同一套引擎日后可以拿去撑起一个命令行工具。
+features:
+  title: 里面有什么
+  sub: 下面每一条都已经实现并在跑，不是路线图。
+  items:
+    live_preview:
+      kicker: 编辑
+      title: 所见即所得，而不是左右分栏
+      body: 标题、粗体、引用、callout、待办、表格、代码块都随打随渲染， 只有光标所在的那一行会露出语法。阅读模式是独立的只读视图， 想看没有脚手架的成品时再切过去。正文字体、代码字体和各自的字号分开设置。
+      alt: Inkstone的编辑器：标题、一段中英混排的正文、待办清单、引用、callout、 对齐的表格和代码块，全部在原位渲染。
+    links:
+      kicker: 链接
+      title: 双链、别名、块引用、反向链接
+      body: '[[笔记]]、[[笔记#标题]]、[[笔记^块]]、![[嵌入]]，以及在frontmatter里声明的别名，全部汇进同一个索引。每篇笔记都会显示谁指向它、它指向谁， 以及它的哪些链接还没有落点。'
+      alt: 一篇笔记，右侧栏列出它的反向链接与出链，下方是一张邻居节点的局部图谱。
+    graph:
+      kicker: 看清形状
+      title: 两次打开，图谱落在同一个地方
+      body: 力导向模拟是确定性的，所以同一个库每次都画出同一张图。 你可以记住它的布局，而不是每次打开都重新辨认一遍。局部图谱只看一篇笔记和它的邻居。
+      alt: 关系图谱视图：笔记是节点，双链是连线，引用越密集的越聚在一起。
+    canvas:
+      kicker: 空间化的笔记
+      title: 白板，用的是开放的JSON Canvas格式
+      body: 卡片、文件和连线摆在一张无限大的纸上，存成JSON Canvas 1.0—— 和这个格式的其他实现读写的是同一个文件。你的白板和你的笔记一样可以带走。
+      alt: 一张白板：笔记卡片和它们之间的连线，在无限画布上按空间关系摆放。
+    search:
+      kicker: 找东西
+      title: 模糊切换器，以及支持运算符的搜索
+      body: '一个快捷键唤起覆盖全库的模糊切换器。全文搜索认识tag: 和path:； 标签写在行内或frontmatter里都行，支持多级嵌套，也不挑文种—— #项目/进行中和 #project/active建索引的方式完全一样。'
+      alt: 快速切换器浮在笔记上方，随着输入逐字过滤整个库。
+    sync:
+      kicker: 两台机器
+      title: iCloud或GitHub，而且由你决定什么跟着走
+      body: 走iCloud同步，或者把整个库推到一个GitHub仓库——冲突会被解决一次， 而不是留下两份副本。按文件类型的开关决定附件和多媒体要不要跟着走， 库自己的 .gitignore会被尊重。
+      alt: GitHub同步设置：仓库与分支选择器，以及决定同步范围的分文件类型开关。
+typography:
+  title: 把中文和英文排在同一行里
+  sub: 难的是汉字句子里嵌一个拉丁词。几乎所有应用都排错，而且是那种看见一次就再也无法忽视的错法。
+  folio: 字样 · Source Serif 4配思源宋体
+  specimen_title: 中英文混排与那四分之一字宽
+  specimen_lead: 中文是密排的。字与字之间没有空格，所以一行是否匀净，眼睛一看就知道。 往这样一行里丢进一个typography，两种文字就撞在一起了。
+  specimen_body: 正文里出现Latin单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与Latin的交界都由构建时插入的空元素撑开，在支持text-autospace的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。
+  specimen_quote: 排版的存在是为了让内容体面。它是仆人，而仆人的举止应当让人看不见。
+  specimen_cite: Robert Bringhurst《字体排印风格要素》
+  notes:
+  - term: 行长
+    def: 正文一行约66个字符，Bringhurst给出的单栏理想宽度。超过75， 眼睛就找不回下一行的行首了。
+  - term: 同一个字族
+    def: 拉丁用Source Serif 4，汉字用思源宋体——而思源宋体的拉丁伴随字体正是 Source Serif。混排的那一行出自同一位设计师的衬线，不是两套字在打架。
+  - term: 颜色即语义
+    def: 只有一种朱砂红——印章压在纸上的那种红——用来标记链接、标签和当前动作。 除此之外没有任何东西是彩色的。
+  - term: 动效是标点
+    def: 元素出现时上移八个像素，此外什么都不动。打开「减弱动态效果」， 这一切一次都不会发生。
+specs:
+  title: 规格
+  sub: 在你下载任何东西之前，值得先知道的部分。
+  rows:
+  - k: 平台
+    v: macOS 26与iOS 26，一套SwiftUI代码，Apple芯片
+  - k: 存储
+    v: 你自己选的文件夹里的纯Markdown文件。没有数据库，不需要导入
+  - k: 兼容性
+    v: Obsidian库原样打开，双向都行。白板是JSON Canvas 1.0
+  - k: Markdown
+    v: GitHub Flavored Markdown，另加双链、嵌入、块引用、callout、脚注、数学公式与Mermaid
+  - k: 同步
+    v: iCloud或GitHub仓库，可按文件类型过滤
+  - k: 界面语言
+    v: English、简体中文、繁體中文
+  - k: 源码
+    v: 在GitHub上公开。尚未选定许可证。
+  - k: 隐私
+    v: 不需要账号，没有遥测，不会发起你没要求过的网络请求
+  closer: 它是免费的，它不扣着你的任何东西，而它写下的文件就是你本来就有的那些文件。
+siblings:
+  audioswitch: 在菜单栏里切换音频设备
+  candela: 控制外接显示器的亮度
+  clipstack: 不碍事的剪贴板历史
+footer:
+  tagline: 一个不动你文件的笔记应用。
+  project: 项目
+  issues: 问题反馈
+  also: 同一双手做的其他东西
+  colophon: 正文用Source Serif 4与思源宋体排版。整站是静态文件，由GitHub Pages提供， 没有任何形式的统计代码。

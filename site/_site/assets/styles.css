@@ -1,0 +1,805 @@
+@charset "utf-8";
+/* Inkstone — inkslab.app
+ *
+ * The page is a book page before it is a landing page. Three ideas hold it up:
+ *
+ *   Müller-Brockmann — one grid, obeyed. Every section head sits on the same
+ *   rule, every column starts on the same line, and nothing is placed by eye.
+ *
+ *   Vignelli — few typefaces, heavy horizontal rules, and colour reserved for
+ *   meaning. There is exactly one hue here and it is the app's own cinnabar.
+ *
+ *   Bringhurst — the measure is 62–66 characters, the scale is modular, and the
+ *   smallest effective difference wins. Nothing is emphasised twice.
+ *
+ * The palette is lifted verbatim from the app's Theme.swift, so the site and the
+ * product are made of the same material rather than two guesses at one brand.
+ */
+
+/* ------------------------------------------------------------------ tokens */
+
+:root {
+  /* Light: the app's `Theme.inkstone` light palette, hex for hex. */
+  --paper:        #FCFBF8;
+  --paper-2:      #F4F2EC;
+  --ink:          #1F1D1A;
+  --ink-2:        #57534B;
+  --ink-faint:    #78736A;
+  --rule:         #E4E0D6;
+  --cinnabar:     #C0453B;
+  --link:         #B03A30;
+  --highlight:    #F6E7A8;
+  --code-bg:      #F1EFE8;
+  /* The faint ink is checked against --paper, where it makes 4.55:1. On the
+   * specimen's --paper-2 ground the same value falls to 4.21:1 — under AA for
+   * the 12px folio and citation set on it. This is that tone taken two steps
+   * darker: 4.59:1 there, still well clear of --ink-2 so the hierarchy holds.
+   * Dark mode needs no equivalent; #8A857D on #1D1D22 already makes 4.58:1. */
+  --ink-faint-on-2: #726D64;
+  --shadow:       0 1px 2px rgb(31 29 26 / .04), 0 12px 34px -12px rgb(31 29 26 / .16);
+
+  /* Latin first, Han second. The browser resolves per character, so this order
+   * is what puts Latin glyphs in Source Serif and Han glyphs in Source Han —
+   * reverse it and every English word is set in the CJK font's Latin. */
+  --serif: "Source Serif 4", var(--cjk), Charter, "Iowan Old Style", Georgia, serif;
+  --cjk:   "Noto Serif SC", "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", serif;
+  /* The interface font is the reader's own system font. On a Mac — the machine
+   * this app runs on — that is SF, which means the site's furniture is set in
+   * the same face as the product's. It also costs nothing to download. */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          var(--cjk-sans), sans-serif;
+  --cjk-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC";
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", monospace;
+
+  /* Modular scale, fluid between a phone and a desktop. The display size is
+   * allowed a much wider range than the body: a headline can afford to be
+   * dramatic, a paragraph cannot. */
+  --t-display: clamp(2.55rem, 1.35rem + 4.6vw, 5rem);
+  --t-h2:      clamp(1.85rem, 1.3rem + 2.1vw, 2.9rem);
+  --t-h3:      clamp(1.3rem, 1.12rem + .62vw, 1.6rem);
+  --t-lede:    clamp(1.15rem, 1.02rem + .5vw, 1.4rem);
+  --t-body:    1.0625rem;
+  --t-small:   .875rem;
+  --t-micro:   .75rem;
+
+  --measure: 34rem;         /* ≈ 66 characters at the body size */
+  --page: 74rem;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --section-gap: clamp(4.5rem, 9vw, 9rem);
+
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --dur: .62s;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* The app's dark palette, likewise verbatim. */
+    --paper:     #16161A;
+    --paper-2:   #1D1D22;
+    --ink:       #E8E6E1;
+    --ink-2:     #ADA89F;
+    --ink-faint: #8A857D;
+    --rule:      #2C2C32;
+    --cinnabar:  #E0685C;
+    --link:      #E87F74;
+    --highlight: #5C5326;
+    --code-bg:   #1F1F25;
+    --ink-faint-on-2: #8A857D;
+    --shadow:    0 1px 2px rgb(0 0 0 / .5), 0 14px 40px -14px rgb(0 0 0 / .7);
+  }
+}
+
+/* Per-language CJK face. Each script gets the Source Han cut drawn for it —
+ * Simplified and Traditional differ in more than encoding, and setting one with
+ * the other's glyphs is the CJK equivalent of a wrong ligature. */
+html[data-lang="zh-Hant"] {
+  --cjk: "Noto Serif TC", "Songti TC", "Source Han Serif TC", serif;
+  --cjk-sans: "PingFang TC", "Hiragino Sans CNS", "Microsoft JhengHei", "Noto Sans CJK TC";
+}
+html[data-lang="ja"] {
+  --cjk: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --cjk-sans: "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP";
+}
+html[data-lang="ko"] {
+  --cjk: "Noto Serif KR", "Apple SD Gothic Neo", serif;
+  --cjk-sans: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR";
+}
+
+/* ------------------------------------------------------------------- reset */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;   /* the sticky bar's height, so anchors clear it */
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: var(--t-body);
+  font-optical-sizing: auto;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: oldstyle-num;   /* text figures sit inside prose */
+}
+
+h1, h2, h3, p, ul, ol, dl, figure, blockquote, table { margin: 0; }
+ul { padding: 0; list-style: none; }
+img, video { display: block; max-width: 100%; height: auto; }
+
+a { color: var(--link); }
+
+::selection { background: var(--highlight); color: var(--ink); }
+
+:focus-visible {
+  outline: 2px solid var(--cinnabar);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------- CJK-Latin mixed setting
+ *
+ * Two mechanisms, never both at once. See site/typeset.py, which writes the
+ * empty <span class="ac"> at every Han/Latin boundary, and whose long comment is
+ * the other half of this rule.
+ *
+ * `text-autospace` has been Baseline since November 2025 and its initial value
+ * is already `normal`, so a current browser inserts the gap itself. There the
+ * span must contribute nothing, or the gap is applied twice and the line opens
+ * up like justified text with too few words. Only where the browser cannot do it
+ * does the span take a width.
+ */
+.ac { display: none; }
+@supports not (text-autospace: normal) {
+  .ac { display: inline-block; inline-size: .115em; }
+}
+
+p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
+  text-autospace: normal;
+  /* Full-width punctuation carries half an em of built-in space. Trimming it at
+   * a line start keeps the left edge of a Chinese paragraph straight — the
+   * single most visible CJK typesetting flaw on the western web. Needs a font
+   * with `chws`/`halt`; without one the browser ignores it and nothing breaks. */
+  text-spacing-trim: space-first;
+  line-break: strict;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hanging-punctuation: allow-end;
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.wrap {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  z-index: 100;
+  padding: .7rem 1.1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: var(--t-small);
+  text-decoration: none;
+}
+.skip:focus { left: 1rem; top: 1rem; }
+
+/* --------------------------------------------------------------------- nav */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  /* The rule is transparent until the page scrolls, so the bar reads as part of
+   * the masthead at rest and as a separate layer once it is over content. The
+   * width never changes, so nothing below it shifts when the colour arrives. */
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s var(--ease), background .3s var(--ease);
+}
+.nav[data-scrolled] { border-bottom-color: var(--rule); }
+
+.nav-inner {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: .8rem var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  text-decoration: none;
+  color: inherit;
+}
+.wordmark img { align-self: center; border-radius: 6px; }
+.wordmark-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -.012em;
+}
+.wordmark-cjk {
+  font-family: var(--cjk);
+  font-size: .82rem;
+  color: var(--ink-faint);
+  letter-spacing: .22em;   /* 墨砚 as a colophon stamp, not as a word */
+  padding-inline-start: .1rem;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(.85rem, 1.8vw, 1.75rem);
+  font-family: var(--sans);
+  font-size: var(--t-small);
+}
+/* `:not(.btn)` is load-bearing. This selector is (0,1,1) and `.btn` is (0,1,0),
+ * so without it the hover-underline's `padding-block-end: 2px` overwrote the
+ * button's own 11.52px bottom padding while the top kept it — the label sat
+ * visibly below centre in a button that was 9px taller at the top than the
+ * bottom. The stray transparent border added another pixel underneath. */
+.nav-links > a:not(.btn) {
+  color: var(--ink-2);
+  text-decoration: none;
+  /* Drawn as a border rather than an underline so its distance from the
+   * baseline is fixed, and it can grow from nothing on hover. */
+  padding-block-end: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.nav-links > a:not(.btn):hover { color: var(--ink); border-bottom-color: var(--cinnabar); }
+
+/* On a phone the bar keeps the wordmark, the language menu and the one button
+ * it exists for. The section anchors and GitHub go: the anchors are a table of
+ * contents for a page you are already scrolling, and GitHub is in the footer.
+ * Nothing overflows without this — measured at 320 and 390 CSS pixels, where
+ * scrollWidth equals clientWidth either way — it is simply five things in a bar
+ * with room for three. */
+@media (max-width: 860px) {
+  .nav-links > a:not(.btn) { display: none; }
+  .wordmark-cjk { display: none; }
+}
+
+/* language menu */
+.lang-menu { position: relative; font-family: var(--sans); }
+.lang-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding-block-end: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.lang-menu > summary::-webkit-details-marker { display: none; }
+.lang-menu > summary::after { content: " ⌄"; color: var(--ink-faint); }
+.lang-menu[open] > summary, .lang-menu > summary:hover {
+  color: var(--ink);
+  border-bottom-color: var(--cinnabar);
+}
+.lang-menu-list {
+  position: absolute;
+  top: calc(100% + .75rem);
+  inset-inline-end: 0;
+  min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  padding: .4rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.lang-menu-list a, .lang-menu-list .lang-current {
+  padding: .42rem .6rem;
+  border-radius: 6px;
+  font-size: var(--t-small);
+  text-decoration: none;
+  color: var(--ink-2);
+}
+.lang-menu-list a:hover { background: var(--paper-2); color: var(--ink); }
+.lang-menu-list .lang-current { color: var(--ink); font-weight: 600; }
+
+/* buttons */
+.btn {
+  /* inline-flex + center, so the label is centred by the box rather than by two
+   * padding values that anything more specific can knock out of step. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: var(--t-small);
+  font-weight: 500;
+  line-height: 1;
+  padding: .72rem 1.15rem;
+  border-radius: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .2s var(--ease), color .2s var(--ease),
+              border-color .2s var(--ease), transform .2s var(--ease);
+}
+.btn-primary { background: var(--cinnabar); color: #FCFBF8; }
+.btn-primary:hover { background: color-mix(in srgb, var(--cinnabar) 86%, #000); }
+.btn-primary:active { transform: translateY(1px); }
+.btn-quiet {
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  background: transparent;
+}
+.btn-quiet:hover { border-color: var(--ink-faint); background: var(--paper-2); }
+@media (prefers-color-scheme: dark) { .btn-primary { color: #16161A; } }
+
+/* -------------------------------------------------------------------- hero */
+
+.hero {
+  padding-block: clamp(3.5rem, 8vw, 7rem) 0;
+  text-align: center;
+}
+
+.eyebrow {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .19em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 1.6rem;
+}
+
+.hero-title {
+  font-size: var(--t-display);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -.028em;
+  max-width: 18ch;
+  margin-inline: auto;
+  /* Optical sizing does most of the work; at display sizes Source Serif's
+   * opsz axis tightens the fit by itself. This only asks for it explicitly. */
+  font-variation-settings: "opsz" 60;
+  text-wrap: balance;
+}
+
+.hero-lede {
+  margin: 1.6rem auto 0;
+  max-width: 40rem;
+  font-size: var(--t-lede);
+  line-height: 1.62;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+  justify-content: center;
+  margin-top: 2.1rem;
+}
+
+.hero-note {
+  margin-top: 1.15rem;
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  letter-spacing: .04em;
+  color: var(--ink-faint);
+}
+
+/* The demo, mounted like a plate in a book: a paper mat, a hairline, and the
+ * picture inset within it. The mat is what keeps a bright video from sitting
+ * directly on the page and burning a hole in it. */
+.film { margin: clamp(2.75rem, 6vw, 4.5rem) auto 0; max-width: 68rem; }
+.film-mat {
+  padding: clamp(.5rem, 1.4vw, 1rem);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.film-frame {
+  width: 100%;
+  border-radius: 7px;
+  background: var(--paper);
+  /* Reserved before the file arrives, so the page below does not jump. This is
+   * the recording's own proportion, not a tidy approximation: the window was
+   * 1800x1130 points and the encode is 1440x904, both of which are 3600:2260.
+   * Rounding it to 16/10 would letterbox a file that fits exactly. */
+  aspect-ratio: 1800 / 1130;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .8s var(--ease);
+}
+.film-frame[data-ready] { opacity: 1; }
+.film figcaption {
+  margin-top: 1rem;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  color: var(--ink-faint);
+}
+
+/* --------------------------------------------------------- section heading
+ *
+ * The Unigrid move: a heavy rule, the title on the line under it, the subtitle
+ * in the second column. It is the same object in every section, which is what
+ * makes the page feel set rather than assembled.
+ */
+.rule-head {
+  border-top: 3px solid var(--ink);
+  padding-top: 1.15rem;
+  margin-bottom: clamp(2.5rem, 5vw, 4rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 1rem clamp(1.5rem, 4vw, 4rem);
+  align-items: baseline;
+}
+.rule-head h2 {
+  font-size: var(--t-h2);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+}
+.rule-sub {
+  font-size: var(--t-body);
+  color: var(--ink-2);
+  max-width: 38ch;
+  text-wrap: pretty;
+}
+@media (max-width: 760px) {
+  .rule-head { grid-template-columns: 1fr; }
+}
+
+/* ------------------------------------------------------------------- creed */
+
+.creed { padding-block: var(--section-gap); }
+.creed-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+.creed-col h3 {
+  font-size: var(--t-h3);
+  font-weight: 600;
+  letter-spacing: -.014em;
+  margin-bottom: .6rem;
+}
+/* The first line of each column carries a cinnabar rule above it — the leader
+ * column mark, and the only place besides links where the hue appears in prose. */
+.creed-col {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.1rem;
+  position: relative;
+}
+.creed-col::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  inset-inline-start: 0;
+  width: 2.5rem;
+  height: 1px;
+  background: var(--cinnabar);
+}
+.creed-col p { color: var(--ink-2); max-width: 34ch; }
+
+/* ---------------------------------------------------------------- features */
+
+.features { padding-block: var(--section-gap); border-top: 1px solid var(--rule); }
+
+.feat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: clamp(1.75rem, 5vw, 4.5rem);
+  align-items: center;
+  padding-block: clamp(2.5rem, 5vw, 4.25rem);
+}
+.feat + .feat { border-top: 1px solid var(--rule); }
+/* Alternating sides. Ordering by grid column rather than by `direction` or
+ * `row-reverse` keeps the DOM in reading order, so a screen reader and a
+ * keyboard still meet the text before its illustration.
+ *
+ * The ratio flips with the order. Without that second line the columns stay
+ * 1fr : 1.25fr while the contents swap, so every other screenshot is rendered
+ * into the narrow column at two thirds the size of its neighbours — the rows
+ * read as alternating importance rather than as alternating sides. */
+.feat-right { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.feat-right .feat-text { grid-column: 2; grid-row: 1; }
+.feat-right .feat-shot { grid-column: 1; grid-row: 1; }
+
+.kicker {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--cinnabar);
+  margin-bottom: .85rem;
+}
+.feat-text h3 {
+  font-size: var(--t-h3);
+  font-weight: 400;
+  line-height: 1.22;
+  letter-spacing: -.018em;
+  margin-bottom: .8rem;
+  text-wrap: balance;
+}
+.feat-text p { color: var(--ink-2); max-width: var(--measure); }
+
+.feat-shot img {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  background: var(--paper-2);
+}
+
+@media (max-width: 860px) {
+  .feat { grid-template-columns: 1fr; }
+  .feat-right .feat-text, .feat-right .feat-shot { grid-column: 1; grid-row: auto; }
+}
+
+/* -------------------------------------------------------------- typography
+ *
+ * The specimen is live text, never a picture of text. This section's whole
+ * claim is about rendering, and a screenshot of rendering proves nothing about
+ * the page you are reading it on.
+ */
+.typo { padding-block: var(--section-gap); border-top: 1px solid var(--rule); }
+
+.specimen {
+  max-width: 42rem;
+  margin-inline: auto;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3.5rem);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;   /* a page, not a card */
+}
+.specimen-folio {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-faint-on-2);
+  padding-bottom: 1.4rem;
+  margin-bottom: 2.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+.specimen-h {
+  font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.28;
+  letter-spacing: -.018em;
+  margin-bottom: 1.4rem;
+}
+/* The drop line: larger, and the only paragraph allowed to be. Its first three
+ * words are small-capped the way a magazine opens a feature. */
+.specimen-lead {
+  font-size: 1.24rem;
+  line-height: 1.62;
+  margin-bottom: 1.3rem;
+}
+.specimen-lead::first-line { font-variant-caps: small-caps; letter-spacing: .02em; }
+.specimen-body {
+  color: var(--ink-2);
+  /* Chinese wants a little more air between lines than Latin: the characters
+   * are denser and fill their em box, so the same leading reads tighter. */
+  line-height: 1.95;
+  margin-bottom: 2rem;
+}
+.specimen-quote {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.6rem;
+}
+.specimen-quote p {
+  font-size: 1.12rem;
+  font-style: italic;
+  line-height: 1.66;
+  /* Hung so the opening quote sits in the margin and the text edge stays true —
+   * the detail that separates a set quotation from an indented one. */
+  text-indent: -.42em;
+}
+.specimen-quote p::before { content: "“"; }
+.specimen-quote p::after { content: "”"; }
+.specimen-quote cite {
+  display: block;
+  margin-top: .9rem;
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-style: normal;
+  letter-spacing: .06em;
+  color: var(--ink-faint-on-2);
+}
+
+.spec-notes {
+  max-width: 42rem;
+  margin: clamp(2.5rem, 5vw, 3.5rem) auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.6rem clamp(1.5rem, 4vw, 3rem);
+}
+.spec-note dt {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: .45rem;
+}
+.spec-note dd { margin: 0; font-size: var(--t-small); color: var(--ink-2); line-height: 1.65; }
+
+/* ------------------------------------------------------------------- specs */
+
+.specs { padding-block: var(--section-gap); border-top: 1px solid var(--rule); }
+
+.spec-table {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+  border-collapse: collapse;
+}
+.spec-table th, .spec-table td {
+  text-align: start;
+  vertical-align: baseline;
+  padding: 1.05rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.spec-table th {
+  width: 32%;
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-inline-end: 2rem;
+}
+.spec-table td { color: var(--ink-2); font-size: var(--t-small); line-height: 1.7; }
+.spec-table tr:first-child th, .spec-table tr:first-child td { border-top: 1px solid var(--rule); }
+
+@media (max-width: 640px) {
+  .spec-table th, .spec-table td { display: block; width: auto; padding-inline-end: 0; }
+  .spec-table th { border-bottom: none; padding-bottom: .3rem; }
+}
+
+.closer { margin-top: clamp(3rem, 6vw, 5rem); text-align: center; }
+.closer-line {
+  font-size: var(--t-lede);
+  line-height: 1.55;
+  max-width: 30ch;
+  margin-inline: auto;
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.site-footer {
+  border-top: 3px solid var(--ink);
+  margin-top: var(--section-gap);
+  padding: clamp(2.5rem, 5vw, 4rem) var(--gutter) 3rem;
+  max-width: var(--page);
+  margin-inline: auto;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: clamp(2rem, 5vw, 4rem);
+}
+@media (max-width: 760px) { .footer-grid { grid-template-columns: 1fr; } }
+
+.footer-brand img { border-radius: 7px; margin-bottom: .9rem; }
+.footer-tagline { font-size: var(--t-small); color: var(--ink-2); max-width: 26ch; }
+
+.footer-h {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 1rem;
+}
+.footer-col ul { display: flex; flex-direction: column; gap: .6rem; }
+.footer-col a {
+  font-family: var(--sans);
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.footer-col a:hover { color: var(--ink); border-bottom-color: var(--cinnabar); }
+
+/* The three sibling apps get a name and one line of what they do. A bare list
+ * of product names is a list of words nobody clicks. */
+/* Icon beside the name, so the four sites' footers read as one family rather
+ * than as three text links and a different-looking fourth. */
+.footer-siblings a { display: flex; align-items: center; gap: .6rem; border-bottom: none; }
+.footer-siblings img { border-radius: 6px; flex: none; }
+.sib-text { display: block; }
+.footer-siblings a:hover .sib-name { border-bottom-color: var(--cinnabar); color: var(--ink); }
+.sib-name {
+  display: inline-block;
+  color: var(--ink);
+  border-bottom: 1px solid transparent;
+  transition: border-color .2s var(--ease);
+}
+.sib-note { display: block; font-size: var(--t-micro); color: var(--ink-faint); margin-top: .1rem; }
+
+.footer-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+}
+.footer-langs a { color: var(--ink-faint); text-decoration: none; }
+.footer-langs a:hover { color: var(--ink); }
+.footer-langs .lang-current { color: var(--ink); font-weight: 600; }
+
+.colophon {
+  margin-top: 1.5rem;
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  line-height: 1.7;
+  color: var(--ink-faint);
+  max-width: 52ch;
+}
+
+/* ------------------------------------------------------------------ motion
+ *
+ * One gesture, used everywhere: eight pixels up, over six tenths of a second,
+ * on an ease that decelerates hard. Nothing scales, nothing slides sideways,
+ * nothing bounces. Elements arrive; they do not perform.
+ *
+ * The class is added by site.js only after the observer is wired, so a reader
+ * with JavaScript off is served the finished page rather than a blank one.
+ */
+[data-reveal] .reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+[data-reveal] .reveal[data-shown] { opacity: 1; transform: none; }
+
+/* Rows inside one section come in a beat apart, which reads as a page settling
+ * rather than a wall appearing. Four steps is enough; past that it feels slow. */
+[data-reveal] .feat:nth-of-type(2) { transition-delay: .06s; }
+[data-reveal] .feat:nth-of-type(3) { transition-delay: .12s; }
+[data-reveal] .creed-col:nth-child(2) { transition-delay: .08s; }
+[data-reveal] .creed-col:nth-child(3) { transition-delay: .16s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  [data-reveal] .reveal { opacity: 1; transform: none; }
+  .film-frame { opacity: 1; }
+}
+
+/* ------------------------------------------------------------------- print */
+
+@media print {
+  .nav, .hero-actions, .film, .site-footer, .skip { display: none; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+}

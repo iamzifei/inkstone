@@ -1,0 +1,6 @@
+backlinks.webp 3600 2260 640 960 1280
+canvas.webp 3600 2260 640 960 1280
+graph.webp 3600 2260 640 960 1280
+live-preview.webp 3600 2260 640 960 1280
+quickswitcher.webp 3600 2260 640 960 1280
+sync.webp 1120 1096 640 960

@@ -1,0 +1,113 @@
+title: Inkstone — a Markdown notes app for macOS and iOS
+description: Plain Markdown files on your own disk. Wikilinks, backlinks, a graph, a canvas and daily notes, in a native app for macOS 26 and iOS 26. No database, no Electron, no account.
+nav:
+  label: Sections
+  skip: Skip to content
+  features: Features
+  typography: Typography
+  specs: Specifications
+cta:
+  download: Download for macOS
+  source: Read the source
+  tour: See what it does
+  kofi: Buy me a coffee
+hero:
+  eyebrow: macOS 26 · iOS 26 · Native SwiftUI
+  title: Your notes are files. They should stay that way.
+  lede: Inkstone is a notes app built on plain Markdown in a folder you choose. It reads the vault you already have, writes nothing you cannot open in any other editor, and keeps its own state in a hidden folder you are free to delete.
+  note: Free · Apple silicon · English · 简体中文 · 繁體中文
+  video_alt: 'A screen recording of Inkstone on macOS: opening a vault, typing a line of mixed Chinese and English, following a wikilink, and opening the graph.'
+  video_caption: Recorded on macOS 26. Unedited, apart from the dissolves between sections.
+creed:
+  title: Three decisions everything else follows from
+  sub: They are load-bearing, and they are why the app behaves as it does.
+  columns:
+  - title: The files are the truth
+    body: There is no database, no import step and no proprietary format. A vault Obsidian created opens here; a vault this app created opens there. If Inkstone disappeared tomorrow you would still have a folder of Markdown.
+  - title: A broken link is permanent
+    body: With no database to repair one, renaming a note rewrites every wikilink that pointed at it, across the whole vault, in the same action. This is the direct consequence of the decision above, not a feature bolted on.
+  - title: The engine knows nothing about screens
+    body: Parsing, indexing, search and the graph live in a package that imports no UI framework at all. That is why they are covered by real tests instead of a simulator, and why the same engine could back a command line tool later.
+features:
+  title: What is in it
+  sub: Everything below is implemented and running, not a roadmap.
+  items:
+    live_preview:
+      kicker: Editing
+      title: Live preview, not a split screen
+      body: Headings, bold, quotes, callouts, checkboxes, tables and code all render in place as you type, with the syntax revealed on the line the cursor is on. Reading mode is a separate, read-only view when you want the page without the scaffolding. Body font, code font and their sizes are set independently.
+      alt: 'The Inkstone editor showing live preview: a heading, a mixed Chinese-English paragraph, a checklist, a quote, a callout, an aligned table and a code block, all rendered in place.'
+    links:
+      kicker: Linking
+      title: Wikilinks, aliases, blocks, backlinks
+      body: '[[Note]], [[Note#Heading]], [[Note^block]], ![[Embeds]] and aliases declared in frontmatter, all resolved into one index. Every note shows what points at it, what it points at, and which of its links have no target yet.'
+      alt: A note with its backlinks and outgoing links listed in the right sidebar, alongside a small local graph of its neighbours.
+    graph:
+      kicker: Seeing the shape
+      title: A graph that settles in the same place twice
+      body: The force simulation is deterministic, so the same vault draws the same picture every time and you can learn its layout rather than re-reading it on every open. Local graph shows one note and its neighbours.
+      alt: 'The graph view: notes as nodes joined by their wikilinks, clustered by how densely they reference one another.'
+    canvas:
+      kicker: Spatial notes
+      title: Canvas, in the open JSON Canvas format
+      body: Cards, files and links on an infinite sheet, saved as JSON Canvas 1.0 — the same file the format's other implementations read and write. Your canvases are as portable as your notes.
+      alt: A canvas with note cards and connections laid out spatially on an infinite sheet.
+    search:
+      kicker: Finding things
+      title: Fuzzy switcher, and search that takes operators
+      body: 'One keystroke opens a fuzzy switcher over every note. Full-text search understands tag: and path:, and tags work inline or in frontmatter, nested, in any script — #项目/进行中 indexes exactly like #project/active.'
+      alt: The quick switcher open over a note, filtering the vault as characters are typed.
+    sync:
+      kicker: Two machines
+      title: iCloud or GitHub, and you choose what travels
+      body: Sync through iCloud, or push the vault to a GitHub repository with conflicts settled once rather than left as two copies. Per-type filters decide whether attachments and media go with it, and the vault's own .gitignore is respected.
+      alt: 'The GitHub sync settings: repository and branch pickers, and per-file-type switches deciding what is synchronised.'
+typography:
+  title: Setting Chinese and English on one line
+  sub: The hard case is a Latin word inside a Han sentence. Nearly every app gets it wrong, in a way that is easy to see once and impossible to unsee after.
+  folio: Specimen · Source Serif 4 with Source Han Serif
+  specimen_title: 中英文混排 and the quarter-em gap
+  specimen_lead: Chinese sets solid. There are no word spaces, so a line's evenness is what the eye reads. Drop typography into that line and the two scripts collide.
+  specimen_body: 正文里出现Latin单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与Latin的交界都由构建时插入的空元素撑开，在支持text-autospace的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。
+  specimen_quote: Typography exists to honour content. It is a servant, and its manners should be invisible.
+  specimen_cite: Robert Bringhurst, The Elements of Typographic Style
+  notes:
+  - term: The measure
+    def: Body text is held to roughly 66 characters a line, the width Bringhurst gives as the single-column ideal. Past about 75 the eye loses the return.
+  - term: One superfamily
+    def: Latin is Source Serif 4; Han is Source Han Serif, whose Latin companion is Source Serif. The mixed line is one designer's serif, not two fighting.
+  - term: Colour is meaning
+    def: A single cinnabar red — the ink of a carved seal pressed onto paper — marks links, tags and the current action. Nothing else is coloured.
+  - term: Motion is punctuation
+    def: Elements rise eight pixels as they arrive and nothing else moves. Turn on Reduce Motion and the page is served without any of it.
+specs:
+  title: Specifications
+  sub: The parts worth knowing before you download anything.
+  rows:
+  - k: Platforms
+    v: macOS 26 and iOS 26, one SwiftUI codebase, Apple silicon
+  - k: Storage
+    v: Plain Markdown files in a folder you pick. No database, no import
+  - k: Compatibility
+    v: Obsidian vaults open unchanged, both directions. Canvas is JSON Canvas 1.0
+  - k: Markdown
+    v: GitHub Flavored Markdown, plus wikilinks, embeds, block references, callouts, footnotes, maths and Mermaid
+  - k: Sync
+    v: iCloud or a GitHub repository, with per-file-type filters
+  - k: Interface languages
+    v: English, 简体中文, 繁體中文
+  - k: Source
+    v: Public on GitHub. A licence has not been chosen yet.
+  - k: Privacy
+    v: No account, no telemetry, no network call you did not ask for
+  closer: It is free, it keeps nothing from you, and the files it writes are the files you already had.
+siblings:
+  audioswitch: Switch audio devices from the menu bar
+  candela: Control external display brightness
+  clipstack: Clipboard history that stays out of the way
+footer:
+  tagline: A notes app that leaves your files alone.
+  project: Project
+  issues: Issues
+  also: Also by the same hand
+  colophon: Set in Source Serif 4 and Source Han Serif. Built as static files, served from GitHub Pages, and no analytics of any kind.

@@ -10,21 +10,36 @@
 	<!-- Required to restore vault access after relaunch via bookmarks. -->
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>
-	<!-- Outbound only: GitHub sync. No inbound server. -->
+	<!-- Outbound only: GitHub sync, and Sparkle's update downloads. Because the
+	     app has this, Sparkle's Downloader XPC service is unnecessary. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<!--
-	iCloud Drive vault storage is intentionally NOT enabled here yet. The
-	`iCloud.com.orris.inkstone` container has to exist in the developer portal
-	before Xcode can mint a provisioning profile for it; enabling it early makes
-	every local build fail to sign. Re-add these keys once the container exists:
-
-		com.apple.developer.ubiquity-container-identifiers
-		com.apple.developer.icloud-container-identifiers
-		com.apple.developer.icloud-services  (CloudDocuments)
-
-	The code path in WelcomeView.createICloudVault() already handles the
-	container being unavailable, so the app degrades cleanly until then.
-	-->
+	<!-- Lets the sandboxed app reach Sparkle's installer tools. Both names are
+	     required and both are derived from the bundle id; without them the
+	     updater fails silently rather than reporting anything. Accepted for
+	     Developer ID distribution, which is how this ships — the Mac App Store
+	     would reject them. -->
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.orris.inkstone</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.com.orris.inkstone</string>
+	</array>
+	<!-- Carries the GitHub repository, branch and schedule between the user's
+	     devices, so a second device is the same vault rather than a fresh
+	     setup. The token travels separately, in iCloud Keychain. -->
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
 </dict>
 </plist>

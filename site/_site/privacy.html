@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Inkstone</title>
+<meta name="description" content="Inkstone collects nothing. There is no account, no telemetry, and no server belonging to us.">
+<link rel="canonical" href="https://inkslab.app/privacy.html">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .legal { max-width: 40rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
+  .legal h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
+  .legal h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 2.5rem; margin-bottom: .6rem; }
+  .legal p, .legal li { color: var(--ink-2); }
+  .legal ul { list-style: disc; padding-inline-start: 1.2rem; margin-block: .8rem; }
+  .legal li { margin-block: .4rem; }
+  .legal .updated { font-family: var(--sans); font-size: var(--t-micro);
+                    letter-spacing: .14em; text-transform: uppercase;
+                    color: var(--ink-faint); margin-bottom: 1.4rem; }
+</style>
+</head>
+<body>
+<main class="wrap legal">
+  <p class="updated">Updated 20 August 2026</p>
+  <h1>Privacy</h1>
+
+  <p>Inkstone collects nothing. There is no account to create, no analytics, no
+  crash reporting, and no server belonging to us for anything to be sent to.</p>
+
+  <h2>Your notes</h2>
+  <p>Your notes are Markdown files in a folder you choose on your own device.
+  Inkstone reads and writes them in place. It keeps its own state — window
+  layout, the last note you had open — in a hidden <code>.inkstone</code> folder
+  inside that same vault, which you are free to delete.</p>
+
+  <h2>The network</h2>
+  <p>Inkstone makes network connections in exactly three situations, all of them
+  started by you:</p>
+  <ul>
+    <li><strong>iCloud sync</strong>, if you put a vault in iCloud Drive. Your
+    files go to Apple, under
+    <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>.
+    They do not pass through us.</li>
+    <li><strong>GitHub sync</strong>, if you turn it on and supply a personal
+    access token. Your files go to the repository you nominate, under
+    <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement">GitHub's
+    privacy statement</a>. The token is stored in the system Keychain and is sent
+    only to GitHub.</li>
+    <li><strong>Update checks</strong>, which fetch
+    <code>https://inkslab.app/appcast.xml</code> — a static file — to see whether
+    a newer version exists. The request carries no identifier we record. You are
+    asked on first launch whether to do this automatically, and you can say no.</li>
+  </ul>
+  <p>Nothing else leaves your device.</p>
+
+  <h2>This website</h2>
+  <p>inkslab.app is static files served by GitHub Pages. There is no analytics
+  script of any kind and no cookie is set. GitHub processes request logs as its
+  infrastructure provider.</p>
+
+  <h2>Children</h2>
+  <p>Inkstone is a text editor with no social features, no user-generated content
+  from anyone but you, and no advertising.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this policy ever changes, the date at the top changes with it and the
+  history is public in the repository. Questions:
+  <a href="https://github.com/iamzifei/inkstone/issues">open an issue</a>.</p>
+</main>
+</body>
+</html>

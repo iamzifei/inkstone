@@ -55,7 +55,10 @@ public struct SettingsData: Codable, Hashable, Sendable {
 
     // Editor behaviour
     public var showLineNumbers = false
-    public var spellCheck = true
+    /// Off by default. In Markdown the checker flags LaTeX, code, wikilinks and
+    /// tags as misspellings, and on collapsed syntax the squiggle shrinks to a
+    /// stray red dot under the rendered content. Obsidian defaults to off too.
+    public var spellCheck = false
     public var autoPairBrackets = true
     /// Turns `- ` into a continued list on Return, and continues checkboxes.
     public var smartLists = true
@@ -81,6 +84,33 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var attachmentFolder = "Attachments"
     public var defaultNewNoteFolder = ""
 
+    /// Whether to keep an iCloud-backed vault's files present on disk.
+    ///
+    /// On by default: a vault in iCloud whose notes have been evicted looks like
+    /// a vault that has lost notes. Turning it off leaves eviction alone, which
+    /// is what you want on a machine short of disk space.
+    public var iCloudSyncEnabled = true
+
+    /// Whether GitHub sync is active. Off by default — it needs a repository and
+    /// a token before it can do anything, so it stays out of the way until asked
+    /// for.
+    public var gitHubSyncEnabled = false
+
+    /// Sync with GitHub on its own, rather than only when asked.
+    public var gitHubAutoSync = true
+    /// How often to sync while the app is open. 0 syncs only when a vault opens.
+    public var gitHubSyncIntervalMinutes = 15
+
+    /// Which file types take part in sync.
+    public var syncPolicy = SyncFilePolicy()
+    /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
+    /// here — this struct is a plain JSON blob in UserDefaults.
+    public var gitHubRepository = ""
+    public var gitHubBranch = "main"
+    /// When this device last changed the GitHub setup, so the copy shared
+    /// between devices can tell which side is newer. Bookkeeping, not a setting.
+    public var gitHubConfigurationUpdatedAt: Date?
+
     // Graph
     public var graphShowTags = true
     public var graphShowAttachments = false
@@ -93,6 +123,62 @@ public struct SettingsData: Codable, Hashable, Sendable {
     }
 
     public init() {}
+
+    /// Decodes leniently: any key that is absent keeps its default.
+    ///
+    /// This is not a nicety, it is a data-loss guard. Settings are loaded with
+    /// `try? JSONDecoder().decode(...)`, and Swift's synthesised decoding treats
+    /// a *missing* key as an error even when the property has a default value.
+    /// With synthesised decoding, therefore, adding any new field to this struct
+    /// makes every settings file written by an earlier build fail to decode — and
+    /// because the failure is swallowed by `try?`, the user silently loses every
+    /// preference they had set. Decoding field by field means an old file simply
+    /// picks up defaults for whatever is new.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            (try? container.decodeIfPresent(T.self, forKey: key)) .flatMap { $0 } ?? fallback
+        }
+        let defaults = SettingsData()
+
+        language = value(.language, defaults.language)
+        appearance = value(.appearance, defaults.appearance)
+        themeID = value(.themeID, defaults.themeID)
+        typography = value(.typography, defaults.typography)
+        editorMode = value(.editorMode, defaults.editorMode)
+
+        showLineNumbers = value(.showLineNumbers, defaults.showLineNumbers)
+        spellCheck = value(.spellCheck, defaults.spellCheck)
+        autoPairBrackets = value(.autoPairBrackets, defaults.autoPairBrackets)
+        smartLists = value(.smartLists, defaults.smartLists)
+        showFrontmatterAsProperties = value(.showFrontmatterAsProperties, defaults.showFrontmatterAsProperties)
+        indentWithTabs = value(.indentWithTabs, defaults.indentWithTabs)
+        tabSize = value(.tabSize, defaults.tabSize)
+
+        useShortestPathLinks = value(.useShortestPathLinks, defaults.useShortestPathLinks)
+        updateLinksOnRename = value(.updateLinksOnRename, defaults.updateLinksOnRename)
+        newLinkFormat = value(.newLinkFormat, defaults.newLinkFormat)
+
+        dailyNoteFolder = value(.dailyNoteFolder, defaults.dailyNoteFolder)
+        dailyNoteFormat = value(.dailyNoteFormat, defaults.dailyNoteFormat)
+        dailyNoteTemplate = value(.dailyNoteTemplate, defaults.dailyNoteTemplate)
+        weekStartsOnMonday = value(.weekStartsOnMonday, defaults.weekStartsOnMonday)
+
+        attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)
+        defaultNewNoteFolder = value(.defaultNewNoteFolder, defaults.defaultNewNoteFolder)
+        iCloudSyncEnabled = value(.iCloudSyncEnabled, defaults.iCloudSyncEnabled)
+        gitHubSyncEnabled = value(.gitHubSyncEnabled, defaults.gitHubSyncEnabled)
+        gitHubAutoSync = value(.gitHubAutoSync, defaults.gitHubAutoSync)
+        gitHubSyncIntervalMinutes = value(.gitHubSyncIntervalMinutes, defaults.gitHubSyncIntervalMinutes)
+        syncPolicy = value(.syncPolicy, defaults.syncPolicy)
+        gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
+        gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)
+        gitHubConfigurationUpdatedAt = value(.gitHubConfigurationUpdatedAt, defaults.gitHubConfigurationUpdatedAt)
+
+        graphShowTags = value(.graphShowTags, defaults.graphShowTags)
+        graphShowAttachments = value(.graphShowAttachments, defaults.graphShowAttachments)
+        graphShowUnresolved = value(.graphShowUnresolved, defaults.graphShowUnresolved)
+    }
 }
 
 /// Observable settings store backed by `UserDefaults`.

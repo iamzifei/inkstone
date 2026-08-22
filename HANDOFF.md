@@ -6,6 +6,20 @@ conversation on another machine can pick up without re-deriving anything.
 Read this top to bottom before touching code. The **Open bug** section is where
 work actually stopped.
 
+> **Update 2026-08-16.** The §4 crash **did not reproduce** on a second machine
+> with real displays attached, and the UI has now been seen and screenshotted.
+> Since then: system dark/light following was broken and is fixed, the accent is
+> now cinnabar, contrast is asserted by tests, and the app has an icon. Current
+> state and the remaining UI defect list live in
+> `/Users/james/Dev/inkstone/docs/plans/2026-08-16-ui-theming-and-icon.md` —
+> read that alongside this file. Since then: tables render, the graph bug is
+> fixed, and attachments (inline images, drop/paste import, per-type sync
+> filters) are implemented, block-level live preview (lists, quotes, callouts,
+> checkboxes, code chips) landed, canvas and graph frame their content, reading
+> mode is read-only, and GitHub sync is built. Tests 26 → 90. **The desktop app
+> is feature-complete against the original brief except iCloud, which is blocked
+> on the container entitlement. iOS has still never been run.**
+
 ---
 
 ## 1. What this is
@@ -129,15 +143,32 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 
 ### NOT verified — be honest about this
 
-- **Nobody has ever seen the UI.** Not one screenshot. The assistant had no Screen
-  Recording permission and peekaboo fell back to a local host instead of the
-  OpenClaw GUI bridge. Live preview quality, CJK line-height, graph smoothness,
-  Liquid Glass conformance — all unknown.
-- **iOS has never been run.** Typechecks only. The UIKit editor path
-  (tap-to-follow-link hit testing via `layoutManager.characterIndex`, keyboard
-  insets) has never executed a single line.
-- **Reading mode falls back to live preview.** No AST renderer yet, even though
-  `swift-markdown` is already a resolved dependency.
+- ~~**Nobody has ever seen the UI.**~~ Resolved 2026-08-16: the macOS UI has been
+  run and screenshotted on a machine with real displays. Live preview, CJK
+  typography and the inspector all render. Graph view is blank — see the defect
+  list in `docs/plans/2026-08-16-ui-theming-and-icon.md`.
+- ~~**iOS has never been run.**~~ Superseded: iOS has been run and screenshotted
+  on the simulator repeatedly, and since 2026-08-18 it is installed on a physical
+  iPhone 15 Pro (`Tools/install-ios.sh`).
+- **Editing on the phone works, confirmed on hardware 2026-08-18.** Tapping a
+  note's text did not raise the keyboard: the custom tap recogniser that handles
+  checkboxes, callouts, copy buttons and links was competing with the text view's
+  own — the one that places the caret and takes first responder. Fixed with a
+  gesture delegate allowing simultaneous recognition, plus taking first responder
+  explicitly when a tap activated nothing, so the outcome does not depend on
+  which recogniser wins.
+
+  Worth keeping: this could not be verified here. Synthetic clicks into the
+  Simulator never reached the simulated screen — the control experiment, clicking
+  the editor-mode button, did nothing either — so those runs said nothing about
+  the app. It was shipped as a hypothesis resting on the UIKit contract and
+  confirmed by James on the device. **Touch behaviour on iOS is not testable from
+  this machine; it needs the phone.**
+- ~~**Reading mode falls back to live preview.**~~ Corrected 2026-08-17 by
+  reading the code rather than the note: reading mode sets `isEditable = false`
+  and passes no caret line, so nothing ever reveals its source. That *is* "fully
+  rendered, read-only" — a separate AST renderer was never needed, because live
+  preview's rendering is the rendering.
 
 ### Feature matrix
 
@@ -151,24 +182,31 @@ Nested tags, CJK tags, a Chinese alias, `[[Ideas/Product Ideas|产品想法]]`
 | Link index, backlinks, unresolved links | ✅ tested |
 | Rename with vault-wide link rewriting | ✅ tested |
 | Tags (inline + frontmatter, nested, CJK) | ✅ tested |
-| Live-preview editor (TextKit) | ⚠️ built, never seen |
+| Live-preview editor (TextKit) | ✅ seen working |
 | Quick switcher + full-text search | ✅ tested |
-| Graph view (force-directed, local graph) | ✅ logic tested, never seen |
-| Canvas (JSON Canvas 1.0) | ✅ round-trip tested, never seen |
-| Calendar + daily notes | ⚠️ built, never seen |
-| Themes, typography, CJK settings | ⚠️ built, never seen |
+| Graph view (force-directed, local graph) | ✅ tested and seen rendering |
+| Canvas (JSON Canvas 1.0) | ✅ round-trip tested; frames content on open |
+| Calendar + daily notes | ✅ seen working |
+| Themes, typography, CJK settings | ✅ seen; dark/light + AA contrast tested |
 | i18n (en / 简体 / 繁體) | ✅ 108 strings |
-| iCloud vault storage | ⚠️ code done, entitlement deferred (§6) |
-| GitHub sync | ❌ not started |
-| Reading-mode renderer | ❌ not started |
-| **Attachments / images / video + preview** | ❌ **not started (requested)** |
-| **Per-file-type sync filters** | ❌ **not started (requested)** |
-| Math, Mermaid, PDF embeds | ❌ not started |
+| iCloud vault storage | ✅ container resolves, vault created, a note verified uploaded (§6) |
+| GitHub sync | ✅ integration tests run against a live repository 2026-08-18; found and fixed a remote-deletion bug and a missing retry (§7) |
+| Reading mode | ✅ read-only, no caret reveal |
+| **Attachments / images / video + preview** | ✅ inline images, drop/paste import |
+| **Per-file-type sync filters** | ✅ applied by the GitHub sync engine |
+| GFM tables | ✅ drawn as a grid: header band, row and column rules, `:--:` alignment |
+| Math (inline + display) | ✅ SwiftMath, typeset in place |
+| Mermaid | ✅ WKWebView snapshot, cached |
+| Inline HTML | ✅ a whitelist of tags styled; the rest left as source |
+| Block HTML | ❌ shown as source (H3 in `docs/plans/2026-08-17-tables-and-html.md`) |
+| PDF embeds | ✅ first page rendered inline; click still opens the file |
+| `![[Note]]` transclusion | ✅ whole note, `#Heading` section or `#^block` |
+| Callout folding | ✅ `[!note]-` folds; the disclosure writes the state back |
 | Plugin API | ❌ not started |
 
 ---
 
-## 4. THE OPEN BUG — read this first
+## 4. A crash that has not returned — history, not a blocker
 
 **Symptom:** James clicked "Open Folder as Vault", picked a folder, app died
 instantly. `SIGABRT`.
@@ -217,7 +255,18 @@ failing under a headless/screen-shared display configuration fits every fact,
 including why **only Inkstone crashed** — of the 3 recent crash reports on that
 machine, only this one touches RenderBox, because most apps never hit that path.
 
-**Confidence: hypothesis, not proven.** It was never reproduced.
+**Confidence: hypothesis, not proven.** It was never reproduced — and as of
+2026-08-18 it still has not been, on a display that has been awake throughout.
+Step 1 below (the cheapest decisive test) has effectively been run many times
+since: the app has been launched, opened vaults and been used across several
+sessions on this machine with no RenderBox abort. The only two Inkstone crash
+reports on this Mac since are both `MermaidRenderer` on the **iOS Simulator**,
+from 2026-08-17 15:38, fixed by 4620eac seventeen minutes later.
+
+**So this section is history, not a live blocker, and should not be the first
+thing a new session reads.** It is kept because the hypothesis is still
+unverified and the timeline analysis is still the useful part if it ever
+returns.
 
 ### Why it couldn't be reproduced
 
@@ -268,11 +317,25 @@ to bypass it. In priority order:
 | --- | --- | --- |
 | Scratch vault | `INKSTONE_SCRATCH_VAULT=1`, or create the marker file at `Application Support/inkstone-scratch-vault` | ✅ yes — seeds a small vault inside the app's own container |
 | Explicit path | `echo /path/to/vault > /tmp/inkstone-test-vault` | ❌ no — sandbox blocks `/tmp` |
-| Env var | `INKSTONE_OPEN_VAULT=/path/to/vault` | ❌ no, and `open` doesn't forward env |
+| Env var | `INKSTONE_OPEN_VAULT=/path/to/vault` | ⚠️ not by inheritance, but `open --env` does forward it |
 
-Debug output goes to stderr **and** to
-`Application Support/inkstone-debug.log` inside the container, because `open`
-discards stderr.
+**Corrected 2026-08-18: `open` forwards environment and can redirect output.**
+This table said it could not, and §4 lists both as dead ends that blocked
+reproducing the crash. Both are wrong — `open --env VAR=value --stdout PATH
+--stderr PATH -W App.app` was used this session to run a debug hook in a
+LaunchServices-launched sandboxed build and read what it printed:
+
+```bash
+open --env INKSTONE_ICLOUD_CHECK=1 --stdout /tmp/out.txt -W .../Inkstone.app
+```
+
+Which matters beyond the flags: a hook that can only be reached by running the
+Mach-O directly is being measured in a process LaunchServices never registered,
+and that is not the app users run. `open --env` removes the reason to test the
+wrong thing.
+
+Debug output still goes to `Application Support/inkstone-debug.log` inside the
+container as well, which needs no flags and survives a crash.
 
 `VaultRegistry.register(folder:)` deliberately tolerates bookmark-creation
 failure (falls back to a path-only vault) so unsandboxed dev builds work.
@@ -289,13 +352,46 @@ shadowed Xcode's own copy, so `xcodebuild` couldn't load `IDESimulatorFoundation
 and refused to build *anything*. Fixed with `sudo xcodebuild -runFirstLaunch`.
 If the second machine shows the same symptom, that's the fix.
 
-**iCloud entitlement is deliberately disabled.** `iCloud.com.orris.inkstone`
-doesn't exist in the developer portal, and enabling the entitlement before the
-container exists makes every local build fail to sign with "requires a
-provisioning profile". The keys are commented in
-`App/Resources/Inkstone.entitlements` with restore instructions.
-`WelcomeView.createICloudVault()` shows an alert instead of failing silently.
-**Create the container in the portal first, then uncomment.**
+**iCloud works. It was never blocked, and the entry that said so was wrong.**
+Corrected 2026-08-17. What this file previously reported:
+
+```
+$ INKSTONE_ICLOUD_CHECK=1 .build-xcode/Build/Products/Debug/Inkstone.app/Contents/MacOS/Inkstone
+iCloud container: UNAVAILABLE for iCloud.com.orris.inkstone
+```
+
+That command cannot produce any other answer. `INKSTONE_ICLOUD_CHECK` is compiled
+into debug builds only, and that debug build was signed with
+`Inkstone-Dev.entitlements` — which carries no iCloud keys at all. **The only
+binary containing the check was the only binary guaranteed to fail it.** Its
+`nil` was a fact about the entitlements it was signed with, and it was written
+down as a fact about Apple's servers, where it then sat for a day directing work
+that did not need doing.
+
+What is actually true, each measured:
+
+| claim | evidence |
+|---|---|
+| the container exists in the portal | `/Applications/Inkstone.app/Contents/embedded.provisionprofile` grants `iCloud.com.orris.inkstone` — Apple does not sign a profile for a container that does not exist |
+| it is live and syncing | `brctl status iCloud.com.orris.inkstone` → `ever-full-sync`, `caught-up`, last-sync updating on each write |
+| a Developer ID build reaches it | archive + export through `Tools/package-dmg.sh`'s exact signing → `iCloud container: AVAILABLE` |
+| the vault path works | `INKSTONE_ICLOUD_CHECK=create` → `Documents/Inkstone` created through the same call the button uses |
+| a note actually uploads | `URLResourceValues` on a note in it → `isUbiquitous: true`, `containerName: Inkstone`, `isUploaded: true` |
+
+One wrong turn is worth keeping, because it nearly became a second false entry:
+a Developer-ID build re-signed by hand with `codesign --force` reports
+UNREACHABLE. That is the re-signing, not the configuration — `codesign` applies
+the entitlements file you hand it, and the shipping entitlements come from
+`-exportArchive` merging the profile. Signing something yourself to test how the
+shipped thing behaves changes the thing being tested.
+
+To run the check honestly, the hook and the entitlement have to be in the same
+binary — the doc comment on `checkICloudIfRequested` gives the commands.
+
+**Verified on device 2026-08-18.** `Sync check.md`, written into the container on
+the Mac, appeared in the "Inkstone (iCloud)" vault on the iPhone 15 Pro. iCloud
+sync is done end to end, Mac → phone. (The Simulator has no iCloud account and
+reports `notSignedIn`, correctly, so it can never stand in for this check.)
 
 **`DEVELOPMENT_TEAM: K9YT36SP4B`** (Orris Technology) is committed in
 `project.yml`. Team IDs aren't secret — they appear in every notarised app — and
@@ -306,11 +402,64 @@ under a different team.
 
 ## 7. Known defects (separate from the crash)
 
-- **The app has no icon.** `AppIcon.appiconset/Contents.json` declares image slots
-  but contains no image files; `xcrun assetutil --info` on the built `Assets.car`
-  shows only `AccentColor`. Needs real icon art (macOS 26 wants Icon Composer).
-- **Reading mode silently behaves as live preview** — the picker offers a mode
-  that doesn't exist yet.
+### Sync, 2026-08-18 — what running the integration tests found
+
+Run for the first time against `iamzifei/inkstone`, with a token from
+`gh auth token` rather than a pasted PAT. Writes went to a throwaway branch,
+deleted afterwards; `main` was not written to.
+
+- **Fixed: an oversized attachment planned `deleteRemote`.** The vault scan
+  filters by size, the planner did not, and the planner sees only hashes — so
+  "not carried by this vault" and "the user deleted it" were the same thing to
+  it. Lowering `maximumFileSizeMB` in Settings would have deleted previously
+  synced files off GitHub.
+- **Fixed: no retry.** A single 503 failed a sync. Two live runs in five.
+  Bounded retry on 5xx/429 only; six runs after, none failed.
+- **Fixed: HTTP errors did not name the failing request.**
+
+**Fixed 2026-08-18, found by James pointing sync at a real vault: a mistyped
+branch could have deleted every local note.** `listFiles` treated a 404 on
+`git/trees/<branch>` as "the repository is empty". A 404 there means *no such
+branch*, and the two lead opposite ways: empty means upload everything, missing
+means we cannot see the remote at all. Reported as an empty remote, the planner
+read every previously-synced file as deleted remotely — and its answer to a
+remote deletion is `deleteLocal`. Demonstrated, not deduced:
+
+```
+PLANNED: [deleteLocal(path: "Notes/Important.md")]
+```
+
+He got the harmless half — nothing had synced yet, so all 8,882 files looked new
+and produced 8,882 failed uploads — because the repository's only branch is
+`master` while the setting said `main`. Had that vault synced once before, the
+same wrong branch would have deleted 8,882 local files.
+
+Three changes: a 404 on the tree is now `branchNotFound`, naming the branch and
+listing what exists; `verify()` checks the branch as well as the repository,
+because a check that tests only the half that is usually right certifies the
+failure; and the engine refuses to run at all when the remote lists nothing while
+the recorded state holds files, whatever the cause.
+
+**Unresolved, n=1: one pull run reported a change on an already-settled vault**
+(`changeCount == 1`), on the very first run and never since — 0 failures in 13
+subsequent runs. Cause not established, so it is not written down as one.
+`SyncReport.changeSummary` now names the offending file if it returns.
+
+**Worth knowing before pointing these tests anywhere:** an earlier run, against
+this repository, deleted six tracked files. `origin/main` is exactly local `main`
+plus six `Delete Samples/Inkstone Demo/… from Inkstone` commits. Nothing is lost
+— every file is present locally and in git history — but the remote branch is
+missing them until someone pushes. That is sync working as designed: the vault it
+was pointed at did not contain those files, so it removed them from the remote.
+It is an argument for pointing the tests at a scratch repository, not at this
+one.
+
+
+- ~~**The app has no icon.**~~ Fixed 2026-08-16. `Tools/generate-app-icon.py`
+  builds every slot from `Tools/icon-artwork.png`; `Assets.car` now carries 11
+  `AppIcon` entries.
+- ~~**Reading mode silently behaves as live preview**~~ — no longer true; see
+  §3. It is read-only and never reveals syntax.
 - Graph `TimelineView`/`Canvas` mutates `@State` from inside the draw closure via
   `Task { @MainActor }`. It works, but it's an odd pattern worth revisiting if the
   graph misbehaves.

@@ -1,0 +1,63 @@
+# Builds and publishes the website to GitHub Pages.
+#
+# Pages can only serve the repository root or /docs, and this repository already
+# uses docs/ for plans and screenshots that have no business being public. So the
+# site is built into site/_site and uploaded as an artifact instead, which lets
+# the source tree stay as it is.
+name: site
+
+on:
+  push:
+    # `feat/website` is here temporarily. `main` is 78 commits behind the real
+    # work and carries four stray notes the app's own GitHub sync pushed into it
+    # while being tested, so the site is published from the branch until someone
+    # decides what main should be. Remove this line and the matching entry in the
+    # github-pages environment's deployment branch policies once it is sorted.
+    branches: [main, feat/website]
+    paths: ['site/**', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress: false` because cancelling a deploy
+# halfway leaves Pages serving a half-published tree.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+
+      # The committed site/_site must match what the source builds. Without this
+      # a hand-edit to the output would survive until the next unrelated build
+      # silently reverted it.
+      - name: Check the committed output is in sync
+        run: python3 site/build.py --check
+
+      - name: Test the typesetting pass
+        run: python3 -m unittest discover -s site/tests
+
+      - run: python3 site/build.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/_site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

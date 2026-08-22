@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Inkstone</title>
+    <link>https://inkslab.app/appcast.xml</link>
+    <description>Most recent Inkstone updates.</description>
+    <language>en</language>
+    <item>
+      <title>0.1.1</title>
+      <pubDate>Thu, 20 Aug 2026 08:19:25 GMT</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/iamzifei/inkstone/releases/download/v0.1.1/Inkstone.dmg" sparkle:edSignature="SevvDFmBg5itFq6VlCUKs2V0F+qwES8BdF6yfTiniQtJao5iifPVarRooxEUSx6LAzCeQTdZqhfV8PtoKU9BDw==" length="10854641" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

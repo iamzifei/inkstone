@@ -11,7 +11,20 @@ struct RootView: View {
     @Environment(\.style) private var style
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    // The inspector starts open on a Mac and closed everywhere else. On an iPad
+    // the sidebar and the inspector are both overlays at these widths, so
+    // opening both by default left the editor as a strip between two floating
+    // panels — three columns' worth of chrome on a screen that fits two.
+    #if os(macOS)
     @State private var isInspectorPresented = true
+    #else
+    @State private var isInspectorPresented = false
+    #endif
+
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         @Bindable var workspace = workspace
@@ -20,23 +33,87 @@ struct RootView: View {
             if workspace.vault == nil {
                 WelcomeView()
             } else {
-                NavigationSplitView(columnVisibility: $columnVisibility) {
-                    SidebarView()
-                        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
-                } detail: {
-                    DetailView()
-                        .inspector(isPresented: $isInspectorPresented) {
-                            InspectorView()
-                                .inspectorColumnWidth(min: 240, ideal: 300, max: 420)
-                        }
+                #if os(iOS)
+                // A compact width — every iPhone, and an iPad in Slide Over —
+                // collapses `NavigationSplitView` to a single column, and the
+                // detail column is then only reachable by navigating to it.
+                // Selecting a note here changes workspace state rather than
+                // following a `NavigationLink`, so nothing pushed and the editor
+                // was unreachable: the note highlighted and the view stayed put.
+                if sizeClass == .compact {
+                    NavigationStack {
+                        SidebarView()
+                            .navigationDestination(isPresented: showingDetail) {
+                                DetailView()
+                                    .toolbar { toolbarContent }
+                            }
+                    }
+                } else {
+                    splitView
                 }
-                .toolbar { toolbarContent }
+                #else
+                splitView
+                #endif
             }
         }
         .tint(style.accent)
         .background(style.background)
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
+        }
+    }
+
+    @ViewBuilder
+    private var splitView: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            SidebarView()
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
+        } detail: {
+            DetailView()
+                .inspector(isPresented: $isInspectorPresented) {
+                    InspectorView()
+                        .inspectorColumnWidth(min: 240, ideal: 300, max: 420)
+                }
+        }
+        .toolbar { toolbarContent }
+    }
+
+    #if os(iOS)
+    /// Drives the push, and closes the tab again when the user swipes back — so
+    /// returning to the list actually deselects, rather than leaving a note
+    /// open that nothing on screen refers to.
+    private var showingDetail: Binding<Bool> {
+        Binding(
+            get: { workspace.activeTab != nil },
+            set: { presented in
+                if !presented, let tab = workspace.activeTab {
+                    workspace.closeTab(tab)
+                }
+            }
+        )
+    }
+    #endif
+
+    private var syncSymbol: String {
+        switch workspace.syncStatus {
+        case .running: "arrow.trianglehead.2.clockwise"
+        case .failed: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
+        default: "arrow.trianglehead.2.clockwise"
+        }
+    }
+
+    private var syncHelp: String {
+        switch workspace.syncStatus {
+        case .idle: String(localized: "Sync with GitHub")
+        case .running(let message): message
+        case .failed(let message): message
+        case .finished(let report):
+            report.changeCount == 0
+                ? String(localized: "Up to date")
+                : String(localized: "\(report.changeCount) change(s) synced")
+        // Says what actually happened. "Failed" would be wrong — the run was cut
+        // short by the system, what it moved is kept, and the next one resumes.
+        case .interrupted: String(localized: "Sync paused — it will continue")
         }
     }
 
@@ -83,6 +160,19 @@ struct RootView: View {
                 Button("Today's Daily Note", systemImage: "sun.max") { workspace.openDailyNote() }
             } label: {
                 Label("New", systemImage: "plus")
+            }
+
+            // Only present once GitHub sync is switched on: a sync button that
+            // can never do anything is worse than no button.
+            if workspace.settings.data.gitHubSyncEnabled {
+                Button {
+                    Task { await workspace.sync() }
+                } label: {
+                    Label("Sync with GitHub", systemImage: syncSymbol)
+                        .symbolEffect(.rotate, isActive: workspace.isSyncing)
+                }
+                .disabled(!workspace.canSync)
+                .help(syncHelp)
             }
 
             Button {

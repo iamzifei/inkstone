@@ -1,0 +1,113 @@
+title: Inkstone — eine Markdown-Notizapp für macOS und iOS
+description: Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.
+nav:
+  label: Abschnitte
+  skip: Zum Inhalt springen
+  features: Funktionen
+  typography: Typografie
+  specs: Technische Daten
+cta:
+  download: Für macOS laden
+  source: Quelltext lesen
+  tour: Ansehen, was sie kann
+  kofi: Auf Ko-fi unterstützen
+hero:
+  eyebrow: macOS 26 · iOS 26 · Natives SwiftUI
+  title: Ihre Notizen sind Dateien. Das sollen sie bleiben.
+  lede: Inkstone arbeitet direkt mit reinem Markdown in einem Ordner Ihrer Wahl. Es liest den Tresor, den Sie schon haben, schreibt nichts, was sich nicht in jedem anderen Editor öffnen ließe, und legt seinen eigenen Zustand in einem versteckten Ordner ab, den Sie jederzeit löschen dürfen.
+  note: Kostenlos · Apple Silicon · English · 简体中文 · 繁體中文
+  video_alt: 'Eine Bildschirmaufnahme von Inkstone unter macOS: ein Tresor wird geöffnet, eine Zeile aus chinesischer und lateinischer Schrift getippt, einem Wikilink gefolgt und der Graph geöffnet.'
+  video_caption: Aufgenommen unter macOS 26. Ungeschnitten, bis auf die Blenden zwischen den Abschnitten.
+creed:
+  title: Drei Entscheidungen, aus denen alles Übrige folgt
+  sub: Sie sind tragend, und sie erklären, warum sich die App so verhält.
+  columns:
+  - title: Die Dateien sind die Wahrheit
+    body: Keine Datenbank, kein Importschritt, kein proprietäres Format. Ein von Obsidian angelegter Tresor öffnet sich hier, einer von hier dort. Wäre Inkstone morgen verschwunden, hätten Sie immer noch einen Ordner voller Markdown.
+  - title: Ein toter Link bleibt tot
+    body: Weil es keine Datenbank gibt, die ihn reparieren könnte, schreibt das Umbenennen einer Notiz jeden Wikilink, der auf sie zeigte, im selben Zug im ganzen Tresor um. Das ist die direkte Folge der Entscheidung darüber, keine nachträglich angebaute Funktion.
+  - title: Die Engine weiß nichts von Bildschirmen
+    body: Parsen, Indizieren, Suche und Graph liegen in einem Paket, das überhaupt kein UI-Framework importiert. Deshalb sind sie von echten Tests gedeckt statt von einem Simulator, und deshalb könnte dieselbe Engine später auch ein Kommandozeilenwerkzeug tragen.
+features:
+  title: Was drin ist
+  sub: Alles Folgende ist gebaut und läuft. Es ist keine Roadmap.
+  items:
+    live_preview:
+      kicker: Schreiben
+      title: Live-Vorschau statt geteiltem Fenster
+      body: Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt.
+      alt: 'Der Editor von Inkstone mit Live-Vorschau: Überschrift, ein Absatz aus gemischt chinesischer und lateinischer Schrift, eine Checkliste, ein Zitat, ein Callout, eine ausgerichtete Tabelle und ein Codeblock.'
+    links:
+      kicker: Verknüpfen
+      title: Wikilinks, Aliase, Blöcke, Backlinks
+      body: '[[Notiz]], [[Notiz#Überschrift]], [[Notiz^Block]], ![[Einbettungen]] und im Frontmatter deklarierte Aliase laufen alle in einen Index. Jede Notiz zeigt, was auf sie zeigt, worauf sie zeigt und welche ihrer Links noch kein Ziel haben.'
+      alt: Eine Notiz, deren Backlinks und ausgehende Links in der rechten Seitenleiste stehen, darunter ein kleiner lokaler Graph der Nachbarn.
+    graph:
+      kicker: Die Form sehen
+      title: Ein Graph, der sich zweimal gleich legt
+      body: 'Die Kräftesimulation ist deterministisch: derselbe Tresor zeichnet jedes Mal dasselbe Bild. Man kann sich seine Anordnung merken, statt sie bei jedem Öffnen neu zu lesen. Der lokale Graph zeigt eine Notiz und ihre Nachbarn.'
+      alt: 'Die Graphansicht: Notizen als Knoten, verbunden durch ihre Wikilinks und geballt nach der Dichte ihrer Verweise.'
+    canvas:
+      kicker: Räumliche Notizen
+      title: Canvas, im offenen Format JSON Canvas
+      body: Karten, Dateien und Verbindungen auf einem unendlichen Blatt, gespeichert als JSON Canvas 1.0 — dieselbe Datei, die auch die anderen Implementierungen des Formats lesen und schreiben. Ihre Canvas sind so portabel wie Ihre Notizen.
+      alt: Ein Canvas mit Notizkarten und Verbindungen, räumlich auf einem unendlichen Blatt angeordnet.
+    search:
+      kicker: Finden
+      title: Unscharfer Umschalter, und Suche mit Operatoren
+      body: 'Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #项目/进行中 wird genau wie #project/active indiziert.'
+      alt: Der Schnellumschalter über einer Notiz, der den Tresor beim Tippen Zeichen für Zeichen filtert.
+    sync:
+      kicker: Zwei Geräte
+      title: iCloud oder GitHub, und Sie bestimmen, was mitreist
+      body: Synchronisieren Sie über iCloud, oder schieben Sie den Tresor in ein GitHub-Repository — Konflikte werden einmal entschieden, statt als zwei Kopien liegen zu bleiben. Filter je Dateityp entscheiden, ob Anhänge und Medien mitkommen, und die .gitignore des Tresors wird respektiert.
+      alt: 'Die Einstellungen der GitHub-Synchronisierung: Auswahl von Repository und Branch sowie Schalter je Dateityp.'
+typography:
+  title: Chinesisch und Lateinisch auf einer Zeile
+  sub: Der schwierige Fall ist ein lateinisches Wort mitten im chinesischen Satz. Fast jede App macht das falsch, und zwar auf eine Weise, die man nach dem ersten Mal nicht mehr übersehen kann.
+  folio: Schriftprobe · Source Serif 4 mit Source Han Serif
+  specimen_title: 中英文混排 und das Viertelgeviert
+  specimen_lead: Chinesisch wird kompress gesetzt. Es gibt keine Wortzwischenräume, also liest das Auge die Gleichmäßigkeit der Zeile. Fällt typography hinein, stoßen die beiden Schriften aneinander.
+  specimen_body: 正文里出现Latin单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与Latin的交界都由构建时插入的空元素撑开，在支持text-autospace的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。
+  specimen_quote: Typografie ist dazu da, dem Inhalt Ehre zu erweisen. Sie ist eine Dienerin, und ihre Manieren sollten unsichtbar sein.
+  specimen_cite: Robert Bringhurst, The Elements of Typographic Style
+  notes:
+  - term: Das Satzmaß
+    def: Der Fließtext bleibt bei rund 66 Zeichen je Zeile, der Breite, die Bringhurst als einspaltiges Ideal nennt. Jenseits von etwa 75 verliert das Auge den Rücksprung.
+  - term: Eine Schriftfamilie
+    def: Lateinisch ist Source Serif 4, Chinesisch ist Source Han Serif, dessen lateinischer Begleiter wiederum Source Serif ist. Die gemischte Zeile ist die Antiqua eines Gestalters, nicht der Streit zweier.
+  - term: Farbe bedeutet etwas
+    def: Ein einziges Zinnoberrot — die Farbe eines in Papier gedrückten Siegels — kennzeichnet Links, Schlagwörter und die aktuelle Aktion. Sonst ist nichts farbig.
+  - term: Bewegung ist Interpunktion
+    def: Elemente steigen bei ihrem Erscheinen um acht Pixel, sonst bewegt sich nichts. Wer „Bewegung reduzieren“ aktiviert hat, bekommt auch das nicht.
+specs:
+  title: Technische Daten
+  sub: Was zu wissen sich lohnt, bevor Sie irgendetwas herunterladen.
+  rows:
+  - k: Plattformen
+    v: macOS 26 und iOS 26, eine SwiftUI-Codebasis, Apple Silicon
+  - k: Speicherung
+    v: Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import
+  - k: Kompatibilität
+    v: Obsidian-Tresore öffnen sich unverändert, in beide Richtungen. Canvas ist JSON Canvas 1.0
+  - k: Markdown
+    v: GitHub Flavored Markdown, dazu Wikilinks, Einbettungen, Blockreferenzen, Callouts, Fußnoten, Formelsatz und Mermaid
+  - k: Synchronisierung
+    v: iCloud oder ein GitHub-Repository, mit Filtern je Dateityp
+  - k: Oberflächensprachen
+    v: English, 简体中文, 繁體中文
+  - k: Quelltext
+    v: Öffentlich auf GitHub. Eine Lizenz ist noch nicht gewählt.
+  - k: Datenschutz
+    v: Kein Konto, keine Telemetrie, kein Netzaufruf, um den Sie nicht gebeten haben
+  closer: Sie ist kostenlos, sie hält Ihnen nichts vor, und die Dateien, die sie schreibt, sind die Dateien, die Sie ohnehin schon hatten.
+siblings:
+  audioswitch: Audiogeräte aus der Menüleiste umschalten
+  candela: Die Helligkeit externer Displays steuern
+  clipstack: Zwischenablage-Verlauf, der nicht im Weg steht
+footer:
+  tagline: Eine Notizapp, die Ihre Dateien in Ruhe lässt.
+  project: Projekt
+  issues: Issues
+  also: Ebenfalls von derselben Hand
+  colophon: Gesetzt in Source Serif 4 und Source Han Serif. Als statische Dateien gebaut, von GitHub Pages ausgeliefert, ohne jede Analytik.

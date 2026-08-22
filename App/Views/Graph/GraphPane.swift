@@ -16,14 +16,31 @@ struct GraphPane: View {
     @State private var pan: CGSize = .zero
     @State private var dragStart: CGSize = .zero
     @State private var hoveredNode: String?
+    @State private var viewportSize: CGSize = .zero
+    /// Delayed "frame the graph" job, cancelled if the graph is rebuilt again.
+    @State private var fitTask: Task<Void, Never>?
 
     var body: some View {
-        GeometryReader { geometry in
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: alpha < 0.005)) { _ in
+        // `simulation` is read *here*, during body evaluation, and handed to the
+        // canvas as a value. That is load-bearing, not stylistic.
+        //
+        // SwiftUI records a @State property as a dependency of `body` only if
+        // `body` actually reads it. Reading it solely inside the `Canvas` draw
+        // closure does not count — that runs at render time, not evaluation time.
+        // So the graph never re-evaluated when the simulation was built: the draw
+        // closure kept the copy it captured on first evaluation, where it was
+        // still nil, and the pane stayed blank forever while `rebuild()` happily
+        // reported 18 nodes.
+        let snapshot = simulation
+
+        return GeometryReader { geometry in
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: alpha < 0.005)) { timeline in
+                // `timeline.date` is likewise threaded in so each frame is a
+                // distinct value and the canvas keeps redrawing as the layout
+                // settles.
                 Canvas { context, size in
-                    draw(in: &context, size: size)
+                    draw(snapshot, in: &context, size: size, at: timeline.date)
                 }
-                .onChange(of: alpha) { _, _ in }
             }
             .background(style.background)
             .contentShape(.rect)
@@ -32,15 +49,27 @@ struct GraphPane: View {
                 handleTap(at: location, in: geometry.size)
             }
             .overlay(alignment: .bottomTrailing) { controls }
-            .onAppear { rebuild() }
+            .onAppear {
+                viewportSize = geometry.size
+                rebuild()
+            }
+            .onChange(of: geometry.size) { _, size in viewportSize = size }
             .onChange(of: workspace.index.noteCount) { _, _ in rebuild() }
         }
     }
 
     // MARK: - Drawing
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
-        guard var simulation else { return }
+    private func draw(
+        _ snapshot: GraphSimulation?,
+        in context: inout GraphicsContext,
+        size: CGSize,
+        at date: Date
+    ) {
+        // Read but unused: it is the value that makes SwiftUI treat each frame as
+        // distinct, which is what keeps the canvas redrawing. See the call site.
+        _ = date
+        guard var simulation = snapshot else { return }
 
         // Advance the simulation and cool it down; a graph that never settles is
         // exhausting to look at.
@@ -147,6 +176,7 @@ struct GraphPane: View {
                 Button { zoom = max(0.2, zoom / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
                 Slider(value: $zoom, in: 0.2...3).frame(width: 110)
                 Button { zoom = min(3, zoom * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
+                Button { fitToContent() } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                 Button { rebuild() } label: { Image(systemName: "arrow.clockwise") }
             }
             .buttonStyle(.plain)
@@ -177,6 +207,53 @@ struct GraphPane: View {
         )
         simulation = GraphSimulation(data: data)
         alpha = 1
+        pan = .zero
+        dragStart = .zero
+
+        // The force layout needs a moment to spread out before its extent means
+        // anything, so the zoom is fitted once it has largely settled rather than
+        // immediately — otherwise every graph would be framed around the tight
+        // knot the nodes start in.
+        fitTask?.cancel()
+        fitTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard !Task.isCancelled else { return }
+            fitToContent()
+        }
+    }
+
+    /// Chooses a zoom that brings the whole graph into view.
+    private func fitToContent() {
+        guard let simulation, viewportSize.width > 0, viewportSize.height > 0 else { return }
+
+        var minX = Double.greatestFiniteMagnitude
+        var minY = Double.greatestFiniteMagnitude
+        var maxX = -Double.greatestFiniteMagnitude
+        var maxY = -Double.greatestFiniteMagnitude
+        for node in simulation.data.nodes {
+            guard let position = simulation.position(of: node.id) else { continue }
+            let radius = simulation.radius(for: node.id)
+            minX = min(minX, position.x - radius)
+            minY = min(minY, position.y - radius)
+            maxX = max(maxX, position.x + radius)
+            maxY = max(maxY, position.y + radius)
+        }
+        guard minX < maxX, minY < maxY else { return }
+
+        let padding: CGFloat = 80
+        let fitted = min(
+            (viewportSize.width - padding * 2) / CGFloat(maxX - minX),
+            (viewportSize.height - padding * 2) / CGFloat(maxY - minY)
+        )
+        // Clamped to the same range the zoom slider offers.
+        let target = min(3, max(0.2, fitted))
+        // Recentre on the graph's own middle, which is rarely the origin.
+        let centre = CGPoint(x: (minX + maxX) / 2, y: (minY + maxY) / 2)
+        withAnimation(.easeOut(duration: 0.35)) {
+            zoom = target
+            pan = CGSize(width: -centre.x * target, height: -centre.y * target)
+        }
+        dragStart = pan
     }
 }
 
@@ -190,9 +267,14 @@ struct LocalGraphThumbnail: View {
     @State private var alpha: Double = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: alpha < 0.01)) { _ in
+        // Same reason as GraphPane: read during body evaluation so SwiftUI knows
+        // the canvas depends on it.
+        let snapshot = simulation
+
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: alpha < 0.01)) { timeline in
             Canvas { context, size in
-                guard var simulation else { return }
+                _ = timeline.date
+                guard var simulation = snapshot else { return }
                 if alpha > 0.01 {
                     simulation.step(alpha: alpha)
                     Task { @MainActor in

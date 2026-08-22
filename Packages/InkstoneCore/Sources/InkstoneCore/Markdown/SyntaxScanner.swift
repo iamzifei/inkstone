@@ -21,12 +21,46 @@ public enum TokenKind: Hashable, Sendable {
     case tag(String)
     case blockIdentifier(String)
     case callout(type: String, folded: Bool, title: String)
-    case blockquote
-    case listMarker
-    case task(checked: Bool)
+    /// `>` quote prefix. `depth` counts the nesting of `>` characters.
+    case blockquote(depth: Int)
+    /// The `-`/`*`/`1.` at the head of a list item. `level` is the indent depth.
+    case listMarker(level: Int, ordered: Bool)
+    /// A `- [ ]` item. `level` is the indent depth, matching `listMarker`, so a
+    /// nested task lines up with the nested bullets around it.
+    case task(checked: Bool, level: Int)
     case comment
     case horizontalRule
     case frontmatter
+    /// `[^1]` in the body of a note.
+    case footnoteReference(id: String)
+    /// `[^1]: …` at the start of a line, defining the note.
+    case footnoteDefinition(id: String)
+    /// `[TOC]` on its own line — a placeholder the renderer replaces with a
+    /// table of contents built from the document's headings.
+    case tableOfContents
+    /// `^text^`
+    case superscript
+    /// `~text~` — distinct from `~~strikethrough~~`.
+    case `subscript`
+    /// A whole GFM table block, header and body together.
+    case table
+    /// The header row of a table, so it can be weighted differently.
+    case tableHeaderRow
+    /// The `|---|:--:|` alignment row, which is scaffolding rather than content
+    /// and is hidden in live preview.
+    case tableDelimiterRow
+    /// The backslash of a CommonMark escape — the `\` of `\*`. The character it
+    /// protects is already literal text; only the backslash needs to go.
+    case escape
+    /// An HTML entity, with the character it stands for: `&copy;` → `©`. The
+    /// source is concealed and the replacement drawn in the gap, because the
+    /// buffer is the file and the file must keep the entity the user typed.
+    case entity(String)
+    /// One inline HTML tag — `<b>` or `</b>` — lowercased, with whether it
+    /// closes. Emitted for every tag; it is the *highlighter* that decides which
+    /// names it can render, because that is a question about attributes rather
+    /// than about syntax.
+    case htmlTag(name: String, isClosing: Bool)
 }
 
 public struct SyntaxToken: Hashable, Sendable {
@@ -67,138 +101,62 @@ public struct WikiLink: Hashable, Sendable {
 
     /// True when the fragment points at a `^block-id` rather than a heading.
     public var isBlockReference: Bool { fragment?.hasPrefix("^") == true }
+
+    /// The display size Obsidian reads out of an embed's pipe.
+    ///
+    /// `![[photo.png|300]]` is 300 points wide, `![[photo.png|300x200]]` is that
+    /// box exactly. The same pipe means display *text* on an ordinary wikilink,
+    /// which is why this is nil unless the alias is nothing but digits — a note
+    /// embedded as `![[Meeting|notes]]` is not 0 points wide.
+    public struct EmbedSize: Hashable, Sendable {
+        public let width: Double
+        /// Nil means "keep the picture's own proportions".
+        public let height: Double?
+    }
+
+    public var embedSize: EmbedSize? {
+        guard let alias, !alias.isEmpty else { return nil }
+        let parts = alias.split(separator: "x", maxSplits: 1, omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        guard let width = Double(parts[0]), width > 0 else { return nil }
+        guard parts.count == 2 else { return EmbedSize(width: width, height: nil) }
+        guard let height = Double(parts[1]), height > 0 else { return nil }
+        return EmbedSize(width: width, height: height)
+    }
 }
 
-/// Single-pass-ish scanner over raw Markdown source.
+
+/// Finds every syntactic element in a Markdown note.
 ///
-/// Implemented with `NSRegularExpression` rather than a hand-written lexer: the
-/// patterns are the spec here, they run in a few milliseconds on notes of
-/// realistic size, and code regions are masked out first so a `#hashtag` inside a
-/// fenced block never becomes a tag.
+/// Two implementations exist and produce the same `[SyntaxToken]` stream:
+///
+///   - `.parser` — a real cmark-gfm parse via `swift-markdown`, with the
+///     Obsidian-only syntax layered on as regexes over the prose regions the
+///     parse isolates. This is the one that runs.
+///   - `.legacy` — the original thirty-regex scan over the raw text. Kept only
+///     so the two can be diffed token for token on real notes; it is not
+///     reachable from the app.
+///
+/// The reason the switch exists at all is that the port is a behaviour change
+/// dressed as a refactor. Every difference between the engines is either a fix
+/// or a regression, and the only way to tell which is to be able to run both.
 public struct SyntaxScanner: Sendable {
-    public init() {}
+    public enum Engine: Sendable {
+        case parser
+        case legacy
+    }
+
+    public let engine: Engine
+
+    public init(engine: Engine = .parser) {
+        self.engine = engine
+    }
 
     public func scan(_ text: String) -> [SyntaxToken] {
-        let nsText = text as NSString
-        let full = NSRange(location: 0, length: nsText.length)
-
-        var tokens: [SyntaxToken] = []
-        var maskedRegions: [NSRange] = []
-
-        // Frontmatter is masked so its YAML `#comments` and `[[values]]` don't
-        // leak into the token stream as tags and links.
-        if let frontmatterRange = frontmatterRange(in: nsText) {
-            tokens.append(SyntaxToken(kind: .frontmatter, range: frontmatterRange))
-            maskedRegions.append(frontmatterRange)
+        switch engine {
+        case .parser: return DocumentScanner().scan(text)
+        case .legacy: return LegacyScanner().scan(text)
         }
-
-        for match in Patterns.codeBlock.matches(in: text, range: full) {
-            let language = match.range(at: 2).location != NSNotFound
-                ? nsText.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespaces)
-                : nil
-            tokens.append(SyntaxToken(
-                kind: .codeBlock(language: language?.isEmpty == false ? language : nil),
-                range: match.range
-            ))
-            maskedRegions.append(match.range)
-        }
-
-        for match in Patterns.mathBlock.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
-            tokens.append(SyntaxToken(kind: .mathBlock, range: match.range, contentRange: match.range(at: 1)))
-            maskedRegions.append(match.range)
-        }
-
-        for match in Patterns.comment.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
-            tokens.append(SyntaxToken(kind: .comment, range: match.range))
-            maskedRegions.append(match.range)
-        }
-
-        for match in Patterns.inlineCode.matches(in: text, range: full)
-        where !isMasked(match.range, in: maskedRegions) {
-            tokens.append(SyntaxToken(kind: .inlineCode, range: match.range, contentRange: match.range(at: 1)))
-            maskedRegions.append(match.range)
-        }
-
-        // From here on, every pattern respects the mask.
-        func addMatches(
-            _ regex: NSRegularExpression,
-            _ makeToken: (NSTextCheckingResult, NSString) -> SyntaxToken?
-        ) {
-            for match in regex.matches(in: text, range: full) {
-                guard !isMasked(match.range, in: maskedRegions) else { continue }
-                if let token = makeToken(match, nsText) { tokens.append(token) }
-            }
-        }
-
-        addMatches(Patterns.heading) { match, text in
-            let level = match.range(at: 1).length
-            return SyntaxToken(kind: .heading(level: level), range: match.range, contentRange: match.range(at: 2))
-        }
-
-        addMatches(Patterns.callout) { match, text in
-            let type = text.substring(with: match.range(at: 1)).lowercased()
-            let foldMarker = match.range(at: 2).length > 0 ? text.substring(with: match.range(at: 2)) : ""
-            let title = match.range(at: 3).location != NSNotFound
-                ? text.substring(with: match.range(at: 3)) : ""
-            return SyntaxToken(
-                kind: .callout(type: type, folded: foldMarker == "-", title: title),
-                range: match.range
-            )
-        }
-
-        addMatches(Patterns.wikiLink) { match, text in
-            let isEmbed = text.substring(with: match.range).hasPrefix("!")
-            let link = Self.makeWikiLink(match: match, text: text)
-            return SyntaxToken(
-                kind: isEmbed ? .embed(link) : .wikiLink(link),
-                range: match.range,
-                contentRange: match.range(at: 1)
-            )
-        }
-
-        addMatches(Patterns.markdownLink) { match, text in
-            SyntaxToken(
-                kind: .markdownLink(destination: text.substring(with: match.range(at: 2))),
-                range: match.range,
-                contentRange: match.range(at: 1)
-            )
-        }
-
-        addMatches(Patterns.tag) { match, text in
-            SyntaxToken(kind: .tag(text.substring(with: match.range(at: 1))), range: match.range)
-        }
-
-        addMatches(Patterns.blockIdentifier) { match, text in
-            SyntaxToken(kind: .blockIdentifier(text.substring(with: match.range(at: 1))), range: match.range(at: 0))
-        }
-
-        addMatches(Patterns.task) { match, text in
-            let marker = text.substring(with: match.range(at: 1))
-            return SyntaxToken(kind: .task(checked: marker != " "), range: match.range, contentRange: match.range(at: 1))
-        }
-
-        addMatches(Patterns.bold) { match, _ in
-            SyntaxToken(kind: .bold, range: match.range, contentRange: match.range(at: 1))
-        }
-        addMatches(Patterns.italic) { match, _ in
-            SyntaxToken(kind: .italic, range: match.range, contentRange: match.range(at: 1))
-        }
-        addMatches(Patterns.strikethrough) { match, _ in
-            SyntaxToken(kind: .strikethrough, range: match.range, contentRange: match.range(at: 1))
-        }
-        addMatches(Patterns.highlight) { match, _ in
-            SyntaxToken(kind: .highlight, range: match.range, contentRange: match.range(at: 1))
-        }
-        addMatches(Patterns.mathInline) { match, _ in
-            SyntaxToken(kind: .mathInline, range: match.range, contentRange: match.range(at: 1))
-        }
-        addMatches(Patterns.horizontalRule) { match, _ in
-            SyntaxToken(kind: .horizontalRule, range: match.range)
-        }
-
-        return tokens.sorted { $0.range.location < $1.range.location }
     }
 
     // MARK: - Convenience extraction
@@ -219,86 +177,5 @@ public struct SyntaxScanner: Sendable {
             if case .tag(let name) = token.kind { return name }
             return nil
         }
-    }
-
-    // MARK: - Helpers
-
-    private static func makeWikiLink(match: NSTextCheckingResult, text: NSString) -> WikiLink {
-        let target = text.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces)
-        var fragment: String?
-        if match.range(at: 2).location != NSNotFound {
-            // Group 2 includes the leading `#`, which we drop but keep any `^`.
-            fragment = String(text.substring(with: match.range(at: 2)).dropFirst())
-        }
-        var alias: String?
-        if match.range(at: 3).location != NSNotFound {
-            alias = String(text.substring(with: match.range(at: 3)).dropFirst())
-        }
-        return WikiLink(target: target, fragment: fragment, alias: alias)
-    }
-
-    private func frontmatterRange(in text: NSString) -> NSRange? {
-        guard text.hasPrefix("---") else { return nil }
-        let full = NSRange(location: 0, length: text.length)
-        guard let match = Patterns.frontmatter.firstMatch(in: text as String, range: full),
-              match.range.location == 0 else { return nil }
-        return match.range
-    }
-
-    private func isMasked(_ range: NSRange, in regions: [NSRange]) -> Bool {
-        regions.contains { NSIntersectionRange($0, range).length > 0 }
-    }
-}
-
-/// The regex catalogue. Kept in one place so the syntax "spec" is reviewable.
-private enum Patterns {
-    static let frontmatter = make(#"\A---[ \t]*\n[\s\S]*?\n---[ \t]*(?:\n|\z)"#)
-
-    /// Fenced code blocks, including unterminated ones at end of file.
-    static let codeBlock = make(#"(?m)^[ \t]*(`{3,}|~{3,})[ \t]*([^\n]*)\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|\z)"#)
-    static let inlineCode = make(#"`([^`\n]+)`"#)
-
-    static let mathBlock = make(#"\$\$([\s\S]*?)\$\$"#)
-    static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?!\$)"#)
-
-    static let comment = make(#"%%[\s\S]*?%%"#)
-
-    static let heading = make(#"(?m)^(#{1,6})[ \t]+(.*?)[ \t]*#*$"#)
-
-    /// `> [!note]+ Optional title` — the callout header line.
-    static let callout = make(#"(?m)^[ \t]*>[ \t]*\[!([A-Za-z0-9_-]+)\]([+-]?)[ \t]*(.*)$"#)
-
-    /// `[[target#fragment|alias]]`, optionally prefixed with `!` for embeds.
-    static let wikiLink = make(#"!?\[\[([^\[\]\|#]*)(#[^\[\]\|]*)?(\|[^\[\]]*)?\]\]"#)
-
-    static let markdownLink = make(#"!?\[([^\]\n]*)\]\(([^)\s]+)(?:[ \t]+"[^"]*")?\)"#)
-
-    /// A tag must contain at least one non-numeric character, otherwise `#1`
-    /// in "issue #1" would be indexed as a tag. Unicode letters are allowed so
-    /// `#中文标签` works.
-    static let tag = make(#"(?<![\p{L}\p{N}_/#])#([\p{L}\p{N}_/-]*[\p{L}_-][\p{L}\p{N}_/-]*)"#)
-
-    /// Block identifier anchored at end of line: `Some text ^my-block`.
-    static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)
-
-    static let task = make(#"(?m)^[ \t]*[-*+][ \t]+\[(.)\][ \t]+"#)
-
-    static let bold = make(#"(?<!\*)\*\*(?!\s)([^\*]+?)(?<!\s)\*\*(?!\*)"#)
-    static let italic = make(#"(?<![\*\w])\*(?!\s|\*)([^\*\n]+?)(?<!\s)\*(?!\*)"#)
-    static let strikethrough = make(#"~~(?!\s)([^~]+?)(?<!\s)~~"#)
-    static let highlight = make(#"==(?!\s)([^=\n]+?)(?<!\s)=="#)
-
-    static let horizontalRule = make(#"(?m)^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$"#)
-
-    private static func make(_ pattern: String) -> NSRegularExpression {
-        // Patterns are compile-time constants; a failure here is a programmer
-        // error and should surface loudly during development, not at runtime.
-        try! NSRegularExpression(pattern: pattern)
-    }
-}
-
-extension NSRegularExpression {
-    fileprivate func matches(in string: String, range: NSRange) -> [NSTextCheckingResult] {
-        matches(in: string, options: [], range: range)
     }
 }

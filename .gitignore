@@ -4,9 +4,9 @@
 Inkstone.xcodeproj/
 
 # Build products
-.build/
-.build-xcode/
-.build-dev/
+# Every derived-data directory, however it is suffixed. Listing them one by one
+# meant a new one (.build-ios) slipped straight into a commit.
+.build*/
 DerivedData/
 *.xcuserdatadata
 xcuserdata/
@@ -22,3 +22,18 @@ Package.pins
 
 # Local-only test harness marker
 /tmp-inkstone-*
+
+# Website
+# The raw screen recordings: ~15 MB per take, and every one is reproducible by
+# running scripts/record-demo.sh. Only the encoded hero (site/assets/video) is
+# committed, because that is what gets served.
+assets/footage/
+.playwright-mcp/
+__pycache__/
+.sparkle-tools/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+.asc/metadata/

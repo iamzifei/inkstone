@@ -35,28 +35,60 @@ public enum FontChoice: Codable, Hashable, Sendable {
 /// renders Chinese beautifully is rarely a good code font, and vice versa — this
 /// is the single most requested typography control in note apps.
 public struct Typography: Codable, Hashable, Sendable {
+
+    /// Default text sizes, which are not the same number on both platforms.
+    ///
+    /// 13pt is `NSFont.systemFontSize` — the size every Mac sidebar, menu and
+    /// panel is drawn at. It was the only default, so the iPhone drew its file
+    /// list at Mac chrome size and the note titles came out visibly small
+    /// against everything else on the phone.
+    ///
+    /// A point is the same length on both, so the mistake is not arithmetic: the
+    /// platforms simply disagree about how big body text should be. iOS builds
+    /// its lists around the 17pt `.body` style, and a row of text at 13pt in the
+    /// middle of a phone reads as an app that was ported rather than written for
+    /// it. Held at arm's length rather than at desk distance, too.
+    enum Default {
+        #if os(macOS)
+        static let interfaceFontSize: Double = 13
+        static let editorFontSize: Double = 16
+        #else
+        /// `UIFont.preferredFont(forTextStyle: .body)` is 17pt at the default
+        /// Dynamic Type setting, which is what these match.
+        static let interfaceFontSize: Double = 17
+        static let editorFontSize: Double = 17
+        #endif
+    }
+
     // Interface chrome (sidebar, menus, panels).
     public var interfaceFont: FontChoice = .system
-    public var interfaceFontSize: Double = 13
+    public var interfaceFontSize: Double = Default.interfaceFontSize
 
     // Editor + preview body text.
     public var editorFont: FontChoice = .system
-    public var editorFontSize: Double = 16
-    /// Multiple of the font size. 1.7–1.8 reads best for mixed CJK/Latin.
-    public var lineHeightMultiple: Double = 1.75
-    public var paragraphSpacing: Double = 10
+    public var editorFontSize: Double = Default.editorFontSize
+    /// Multiple of the font size.
+    ///
+    /// 1.6 matches Typora's default theme. Earlier this was 1.75, which is a
+    /// reasonable figure for dense CJK but left Latin prose looking airy and
+    /// pushed everything below the fold.
+    public var lineHeightMultiple: Double = 1.6
+    /// Space after a paragraph. One line of body text, as Typora uses.
+    public var paragraphSpacing: Double = 16
     /// Maximum measure in points. Long lines are the enemy of reading comfort.
-    public var readableLineWidth: Double = 700
+    /// Typora's default theme caps its column at 860pt including 30pt of padding
+    /// each side, so ~800pt of text.
+    public var readableLineWidth: Double = 800
     public var isReadableLineWidthEnabled: Bool = true
     /// Extra tracking, in points. Slight positive tracking helps dense CJK text.
     public var letterSpacing: Double = 0
 
     // Code blocks and inline code, deliberately separate from body text.
     public var codeFont: FontChoice = .monospaced
-    public var codeFontSize: Double = 13.5
-    public var codeLineHeightMultiple: Double = 1.5
+    public var codeFontSize: Double = 14
+    public var codeLineHeightMultiple: Double = 1.45
 
-    // Headings scale off the body size using a modular scale.
+    // Headings scale off the body size.
     public var headingScale: Double = 1.22
     public var headingWeightBoost: Bool = true
 
@@ -71,10 +103,17 @@ public struct Typography: Codable, Hashable, Sendable {
 
     public init() {}
 
-    /// Point size for a heading of the given level, derived from the modular scale.
+    /// Multipliers of the body size, one per heading level.
+    ///
+    /// These are Typora's (and GitHub's) ratios rather than a modular scale. The
+    /// scale produced an h6 *larger* than body text, which is backwards — a
+    /// level-six heading should read as a label, not as emphasis.
+    static let headingRatios: [Double] = [2.25, 1.75, 1.5, 1.25, 1.125, 1.0]
+
+    /// Point size for a heading of the given level.
     public func headingSize(level: Int) -> Double {
-        let steps = Double(max(0, 7 - max(1, min(6, level))))
-        return editorFontSize * pow(headingScale, steps / 1.6)
+        let index = max(1, min(6, level)) - 1
+        return editorFontSize * Self.headingRatios[index]
     }
 
     /// Curated font families that render Chinese well, offered first in pickers.
