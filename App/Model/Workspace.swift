@@ -167,7 +167,14 @@ final class Workspace {
 
     // MARK: - Vault lifecycle
 
-    func open(_ vault: Vault) {
+    /// Opens a vault.
+    ///
+    /// `startingBackgroundWork` exists for the one caller that is not a person:
+    /// the iOS background task handler. Opening normally starts a sync and the
+    /// repeat timer, which is right when someone has just picked a vault and
+    /// wrong when the OS woke a scene-less process to do exactly one sync — that
+    /// combination gave two `sync()` runs racing over the same working tree.
+    func open(_ vault: Vault, startingBackgroundWork: Bool = true) {
         closeCurrentVault()
         do {
             let url = try registry.beginAccess(to: vault)
@@ -187,10 +194,12 @@ final class Workspace {
             reindex()
             startWatching(url)
 
-            if settings.data.gitHubAutoSync {
-                Task { await syncIfEnabled() }
+            if startingBackgroundWork {
+                if settings.data.gitHubAutoSync {
+                    Task { await syncIfEnabled() }
+                }
+                restartAutoSync()
             }
-            restartAutoSync()
         } catch {
             self.vault = nil
             root = nil
@@ -205,11 +214,11 @@ final class Workspace {
     /// only fires when a scene is actually rendered — and iOS waking the app for
     /// a background task renders nothing. Sync would then find no vault, do
     /// nothing, and report success.
-    func openMostRecentVaultIfNeeded() {
+    func openMostRecentVaultIfNeeded(startingBackgroundWork: Bool = true) {
         guard vault == nil,
               let latest = registry.vaults.max(by: { $0.lastOpened < $1.lastOpened })
         else { return }
-        open(latest)
+        open(latest, startingBackgroundWork: startingBackgroundWork)
     }
 
     /// Syncs only if it is configured and switched on, and stays quiet
@@ -292,14 +301,34 @@ final class Workspace {
         case running(String)
         case finished(SyncReport)
         case failed(String)
+        /// Cut short rather than broken. Distinct from `failed` because the
+        /// honest thing to tell someone is different: nothing went wrong, the
+        /// run simply ran out of time, what it managed is kept, and the next run
+        /// picks up from there. Reporting that as a failure is what makes a
+        /// working background sync look like a broken one.
+        case interrupted
     }
 
     private(set) var syncStatus: SyncStatus = .idle
+
+    /// How far the running sync has got. `nil` when nothing is running, and
+    /// present with a `nil` fraction during the phases before the plan exists.
+    private(set) var syncProgress: SyncProgress?
 
     /// The repeating background sync, cancelled when the vault closes or the
     /// interval changes.
     @ObservationIgnored private var autoSyncTask: Task<Void, Never>?
     var isSyncing: Bool { if case .running = syncStatus { return true }; return false }
+
+    /// Whether the vault has never completed a sync against this repository.
+    ///
+    /// The expensive case, and the one worth treating differently: a first sync
+    /// moves the whole vault, takes minutes rather than seconds, and is exactly
+    /// the run that a thirty-second app-refresh window cannot finish.
+    var needsFirstSync: Bool {
+        guard let root else { return false }
+        return SyncState.load(from: root).lastSyncedAt == nil
+    }
 
     /// Whether a sync could run right now — enabled, configured, and idle.
     var canSync: Bool {
@@ -418,23 +447,35 @@ final class Workspace {
         let engine = SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy)
 
         syncStatus = .running("Starting…")
+        syncProgress = SyncProgress(message: "Starting…")
         pendingFirstSync = nil
         do {
-            let report = try await engine.run(firstSyncDirection: firstSyncDirection) { message in
-                Task { @MainActor in self.syncStatus = .running(message) }
+            let report = try await engine.run(firstSyncDirection: firstSyncDirection) { update in
+                Task { @MainActor in
+                    self.syncStatus = .running(update.message)
+                    self.syncProgress = update
+                }
             }
+            syncProgress = nil
             syncStatus = .finished(report)
             // Files may have arrived or vanished underneath us.
             refreshTree()
             reindex()
             for document in documents.values { document.reloadIfUnchangedLocally() }
+        } catch is CancellationError {
+            // Not a failure. The engine saved what it moved before rethrowing,
+            // so the next run resumes rather than restarts.
+            syncProgress = nil
+            syncStatus = .interrupted
         } catch let error as SyncError {
             // A question, not a failure: it is waiting for an answer only the
             // user has, and the pane offers it rather than burying it in a
             // sentence that ends the run.
             if case .firstSyncNeedsDirection = error { pendingFirstSync = error }
+            syncProgress = nil
             syncStatus = .failed(error.localizedDescription)
         } catch {
+            syncProgress = nil
             syncStatus = .failed(error.localizedDescription)
         }
     }

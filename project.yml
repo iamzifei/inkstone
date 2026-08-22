@@ -89,6 +89,9 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - com.orris.inkstone.sync.refresh
           - com.orris.inkstone.sync.processing
+          # Wildcard, per the BGContinuedProcessingTaskRequest header: registered
+          # once in this form, submitted with a unique suffix per sync.
+          - com.orris.inkstone.sync.continued.*
         # Sparkle. The feed is served from the site rather than from
         # raw.githubusercontent.com/.../main like the sibling apps: main is not
         # this repository's trunk (see docs/plans/2026-08-20-website-and-domain.md),

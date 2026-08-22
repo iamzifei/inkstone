@@ -393,7 +393,7 @@ private struct SyncSettings: View {
         list[list.count - 1].isLast = true
         list.append(SyncAction(button: AnyView(
             Button(workspace.isSyncing ? "Syncing…" : "Sync now") {
-                Task { await workspace.sync() }
+                startSync()
             }
             .buttonStyle(.borderedProminent)
             .disabled(off || workspace.isSyncing || workspace.root == nil
@@ -424,7 +424,27 @@ private struct SyncSettings: View {
     }
 
     private func runFirstSync(_ direction: FirstSyncDirection) {
-        Task { await workspace.sync(firstSyncDirection: direction) }
+        startSync(firstSyncDirection: direction)
+    }
+
+    /// Starts a sync the way the platform allows it to finish.
+    ///
+    /// On iOS this hands the work to a continued-processing task, so it keeps
+    /// going when the user leaves the app and the system shows its progress
+    /// while it does. That matters most for exactly the run being started here:
+    /// a first sync moves the whole vault and will not fit in the window an
+    /// ordinary background refresh gets.
+    ///
+    /// Falls back to a plain in-app sync when the scheduler will not take it,
+    /// which still works — it just stops when the app is suspended. On macOS
+    /// there is nothing to survive: the process keeps running.
+    private func startSync(firstSyncDirection: FirstSyncDirection? = nil) {
+        #if os(iOS)
+        if BackgroundSync.syncVisibly(workspace: workspace, firstSyncDirection: firstSyncDirection) {
+            return
+        }
+        #endif
+        Task { await workspace.sync(firstSyncDirection: firstSyncDirection) }
     }
 
     /// The fields that travel between devices, as one comparable value.
@@ -459,10 +479,36 @@ private struct SyncSettings: View {
         case .idle:
             EmptyView()
         case .running(let message):
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(message).font(.callout).foregroundStyle(.secondary)
+            // A determinate bar once the plan exists. A spinner and a filename
+            // cannot answer "is this nearly done or barely started", which is
+            // the only question anyone actually has while waiting on a first
+            // sync of a whole vault.
+            VStack(alignment: .leading, spacing: 6) {
+                if let fraction = workspace.syncProgress?.fraction,
+                   let progress = workspace.syncProgress {
+                    ProgressView(value: fraction)
+                    HStack(spacing: 8) {
+                        Text(message).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Text("\(progress.completed) / \(progress.total)")
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(message).font(.callout).foregroundStyle(.secondary)
+                    }
+                }
             }
+        case .interrupted:
+            Label(
+                "Sync paused before it finished. What was transferred is kept — the next run continues from there.",
+                systemImage: "pause.circle"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
@@ -656,6 +702,12 @@ private struct SyncSettings: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            #if os(iOS)
+            // Only iOS suspends the app, so only iOS needs to explain what the
+            // system did with the sync requests.
+            BackgroundSyncSection()
+            #endif
 
             Section {
                 Toggle("Images", isOn: syncBinding(for: .image))

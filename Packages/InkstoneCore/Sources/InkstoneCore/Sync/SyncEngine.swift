@@ -37,6 +37,37 @@ public enum SyncError: LocalizedError, Sendable {
     }
 }
 
+/// How far along a sync is, while it is running.
+///
+/// Was a bare `String`. A sentence is enough for a status line and not enough
+/// for anything else: iOS 26's `BGContinuedProcessingTask` requires a real
+/// `Progress` with unit counts and will forcibly expire a task that looks
+/// stalled, and "Downloading notes/2026-08-14.md…" says nothing about whether
+/// that is the second file of eight hundred or the last.
+public struct SyncProgress: Sendable {
+    /// What is happening, for a status line.
+    public let message: String
+    /// Actions finished so far, and how many there are in total. Both zero
+    /// during the phases before the plan exists — verifying the repository,
+    /// listing the remote, scanning the vault — which is honest: at that point
+    /// the total is genuinely not known yet.
+    public let completed: Int
+    public let total: Int
+
+    public init(message: String, completed: Int = 0, total: Int = 0) {
+        self.message = message
+        self.completed = completed
+        self.total = total
+    }
+
+    /// `nil` while the total is unknown, so a caller can show an indeterminate
+    /// bar rather than a bar pinned at zero.
+    public var fraction: Double? {
+        guard total > 0 else { return nil }
+        return Double(completed) / Double(total)
+    }
+}
+
 /// Result of one sync run, for reporting back to the user.
 public struct SyncReport: Sendable, Hashable {
     public var uploaded: [String] = []
@@ -118,16 +149,16 @@ public struct SyncEngine: Sendable {
     ///   is a real conflict with a real answer, and keeping both is it.
     public func run(
         firstSyncDirection: FirstSyncDirection? = nil,
-        progress: (@Sendable (String) -> Void)? = nil
+        progress: (@Sendable (SyncProgress) -> Void)? = nil
     ) async throws -> SyncReport {
-        progress?("Checking repository…")
+        progress?(SyncProgress(message: "Checking repository…"))
         _ = try await client.verify()
 
-        progress?("Listing remote files…")
+        progress?(SyncProgress(message: "Listing remote files…"))
         let remote = try await client.listFiles()
         let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
 
-        progress?("Scanning vault…")
+        progress?(SyncProgress(message: "Scanning vault…"))
         let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
 
@@ -206,14 +237,33 @@ public struct SyncEngine: Sendable {
         }
         let stamp = timestamp()
 
-        for action in actions {
+        // Whether the run stopped early. Kept separate from the failure list
+        // because it means something different: not "these files could not be
+        // synced" but "this run was cut short and the rest has not been tried".
+        var interrupted = false
+
+        for (index, action) in actions.enumerated() {
+            // Cancellation used to be invisible here. The network calls throw on
+            // cancellation, the `catch` below treats that like any other
+            // per-file failure, and the loop carries on — so an expired
+            // background task did not stop the sync, it converted every one of
+            // the remaining files into a failure entry and then reported a
+            // finished run. On a first sync of a real vault that is thousands of
+            // spurious failures and a report that says the sync completed.
+            if Task.isCancelled {
+                interrupted = true
+                break
+            }
+
             do {
                 switch action {
                 case .skip(_, let reason):
                     if reason == .filtered { report.skipped += 1 }
 
                 case .upload(let path):
-                    progress?("Uploading \(path)…")
+                    progress?(SyncProgress(
+                        message: "Uploading \(path)…", completed: index, total: actions.count
+                    ))
                     let data = try Data(contentsOf: fileURL(path))
                     let sha = try await client.upload(
                         path: path,
@@ -225,7 +275,9 @@ public struct SyncEngine: Sendable {
                     report.uploaded.append(path)
 
                 case .download(let path):
-                    progress?("Downloading \(path)…")
+                    progress?(SyncProgress(
+                        message: "Downloading \(path)…", completed: index, total: actions.count
+                    ))
                     guard let file = remoteByPath[path] else { break }
                     let data = try await client.download(sha: file.sha, path: path)
                     try write(data, to: path)
@@ -233,14 +285,18 @@ public struct SyncEngine: Sendable {
                     report.downloaded.append(path)
 
                 case .deleteRemote(let path):
-                    progress?("Removing \(path) from GitHub…")
+                    progress?(SyncProgress(
+                        message: "Removing \(path) from GitHub…", completed: index, total: actions.count
+                    ))
                     guard let file = remoteByPath[path] else { break }
                     try await client.delete(path: path, sha: file.sha, message: "Delete \(path) from Inkstone")
                     state.blobs.removeValue(forKey: path)
                     report.deletedRemotely.append(path)
 
                 case .deleteLocal(let path):
-                    progress?("Removing \(path)…")
+                    progress?(SyncProgress(
+                        message: "Removing \(path)…", completed: index, total: actions.count
+                    ))
                     try? FileManager.default.removeItem(at: fileURL(path))
                     state.blobs.removeValue(forKey: path)
                     report.deletedLocally.append(path)
@@ -249,7 +305,9 @@ public struct SyncEngine: Sendable {
                     // Never overwrite. The remote copy is saved beside the local
                     // one and the user decides which to keep; losing a note to an
                     // automatic merge is far worse than having two of them.
-                    progress?("Conflict on \(path)…")
+                    progress?(SyncProgress(
+                        message: "Conflict on \(path)…", completed: index, total: actions.count
+                    ))
                     guard let file = remoteByPath[path] else {
                         report.conflicted.append(path)
                         break
@@ -280,11 +338,21 @@ public struct SyncEngine: Sendable {
             }
         }
 
-        state.lastSyncedAt = Date()
         state.repository = client.configuration.repository
         state.branch = client.configuration.branch
+        // Saved either way, and that is the point: `state.blobs` holds every
+        // file this run did move, plus the first-sync direction seeded above.
+        // Persisting it is what stops an interrupted first sync from starting
+        // over — and, on a `.preferRemote` first sync, what stops the files it
+        // never reached from being re-asked about as fresh conflicts.
+        //
+        // `lastSyncedAt` is the exception. It answers "did a sync complete", and
+        // stamping it after a run that was cut off two thirds of the way through
+        // is how a half-synced vault reports itself as up to date.
+        if !interrupted { state.lastSyncedAt = Date() }
         try? state.save(to: vaultRoot)
 
+        if interrupted { throw CancellationError() }
         return report
     }
 

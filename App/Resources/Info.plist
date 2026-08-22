@@ -6,6 +6,7 @@
 	<array>
 		<string>com.orris.inkstone.sync.refresh</string>
 		<string>com.orris.inkstone.sync.processing</string>
+		<string>com.orris.inkstone.sync.continued.*</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>

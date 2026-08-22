@@ -159,6 +159,128 @@ whether they are used. They are, by the two task identifiers above. If the
 listing is rejected on that point, the answer is: GitHub vault sync while the
 app is not in the foreground.
 
+### It looked like it was not running at all
+
+Reported after shipping: on iOS the vault still only updates while the app is on
+screen. The honest reading of that observation on its own is narrower than it
+sounds — it proves the vault did not change during one unattended window. It does
+not prove the handler never ran, because **nothing recorded whether it ran**. A
+background sync that has never once been granted and one that runs perfectly
+produced exactly the same evidence: none.
+
+So the first change is evidence, not a fix. `BackgroundSyncLog` writes each
+`scheduled` / `launched` / `skipped` / `finished` / `failed` / `expired` event to
+`UserDefaults` — it has to survive process death, since a background launch is a
+different process run — and mirrors them to `os_log`. Settings > Sync now shows
+them, newest first, along with the two things that silently disable the whole
+mechanism and raise no error while doing it:
+
+* **Background App Refresh off**, per-app or system-wide. `submit` still
+  succeeds. The task simply never runs.
+* **Low Power Mode**, which suspends background refresh while it is on.
+
+A log full of `scheduled` with no `launched` means the requests are being made and
+the system is declining them; that is a device setting or iOS's own judgement, not
+a bug in this code. `launched` followed by `skipped` names its own cause, term by
+term, instead of leaving `canSync == false` with three candidates.
+
+**One real bug found while wiring it up.** The handler called
+`openMostRecentVaultIfNeeded()`, and `open` starts an auto-sync and the foreground
+repeat timer. In a background launch that meant a *second* `sync()` racing the
+handler's own over the same working tree. `open(_:startingBackgroundWork:)` now
+lets the handler ask for the vault and nothing else.
+
+**What is still true regardless.** `BGTaskScheduler` is opportunistic. The
+interval in the picker is a floor the system is free to ignore, it budgets wake-ups
+from how often the app is actually opened, and force-quitting from the app switcher
+stops background launches until the app is opened again. "Sync every 15 minutes
+unattended" is not something this API can promise. If it has to be dependable, the
+mechanism is a silent push (`content-available`) driven by a GitHub webhook — real
+server infrastructure, and a separate decision.
+
+To force a run while attached to Xcode, pause in the debugger and:
+
+    e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"com.orris.inkstone.sync.refresh"]
+
+### The root cause: it crashed on every wake-up
+
+`register(forTaskWithIdentifier:using:launchHandler:)` was called with
+`using: nil`, which means *a default background queue*. The handler body reaches
+`Workspace`, which is `@MainActor`, so it was wrapped in
+`MainActor.assumeIsolated`. On a dispatch worker thread that does not warn and
+does not fall back. It traps.
+
+Three crash reports pulled off the phone say it in one voice — 2026-08-20 21:48,
+2026-08-21 18:25, 2026-08-21 22:47:
+
+    _dispatch_assert_queue_fail
+    swift_task_isCurrentExecutorWithFlags
+    closure #1 in static BackgroundSync.register(workspace:)     ← the refresh handler
+    -[BGTaskScheduler _runTask:registration:]_block_invoke
+    _dispatch_workloop_worker_thread
+
+`closure #2` — the processing handler — appears in another. Both task types, the
+same trap.
+
+**So iOS was waking the app the whole time, and every wake-up died on arrival.**
+Not once did it sync. From outside, that is indistinguishable from a system that
+never grants background time, and it was mistaken for exactly that twice — once
+in the "verified on device" note above, once again after the logging went in.
+
+The logging could not tell them apart either, and it is worth being precise about
+why: `BackgroundSyncLog.record(.launched)` is the *first statement of the handler
+body*, and the trap happens before the body is entered. An empty log was read as
+"iOS never called us" when it meant "iOS called us and we died in the doorway".
+The thing that settled it was none of the app's own instrumentation — it was
+`devicectl device copy from --domain-type systemCrashLogs`.
+
+The fix is one argument: `using: DispatchQueue.main`.
+
+**Verified after the fix**, on the same phone: registration ok for both periodic
+identifiers, and a continued-processing probe submitted and *launched* —
+`[bg] continued probe launched: com.orris.inkstone.sync.continued.j8fzmgcbtn0g` —
+with the handler running to completion and no crash report generated.
+
+### Finishing a first sync, visibly
+
+Two complaints, one mechanism. A first sync moves the whole vault and takes
+minutes; an app-refresh window is around thirty seconds, so the run that matters
+most is the one guaranteed to be cut off. And unattended work with no visible
+sign is indistinguishable from no work at all — five minutes of watching cannot
+tell them apart.
+
+`BGContinuedProcessingTask` (iOS 26) answers both: submitted from the foreground,
+it keeps running after the app leaves the screen and the system shows live
+progress while it does. The earlier note here dismissed it as a different
+feature. It was right about what it is and wrong about whether it was needed.
+
+Its identifier rules cost a second crash to establish, and are worth writing down
+because the header only half says them:
+
+| form | example | used for |
+| --- | --- | --- |
+| wildcard | `…sync.continued.*` | the Info.plist entry |
+| base | `…sync.continued` | nothing at runtime |
+| composed | `…sync.continued.j8fzmgcbtn0g` | **both** `register` and `submit` |
+
+Registering the wildcard or the base form returns `false` silently. Submission is
+accepted anyway, and the system then terminates the app with `No launch handler
+registered for task with identifier …sync.continued.z5pvzdplrm5m` — which names
+the answer. **Register per request, immediately before submitting, with a fresh
+suffix** (the header warns that registering one identifier twice kills the app).
+That is also why continued-processing registrations are exempt from the
+register-before-launch-finishes rule: the identifier does not exist yet.
+
+**Interruption is now the designed path, not an accident.** `SyncEngine` checks
+`Task.isCancelled` at the top of its action loop and stops. It used to have no
+check at all: cancellation surfaced as a per-file error, the loop carried on, and
+every remaining file became a failure entry in a report that still said the run
+finished. `SyncState` is saved either way — that is what makes an interrupted
+first sync resume instead of restart, and what stops a `.preferRemote` answer
+from being re-asked about the files it never reached — but `lastSyncedAt` is
+stamped only on a complete run, so a third-synced vault cannot report itself up
+to date. Two tests in `SyncInterruptionTests` hold that shape.
+
 ## An iOS app cannot be downloaded from a website
 
 Worth being plain about, since item 4 asked for "packaging and a download". There
