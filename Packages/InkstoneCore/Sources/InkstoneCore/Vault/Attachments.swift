@@ -130,7 +130,68 @@ public struct SyncFilePolicy: Codable, Hashable, Sendable {
     /// every run, forever — three of them in one real vault.
     public var maximumFileSizeMB = 38
 
+    /// Folders and paths this vault does not sync, in `.gitignore` syntax.
+    ///
+    /// Type switches answer "which kinds of file", and that is the wrong axis
+    /// when two devices share one vault but not one job. A phone used for
+    /// capture and reading has no business holding — let alone editing — the
+    /// rule files a desktop rewrites all day, and every file both sides can
+    /// touch is a file they can collide on.
+    ///
+    /// Measured, not supposed: a vault synced between a Mac and a phone
+    /// produced eight conflict copies in one afternoon, and every one of them
+    /// was a rule file under a single folder that the phone only ever held
+    /// because sync carries everything. Excluding that one folder would have
+    /// left nothing for the two sides to disagree about.
+    ///
+    /// `.gitignore` syntax rather than a new one: the vault already speaks it,
+    /// `GitIgnore` already implements it, and a second path-matching dialect
+    /// would be a second set of edge cases to get subtly wrong. The supported
+    /// subset is whatever `GitIgnore` supports — see that type.
+    ///
+    /// Empty means nothing extra is excluded; the vault's own `.gitignore`
+    /// still applies either way.
+    public var excludedPaths: [String] = []
+
     public init() {}
+
+    /// Decoded key by key, each one optional, rather than by the synthesized
+    /// initialiser.
+    ///
+    /// The synthesized one throws on any key it does not find, so adding a
+    /// field to this struct would make every already-stored policy fail to
+    /// decode — and a policy that fails to decode is a policy silently reset to
+    /// defaults, which for `syncsVideos` and `maximumFileSizeMB` means a vault
+    /// quietly changing what it carries. `excludedPaths` was the first field
+    /// added after shipping; it must also be the last one that can do this.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = SyncFilePolicy()
+        syncsImages = try container.decodeIfPresent(Bool.self, forKey: .syncsImages)
+            ?? defaults.syncsImages
+        syncsAudio = try container.decodeIfPresent(Bool.self, forKey: .syncsAudio)
+            ?? defaults.syncsAudio
+        syncsPDFs = try container.decodeIfPresent(Bool.self, forKey: .syncsPDFs)
+            ?? defaults.syncsPDFs
+        syncsVideos = try container.decodeIfPresent(Bool.self, forKey: .syncsVideos)
+            ?? defaults.syncsVideos
+        syncsOtherFiles = try container.decodeIfPresent(Bool.self, forKey: .syncsOtherFiles)
+            ?? defaults.syncsOtherFiles
+        maximumFileSizeMB = try container.decodeIfPresent(Int.self, forKey: .maximumFileSizeMB)
+            ?? defaults.maximumFileSizeMB
+        excludedPaths = try container.decodeIfPresent([String].self, forKey: .excludedPaths)
+            ?? defaults.excludedPaths
+    }
+
+    /// The excluded paths compiled into a matcher.
+    ///
+    /// Built on demand and deliberately not stored: this is a `Codable` value
+    /// type that gets copied through settings, and a compiled regex is neither
+    /// codable nor cheap to copy. Callers that test many paths should build it
+    /// once and keep it for the loop, which is what both call sites do.
+    public var pathExcluder: GitIgnore {
+        GitIgnore(contents: excludedPaths.joined(separator: "\n"))
+    }
 
     public func syncs(_ kind: AttachmentKind) -> Bool {
         switch kind {

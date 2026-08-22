@@ -374,6 +374,11 @@ public struct SyncEngine: Sendable {
         // for the same reason an oversized file is: "this vault is not carrying
         // it" must never be read as "the user deleted it".
         let ignore = GitIgnore.load(from: vaultRoot)
+        // Two separate lists that answer the same question. `.gitignore` is the
+        // vault's own rule about what does not belong in the repository at all;
+        // `excludedPaths` is this device's rule about what it does not carry.
+        // A desktop and a phone share the first and differ on the second.
+        let excluder = policy.pathExcluder
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey]
         // The enumerator hands back paths in whatever form the file system
         // canonicalises to, which is not always the form the root was written
@@ -415,6 +420,15 @@ public struct SyncEngine: Sendable {
             else { continue }
 
             guard !ignore.ignores(relative) else {
+                excluded.insert(relative)
+                continue
+            }
+
+            guard excluder.isEmpty || !excluder.ignores(relative) else {
+                // Recorded as excluded rather than simply skipped, so the planner
+                // reads it as "this device does not carry it" and not as "the
+                // user deleted it" — otherwise turning an exclusion on would
+                // delete the remote copy for every other device too.
                 excluded.insert(relative)
                 continue
             }

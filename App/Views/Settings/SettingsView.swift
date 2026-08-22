@@ -806,6 +806,28 @@ private struct SyncSettings: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                // Free text rather than a folder picker: the patterns are
+                // per-device but the vault is shared, and a picker would only
+                // offer folders that exist on whichever device is being set up.
+                TextEditor(text: excludedPathsBinding)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 76)
+            } header: {
+                Text("Folders to skip on this device")
+            } footer: {
+                Text(
+                    """
+                    One pattern per line, in .gitignore syntax — `Rules/` for a \
+                    folder, `*.tmp.md` for a glob, `!keep.md` to bring one back. \
+                    Skipped files are neither uploaded from here nor downloaded \
+                    to here, and are never deleted from the other devices.
+                    """
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .task {
@@ -824,6 +846,22 @@ private struct SyncSettings: View {
         Binding(
             get: { workspace.settings.data.syncPolicy.syncs(kind) },
             set: { workspace.settings.data.syncPolicy.setSyncs(kind, $0) }
+        )
+    }
+
+    /// One pattern per line, which is how the list is edited and not how it is
+    /// stored. Blank lines are dropped on the way in so that trailing newlines
+    /// and stray blank rows never reach the matcher, where an empty pattern
+    /// would be a rule that matches nothing and costs a regex to find out.
+    private var excludedPathsBinding: Binding<String> {
+        Binding(
+            get: { workspace.settings.data.syncPolicy.excludedPaths.joined(separator: "\n") },
+            set: {
+                workspace.settings.data.syncPolicy.excludedPaths = $0
+                    .split(separator: "\n", omittingEmptySubsequences: false)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            }
         )
     }
 

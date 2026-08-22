@@ -63,7 +63,19 @@ public enum SyncPlanner {
         policy: SyncFilePolicy = SyncFilePolicy(),
         excludedLocally: Set<String> = []
     ) -> [SyncAction] {
-        entries.map { entry in
+        // Compiled once for the whole plan, not once per entry: `pathExcluder`
+        // builds regexes, and a vault with thousands of notes would build them
+        // thousands of times for an answer that cannot change mid-plan.
+        let excluder = policy.pathExcluder
+        return entries.map { entry in
+            // An excluded path takes part in nothing, in either direction. This
+            // has to happen here and not only in the local scan, because a file
+            // that exists only on the remote never appears in that scan — and
+            // without this it would be downloaded onto the very device the
+            // exclusion exists to keep it off.
+            if !excluder.isEmpty, excluder.ignores(entry.path) {
+                return .skip(path: entry.path, reason: .filtered)
+            }
             // Before anything else: a file this vault is not carrying takes part
             // in nothing, in either direction. Neither deleted from the remote
             // nor fetched again on every run.
