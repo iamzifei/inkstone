@@ -81,8 +81,8 @@
   </table>
   <p>They are not exclusive. A vault can sit in iCloud Drive <em>and</em> push to GitHub; iCloud moves it between your own devices quickly, GitHub keeps the history and the off-Apple copy.</p>
   <h2 id="icloud">iCloud Drive</h2>
-  <p>There is no switch to turn on. Put the vault folder in iCloud Drive and open it, and iCloud does the rest — it is the system moving files, not Inkstone.</p>
-  <p>The one setting that exists is <strong>Keep files downloaded</strong>, and it is on by default. iCloud saves disk space by evicting the contents of files you have not opened recently, leaving a placeholder behind. To Inkstone a placeholder is an empty note, so a vault that has been sitting idle can look like a vault that has lost its notes. Turn it off only on a machine genuinely short of disk.</p>
+  <p>There is no switch to turn on, and none to turn off. Whether iCloud carries a vault depends on <strong>where the folder is</strong>: put it in iCloud Drive and the system syncs it. No app can stop that, and Inkstone does not pretend to — to stop it, keep the folder somewhere else.</p>
+  <p>The one setting here is <strong>Keep files downloaded</strong>, on by default. iCloud saves disk space by evicting the contents of files you have not opened recently, leaving a placeholder behind. To Inkstone a placeholder is an empty note, so a vault that has been sitting idle can look like a vault that has lost its notes. Turn it off only on a device genuinely short of space.</p>
   <div class="rule-box">
     <p><strong>iCloud makes its own conflict copies.</strong> If the same file is edited on two devices before either has finished syncing, iCloud keeps both and marks one. That is Apple's mechanism, not Inkstone's, and it looks different from the ones below.</p>
   </div>
@@ -114,6 +114,11 @@
   <div class="rule-box">
     <p><strong>The repository belongs to the vault, not to the app.</strong> Each vault has its own repository setting. Opening a different vault does not inherit the last one's, and a vault that has not been given a repository does not sync at all.</p>
   </div>
+  <h3>One repository, one vault, per device</h3>
+  <p>Two folders on the same device cannot both hold the same repository. Inkstone refuses it, and neither of them syncs until one gives it up.</p>
+  <p>This is not a limit, it is the arrangement that has no correct behaviour: every sync makes the repository look like whichever folder ran last, so the two overwrite each other in turn. Nothing about it is recoverable by being cleverer — there is no way to tell which of two working copies is meant to be the repository.</p>
+  <p>The pane names the vault that already has it and offers to move it, rather than simply refusing: a binding outlives the folder it was made for, and a refusal with no way through would leave you unable to use that repository anywhere.</p>
+  <p>Two <em>devices</em> sharing one repository is the whole point, and is unaffected.</p>
   <h2 id="conflicts">When a conflict happens</h2>
   <p>Exactly one situation produces one:</p>
   <div class="rule-box">

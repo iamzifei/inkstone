@@ -128,6 +128,44 @@ Mac after checking which side each one holds — at least one is larger than the
 live file it sits beside — one was 5509 bytes against 3399 — so they are not
 all redundant.
 
+## One repository, one vault, per device — 2026-08-23
+
+Per-vault bindings stopped a repository from being *inherited*. They did not stop
+two vaults from being bound to the same repository deliberately, and the phone
+ended up in exactly that state: two vaults, both naming the same repository, both
+disabled only because someone had switched them off by hand.
+
+There is no correct behaviour for that arrangement. Each sync makes the
+repository look like whichever folder ran last, so the two overwrite each other
+in turn, and nothing cleverer helps — there is no way to tell which of two
+working copies is meant to be the repository. `Workspace.vaultSharingThisRepository`
+finds it, `canSync` and `restartAutoSync` refuse it, and the Sync pane offers
+**Use it for this vault instead** rather than a wall: a binding outlives the
+folder it was made for, and a refusal with no way through would leave someone
+unable to use that repository anywhere.
+
+Two *devices* sharing one repository is the point of the feature and is
+untouched, as is switching between vaults bound to different repositories.
+
+### And the iCloud switch stopped claiming to be one
+
+`iCloudSyncEnabled` appears in exactly two places, and both are the same call:
+
+    if settings.data.iCloudSyncEnabled && vault.isCloudBacked {
+        ICloudFiles.requestDownloads(in: url)
+    }
+
+It controls **eviction**, not syncing. A folder in iCloud Drive is synced by the
+system and no app can turn that off — the only real control is where the folder
+lives. The toggle said "Sync this vault with iCloud Drive", which reads as a
+switch for something it cannot switch. It now says **Keep files downloaded**, and
+the footer says plainly that the location decides the rest.
+
+A genuine control — *move this vault into or out of iCloud Drive* — is worth
+having and is not this change. It is a file move, not a setting, and it has to
+materialise evicted files first or it silently moves placeholders: a vault that
+looks emptied, which is the exact failure the eviction setting exists to prevent.
+
 ## The repository was reconciled, 2026-08-22
 
 a user's notes vault and `origin/master` had diverged to 72 local commits against 1410

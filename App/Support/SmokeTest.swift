@@ -115,6 +115,40 @@ enum SmokeTest {
         workspace.overridesGitWorkingCopyGuard = true
         check("the override releases it", !workspace.isBlockedByGitWorkingCopy)
 
+        // --- one repository, one vault ---
+        //
+        // The real implementation, not a restatement of the rule: this is the
+        // check that would have caught a phone holding two vaults pointed at
+        // one repository, which is what it was doing.
+        check("one vault holding a repository is fine", workspace.vaultSharingThisRepository == nil)
+
+        try? FileManager.default.createDirectory(
+            at: root.appending(path: "Second"), withIntermediateDirectories: true)
+        if let second = try? workspace.registry.register(
+            folder: root.appending(path: "Second"), name: "Second"
+        ) {
+            workspace.settings.data.vaultSync[second.id.uuidString] = VaultSyncBinding(
+                repository: "owner/notes", branch: "main", isEnabled: true)
+            check("a second vault on the same repository is caught",
+                  workspace.vaultSharingThisRepository?.id == second.id)
+            check("and neither may sync", !workspace.canSync)
+
+            workspace.claimRepositoryFromOtherVault()
+            check("claiming it clears the other", workspace.vaultSharingThisRepository == nil)
+            check("the other vault is left unbound",
+                  workspace.settings.data.vaultSync[second.id.uuidString] == nil)
+
+            // Switching between vaults bound to *different* repositories is
+            // ordinary use and must stay untouched by any of this.
+            workspace.settings.data.vaultSync[second.id.uuidString] = VaultSyncBinding(
+                repository: "owner/journal", branch: "main", isEnabled: true)
+            check("a different repository is not a conflict",
+                  workspace.vaultSharingThisRepository == nil)
+            workspace.forget(second)
+        } else {
+            check("register a second vault", false)
+        }
+
         // --- the help link, per language ---
         //
         // The site tests check that every URL this can produce lands on a page

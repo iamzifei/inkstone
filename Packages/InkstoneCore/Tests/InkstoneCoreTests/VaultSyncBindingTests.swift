@@ -56,6 +56,38 @@ struct VaultSyncBindingTests {
         #expect(old.syncOverridesGit.isEmpty)
     }
 
+    /// One repository, one vault, per device.
+    ///
+    /// Stated as a predicate over the binding map because `Workspace` lives in
+    /// the app target, out of this package's reach — but the rule is the thing
+    /// worth failing on, and it should be written down somewhere that can fail.
+    /// `SmokeTest` exercises the real implementation.
+    @Test("Two vaults on one device cannot hold the same repository")
+    func oneRepositoryPerDevice() {
+        func otherVaultHolding(_ repository: String, besides me: String,
+                               in map: [String: VaultSyncBinding]) -> String? {
+            map.first { key, binding in key != me && binding.repository == repository }?.key
+        }
+
+        let mine = UUID().uuidString, theirs = UUID().uuidString
+        var map: [String: VaultSyncBinding] = [
+            mine: VaultSyncBinding(repository: "owner/notes", branch: "main", isEnabled: true),
+            theirs: VaultSyncBinding(repository: "owner/notes", branch: "main", isEnabled: true),
+        ]
+        #expect(otherVaultHolding("owner/notes", besides: mine, in: map) == theirs)
+
+        // Claiming it removes the other binding rather than leaving both — a
+        // second vault kept "for later" is the state this exists to prevent.
+        map.removeValue(forKey: theirs)
+        #expect(otherVaultHolding("owner/notes", besides: mine, in: map) == nil)
+
+        // Different repositories on one device are ordinary, and switching
+        // between those vaults must stay unaffected.
+        map[theirs] = VaultSyncBinding(repository: "owner/journal", branch: "main", isEnabled: true)
+        #expect(otherVaultHolding("owner/notes", besides: mine, in: map) == nil)
+        #expect(otherVaultHolding("owner/journal", besides: theirs, in: map) == nil)
+    }
+
     /// The rule the shared-configuration path now follows. Written as a plain
     /// predicate because `Workspace` is in the app target, not this package —
     /// but the rule is the thing that matters, and it should be stated

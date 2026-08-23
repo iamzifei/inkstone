@@ -238,6 +238,7 @@ final class Workspace {
         autoSyncTask = nil
 
         guard syncBinding.isEnabled, !isBlockedByGitWorkingCopy,
+              vaultSharingThisRepository == nil,
               settings.data.gitHubAutoSync else { return }
         let minutes = settings.data.gitHubSyncIntervalMinutes
         guard minutes > 0 else { return }
@@ -406,11 +407,48 @@ final class Workspace {
         vaultIsGitWorkingCopy && !overridesGitWorkingCopyGuard
     }
 
+    /// Another vault on this device already bound to the open vault's
+    /// repository, if there is one.
+    ///
+    /// Two folders claiming to be the working copy of one repository is never a
+    /// configuration anyone wants: each sync makes the repository look like one
+    /// of them, so they overwrite each other's results in turn. It is also
+    /// exactly what happened — a phone holding two vaults pointed at the same
+    /// repository as a desktop vault, all three on a fifteen-minute timer.
+    ///
+    /// Per device, because that is the scope a binding has. Two *devices*
+    /// sharing one repository is the arrangement this feature is for.
+    var vaultSharingThisRepository: Vault? {
+        guard let vault, syncBinding.isConfigured else { return nil }
+        return registry.vaults.first { other in
+            other.id != vault.id
+                && settings.data.vaultSync[other.id.uuidString]?.repository == syncBinding.repository
+        }
+    }
+
+    /// Moves the repository onto the open vault, taking it off the one that had
+    /// it.
+    ///
+    /// Offered rather than simply refusing: a binding can be left behind by a
+    /// folder that has since been deleted or replaced, and a wall with no door
+    /// would leave the user unable to bind anything to that repository ever
+    /// again without knowing why.
+    func claimRepositoryFromOtherVault() {
+        guard let other = vaultSharingThisRepository else { return }
+        settings.data.vaultSync.removeValue(forKey: other.id.uuidString)
+        settings.data.syncOverridesGit.remove(other.id.uuidString)
+        restartAutoSync()
+    }
+
     /// Whether a sync could run right now — bound, permitted, configured, idle.
     var canSync: Bool {
         syncBinding.isEnabled
             && syncBinding.isConfigured
             && !isBlockedByGitWorkingCopy
+            // The backstop. The pane refuses to leave the setup in this state,
+            // but a binding can also arrive from the migration or from a shared
+            // configuration, and neither of those goes through the pane.
+            && vaultSharingThisRepository == nil
             && SyncCredentials.hasToken
             && root != nil
             && !isSyncing

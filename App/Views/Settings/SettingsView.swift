@@ -650,20 +650,26 @@ private struct SyncSettings: View {
         Form {
             Section {
                 @Bindable var settings = workspace.settings
-                Toggle("Sync this vault with iCloud Drive", isOn: $settings.data.iCloudSyncEnabled)
+                // Named for what it does. It used to say "Sync this vault with
+                // iCloud Drive", which reads as a sync switch and is not one:
+                // the only thing behind it is `ICloudFiles.requestDownloads`.
+                // A folder in iCloud Drive is synced by the system, and no app
+                // can turn that off — the way to stop it is to keep the folder
+                // somewhere else.
+                Toggle("Keep files downloaded", isOn: $settings.data.iCloudSyncEnabled)
                     .disabled(workspace.vault?.isCloudBacked != true)
 
                 if workspace.vault?.isCloudBacked == true {
                     Label(
                         settings.data.iCloudSyncEnabled
-                            ? "Syncing. Notes are kept downloaded on this Mac."
-                            : "Paused. iCloud may move notes off this Mac to save space.",
+                            ? "Notes are kept on this device rather than evicted."
+                            : "iCloud may move notes off this device to save space.",
                         systemImage: settings.data.iCloudSyncEnabled ? "checkmark.icloud" : "icloud.slash"
                     )
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 } else {
-                    Text("This vault is stored locally. Create a vault in iCloud Drive, or move this folder there, to sync it across your devices.")
+                    Text("This vault is stored locally, so iCloud does not carry it. Create a vault in iCloud Drive, or move this folder there, to sync it across your devices.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -673,7 +679,7 @@ private struct SyncSettings: View {
                 // Worth stating plainly, because the switch does less than it
                 // looks like it does: iCloud moves the files, not this app.
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("iCloud Drive syncs the folder itself. This keeps notes downloaded rather than evicted, so they stay visible and open instantly — turn it off on a Mac short of disk space.")
+                    Text("Whether iCloud carries this vault depends on where the folder is, not on a switch here — a folder in iCloud Drive is synced by the system. This setting only decides whether its notes stay on this device or may be evicted to placeholders to save space.")
                     Link("How syncing works", destination: SyncHelp.url(for: locale))
                 }
                 .font(.footnote)
@@ -681,6 +687,29 @@ private struct SyncSettings: View {
             }
             Section {
                 @Bindable var settings = workspace.settings
+                // One repository, one vault, per device. Offered as a move
+                // rather than a wall: a binding outlives the folder it was made
+                // for, and a refusal with no way through would leave someone
+                // unable to bind that repository anywhere, ever, without being
+                // told why.
+                if let other = workspace.vaultSharingThisRepository {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(
+                            "\(workspace.syncBinding.repository) is already used by “\(other.name)”",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(style.palette.unresolvedLink.color)
+                        Text("Two folders pointing at one repository overwrite each other: every sync makes the repository look like whichever one ran last. Neither will sync until one of them gives it up.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button("Use it for this vault instead") {
+                            workspace.claimRepositoryFromOtherVault()
+                        }
+                        .font(.footnote)
+                    }
+                }
+
                 // Said before the toggle, because it explains why the toggle
                 // is off and cannot be turned on. Git is not a lesser sync to
                 // be worked around — it is the better one for this folder, and
@@ -728,7 +757,9 @@ private struct SyncSettings: View {
                     .disabled(workspace.root == nil || workspace.isBlockedByGitWorkingCopy)
                     .onChange(of: workspace.syncBinding.isEnabled) { workspace.restartAutoSync() }
 
-                let off = !workspace.syncBinding.isEnabled || workspace.isBlockedByGitWorkingCopy
+                let off = !workspace.syncBinding.isEnabled
+                    || workspace.isBlockedByGitWorkingCopy
+                    || workspace.vaultSharingThisRepository != nil
 
                 SecureField("Personal access token", text: $token, prompt: Text(
                     SyncCredentials.hasToken ? "Saved in Keychain" : "ghp_…"
