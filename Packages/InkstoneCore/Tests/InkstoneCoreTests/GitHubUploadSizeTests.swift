@@ -15,7 +15,7 @@ extension GitHubClientTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return GitHubClient(
-            configuration: .init(repository: "iamzifei/notes", branch: "main"),
+            configuration: .init(repository: "owner/notes", branch: "main"),
             token: "test-token",
             session: URLSession(configuration: configuration),
             retry: .immediate

@@ -10,7 +10,7 @@ extension GitHubClientTests {
   struct PickerTests {
 
     private func makeClient(
-        repository: String = "iamzifei/notes",
+        repository: String = "owner/notes",
         respond: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)
     ) -> GitHubClient {
         StubProtocol.handler = respond
@@ -36,12 +36,12 @@ extension GitHubClientTests {
     func listsRepositories() async throws {
         let client = makeClient { [ok] _ in
             ok("""
-            [{"full_name":"iamzifei/notes","default_branch":"main","permissions":{"push":true}},
-             {"full_name":"iamzifei/vault","default_branch":"trunk","permissions":{"push":false}}]
+            [{"full_name":"owner/notes","default_branch":"main","permissions":{"push":true}},
+             {"full_name":"owner/vault","default_branch":"trunk","permissions":{"push":false}}]
             """)
         }
         let repositories = try await client.listRepositories(pages: 1)
-        #expect(repositories.map(\.fullName) == ["iamzifei/notes", "iamzifei/vault"])
+        #expect(repositories.map(\.fullName) == ["owner/notes", "owner/vault"])
         #expect(repositories[1].defaultBranch == "trunk")
     }
 
@@ -64,7 +64,7 @@ extension GitHubClientTests {
     @Test("A missing permissions block does not disable the repository")
     func missingPermissions() async throws {
         let client = makeClient { [ok] _ in
-            ok(#"[{"full_name":"iamzifei/notes","default_branch":"main"}]"#)
+            ok(#"[{"full_name":"owner/notes","default_branch":"main"}]"#)
         }
         let repositories = try await client.listRepositories(pages: 1)
         #expect(repositories.first?.canPush == true)

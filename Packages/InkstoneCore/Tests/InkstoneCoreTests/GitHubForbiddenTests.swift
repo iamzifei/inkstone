@@ -24,7 +24,7 @@ extension GitHubClientTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return GitHubClient(
-            configuration: .init(repository: "iamzifei/notes", branch: "main"),
+            configuration: .init(repository: "owner/notes", branch: "main"),
             token: "test-token",
             session: URLSession(configuration: configuration),
             retry: .immediate
@@ -86,7 +86,7 @@ extension GitHubClientTests {
             headers: ["X-RateLimit-Remaining": "4321"],
             body: #"{"message":"Resource not accessible by personal access token"}"#
         ))
-        #expect(text.contains("iamzifei/notes"))
+        #expect(text.contains("owner/notes"))
         #expect(text.contains("Resource not accessible"))
         #expect(!text.contains("rejected the token"))
     }

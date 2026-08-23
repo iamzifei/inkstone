@@ -80,8 +80,21 @@ a vault that did not contain those files, syncing to a repository that did.
    hypothetical: a recordings folder and audio chunks are excluded by one vault's
    `.gitignore` and sit in its repository regardless. A vault whose `.gitignore`
    names itself still keeps it private.
-6. ⬜ Mass-deletion guard — refuse a run that would delete more than some
-   fraction of the recorded blobs without confirmation.
+6. ✅ **Mass-deletion guard.** A run that would delete more than half of the
+   *recorded* blobs — measured against `state.blobs`, not against what is on
+   disk now — stops with `SyncError.tooManyDeletions` and says how many, out of
+   how many, and on which side. Confirming lets the same run through.
+
+   Two thresholds, because a guard that fires on ordinary tidying is worse than
+   none: people learn to click past it, and then it does not work for the case
+   it exists for. Half is generous on purpose — this is not trying to catch a
+   careless clean-up, it is trying to catch the shape both incidents had, where
+   a vault is bound to a repository that is not its own and nearly everything on
+   one side reads as deleted on the other. And below ten files the share is
+   meaningless: two of three is 67% and is nobody's disaster.
+
+   `MassDeletionGuardTests` covers both halves, plus the first sync, which has
+   no recorded state to measure against and nothing it could be deleting.
 
 A trap worth recording: `SettingsData` has a hand-written lenient `init(from:)`.
 `CodingKeys` is synthesised and picks new properties up automatically, but the

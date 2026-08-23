@@ -17,7 +17,7 @@ extension GitHubClientTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return GitHubClient(
-            configuration: .init(repository: "iamzifei/notes", branch: branch),
+            configuration: .init(repository: "owner/notes", branch: branch),
             token: "test-token",
             session: URLSession(configuration: configuration),
             retry: .immediate
@@ -63,7 +63,7 @@ extension GitHubClientTests {
         let client = makeClient { [reply] request in
             let path = request.url?.path ?? ""
             if path.contains("/branches") { return reply(200, #"[{"name":"master"}]"#) }
-            return reply(200, #"{"full_name":"iamzifei/notes"}"#)
+            return reply(200, #"{"full_name":"owner/notes"}"#)
         }
         await #expect(throws: GitHubError.self) { _ = try await client.verify() }
     }
@@ -75,9 +75,9 @@ extension GitHubClientTests {
             if path.contains("/branches") {
                 return reply(200, #"[{"name":"main"},{"name":"master"}]"#)
             }
-            return reply(200, #"{"full_name":"iamzifei/notes"}"#)
+            return reply(200, #"{"full_name":"owner/notes"}"#)
         }
-        #expect(try await client.verify() == "iamzifei/notes")
+        #expect(try await client.verify() == "owner/notes")
     }
 
     /// A repository with no commits has no branches, and the branch's absence is
@@ -87,9 +87,9 @@ extension GitHubClientTests {
         let client = makeClient { [reply] request in
             let path = request.url?.path ?? ""
             if path.contains("/branches") { return reply(409, #"{"message":"empty"}"#) }
-            return reply(200, #"{"full_name":"iamzifei/notes"}"#)
+            return reply(200, #"{"full_name":"owner/notes"}"#)
         }
-        #expect(try await client.verify() == "iamzifei/notes")
+        #expect(try await client.verify() == "owner/notes")
     }
 
     /// The message has to name the branch and say what is actually there —
@@ -98,11 +98,11 @@ extension GitHubClientTests {
     @Test("The message names the branch and the alternatives")
     func messageIsUseful() {
         let error = GitHubError.branchNotFound(
-            branch: "main", repository: "iamzifei/zhanyoucai", available: ["master"]
+            branch: "main", repository: "owner/notes", available: ["master"]
         )
         let text = error.errorDescription ?? ""
         #expect(text.contains("main"))
-        #expect(text.contains("iamzifei/zhanyoucai"))
+        #expect(text.contains("owner/notes"))
         #expect(text.contains("master"))
     }
   }

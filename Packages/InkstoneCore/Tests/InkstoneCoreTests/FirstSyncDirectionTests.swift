@@ -34,13 +34,13 @@ extension GitHubClientTests {
             if request.httpMethod == "PUT" {
                 return reply(201, Data(#"{"content":{"sha":"1111111111111111111111111111111111111111"}}"#.utf8))
             }
-            return reply(200, Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return reply(200, Data(#"{"full_name":"owner/notes"}"#.utf8))
         }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return SyncEngine(
             client: GitHubClient(
-                configuration: .init(repository: "iamzifei/notes", branch: "main"),
+                configuration: .init(repository: "owner/notes", branch: "main"),
                 token: "t",
                 session: URLSession(configuration: configuration),
                 retry: .immediate

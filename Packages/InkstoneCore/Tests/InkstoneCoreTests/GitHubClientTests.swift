@@ -37,7 +37,7 @@ struct GitHubClientTests {
     }
 
     private func makeClient(
-        repository: String = "iamzifei/notes",
+        repository: String = "owner/notes",
         respond: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)
     ) -> GitHubClient {
         StubProtocol.handler = respond
@@ -124,7 +124,7 @@ struct GitHubClientTests {
             if request.url?.path.contains("/branches") == true {
                 return (self.response(200), Data(#"[{"name":"main"}]"#.utf8))
             }
-            return (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return (self.response(200), Data(#"{"full_name":"owner/notes"}"#.utf8))
         }
         _ = try await client.verify()
 
@@ -137,7 +137,7 @@ struct GitHubClientTests {
             if request.url?.path.contains("/branches") == true {
                 return (self.response(200), Data(#"[{"name":"main"}]"#.utf8))
             }
-            return (self.response(200), Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return (self.response(200), Data(#"{"full_name":"owner/notes"}"#.utf8))
         }
         _ = try await client.verify()
 

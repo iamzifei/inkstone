@@ -17,6 +17,15 @@ public enum SyncError: LocalizedError, Sendable {
     /// A first sync found files that differ on the two sides, and there is no
     /// basis for choosing between them.
     case firstSyncNeedsDirection(differing: Int, localFiles: Int, remoteFiles: Int)
+    /// This run would remove most of what was recorded. Needs saying yes to.
+    case tooManyDeletions(deleting: Int, of: Int, side: DeletionSide)
+
+    /// Which side a mass deletion would fall on. The two read very differently
+    /// to whoever has to answer: one empties a repository, the other empties the
+    /// folder in front of them.
+    public enum DeletionSide: Sendable, Hashable {
+        case local, remote
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -26,6 +35,14 @@ public enum SyncError: LocalizedError, Sendable {
                 and the repository has \(remoteFiles); \(differing) of them differ. \
                 There is no earlier sync to compare against, so neither side is \
                 known to be newer — choose which one to keep.
+                """
+        case .tooManyDeletions(let deleting, let total, let side):
+            let place = side == .remote ? "from GitHub" : "from this device"
+            return """
+                Stopped: this sync would delete \(deleting) of \(total) synced files \
+                \(place). That is usually a sign the wrong folder or branch is \
+                configured rather than a deletion anyone asked for. Check them, or \
+                confirm if it is what you meant.
                 """
         case .remoteUnexpectedlyEmpty(let recorded):
             return """
@@ -147,8 +164,24 @@ public struct SyncEngine: Sendable {
     ///   files differing on both sides. Required in that situation and ignored in
     ///   every other: once there is a recorded state, a difference on both sides
     ///   is a real conflict with a real answer, and keeping both is it.
+    /// The share of recorded files a run may delete before it stops to ask.
+    ///
+    /// Half is deliberately generous. This is not trying to catch a careless
+    /// tidy-up; it is trying to catch the shape both of this week's incidents
+    /// had — a vault pointed at a repository that is not its own, where nearly
+    /// everything on one side looks deleted on the other.
+    public static let deletionShareNeedingConfirmation = 0.5
+
+    /// Below this, the share is meaningless. Two of three files is 67% and is
+    /// nobody's disaster; stopping for it would train the answer out of people.
+    public static let deletionsAlwaysAllowed = 10
+
+    /// - Parameter confirmingLargeDeletion: says yes to a run that would remove
+    ///   most of the recorded files. Required only when `tooManyDeletions` has
+    ///   already been thrown, and ignored otherwise.
     public func run(
         firstSyncDirection: FirstSyncDirection? = nil,
+        confirmingLargeDeletion: Bool = false,
         progress: (@Sendable (SyncProgress) -> Void)? = nil
     ) async throws -> SyncReport {
         progress?(SyncProgress(message: "Checking repository…"))
@@ -235,6 +268,34 @@ public struct SyncEngine: Sendable {
                 )
             }
         }
+        // Before anything is written. A plan that deletes most of what was
+        // recorded is far more often a misconfiguration than an instruction —
+        // the wrong folder bound to the repository, or a branch that is not the
+        // one the files are on. Both of those look exactly like "the user
+        // deleted everything", and the engine's answer to a deletion is to
+        // propagate it.
+        //
+        // Checked against `state.blobs`, not against what is on disk now: the
+        // question is how much of the *previously synced* vault is about to go,
+        // and a vault that has genuinely grown should not raise the bar for
+        // noticing that the rest of it is disappearing.
+        if !confirmingLargeDeletion, !state.blobs.isEmpty {
+            let recorded = state.blobs.count
+            for side in [SyncError.DeletionSide.remote, .local] {
+                let count = actions.filter { action in
+                    switch action {
+                    case .deleteRemote: return side == .remote
+                    case .deleteLocal: return side == .local
+                    default: return false
+                    }
+                }.count
+                guard count > Self.deletionsAlwaysAllowed,
+                      Double(count) >= Double(recorded) * Self.deletionShareNeedingConfirmation
+                else { continue }
+                throw SyncError.tooManyDeletions(deleting: count, of: recorded, side: side)
+            }
+        }
+
         let stamp = timestamp()
 
         // Whether the run stopped early. Kept separate from the failure list

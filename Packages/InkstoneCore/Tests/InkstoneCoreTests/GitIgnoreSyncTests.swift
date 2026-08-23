@@ -29,12 +29,12 @@ extension GitHubClientTests {
             if request.httpMethod == "PUT" {
                 return reply(201, Data(#"{"content":{"sha":"0000000000000000000000000000000000000000"}}"#.utf8))
             }
-            return reply(200, Data(#"{"full_name":"iamzifei/notes"}"#.utf8))
+            return reply(200, Data(#"{"full_name":"owner/notes"}"#.utf8))
         }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return GitHubClient(
-            configuration: .init(repository: "iamzifei/notes", branch: "main"),
+            configuration: .init(repository: "owner/notes", branch: "main"),
             token: "test-token",
             session: URLSession(configuration: configuration),
             retry: .immediate

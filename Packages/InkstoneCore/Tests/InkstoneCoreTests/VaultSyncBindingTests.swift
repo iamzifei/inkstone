@@ -36,21 +36,21 @@ struct VaultSyncBindingTests {
         var settings = SettingsData()
         let id = UUID().uuidString
         settings.vaultSync[id] = VaultSyncBinding(
-            repository: "iamzifei/notes", branch: "main", isEnabled: true
+            repository: "owner/notes", branch: "main", isEnabled: true
         )
         settings.syncOverridesGit.insert(id)
 
         let data = try JSONEncoder().encode(settings)
         let restored = try JSONDecoder().decode(SettingsData.self, from: data)
-        #expect(restored.vaultSync[id]?.repository == "iamzifei/notes")
+        #expect(restored.vaultSync[id]?.repository == "owner/notes")
         #expect(restored.syncOverridesGit.contains(id))
 
         // Settings written before this change carry neither key. They must load,
         // not reset every other preference to its default — `SettingsData` is
         // decoded with `try?`, so a throw here would silently wipe the file.
-        let legacy = Data(#"{"gitHubRepository":"iamzifei/old","themeID":"inkstone"}"#.utf8)
+        let legacy = Data(#"{"gitHubRepository":"owner/old","themeID":"inkstone"}"#.utf8)
         let old = try JSONDecoder().decode(SettingsData.self, from: legacy)
-        #expect(old.gitHubRepository == "iamzifei/old")
+        #expect(old.gitHubRepository == "owner/old")
         #expect(old.vaultSync.isEmpty)
         #expect(old.didMigrateSyncBindings == false)
         #expect(old.syncOverridesGit.isEmpty)
@@ -69,7 +69,7 @@ struct VaultSyncBindingTests {
         // The Mac's vault and the phone's vault were different folders. The
         // phone adopting the Mac's repository is exactly what must not happen.
         #expect(adoptable(vaultRepository: "", shared: "a private notes repository") == false)
-        #expect(adoptable(vaultRepository: "iamzifei/notes", shared: "a private notes repository") == false)
+        #expect(adoptable(vaultRepository: "owner/notes", shared: "a private notes repository") == false)
 
         // Same repository already recorded: this is a genuine second copy of the
         // same vault, and carrying the branch and switches across is the point

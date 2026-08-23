@@ -567,7 +567,15 @@ final class Workspace {
     /// pane turns it into three buttons.
     var pendingFirstSync: SyncError?
 
-    func sync(firstSyncDirection: FirstSyncDirection? = nil) async {
+    /// Set when a run stopped rather than delete most of the synced files. The
+    /// Sync pane turns it into one button, and it is deliberately not the same
+    /// button as anything else: saying yes here is the irreversible one.
+    var pendingLargeDeletion: SyncError?
+
+    func sync(
+        firstSyncDirection: FirstSyncDirection? = nil,
+        confirmingLargeDeletion: Bool = false
+    ) async {
         guard let root else { return }
         guard syncBinding.isConfigured, let token = SyncCredentials.token() else {
             syncStatus = .failed(GitHubError.notConfigured.localizedDescription)
@@ -588,8 +596,12 @@ final class Workspace {
         syncStatus = .running("Starting…")
         syncProgress = SyncProgress(message: "Starting…")
         pendingFirstSync = nil
+        pendingLargeDeletion = nil
         do {
-            let report = try await engine.run(firstSyncDirection: firstSyncDirection) { update in
+            let report = try await engine.run(
+                firstSyncDirection: firstSyncDirection,
+                confirmingLargeDeletion: confirmingLargeDeletion
+            ) { update in
                 Task { @MainActor in
                     self.syncStatus = .running(update.message)
                     self.syncProgress = update
@@ -611,6 +623,7 @@ final class Workspace {
             // user has, and the pane offers it rather than burying it in a
             // sentence that ends the run.
             if case .firstSyncNeedsDirection = error { pendingFirstSync = error }
+            if case .tooManyDeletions = error { pendingLargeDeletion = error }
             syncProgress = nil
             syncStatus = .failed(error.localizedDescription)
         } catch {

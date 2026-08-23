@@ -520,13 +520,25 @@ private struct SyncSettings: View {
     /// Falls back to a plain in-app sync when the scheduler will not take it,
     /// which still works — it just stops when the app is suspended. On macOS
     /// there is nothing to survive: the process keeps running.
-    private func startSync(firstSyncDirection: FirstSyncDirection? = nil) {
+    private func startSync(
+        firstSyncDirection: FirstSyncDirection? = nil,
+        confirmingLargeDeletion: Bool = false
+    ) {
         #if os(iOS)
-        if BackgroundSync.syncVisibly(workspace: workspace, firstSyncDirection: firstSyncDirection) {
+        // Not through the continued task when confirming a deletion: that path
+        // hands the work to the system and comes back through a fresh handler,
+        // which would not carry the answer that was just given.
+        if !confirmingLargeDeletion,
+           BackgroundSync.syncVisibly(workspace: workspace, firstSyncDirection: firstSyncDirection) {
             return
         }
         #endif
-        Task { await workspace.sync(firstSyncDirection: firstSyncDirection) }
+        Task {
+            await workspace.sync(
+                firstSyncDirection: firstSyncDirection,
+                confirmingLargeDeletion: confirmingLargeDeletion
+            )
+        }
     }
 
     /// The fields that travel between devices, as one comparable value.
@@ -813,6 +825,26 @@ private struct SyncSettings: View {
                             Button("Keep this Mac's") { runFirstSync(.preferLocal) }
                             Button("Keep GitHub's") { runFirstSync(.preferRemote) }
                             Button("Keep both") { runFirstSync(.keepBoth) }
+                        }
+                    }
+                }
+
+                // Its own block, and its own wording. This is the one button
+                // in the pane whose answer cannot be undone, so it says what
+                // will go rather than "Continue".
+                if let pending = workspace.pendingLargeDeletion {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(
+                            pending.localizedDescription,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(style.palette.unresolvedLink.color)
+                        HStack {
+                            Button("Delete them and sync", role: .destructive) {
+                                startSync(confirmingLargeDeletion: true)
+                            }
+                            Button("Cancel") { workspace.pendingLargeDeletion = nil }
                         }
                     }
                 }

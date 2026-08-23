@@ -5,31 +5,33 @@ import Testing
 @Suite("Gitignore")
 struct GitIgnoreTests {
 
-    /// The actual file from the vault this was written for, so the test is about
-    /// a real case rather than an imagined one.
+    /// Modelled on a real vault's `.gitignore` — CJK folder names, a trailing
+    /// slash, a glob and a rooted path — rather than on an imagined one. The
+    /// names are neutral: this repository is public, and a test fixture is no
+    /// place to publish someone's folder structure.
     private let realVault = GitIgnore(contents: """
         _pdf/
         .DS_Store
         *.tmp
         /tmp/
-        _原件PDF/
-        _会话记录/
-        _原件录音/
+        _归档PDF/
+        _日志/
+        _录音/
         """)
 
     @Test("A directory pattern covers everything under it")
     func directoryPattern() {
-        #expect(realVault.ignores("_原件PDF/06-Drucker-Practice-of-Management.pdf"))
-        #expect(realVault.ignores("_原件录音/李同学课程/2026-06-27 09:44:51.wav"))
-        #expect(realVault.ignores("_会话记录/a/b/c.md"))
+        #expect(realVault.ignores("_归档PDF/06-Drucker-Practice-of-Management.pdf"))
+        #expect(realVault.ignores("_录音/课程/2026-06-27 09:44:51.wav"))
+        #expect(realVault.ignores("_日志/a/b/c.md"))
     }
 
     @Test("Notes outside those folders are untouched")
     func keepsEverythingElse() {
         #expect(!realVault.ignores("00_首页.md"))
-        #expect(!realVault.ignores("01-原始素材区/知识库/思想体系/06-Drucker.md"))
+        #expect(!realVault.ignores("01-素材/知识库/06-Drucker.md"))
         // Similar name, different folder.
-        #expect(!realVault.ignores("_原件PDF-notes/summary.md"))
+        #expect(!realVault.ignores("_归档PDF-notes/summary.md"))
     }
 
     @Test("A bare name matches at any depth")
@@ -99,12 +101,12 @@ struct GitIgnoreScanTests {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "inkstone-ignore-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
-            at: root.appending(path: "_原件PDF"), withIntermediateDirectories: true
+            at: root.appending(path: "_归档PDF"), withIntermediateDirectories: true
         )
         defer { try? FileManager.default.removeItem(at: root) }
-        try Data("ignore me\n".utf8).write(to: root.appending(path: "_原件PDF/big.pdf"))
+        try Data("ignore me\n".utf8).write(to: root.appending(path: "_归档PDF/big.pdf"))
         try Data("keep me\n".utf8).write(to: root.appending(path: "Note.md"))
-        try Data("_原件PDF/\n".utf8).write(to: root.appending(path: ".gitignore"))
+        try Data("_归档PDF/\n".utf8).write(to: root.appending(path: ".gitignore"))
 
         let engine = SyncEngine(
             client: GitHubClient(configuration: .init(repository: "a/b", branch: "main"), token: "t"),
@@ -114,15 +116,15 @@ struct GitIgnoreScanTests {
         let (files, excluded) = engine.localFiles()
 
         #expect(files.keys.contains("Note.md"))
-        #expect(!files.keys.contains("_原件PDF/big.pdf"))
+        #expect(!files.keys.contains("_归档PDF/big.pdf"))
         // The distinction that matters: excluded, so the planner skips it in both
         // directions rather than reading its absence as a deletion.
-        #expect(excluded.contains("_原件PDF/big.pdf"))
+        #expect(excluded.contains("_归档PDF/big.pdf"))
         #expect(
             SyncPlanner.plan(
-                entries: [SyncEntry(path: "_原件PDF/big.pdf", local: nil, remote: "abc", base: "abc")],
+                entries: [SyncEntry(path: "_归档PDF/big.pdf", local: nil, remote: "abc", base: "abc")],
                 excludedLocally: excluded
-            ) == [.skip(path: "_原件PDF/big.pdf", reason: .filtered)]
+            ) == [.skip(path: "_归档PDF/big.pdf", reason: .filtered)]
         )
     }
 

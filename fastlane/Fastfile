@@ -105,6 +105,31 @@ platform :ios do
     )
   end
 
+  desc "Upload the binary only. No metadata, no screenshots, no submission."
+  # `release` submits for review, which is the wrong verb when a version is
+  # already WAITING_FOR_REVIEW: submitting again cancels the queued submission
+  # and starts the wait over. This lane puts a build on App Store Connect and
+  # touches nothing else, so a build can be ready without spending the place in
+  # the queue that the last one is holding.
+  lane :upload_build do
+    unless File.exist?(IPA_PATH)
+      UI.user_error!("No IPA at #{IPA_PATH}. Build one with Tools/package-ios.sh")
+    end
+
+    deliver(
+      api_key: asc_key,
+      ipa: IPA_PATH,
+      app_identifier: APP_ID,
+
+      skip_metadata: true,
+      skip_screenshots: true,
+      skip_binary_upload: false,
+      submit_for_review: false,
+      run_precheck_before_submit: false,
+      force: true
+    )
+  end
+
   desc "Read-only: does the API key work, and does the app record exist yet?"
   lane :check do
     key = asc_key

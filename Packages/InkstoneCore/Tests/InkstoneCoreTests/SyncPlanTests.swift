@@ -137,13 +137,13 @@ struct SyncPlanTests {
 
         var state = SyncState()
         state.blobs["Home.md"] = "abc123"
-        state.repository = "iamzifei/notes"
+        state.repository = "owner/notes"
         state.branch = "main"
         try state.save(to: root)
 
         let loaded = SyncState.load(from: root)
         #expect(loaded.blobs["Home.md"] == "abc123")
-        #expect(loaded.repository == "iamzifei/notes")
+        #expect(loaded.repository == "owner/notes")
     }
 
     @Test("A vault that has never synced loads an empty state")
