@@ -7,6 +7,9 @@ import InkstoneCore
 enum TabContent: Hashable, Identifiable {
     case note(URL)
     case canvas(URL)
+    /// A file to look at rather than edit. The kind is carried so the tab can
+    /// pick a viewer and an icon without reading the file again.
+    case attachment(URL, AttachmentKind)
     case graph
     case calendar
 
@@ -14,6 +17,7 @@ enum TabContent: Hashable, Identifiable {
         switch self {
         case .note(let url): return "note:" + url.path(percentEncoded: false)
         case .canvas(let url): return "canvas:" + url.path(percentEncoded: false)
+        case .attachment(let url, _): return "file:" + url.path(percentEncoded: false)
         case .graph: return "graph"
         case .calendar: return "calendar"
         }
@@ -22,6 +26,7 @@ enum TabContent: Hashable, Identifiable {
     var url: URL? {
         switch self {
         case .note(let url), .canvas(let url): return url
+        case .attachment(let url, _): return url
         case .graph, .calendar: return nil
         }
     }
@@ -806,11 +811,27 @@ final class Workspace {
         if settings.data.iCloudSyncEnabled, vault?.isCloudBacked == true {
             _ = ICloudFiles.ensureDownloaded(url, timeout: 2)
         }
-        if url.pathExtension.lowercased() == "canvas" {
+        // Read a prefix, not the file: deciding needs only the first few
+        // kilobytes, and a vault can hold a video.
+        switch FileOpening.decide(for: url, sampling: Self.sniff(url)) {
+        case .canvas:
             open(.canvas(url), inNewTab: inNewTab)
-        } else {
+        case .text:
             open(.note(url), inNewTab: inNewTab)
+        case .preview(let kind):
+            open(.attachment(url, kind), inNewTab: inNewTab)
         }
+    }
+
+    /// The first few kilobytes of `url`, for deciding what it is.
+    ///
+    /// A handle rather than `Data(contentsOf:)`: the caller may be pointing at
+    /// a two-gigabyte video, and reading all of it to find out that it is a
+    /// video would freeze the click that opened it.
+    private static func sniff(_ url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return try? handle.read(upToCount: FileOpening.sniffLength)
     }
 
     func closeTab(_ content: TabContent) {
@@ -927,6 +948,28 @@ final class Workspace {
 
         refreshTree()
         reindex()
+    }
+
+    /// Copies a file beside itself, the way the Finder does — "Note copy.md",
+    /// then "Note copy 2.md".
+    ///
+    /// Deliberately not a rename-and-copy dance: the original is untouched, so a
+    /// failure leaves the vault exactly as it was.
+    @discardableResult
+    func duplicate(_ url: URL) -> URL? {
+        let folder = url.deletingLastPathComponent()
+        let ext = url.pathExtension
+        let stem = url.deletingPathExtension().lastPathComponent
+        let name = ext.isEmpty ? "\(stem) copy" : "\(stem) copy.\(ext)"
+        let destination = uniqueURL(in: folder, name: name)
+        do {
+            try FileManager.default.copyItem(at: url, to: destination)
+        } catch {
+            return nil
+        }
+        refreshTree()
+        reindex()
+        return destination
     }
 
     func delete(_ url: URL) {

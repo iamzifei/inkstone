@@ -203,6 +203,9 @@ private struct DetailView: View {
             case .canvas(let url):
                 CanvasPane(url: url)
                     .id(url)
+            case .attachment(let url, let kind):
+                AttachmentView(url: url, kind: kind)
+                    .id(url)
             case .graph:
                 GraphPane()
             case .calendar:
@@ -260,6 +263,9 @@ private struct TabStrip: View {
         switch tab {
         case .note(let url), .canvas(let url):
             return url.deletingPathExtension().lastPathComponent
+        // The extension stays: two files can differ only by it, and for
+        // something being looked at rather than edited it is half the identity.
+        case .attachment(let url, _): return url.lastPathComponent
         case .graph: return String(localized: "Graph")
         case .calendar: return String(localized: "Calendar")
         }
@@ -269,6 +275,14 @@ private struct TabStrip: View {
         switch tab {
         case .note: return "doc.text"
         case .canvas: return "square.on.circle"
+        case .attachment(_, let kind):
+            switch kind {
+            case .image: return "photo"
+            case .video: return "film"
+            case .audio: return "waveform"
+            case .pdf: return "doc.richtext"
+            case .other: return "doc"
+            }
         case .graph: return "point.3.filled.connected.trianglepath.dotted"
         case .calendar: return "calendar"
         }

@@ -298,6 +298,9 @@ private struct FileRow: View {
                     workspace.openNote(at: node.url, inNewTab: true)
                 }
             }
+            Button("Duplicate", systemImage: "plus.square.on.square") {
+                workspace.duplicate(node.url)
+            }
             Button("Rename…", systemImage: "pencil") {
                 renameText = node.basename
                 renaming = node.url
@@ -311,6 +314,12 @@ private struct FileRow: View {
             }
             Button("Copy Absolute Path", systemImage: "doc.on.doc.fill") {
                 copyToPasteboard(node.url.path(percentEncoded: false))
+            }
+            // The escape hatch for everything this app will never render, and
+            // for the times another app is simply the right one — a PSD, a
+            // spreadsheet, a video someone wants to scrub properly.
+            Button("Open in Default App", systemImage: "arrow.up.forward.app") {
+                NSWorkspace.shared.open(node.url)
             }
             Button("Reveal in Finder", systemImage: "folder") {
                 // Selects the item in its parent folder rather than opening it,
