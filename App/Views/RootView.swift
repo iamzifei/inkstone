@@ -184,19 +184,58 @@ struct RootView: View {
     }
 }
 
-/// The main content area: tab strip plus whatever the active tab shows.
+/// The main content area: one pane, or two side by side.
 private struct DetailView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
 
     var body: some View {
+        #if os(macOS)
+        // A draggable divider rather than a fixed half: the two panes are rarely
+        // wanted at the same width — a note beside its reference, an image
+        // beside the note that embeds it.
+        if workspace.isSplit {
+            HSplitView {
+                PaneView(pane: .primary)
+                PaneView(pane: .secondary)
+            }
+            .background(style.background)
+        } else {
+            PaneView(pane: .primary)
+        }
+        #else
+        // No split on a phone: two half-columns of text is worse than one.
+        PaneView(pane: .primary)
+        #endif
+    }
+}
+
+/// One half of the content area — its own tabs, its own active tab.
+private struct PaneView: View {
+    let pane: Workspace.Pane
+
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+
+    private var tabs: [TabContent] {
+        pane == .primary ? workspace.tabs : workspace.secondaryTabs
+    }
+
+    private var active: TabContent? {
+        pane == .primary ? workspace.activeTab : workspace.secondaryActiveTab
+    }
+
+    var body: some View {
         VStack(spacing: 0) {
-            if workspace.tabs.count > 1 {
-                TabStrip()
+            // The right-hand pane always shows its strip, even with one tab:
+            // without it there is nothing to close, and no way back to a single
+            // pane short of closing the file some other way.
+            if tabs.count > 1 || (pane == .secondary && !tabs.isEmpty) {
+                TabStrip(pane: pane)
                 Divider().overlay(style.divider)
             }
 
-            switch workspace.activeTab {
+            switch active {
             case .note(let url):
                 NoteEditorPane(url: url)
                     .id(url)
@@ -214,19 +253,31 @@ private struct DetailView: View {
                 EmptyStatePane()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(style.background)
+        // Any click in a pane makes it the one new work lands in, so following a
+        // link on the right opens beside it rather than jumping back to the left.
+        .contentShape(.rect)
+        .onTapGesture { workspace.focusedPane = pane }
     }
 }
 
 private struct TabStrip: View {
+    var pane: Workspace.Pane = .primary
+
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
+
+    private var tabs: [TabContent] {
+        pane == .primary ? workspace.tabs : workspace.secondaryTabs
+    }
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 2) {
-                ForEach(workspace.tabs) { tab in
-                    let isActive = workspace.activeTab == tab
+                ForEach(tabs) { tab in
+                    let isActive = (pane == .primary ? workspace.activeTab
+                                                     : workspace.secondaryActiveTab) == tab
                     HStack(spacing: 6) {
                         Image(systemName: icon(for: tab))
                             .font(.caption2)
@@ -250,7 +301,11 @@ private struct TabStrip: View {
                             .fill(isActive ? style.secondaryBackground : .clear)
                     )
                     .contentShape(.rect)
-                    .onTapGesture { workspace.activeTab = tab }
+                    .onTapGesture {
+                        if pane == .primary { workspace.activeTab = tab }
+                        else { workspace.secondaryActiveTab = tab }
+                        workspace.focusedPane = pane
+                    }
                 }
             }
             .padding(.horizontal, 8)

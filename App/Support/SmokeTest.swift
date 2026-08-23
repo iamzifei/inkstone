@@ -97,6 +97,61 @@ enum SmokeTest {
         workspace.delete(renamed)
         check("delete a note", !FileManager.default.fileExists(atPath: renamed.path))
 
+        // --- bookmarks, moving, split panes, history ---
+        guard let pinned = workspace.createNote(named: "Pinned") else {
+            check("create a note to pin", false)
+            return
+        }
+        workspace.toggleBookmark(pinned)
+        check("pin a file", workspace.isBookmarked(pinned))
+        check("it appears in the list", workspace.bookmarkedURLs.contains(pinned))
+
+        let folder = root.appending(path: "Moved")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        workspace.refreshTree()
+        let movedTo = workspace.move(pinned, to: folder)
+        // Compared by path, not by URL: `deletingLastPathComponent()` hands back
+        // a directory URL with a trailing slash, so `==` is false even when the
+        // move worked — which is what this assertion claimed the first time.
+        check("move a file into a folder",
+              movedTo?.deletingLastPathComponent().path(percentEncoded: false)
+                  .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                  == folder.path(percentEncoded: false)
+                  .trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        // The pin follows: the user pinned the note, not the path.
+        if let movedTo {
+            check("the bookmark follows the move", workspace.isBookmarked(movedTo))
+            check("and not the old path", !workspace.isBookmarked(pinned))
+        }
+
+        let target = movedTo ?? pinned
+        workspace.openBeside(target)
+        check("open to the right makes a split", workspace.isSplit)
+        check("and focuses the new pane", workspace.focusedPane == .secondary)
+        if let secondary = workspace.secondaryActiveTab {
+            workspace.closeTab(secondary)
+        }
+        check("closing its last tab closes the split", !workspace.isSplit)
+        check("and focus returns to the left", workspace.focusedPane == .primary)
+
+        // History records the state *before* a write, so the first save of an
+        // edited note keeps what it replaced.
+        if let document = workspace.document(for: target) {
+            document.text = "first\n"
+            document.save()
+            document.text = "second\n"
+            document.save()
+        }
+        let versions = workspace.versions(of: target)
+        check("an edit leaves a version behind", !versions.isEmpty)
+        if let newest = versions.first {
+            check("restoring puts the note back", workspace.restore(newest, of: target))
+        }
+
+        workspace.delete(target)
+        check("deleting drops the bookmark", !workspace.isBookmarked(target))
+        check("and the history with it", workspace.versions(of: target).isEmpty)
+
         // --- sync bindings ---
         check("a fresh vault is unbound", !workspace.syncBinding.isConfigured)
         check("an unbound vault does not sync", !workspace.canSync)

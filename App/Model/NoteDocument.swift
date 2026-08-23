@@ -55,8 +55,18 @@ final class NoteDocument {
         }
     }
 
+    /// Called before each write so the previous state can be kept.
+    ///
+    /// Set by `Workspace`, which owns the vault root the history lives in. A
+    /// closure rather than a reference to the workspace: a document should not
+    /// need to know about tabs and sync to save itself.
+    var onWillWrite: ((String) -> Void)?
+
     func save() {
         guard isDirty else { return }
+        // Snapshot what is about to be replaced, not what replaces it: recovery
+        // means getting back the state *before* the edit that went wrong.
+        onWillWrite?(text)
         do {
             try store.write(text, to: url)
             isDirty = false

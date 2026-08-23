@@ -34,7 +34,7 @@ enum TabContent: Hashable, Identifiable {
 
 /// Which pane the sidebar is showing.
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case files, search, tags, links, outline
+    case files, search, bookmarks, tags, links, outline
     var id: String { rawValue }
 }
 
@@ -143,7 +143,26 @@ final class Workspace {
         revealTarget = RevealTarget(url: url, range: range, token: revealToken)
     }
 
+    /// Which of the two panes new work goes to.
+    ///
+    /// macOS only. A split on a phone is two half-columns of text, and Obsidian
+    /// does not offer one there either.
+    enum Pane: Hashable { case primary, secondary }
+
     var tabs: [TabContent] = []
+
+    /// The right-hand pane's tabs. Empty means there is no split — the pane
+    /// appears when something is sent to it and disappears when its last tab
+    /// closes, so there is never an empty half of the window to explain.
+    var secondaryTabs: [TabContent] = []
+    var secondaryActiveTab: TabContent?
+
+    /// Where an ordinary open lands. Follows the last pane the user touched, so
+    /// clicking a link in the right-hand pane opens beside it rather than
+    /// jumping back to the left.
+    var focusedPane: Pane = .primary
+
+    var isSplit: Bool { !secondaryTabs.isEmpty }
     var activeTab: TabContent? {
         didSet {
             guard let activeTab, activeTab != oldValue else { return }
@@ -160,6 +179,11 @@ final class Workspace {
     private(set) var history: [TabContent] = []
     private(set) var historyIndex = -1
     private var isNavigatingHistory = false
+
+    /// The open vault's pinned files. Loaded on open and written on every
+    /// change — the list is a handful of strings, and losing it to a crash
+    /// because it was only flushed on quit would be a poor trade.
+    private(set) var bookmarks = Bookmarks()
 
     private var watcher: VaultWatcher?
     private let indexBuilder = IndexBuilder()
@@ -197,6 +221,7 @@ final class Workspace {
 
             // Before the auto-sync below can read a binding.
             migrateSyncBindingIfNeeded(for: vault, root: url)
+            bookmarks = Bookmarks.load(from: url)
 
             refreshTree()
             reindex()
@@ -290,6 +315,9 @@ final class Workspace {
         documents.removeAll()
         tabs.removeAll()
         activeTab = nil
+        secondaryTabs.removeAll()
+        secondaryActiveTab = nil
+        focusedPane = .primary
         history.removeAll()
         historyIndex = -1
     }
@@ -779,8 +807,61 @@ final class Workspace {
         guard let store else { return nil }
         if let existing = documents[url] { return existing }
         let document = NoteDocument(url: url, store: store)
+        // The state *before* each write goes into history. Snapshotting after
+        // would preserve the edit rather than what it replaced, which is the
+        // wrong half of a recovery.
+        document.onWillWrite = { [weak self] previous in
+            self?.recordHistory(for: url, previous: previous)
+        }
         documents[url] = document
         return document
+    }
+
+    // MARK: - History
+
+    /// Local snapshots of the open vault's notes.
+    ///
+    /// Not `history`: that name is taken by the back/forward stack, and two
+    /// different histories sharing one word is how the wrong one gets called.
+    var fileHistory: FileHistory? { root.map(FileHistory.init(vaultRoot:)) }
+
+    func versions(of url: URL) -> [FileHistory.Version] {
+        guard let root, let history = fileHistory else { return [] }
+        return history.versions(of: VaultPath.relative(of: url, in: root))
+    }
+
+    private func recordHistory(for url: URL, previous: String) {
+        guard let root, let history = fileHistory else { return }
+        try? history.record(VaultPath.relative(of: url, in: root),
+                            contents: Data(previous.utf8))
+    }
+
+    /// Puts a note back to an earlier state.
+    ///
+    /// The current text is snapshotted first, so restoring is itself undoable —
+    /// otherwise recovering from a bad edit could destroy a good one, and the
+    /// feature would need its own recovery.
+    @discardableResult
+    func restore(_ version: FileHistory.Version, of url: URL) -> Bool {
+        guard let store, let history = fileHistory, let root,
+              let data = history.contents(of: version),
+              let text = String(data: data, encoding: .utf8)
+        else { return false }
+
+        let path = VaultPath.relative(of: url, in: root)
+        if let current = try? String(contentsOf: url, encoding: .utf8) {
+            try? history.record(path, contents: Data(current.utf8))
+        }
+
+        do {
+            try store.write(text, to: url)
+        } catch {
+            return false
+        }
+        documents.removeValue(forKey: url)
+        _ = document(for: url)
+        reindex()
+        return true
     }
 
     func saveAll() {
@@ -790,18 +871,48 @@ final class Workspace {
     // MARK: - Tabs & navigation
 
     func open(_ content: TabContent, inNewTab: Bool = false) {
-        if !tabs.contains(content) {
-            if inNewTab || tabs.isEmpty || activeTab == nil {
-                tabs.append(content)
-            } else if let activeTab, let index = tabs.firstIndex(of: activeTab) {
+        open(content, inNewTab: inNewTab, in: focusedPane)
+    }
+
+    func open(_ content: TabContent, inNewTab: Bool = false, in pane: Pane) {
+        var list = pane == .primary ? tabs : secondaryTabs
+        let active = pane == .primary ? activeTab : secondaryActiveTab
+
+        if !list.contains(content) {
+            if inNewTab || list.isEmpty || active == nil {
+                list.append(content)
+            } else if let active, let index = list.firstIndex(of: active) {
                 // Replace the current tab, matching how a browser handles a
                 // plain click versus a ⌘-click.
-                tabs[index] = content
+                list[index] = content
             } else {
-                tabs.append(content)
+                list.append(content)
             }
         }
-        activeTab = content
+
+        if pane == .primary {
+            tabs = list
+            activeTab = content
+        } else {
+            secondaryTabs = list
+            secondaryActiveTab = content
+        }
+        focusedPane = pane
+    }
+
+    /// Opens a file in the pane beside this one, making the split if there is
+    /// not one yet.
+    func openBeside(_ url: URL) {
+        let content: TabContent
+        switch FileOpening.decide(for: url, sampling: Self.sniff(url)) {
+        case .canvas: content = .canvas(url)
+        case .text: content = .note(url)
+        case .preview(let kind): content = .attachment(url, kind)
+        }
+        // From the right-hand pane, "beside" means the left — otherwise the
+        // command would do nothing there, which reads as broken rather than as
+        // deliberate.
+        open(content, inNewTab: true, in: focusedPane == .secondary ? .primary : .secondary)
     }
 
     func openNote(at url: URL, inNewTab: Bool = false) {
@@ -835,14 +946,33 @@ final class Workspace {
     }
 
     func closeTab(_ content: TabContent) {
-        if let url = content.url {
+        // A file open in both panes is one document; only forget it when the
+        // last tab showing it goes, or closing the copy on the right would
+        // discard unsaved edits made on the left.
+        let stillOpen = (tabs + secondaryTabs).filter { $0 == content }.count > 1
+        if let url = content.url, !stillOpen {
             documents[url]?.save()
             documents.removeValue(forKey: url)
         }
-        guard let index = tabs.firstIndex(of: content) else { return }
-        tabs.remove(at: index)
-        if activeTab == content {
-            activeTab = tabs.indices.contains(index) ? tabs[index] : tabs.last
+
+        if let index = tabs.firstIndex(of: content) {
+            tabs.remove(at: index)
+            if activeTab == content {
+                activeTab = tabs.indices.contains(index) ? tabs[index] : tabs.last
+            }
+        }
+        if let index = secondaryTabs.firstIndex(of: content) {
+            secondaryTabs.remove(at: index)
+            if secondaryActiveTab == content {
+                secondaryActiveTab = secondaryTabs.indices.contains(index)
+                    ? secondaryTabs[index] : secondaryTabs.last
+            }
+        }
+        // The split closes itself when its last tab goes: an empty half of the
+        // window is a state with nothing to say and no obvious way out.
+        if secondaryTabs.isEmpty {
+            secondaryActiveTab = nil
+            focusedPane = .primary
         }
     }
 
@@ -933,6 +1063,12 @@ final class Workspace {
             LinkRewriter(store: store).rename(from: oldBasename, to: newBasename, in: others)
         }
 
+        bookmarks.rename(VaultPath.relative(of: url, in: root),
+                         to: VaultPath.relative(of: destination, in: root))
+        try? bookmarks.save(to: root)
+        fileHistory?.rename(VaultPath.relative(of: url, in: root),
+                        to: VaultPath.relative(of: destination, in: root))
+
         // Move any open document/tab over to the new URL.
         if let document = documents.removeValue(forKey: url) {
             document.save()
@@ -948,6 +1084,96 @@ final class Workspace {
 
         refreshTree()
         reindex()
+    }
+
+    // MARK: - Bookmarks
+
+    /// Whether `url` is pinned. Takes a URL and not a path so callers do not
+    /// each have to remember which form the store holds.
+    func isBookmarked(_ url: URL) -> Bool {
+        guard let root else { return false }
+        return bookmarks.contains(VaultPath.relative(of: url, in: root))
+    }
+
+    func toggleBookmark(_ url: URL) {
+        guard let root else { return }
+        bookmarks.toggle(VaultPath.relative(of: url, in: root))
+        try? bookmarks.save(to: root)
+    }
+
+    /// The pinned files that still exist, as URLs.
+    ///
+    /// Filtered rather than pruned: a file can be missing because an external
+    /// sync has not finished bringing it back, and silently forgetting the
+    /// bookmark would turn a slow download into a lost pin.
+    var bookmarkedURLs: [URL] {
+        guard let root else { return [] }
+        return bookmarks.paths
+            .map { root.appending(path: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) }
+    }
+
+    // MARK: - Moving
+
+    /// Moves a file into another folder of the same vault.
+    ///
+    /// Wikilinks resolve by name and so survive a move untouched; the index is
+    /// rebuilt because paths are half of what it holds. The bookmark follows,
+    /// because the user pinned the note rather than the path.
+    @discardableResult
+    func move(_ url: URL, to folder: URL) -> URL? {
+        guard let store, let root else { return nil }
+        guard url.deletingLastPathComponent() != folder else { return nil }
+        let destination = uniqueURL(in: folder, name: url.lastPathComponent)
+        do {
+            try FileManager.default.moveItem(at: url, to: destination)
+        } catch {
+            return nil
+        }
+
+        bookmarks.rename(VaultPath.relative(of: url, in: root),
+                         to: VaultPath.relative(of: destination, in: root))
+        try? bookmarks.save(to: root)
+        fileHistory?.rename(VaultPath.relative(of: url, in: root),
+                        to: VaultPath.relative(of: destination, in: root))
+
+        if let document = documents.removeValue(forKey: url) {
+            document.save()
+            documents[destination] = NoteDocument(url: destination, store: store)
+        }
+        if let index = tabs.firstIndex(where: { $0.url == url }) {
+            let replacement = Self.tab(for: destination)
+            tabs[index] = replacement
+            if activeTab?.url == url { activeTab = replacement }
+        }
+
+        refreshTree()
+        reindex()
+        return destination
+    }
+
+    /// Every folder in the open vault, for the "Move to…" menu.
+    var folders: [URL] {
+        guard let root else { return [] }
+        var found: [URL] = [root]
+        func walk(_ node: FileNode) {
+            guard node.isDirectory else { return }
+            found.append(node.url)
+            node.children?.forEach(walk)
+        }
+        tree?.children?.forEach(walk)
+        return found
+    }
+
+    /// The tab a file should open in, by extension alone.
+    ///
+    /// Used where a file is being *moved* rather than opened, so its contents
+    /// have already been decided about and re-sniffing would be wasted work.
+    private static func tab(for url: URL) -> TabContent {
+        switch url.pathExtension.lowercased() {
+        case "canvas": return .canvas(url)
+        default: return .note(url)
+        }
     }
 
     /// Copies a file beside itself, the way the Finder does — "Note copy.md",
@@ -973,6 +1199,13 @@ final class Workspace {
     }
 
     func delete(_ url: URL) {
+        if let root {
+            bookmarks.remove(VaultPath.relative(of: url, in: root))
+            try? bookmarks.save(to: root)
+            // The history goes too. Keeping snapshots of a deleted file would
+            // make "delete" mean something other than what it says.
+            fileHistory?.forget(VaultPath.relative(of: url, in: root))
+        }
         guard let store else { return }
         try? store.delete(url)
         documents.removeValue(forKey: url)

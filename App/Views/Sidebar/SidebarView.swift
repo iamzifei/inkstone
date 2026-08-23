@@ -64,6 +64,7 @@ struct SidebarView: View {
             switch workspace.sidebarSection {
             case .files: FileTreeView()
             case .search: SearchPane()
+            case .bookmarks: BookmarksPane()
             case .tags: TagListView()
             case .links: UnresolvedLinksView()
             case .outline: OutlinePane()
@@ -177,6 +178,7 @@ private struct SectionPicker: View {
         switch section {
         case .files: return "folder"
         case .search: return "magnifyingglass"
+        case .bookmarks: return "bookmark"
         case .tags: return "number"
         case .links: return "link"
         case .outline: return "list.bullet.indent"
@@ -187,6 +189,7 @@ private struct SectionPicker: View {
         switch section {
         case .files: return String(localized: "Files")
         case .search: return String(localized: "Search")
+        case .bookmarks: return String(localized: "Bookmarks")
         case .tags: return String(localized: "Tags")
         case .links: return String(localized: "Unresolved Links")
         case .outline: return String(localized: "Outline")
@@ -235,6 +238,19 @@ private struct FileRow: View {
     @Binding var expanded: Set<URL>
     @Binding var renaming: URL?
     @Binding var renameText: String
+    /// Non-nil while the history sheet is up. Carries the file rather than a
+    /// Bool so the sheet cannot outlive the row that opened it and show the
+    /// wrong one.
+    ///
+    /// Wrapped rather than conforming `URL` to `Identifiable`: that extension
+    /// would apply to every URL in the project, and `id` on a file URL is a
+    /// claim about identity that should not be made globally by a sidebar.
+    @State private var historyTarget: HistoryTarget?
+
+    private struct HistoryTarget: Identifiable {
+        let url: URL
+        var id: String { url.path(percentEncoded: false) }
+    }
 
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
@@ -297,6 +313,31 @@ private struct FileRow: View {
                 Button("Open in New Tab", systemImage: "plus.rectangle.on.rectangle") {
                     workspace.openNote(at: node.url, inNewTab: true)
                 }
+                #if os(macOS)
+                Button("Open to the Right", systemImage: "rectangle.righthalf.inset.filled") {
+                    workspace.openBeside(node.url)
+                }
+                #endif
+            }
+            if !node.isDirectory {
+                Button(
+                    workspace.isBookmarked(node.url) ? "Remove Bookmark" : "Bookmark",
+                    systemImage: workspace.isBookmarked(node.url) ? "bookmark.slash" : "bookmark"
+                ) {
+                    workspace.toggleBookmark(node.url)
+                }
+                // A submenu of the vault's folders rather than a modal picker:
+                // the destinations are known and finite, and a menu is one
+                // gesture where a dialog is three.
+                Button("Version History…", systemImage: "clock.arrow.circlepath") {
+                    historyTarget = HistoryTarget(url: node.url)
+                }
+                Menu("Move to…", systemImage: "folder") {
+                    ForEach(workspace.folders, id: \.self) { folder in
+                        Button(folderLabel(folder)) { workspace.move(node.url, to: folder) }
+                            .disabled(folder == node.url.deletingLastPathComponent())
+                    }
+                }
             }
             Button("Duplicate", systemImage: "plus.square.on.square") {
                 workspace.duplicate(node.url)
@@ -334,6 +375,11 @@ private struct FileRow: View {
             }
         }
 
+        .sheet(item: $historyTarget) { target in
+            VersionHistoryView(url: target.url)
+                .environment(workspace)
+        }
+
         if node.isDirectory, isExpanded, let children = node.children {
             ForEach(children) { child in
                 FileRow(
@@ -366,6 +412,14 @@ private struct FileRow: View {
     }
     #endif
 
+    /// The vault root reads as the vault's own name; everything else as its
+    /// path inside it, so two folders called "Drafts" are distinguishable.
+    private func folderLabel(_ folder: URL) -> String {
+        guard let root = workspace.root else { return folder.lastPathComponent }
+        if folder == root { return workspace.vault?.name ?? folder.lastPathComponent }
+        return VaultPath.relative(of: folder, in: root)
+    }
+
     static func icon(for url: URL) -> String {
         switch url.pathExtension.lowercased() {
         case "canvas": return "square.on.circle"
@@ -374,6 +428,101 @@ private struct FileRow: View {
         case "mp3", "m4a", "wav": return "waveform"
         case "mp4", "mov": return "film"
         default: return "doc"
+        }
+    }
+}
+
+/// The pinned files, in the order they were pinned.
+///
+/// Missing files are left out rather than removed from the store: a file can be
+/// absent because a sync has not finished bringing it back, and forgetting the
+/// bookmark then would turn a slow download into a lost pin.
+struct BookmarksPane: View {
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+
+    var body: some View {
+        let marks = workspace.bookmarkedURLs
+        if marks.isEmpty {
+            VStack(spacing: 6) {
+                Image(systemName: "bookmark")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(style.faintText)
+                Text("No bookmarks yet.")
+                    .font(style.uiFont)
+                    .foregroundStyle(style.secondaryText)
+                Text("Right-click a file to pin it here.")
+                    .font(style.uiFont)
+                    .foregroundStyle(style.faintText)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 16)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(marks, id: \.self) { url in
+                        BookmarkRow(url: url)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+}
+
+private struct BookmarkRow: View {
+    let url: URL
+
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+
+    var body: some View {
+        let isActive = workspace.activeTab?.url == url
+        HStack(spacing: 5) {
+            Image(systemName: FileRow.icon(for: url))
+                .font(style.uiIcon(11.0 / 13, weight: .semibold))
+                .frame(width: style.uiFontSize * 10 / 13)
+                .foregroundStyle(style.faintText)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(url.deletingPathExtension().lastPathComponent)
+                    .font(style.uiFont)
+                    .lineLimit(1)
+                    .foregroundStyle(isActive ? style.text : style.secondaryText)
+                // The folder, because two notes can share a name and the point
+                // of a pinned list is going straight to the right one.
+                if let root = workspace.root {
+                    let folder = VaultPath.relative(of: url.deletingLastPathComponent(), in: root)
+                    if folder != url.deletingLastPathComponent().lastPathComponent || !folder.isEmpty {
+                        Text(folder)
+                            .font(style.uiFont)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .foregroundStyle(style.faintText)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(isActive ? style.background : .clear)
+                .padding(.horizontal, 4)
+        )
+        .contentShape(.rect)
+        .onTapGesture { workspace.openNote(at: url) }
+        .contextMenu {
+            Button("Remove Bookmark", systemImage: "bookmark.slash") {
+                workspace.toggleBookmark(url)
+            }
+            #if os(macOS)
+            Button("Reveal in Finder", systemImage: "folder") {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            }
+            #endif
         }
     }
 }
