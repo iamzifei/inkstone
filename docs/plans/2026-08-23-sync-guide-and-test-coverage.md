@@ -81,6 +81,53 @@ Two traps found while writing them, both worth keeping:
   against work that had never been given a chance to start. `Task.sleep` yields;
   `RunLoop.run` there does not.
 
+## Second pass: three languages, and pictures
+
+The guide shipped in English only, and the app linked to it regardless of the
+language the app was being read in.
+
+**`site/guide.py` now holds the structure once and the words three times** — the
+languages the app itself ships. Not the site's eight: that system fails the build
+unless every page exists in all of them, which is right for marketing copy and
+wrong here, because promising a French guide the app does not have is worse than
+sending a French reader to the English one. `build.py` renders it into the same
+language directories the rest of the site uses, so `SyncHelp.url(for:)` in the
+app is a prefix and a filename. It matches on **script**, not region: `zh-Hans-SG`
+and `zh-Hant-HK` differ in the half that decides which page a reader can read.
+
+Two tests hold the seam that nothing else watches. One reads
+`SyncHelp.directories` out of the Swift and resolves every URL it can produce
+against the pages the site actually emits. The other compares the `<h2>` ids
+across the three languages, so a translation that quietly loses a section fails
+the build rather than waiting for a reader of that language to notice.
+
+**The screenshots are captured, not staged.** `scripts/capture-sync-shots.sh`
+drives the real app: the Sync pane with a repository set, the notice shown for a
+git working copy, and a conflict copy sitting beside the note it came from.
+
+Desensitisation is by construction, and it took two goes:
+
+* `INKSTONE_DEMO_DEFAULTS` swaps `UserDefaults` for a scratch suite, so the vault
+  list, bindings and interval on screen are the seeded ones.
+* **That was not enough.** The first capture had a private repository name across
+  the top of the pane — published by another device into `NSUbiquitousKeyValueStore`,
+  which is iCloud and untouched by any defaults suite. `SharedSyncConfiguration`
+  now reads *and writes* nothing during a demo launch; the write direction is the
+  worse one, since a demo repository published into a real iCloud store would
+  propagate an invented setup to the user's own devices.
+* A test greps the committed PNGs for the strings that leaked, so the check
+  outlives the memory of it.
+
+Three things the capture pipeline needed, each found by the picture being wrong:
+
+* The sandboxed build cannot open a vault outside the file picker, so the harness
+  builds with `Inkstone-Dev.entitlements` — as `record-demo.sh` already did.
+* The Settings window is 560×460, under `inkstone-window.py`'s size floor, so it
+  was not merely deprioritised but invisible; `--title` picks it by name.
+* macOS ships bash 3.2, where expanding an empty array under `set -u` is an
+  error — which surfaced as an empty window id, reading as "no window" rather
+  than "bad shell".
+
 ## HUMAN QUEUE
 
 * Notarising the macOS build needs the Apple credentials; unattended packaging

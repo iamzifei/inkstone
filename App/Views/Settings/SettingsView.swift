@@ -12,12 +12,12 @@ struct SettingsView: View {
 
     var body: some View {
         #if os(macOS)
-        TabView {
-            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
-            TypographySettings().tabItem { Label("Typography", systemImage: "textformat") }
-            EditorSettings().tabItem { Label("Editor", systemImage: "square.and.pencil") }
-            FilesSettings().tabItem { Label("Files & Links", systemImage: "folder") }
-            SyncSettings().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+        TabView(selection: $tab) {
+            ForEach(Pane.allCases) { pane in
+                pane.view
+                    .tabItem { Label(pane.title, systemImage: pane.symbol) }
+                    .tag(pane)
+            }
         }
         .frame(width: 560, height: 460)
         #else
@@ -42,7 +42,21 @@ struct SettingsView: View {
         #endif
     }
 
-    #if !os(macOS)
+    #if os(macOS)
+    /// Which tab is showing. A selection rather than TabView's own default, so a
+    /// pane can be opened from code — the Sync pane is five tabs in and behind a
+    /// click, which is exactly the kind of thing that never gets screenshotted or
+    /// checked because reaching it by hand is tedious.
+    ///
+    ///     INKSTONE_OPEN_SETTINGS=sync .../Inkstone
+    @State private var tab: Pane = {
+        #if DEBUG
+        if let name = ProcessInfo.processInfo.environment["INKSTONE_OPEN_SETTINGS"],
+           let pane = Pane(rawValue: name) { return pane }
+        #endif
+        return .appearance
+    }()
+    #else
     /// A value-driven path rather than view-carrying links, so a pane can be
     /// opened from code. Verifying a settings pane otherwise means driving a tap
     /// on each one, which is exactly the kind of check that quietly stops being
@@ -59,7 +73,10 @@ struct SettingsView: View {
         return []
         #endif
     }()
+    #endif
 
+    /// Both platforms use these: the Mac tags its tabs with them, iOS pushes
+    /// them onto a navigation path.
     enum Pane: String, CaseIterable, Identifiable, Hashable {
         case appearance, typography, editor, files, sync
 
@@ -95,7 +112,6 @@ struct SettingsView: View {
             }
         }
     }
-    #endif
 }
 
 private struct AppearanceSettings: View {
@@ -299,18 +315,48 @@ private struct FilesSettings: View {
     }
 }
 
-/// Where the sync guide lives.
+/// Where the sync guide lives, in the language the app is being read in.
 ///
-/// One constant rather than two literals: the URL appears in both sections of
-/// this pane, and a help link that 404s is worse than no help link — it is a
-/// promise the app breaks in front of someone already confused. `SiteLinkTests`
-/// checks this string against the page the site actually builds.
+/// One place rather than a literal per call site: the link appears in both
+/// sections of this pane, and a help link that 404s is worse than no help link —
+/// it is a promise the app breaks in front of someone already confused.
+/// `site/tests/test_site.py` resolves every URL this can return against the
+/// pages the site actually publishes.
+///
+/// Three languages, not the site's eight, and deliberately: these are the ones
+/// the app itself ships (`CFBundleLocalizations`). Sending a reader who chose
+/// 繁體中文 to an English page is a worse answer than the site's language
+/// switcher, and offering French here would promise a translation the app does
+/// not have.
 enum SyncHelp {
-    static let url = URL(string: "https://inkslab.app/sync.html")!
+    private static let site = "https://inkslab.app"
+
+    /// The path segment per language, matching `LANGS[…]["dir"]` in
+    /// `site/build.py`. English is the default and has no prefix.
+    static let directories: [String: String] = ["zh-Hans": "zh/", "zh-Hant": "zh-Hant/"]
+
+    static func url(for locale: Locale) -> URL {
+        URL(string: site + "/" + directory(for: locale) + "sync.html")!
+    }
+
+    /// Matched on script rather than on region: a reader in Singapore is
+    /// `zh-Hans-SG` and one in Hong Kong is `zh-Hant-HK`, and the script is what
+    /// decides which page they can read. `Locale` resolves the script for us
+    /// when the identifier omits it — `zh-TW` reports `Hant`.
+    static func directory(for locale: Locale) -> String {
+        guard locale.language.languageCode?.identifier == "zh" else { return "" }
+        let script = locale.language.script?.identifier
+            ?? Locale.Language(identifier: locale.identifier).script?.identifier
+        return script == "Hant" ? directories["zh-Hant"]! : directories["zh-Hans"]!
+    }
 }
 
 private struct SyncSettings: View {
     @Environment(Workspace.self) private var workspace
+    /// The app's chosen language, injected by `InkstoneApp`. Not
+    /// `Locale.current`, which is the system's — someone who set the app to
+    /// 繁體中文 on an English Mac should get the Chinese guide.
+    @Environment(\.locale) private var locale
     @Environment(\.style) private var style
     /// Held only long enough to save it; the stored value lives in the Keychain.
     @State private var token = ""
@@ -616,7 +662,7 @@ private struct SyncSettings: View {
                 // looks like it does: iCloud moves the files, not this app.
                 VStack(alignment: .leading, spacing: 6) {
                     Text("iCloud Drive syncs the folder itself. This keeps notes downloaded rather than evicted, so they stay visible and open instantly — turn it off on a Mac short of disk space.")
-                    Link("How syncing works", destination: SyncHelp.url)
+                    Link("How syncing works", destination: SyncHelp.url(for: locale))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -786,7 +832,7 @@ private struct SyncSettings: View {
                     // Placed where someone reads when they are stuck: under the
                     // section that asks for a token and a repository, next to
                     // the sentence explaining what they are for.
-                    Link("Setting up sync, and when it conflicts", destination: SyncHelp.url)
+                    Link("Setting up sync, and when it conflicts", destination: SyncHelp.url(for: locale))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

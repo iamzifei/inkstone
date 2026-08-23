@@ -9,5 +9,7 @@
   <url><loc>https://inkslab.app/privacy.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/sync.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/zh-Hant/</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://inkslab.app/zh-Hant/sync.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/zh/</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://inkslab.app/zh/sync.html</loc><changefreq>monthly</changefreq></url>
 </urlset>

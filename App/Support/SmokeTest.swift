@@ -115,6 +115,29 @@ enum SmokeTest {
         workspace.overridesGitWorkingCopyGuard = true
         check("the override releases it", !workspace.isBlockedByGitWorkingCopy)
 
+        // --- the help link, per language ---
+        //
+        // The site tests check that every URL this can produce lands on a page
+        // that exists. Nothing checked the mapping itself, and it cannot be
+        // read off the binary either: `"zh-Hant/"` and `"sync.html"` are short
+        // enough for Swift to store inline rather than as literals, so grepping
+        // the shipped binary for them finds nothing and proves nothing.
+        let expected: [(String, String)] = [
+            ("en_AU", "https://inkslab.app/sync.html"),
+            ("zh-Hans", "https://inkslab.app/zh/sync.html"),
+            ("zh-Hant", "https://inkslab.app/zh-Hant/sync.html"),
+            // Region rather than script: the script is the half that decides
+            // which page a reader can actually read.
+            ("zh-TW", "https://inkslab.app/zh-Hant/sync.html"),
+            ("zh-CN", "https://inkslab.app/zh/sync.html"),
+            ("zh-HK", "https://inkslab.app/zh-Hant/sync.html"),
+            ("fr_FR", "https://inkslab.app/sync.html"),
+        ]
+        for (identifier, url) in expected {
+            let got = SyncHelp.url(for: Locale(identifier: identifier)).absoluteString
+            check("help link for \(identifier) → \(url)", got == url)
+        }
+
         // --- forgetting ---
         let id = vault.id.uuidString
         workspace.forget(vault)

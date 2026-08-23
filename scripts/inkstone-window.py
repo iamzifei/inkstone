@@ -27,6 +27,16 @@ MIN_W, MIN_H = 640, 400
 
 
 def main() -> int:
+    # Optional: --title SUBSTRING picks a named window instead of the largest
+    # one, and relaxes the size floor with it. The Settings window is 560x460 —
+    # under the floor above, so without this it is not merely deprioritised, it
+    # is invisible, and the capture silently gets the document window instead.
+    wanted = None
+    argv = sys.argv[1:]
+    if "--title" in argv:
+        wanted = argv[argv.index("--title") + 1].lower()
+    min_w, min_h = (0, 0) if wanted else (MIN_W, MIN_H)
+
     listing = Quartz.CGWindowListCopyWindowInfo(
         Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
         Quartz.kCGNullWindowID,
@@ -42,7 +52,9 @@ def main() -> int:
             continue
         bounds = window.get("kCGWindowBounds") or {}
         width, height = int(bounds.get("Width", 0)), int(bounds.get("Height", 0))
-        if width < MIN_W or height < MIN_H:
+        if width < min_w or height < min_h:
+            continue
+        if wanted and wanted not in (window.get("kCGWindowName") or "").lower():
             continue
         # Largest wins: the document window, not an inspector that happens to
         # clear the minimum.
@@ -51,7 +63,7 @@ def main() -> int:
                     int(bounds.get("X", 0)), int(bounds.get("Y", 0)), width, height)
 
     if best is None:
-        print(f"no on-screen {OWNER} window", file=sys.stderr)
+        print(f"no on-screen {OWNER} window" + (f" titled {wanted!r}" if wanted else ""), file=sys.stderr)
         return 1
     _, wid, x, y, w, h = best
     print(f"{wid} {x} {y} {w} {h}")

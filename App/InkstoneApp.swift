@@ -3,7 +3,21 @@ import InkstoneCore
 
 @main
 struct InkstoneApp: App {
-    @State private var workspace = Workspace()
+    /// Normally the real one. `INKSTONE_DEMO_DEFAULTS` swaps in a throwaway
+    /// suite instead, so a screenshot run cannot show — or disturb — the
+    /// repository, vault list and token state of whoever is actually using this
+    /// Mac. Isolation by construction rather than by remembering to blank
+    /// fields afterwards.
+    @State private var workspace: Workspace = {
+        #if DEBUG
+        if let suite = ProcessInfo.processInfo.environment["INKSTONE_DEMO_DEFAULTS"],
+           let defaults = UserDefaults(suiteName: suite) {
+            return Workspace(registry: VaultRegistry(defaults: defaults),
+                             settings: AppSettings(defaults: defaults))
+        }
+        #endif
+        return Workspace()
+    }()
 
     #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
@@ -542,6 +556,7 @@ struct InkstoneApp: App {
                 #endif
                 .onAppear {
                     openLastVault()
+                    seedDemoSyncBinding()
                     // A token saved before it could travel; move it onto iCloud
                     // Keychain so the other device does not ask for it again.
                     SyncCredentials.migrateToICloudKeychain()
@@ -585,6 +600,25 @@ struct InkstoneApp: App {
 
     /// Reopens whichever vault was used last, so launching lands the user back
     /// where they were rather than on a chooser.
+    /// Fills the Sync pane with a plausible, invented setup for screenshots.
+    ///
+    ///     INKSTONE_DEMO_SYNC=you/notes@main
+    ///
+    /// Paired with `INKSTONE_DEMO_DEFAULTS`, which is where it is written — this
+    /// never touches the real settings.
+    private func seedDemoSyncBinding() {
+        #if DEBUG
+        guard let spec = ProcessInfo.processInfo.environment["INKSTONE_DEMO_SYNC"] else { return }
+        let parts = spec.split(separator: "@", maxSplits: 1).map(String.init)
+        workspace.syncBinding = VaultSyncBinding(
+            repository: parts.first ?? "",
+            branch: parts.count == 2 ? parts[1] : "main",
+            isEnabled: true
+        )
+        print("[demo] seeded sync binding: \(spec) on \(workspace.vault?.name ?? "no vault")")
+        #endif
+    }
+
     private func openLastVault() {
         #if DEBUG
         // Test hook: opens a vault at launch without going through the file

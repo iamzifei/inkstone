@@ -14,13 +14,35 @@ enum SharedSyncConfiguration {
 
     private static let key = "com.orris.inkstone.github-sync"
 
+    /// Whether this launch is a throwaway one, for screenshots or a smoke run.
+    ///
+    /// The rest of the demo isolation swaps `UserDefaults` for a scratch suite.
+    /// That is not enough here: this store is **iCloud**, shared with every
+    /// device on the account and untouched by any defaults suite. A screenshot
+    /// run without this shows the real repository the user's other device
+    /// publishes — which is exactly what the first attempt at these pictures
+    /// caught, with a private repository name across the top of the pane.
+    ///
+    /// It also stops the traffic going the other way, which is the worse
+    /// direction: a demo configuration published into a real iCloud store would
+    /// propagate an invented repository to the user's own devices.
+    private static var isDemoLaunch: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["INKSTONE_DEMO_DEFAULTS"] != nil
+        #else
+        return false
+        #endif
+    }
+
     /// What another device published, if anything.
     static func published() -> GitHubSyncConfiguration? {
+        guard !isDemoLaunch else { return nil }
         guard let data = NSUbiquitousKeyValueStore.default.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(GitHubSyncConfiguration.self, from: data)
     }
 
     static func publish(_ configuration: GitHubSyncConfiguration) {
+        guard !isDemoLaunch else { return }
         guard let data = try? JSONEncoder().encode(configuration) else { return }
         let store = NSUbiquitousKeyValueStore.default
         store.set(data, forKey: key)
@@ -34,6 +56,7 @@ enum SharedSyncConfiguration {
     /// populated before the app asks, and nothing notifies about a value that
     /// was already there.
     static func refresh() {
+        guard !isDemoLaunch else { return }
         NSUbiquitousKeyValueStore.default.synchronize()
     }
 

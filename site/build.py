@@ -28,6 +28,7 @@ from pathlib import Path
 
 import yaml
 
+import guide
 from typeset import autospace
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -581,15 +582,16 @@ def static_pages() -> list[str]:
     static = ROOT / "site" / "static"
     if not static.exists():
         return []
-    return [f"{SITE}/{item.name}" for item in sorted(static.iterdir())
-            if item.is_file() and item.suffix == ".html"]
+    return [f"{SITE}/{item.relative_to(static).as_posix()}"
+            for item in sorted(static.rglob("*.html")) if item.is_file()]
 
 
 def sitemap(pages: list[Page]) -> str:
     # Static pages belong here too. They were left out when the sitemap was
     # written, which was survivable for a privacy policy nobody searches for and
     # is not for a help page the app sends people to.
-    urls = sorted({p.url for p in pages} | set(static_pages()))
+    urls = sorted({p.url for p in pages} | set(static_pages())
+                  | {f"{SITE}/{d}sync.html" for d, _, _ in guide.LANGS.values()})
     entries = "\n".join(
         f"  <url><loc>{url}</loc><changefreq>monthly</changefreq></url>"
         for url in urls
@@ -632,15 +634,39 @@ def build(out: Path) -> None:
     if manifest.exists():
         manifest.unlink()
 
+    # The sync guide, in the languages the app ships. Generated rather than
+    # written three times: the structure is identical and only the words differ,
+    # so three hand-kept copies would drift the way this whole build exists to
+    # prevent.
+    for lang in guide.LANGS:
+        page = out / guide.LANGS[lang][0] / "sync.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text(autospace(guide.render(lang, SITE, asset_hash)), encoding="utf-8")
+
     # Verbatim pages. These sit outside the eight-language system on purpose:
     # build.py requires every *marketing* page to exist in every language so a
     # dropped translation is a build error, and a privacy policy that Apple
     # requires in one language should not be held hostage to that rule.
+    # The sync guide, in the languages the app ships. Generated rather than
+    # written three times: the structure is identical and only the words differ,
+    # so three hand-kept copies would drift the way this whole build exists to
+    # prevent.
+    for lang in guide.LANGS:
+        page = out / guide.LANGS[lang][0] / "sync.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text(autospace(guide.render(lang, SITE, asset_hash)), encoding="utf-8")
+
     static = ROOT / "site" / "static"
     if static.exists():
-        for item in sorted(static.iterdir()):
-            if item.is_file():
-                shutil.copyfile(item, out / item.name)
+        # Copied with its subdirectories, so a verbatim page can be localised the
+        # way the templated ones are — `static/zh/sync.html` lands at `/zh/sync.html`
+        # and matches the language prefix the rest of the site already uses.
+        for item in sorted(static.rglob("*")):
+            if not item.is_file():
+                continue
+            target = out / item.relative_to(static)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(item, target)
 
     # Sparkle's update feed. It lives at the repository root because that is
     # where Tools/release.sh writes it, and it is published from here because the

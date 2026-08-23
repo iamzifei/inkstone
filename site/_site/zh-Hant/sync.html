@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同步你的 vault — Inkstone</title>
+<meta name="description" content="如何讓一個 Inkstone vault 出現在多台裝置上：iCloud 雲碟與 GitHub 各自擅長什麼、怎麼設定，以及衝突到底在什麼情況下才會發生。">
+<link rel="canonical" href="https://inkslab.app/zh-Hant/sync.html">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/sync.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/sync.html">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/sync.html">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/sync.html">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=f8db207b">
+<style>
+  .doc { max-width: 42rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
+  .doc h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
+  .doc h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 3rem; margin-bottom: .6rem; }
+  .doc h3 { font-size: var(--t-body); font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
+  .doc p, .doc li, .doc td { color: var(--ink-2); }
+  .doc p { margin-block: .9rem; }
+  .doc h2 + p, .doc h3 + p { margin-top: 0; }
+  .doc ul, .doc ol { padding-inline-start: 1.2rem; margin-block: .8rem; }
+  .doc ul { list-style: disc; }
+  .doc ol { list-style: decimal; }
+  .doc li { margin-block: .4rem; }
+  .doc .updated { font-family: var(--sans); font-size: var(--t-micro);
+                  letter-spacing: .14em; text-transform: uppercase;
+                  color: var(--ink-faint); margin-bottom: 1.4rem; }
+  .doc table { width: 100%; border-collapse: collapse; margin-block: 1.2rem;
+               font-size: var(--t-small); }
+  .doc th { text-align: left; font-family: var(--sans); font-size: var(--t-micro);
+            letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+            font-weight: 500; padding: .5rem .8rem .5rem 0;
+            border-bottom: 1px solid var(--rule); }
+  .doc td { padding: .7rem .8rem .7rem 0; border-bottom: 1px solid var(--rule);
+            vertical-align: top; }
+  .doc td:last-child, .doc th:last-child { padding-right: 0; }
+  .doc .rule-box { border-inline-start: 2px solid var(--ink-faint);
+                   padding-inline-start: 1.1rem; margin-block: 1.4rem; }
+  .doc .rule-box p:first-child { margin-top: 0; }
+  .doc .rule-box p:last-child { margin-bottom: 0; }
+  .doc figure { margin: 1.8rem 0; color: var(--ink-2); }
+  .doc figure img { display: block; width: 100%; height: auto; border-radius: 8px;
+                    border: 1px solid var(--rule); }
+  /* Shown near the size the window actually is — a 560pt panel blown up to
+     the full measure reads as a diagram rather than as a screenshot. */
+  .doc figure.window img { max-width: 30rem; }
+  .doc figure.narrow img { max-width: 19rem; }
+  .doc figcaption { font-family: var(--sans); font-size: var(--t-micro);
+                    color: var(--ink-faint); margin-top: .6rem; }
+  .doc figure svg text { font-family: var(--sans); }
+  .doc .langs { font-family: var(--sans); font-size: var(--t-micro);
+                letter-spacing: .1em; text-transform: uppercase;
+                color: var(--ink-faint); margin-bottom: 1.4rem; }
+  .doc .langs a { margin-inline-end: .9rem; }
+  .doc .home { font-family: var(--sans); font-size: var(--t-small);
+               display: inline-block; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<main class="wrap doc" id="main">
+  <p class="updated">更新於 2026 年 8 月 23 日</p>
+  <p class="langs"><a href="https://inkslab.app/sync.html">English</a> <a href="https://inkslab.app/zh/sync.html">简体中文</a> <span>繁體中文</span></p>
+  <h1>同步你的 vault</h1>
+  <p>vault 就是一個裝著 Markdown 檔案的資料夾，沒有任何專有格式，所以把它弄到第二台裝置上的合理做法不只一種。Inkstone 提供兩種，各有各的長處。</p>
+  <table>
+    <thead>
+      <tr><th>&nbsp;</th><th>iCloud 雲碟</th><th>GitHub</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>設定</td><td>把資料夾放進 iCloud 雲碟</td><td>一個儲存庫和一個存取權杖</td></tr>
+      <tr><td>速度</td><td>幾秒</td><td>幾分鐘，按排程執行</td></tr>
+      <tr><td>歷史</td><td>無法翻閱</td><td>每一次變更都是一個提交</td></tr>
+      <tr><td>適用於</td><td>你自己的 Apple 裝置</td><td>任何能連上 GitHub 的東西</td></tr>
+      <tr><td>成本</td><td>iCloud 儲存空間</td><td>私有儲存庫免費</td></tr>
+    </tbody>
+  </table>
+  <p>兩者並不互斥。一個 vault 可以既放在 iCloud 雲碟裡，<em>又</em>推送到 GitHub——iCloud 在你自己的裝置之間搬得快，GitHub 保留歷史和一份不依賴 Apple 的副本。</p>
+  <h2 id="icloud">iCloud 雲碟</h2>
+  <p>沒有開關要打開。把 vault 資料夾放進 iCloud 雲碟再打開它，剩下的 iCloud 會做——搬檔案的是系統，不是 Inkstone。</p>
+  <p>唯一存在的設定是<strong>保持檔案已下載</strong>，預設開啟。iCloud 會把你最近沒開過的檔案內容清掉以節省磁碟空間，只留一個佔位符。而佔位符在 Inkstone 看來就是一篇空筆記，所以一個閒置了一陣子的 vault 會看起來像是掉了筆記。只在磁碟真的吃緊的機器上才關掉它。</p>
+  <div class="rule-box">
+    <p><strong>iCloud 會產生它自己的衝突副本。</strong>如果同一個檔案在兩台裝置上都被改過、而兩邊都還沒同步完，iCloud 會兩份都留下並標記其中一份。那是 Apple 的機制，不是 Inkstone 的，長得也和下面說的不一樣。</p>
+  </div>
+  <h2 id="github">GitHub</h2>
+  <p>你需要一個儲存庫——私有的完全可以，而且很正常——以及一個細粒度個人存取權杖，對該儲存庫擁有 <strong>Contents: read and write</strong> 權限。權杖存在你的鑰匙圈裡，絕不寫進 vault，也絕不寫進設定檔。</p>
+  <figure class="window">
+    <picture>
+      <source srcset="../assets/guide/sync-settings.webp" type="image/webp">
+      <img src="../assets/guide/sync-settings.png" alt="設定 › Sync，已填好儲存庫與分支"
+           width="1120" height="1096" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>設定 › Sync，已填好儲存庫與分支</figcaption>
+  </figure>
+  <h3>第一台裝置</h3>
+  <ol>
+    <li>打開你想同步的 vault。</li>
+    <li>設定 › Sync，開啟 <strong>Sync this vault with GitHub</strong>。</li>
+    <li>貼上權杖，選擇儲存庫和分支。</li>
+    <li>按 <strong>Sync now</strong>。</li>
+  </ol>
+  <h3>第二台裝置</h3>
+  <p>從一個<strong>空資料夾</strong>開始。這一條比本頁其他任何內容都重要。</p>
+  <ol>
+    <li>新建一個空資料夾，把它當作 vault 打開。</li>
+    <li>填入同一個儲存庫和分支。</li>
+    <li>同步。它會問你哪一邊算數——選 <strong>Keep GitHub's</strong>。</li>
+  </ol>
+  <p>把一個已經裝著筆記的資料夾指向一個裝著另一批筆記的儲存庫，等於要求兩套不相干的檔案合成一套。App 無法知道哪個是哪個，於是兩份都留下，每一個有差異的檔案你都會拿到一份衝突副本。</p>
+  <div class="rule-box">
+    <p><strong>儲存庫屬於 vault，不屬於 App。</strong>每個 vault 有自己的儲存庫設定。打開另一個 vault 不會繼承上一個的，而沒有被指定儲存庫的 vault 根本不會同步。</p>
+  </div>
+  <h2 id="conflicts">衝突什麼時候發生</h2>
+  <p>只有一種情況會產生衝突：</p>
+  <div class="rule-box">
+    <p>同一個檔案，自兩邊上次達成一致以來，<strong>在兩台裝置上都被改過</strong>。</p>
+  </div>
+  <p>規則就這一條。每次同步會為每個檔案比較三樣東西：這裡是什麼、GitHub 上是什麼、以及上一次完成的同步記錄了什麼。如果只有一邊動了，那一邊勝出，毫無歧義。如果兩邊都動了，就沒有任何 App 能替你選的答案。</p>
+  <p>也就是說：</p>
+  <ul>
+    <li>在一台上改、等它同步完、再用另一台——<strong>永遠不衝突</strong>，隔多久都一樣。</li>
+    <li>在兩台裝置上改<em>不同</em>的筆記——永遠不衝突，哪怕一邊很舊。</li>
+    <li>在同步之前，兩台裝置上改<em>同一篇</em>筆記——會衝突，也應該衝突。</li>
+  </ul>
+  <p><strong>衝突絕不覆蓋任何東西。</strong>GitHub 那一份會寫在你這份旁邊，名字是 <code>筆記 (conflict 2026-08-23 1420).md</code>，兩份都在。打開它們，留下你要的，刪掉另一份。副本只產生一次，不是每次同步產生一次。</p>
+  <figure class="narrow">
+    <picture>
+      <source srcset="../assets/guide/sync-conflict-copies.webp" type="image/webp">
+      <img src="../assets/guide/sync-conflict-copies.png" alt="衝突副本就放在它來源的那篇筆記旁邊"
+           width="620" height="880" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>衝突副本就放在它來源的那篇筆記旁邊</figcaption>
+  </figure>
+  <h3>首次同步是例外</h3>
+  <p>首次同步之前，沒有任何「兩邊曾經一致」的記錄，所以每一個兩邊都存在且有差異的檔案都像是「都改過」。它不會為每個檔案都造一份衝突副本，而是問你一次——留本機的、留 GitHub 的、還是兩個都留——然後記住這個答案。</p>
+  <h3>怎麼少遇到衝突</h3>
+  <ul>
+    <li><strong>換裝置之前先同步。</strong>在 iOS 上，同步會在你離開 App 之後繼續跑，系統會一直顯示進度直到跑完。</li>
+    <li><strong>在手機上編輯之前，先讓它把同步跑完。</strong>Sync 面板在工作時會顯示進度列和檔案計數。</li>
+  </ul>
+  <h2 id="schedule">它實際多久跑一次</h2>
+  <p>你選的間隔是下限，不是承諾。</p>
+  <p>在 macOS 上 App 一直在執行，所以間隔是準的。在 iOS 上由系統決定：它根據你打開 App 的頻率來分配背景時間，而且如果你從 App 切換器裡滑掉了 App，在你再次打開它之前系統不會喚醒它。預期是一天幾次背景執行，而不是每個間隔一次。「背景 App 重新整理」必須開啟，低耗電模式會完全暫停它。</p>
+  <p>設定 › Sync 會顯示系統實際做了什麼——上次喚醒 App 是什麼時候，以及每一次嘗試的記錄。</p>
+  <h2 id="git">如果這個 vault 是 git 工作副本</h2>
+  <p>如果資料夾裡有 <code>.git</code> 目錄，Inkstone 的 GitHub 同步會自動關閉，並說明原因。</p>
+  <figure class="window">
+    <picture>
+      <source srcset="../assets/guide/sync-git-guard.webp" type="image/webp">
+      <img src="../assets/guide/sync-git-guard.png" alt="對一個 git 已經在同步的 vault 顯示的提示"
+           width="1120" height="1096" loading="lazy" decoding="async">
+    </picture>
+    <figcaption>對一個 git 已經在同步的 vault 顯示的提示</figcaption>
+  </figure>
+  <p>這不是限制，而是兩套機制在打架。git 會合併：三方合併、有歷史、衝突標記由人來解決。Inkstone 的同步是逐檔案、後寫覆蓋先寫。讓兩者在同一個資料夾上跑，各自會撤銷對方的結果。</p>
+  <p>行得通的安排是每套機制只有一個寫入方：</p>
+  <figure aria-label="桌面端走 git、手機端走 Inkstone，共同指向一個儲存庫">
+    <svg viewBox="0 0 600 150" role="img" width="100%" style="max-width:36rem;height:auto">
+      <g fill="none" stroke="currentColor" stroke-width="1" opacity=".3">
+        <path d="M252 30 H440"/><path d="M252 120 H440"/>
+        <path d="M440 30 V120"/><path d="M440 75 H464"/>
+      </g>
+      <g fill="currentColor" font-size="12">
+        <text x="0" y="34" opacity=".5" letter-spacing=".1em">桌面端</text>
+        <text x="0" y="124" opacity=".5" letter-spacing=".1em">手機端</text>
+        <text x="266" y="21" opacity=".6">git pull / push</text>
+        <text x="266" y="111" opacity=".6">Inkstone 同步</text>
+        <text x="472" y="79" font-size="13">儲存庫</text>
+      </g>
+    </svg>
+  </figure>
+  <p>桌面端用 git，手機端用 Inkstone。手機的變更透過 <code>git pull</code> 到達桌面；桌面的變更推送之後到達手機。提交之前先 pull——手機也在往同一個分支寫。</p>
+  <p>如果你確實想同步一個 git 工作副本，有一個針對單一 vault 的覆寫開關。不主動打開它就一直是關的。</p>
+  <h2 id="refuses">Inkstone 拒絕做的事</h2>
+  <p>有幾種情況看起來像是一條指令，但幾乎總是意外，所以同步會停下來而不是照做。</p>
+  <ul>
+    <li><strong>儲存庫變空了</strong>，但之前在那裡記錄過檔案。空清單遠遠更可能是分支填錯了或權杖掉了權限，而不是有人真的清空了它——而對「遠端檔案被刪」的正確反應是刪掉本機那份。</li>
+    <li><strong>分支不存在。</strong>錯誤訊息會列出實際存在的分支。</li>
+    <li><strong>這個 vault 是 git 工作副本</strong>，見上。</li>
+  </ul>
+  <p>被中斷的同步是安全的：已經搬過去的會保留，下一次從那裡繼續，而不是從頭再來。</p>
+  <h2 id="files">哪些檔案會被同步</h2>
+  <p>筆記和白板永遠同步。附件按類型同步——圖片、音訊、PDF、影片、其他檔案——每一類有自己的開關，另有一個容量上限。都在設定 › Sync 裡。</p>
+  <p>vault 根目錄下的 <code>.gitignore</code> 會被遵守，並且會跟著 vault 一起同步，所以第二台裝置拿到的是同一套規則，而不是把第一台刻意排除掉的東西全都傳上去。</p>
+  <a class="home" href="https://inkslab.app/zh-Hant/">← Inkstone</a>
+</main>
+</body>
+</html>
