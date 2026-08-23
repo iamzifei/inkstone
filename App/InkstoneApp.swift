@@ -39,6 +39,7 @@ struct InkstoneApp: App {
         // and write images with AppKit imaging.
         #if DEBUG && os(macOS)
         Self.runHighlightBenchmarkIfRequested()
+        SmokeTest.runIfRequested()
         #endif
     }
 

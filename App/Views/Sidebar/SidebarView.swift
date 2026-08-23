@@ -1,5 +1,8 @@
 import SwiftUI
 import InkstoneCore
+#if os(macOS)
+import AppKit
+#endif
 
 /// Left column: vault switcher, section picker, and the active section's content.
 struct SidebarView: View {
@@ -299,6 +302,23 @@ private struct FileRow: View {
                 renameText = node.basename
                 renaming = node.url
             }
+            #if os(macOS)
+            // macOS only. The two path items are for pasting somewhere else —
+            // a terminal, a link, a message — and Finder does not exist on iOS.
+            Divider()
+            Button("Copy Relative Path", systemImage: "doc.on.doc") {
+                copyToPasteboard(relativePath)
+            }
+            Button("Copy Absolute Path", systemImage: "doc.on.doc.fill") {
+                copyToPasteboard(node.url.path(percentEncoded: false))
+            }
+            Button("Reveal in Finder", systemImage: "folder") {
+                // Selects the item in its parent folder rather than opening it,
+                // which is what "reveal" means and what a folder needs — opening
+                // a folder would show its contents, not the folder.
+                NSWorkspace.shared.activateFileViewerSelecting([node.url])
+            }
+            #endif
             Divider()
             Button("Delete", systemImage: "trash", role: .destructive) {
                 workspace.delete(node.url)
@@ -317,6 +337,25 @@ private struct FileRow: View {
             }
         }
     }
+
+    #if os(macOS)
+    /// The path as the vault knows it, for pasting into notes, messages and
+    /// commands run from the vault root.
+    private var relativePath: String {
+        guard let root = workspace.root else { return node.url.lastPathComponent }
+        return VaultPath.relative(of: node.url, in: root)
+    }
+
+    /// - Note: `clearContents()` is not optional. `NSPasteboard` keeps whatever
+    ///   was there until it is told otherwise, and writing a string without
+    ///   clearing first leaves the previous owner's richer representation in
+    ///   place — so the paste lands as whatever was copied before this.
+    private func copyToPasteboard(_ string: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
+    }
+    #endif
 
     static func icon(for url: URL) -> String {
         switch url.pathExtension.lowercased() {

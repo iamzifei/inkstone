@@ -572,10 +572,27 @@ def read_pages() -> list[Page]:
     return pages
 
 
+def static_pages() -> list[str]:
+    """The verbatim pages, as site-absolute URLs.
+
+    They are read from disk rather than listed here so that adding a page is one
+    file and not two — the second of which would be the one forgotten.
+    """
+    static = ROOT / "site" / "static"
+    if not static.exists():
+        return []
+    return [f"{SITE}/{item.name}" for item in sorted(static.iterdir())
+            if item.is_file() and item.suffix == ".html"]
+
+
 def sitemap(pages: list[Page]) -> str:
+    # Static pages belong here too. They were left out when the sitemap was
+    # written, which was survivable for a privacy policy nobody searches for and
+    # is not for a help page the app sends people to.
+    urls = sorted({p.url for p in pages} | set(static_pages()))
     entries = "\n".join(
-        f"  <url><loc>{p.url}</loc><changefreq>monthly</changefreq></url>"
-        for p in sorted(pages, key=lambda p: p.url)
+        f"  <url><loc>{url}</loc><changefreq>monthly</changefreq></url>"
+        for url in urls
     )
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

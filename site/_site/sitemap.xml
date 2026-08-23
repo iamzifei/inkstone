@@ -6,6 +6,8 @@
   <url><loc>https://inkslab.app/fr/</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/ja/</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/ko/</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://inkslab.app/privacy.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://inkslab.app/sync.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/zh-Hant/</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://inkslab.app/zh/</loc><changefreq>monthly</changefreq></url>
 </urlset>

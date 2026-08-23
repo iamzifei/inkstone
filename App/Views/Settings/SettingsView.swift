@@ -299,6 +299,16 @@ private struct FilesSettings: View {
     }
 }
 
+/// Where the sync guide lives.
+///
+/// One constant rather than two literals: the URL appears in both sections of
+/// this pane, and a help link that 404s is worse than no help link — it is a
+/// promise the app breaks in front of someone already confused. `SiteLinkTests`
+/// checks this string against the page the site actually builds.
+enum SyncHelp {
+    static let url = URL(string: "https://inkslab.app/sync.html")!
+}
+
 private struct SyncSettings: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
@@ -604,9 +614,12 @@ private struct SyncSettings: View {
             } footer: {
                 // Worth stating plainly, because the switch does less than it
                 // looks like it does: iCloud moves the files, not this app.
-                Text("iCloud Drive syncs the folder itself. This keeps notes downloaded rather than evicted, so they stay visible and open instantly — turn it off on a Mac short of disk space.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("iCloud Drive syncs the folder itself. This keeps notes downloaded rather than evicted, so they stay visible and open instantly — turn it off on a Mac short of disk space.")
+                    Link("How syncing works", destination: SyncHelp.url)
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
             Section {
                 @Bindable var settings = workspace.settings
@@ -768,9 +781,15 @@ private struct SyncSettings: View {
             } header: {
                 Text("GitHub")
             } footer: {
-                Text("Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.")
+                    // Placed where someone reads when they are stuck: under the
+                    // section that asks for a token and a repository, next to
+                    // the sentence explaining what they are for.
+                    Link("Setting up sync, and when it conflicts", destination: SyncHelp.url)
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
 
             #if os(iOS)

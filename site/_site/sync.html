@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Syncing a vault — Inkstone</title>
+<meta name="description" content="How to keep an Inkstone vault on more than one device, with iCloud Drive or a GitHub repository — what each one is good at, how to set it up, and exactly when a conflict happens.">
+<link rel="canonical" href="https://inkslab.app/sync.html">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .doc { max-width: 42rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
+  .doc h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
+  .doc h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 3rem; margin-bottom: .6rem; }
+  .doc h3 { font-size: var(--t-body); font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
+  .doc p, .doc li, .doc td { color: var(--ink-2); }
+  /* The site's base stylesheet leaves paragraph spacing to each page's own
+     layout, so without this the prose runs together into one block. */
+  .doc p { margin-block: .9rem; }
+  .doc h2 + p, .doc h3 + p { margin-top: 0; }
+  .doc ul, .doc ol { padding-inline-start: 1.2rem; margin-block: .8rem; }
+  .doc ul { list-style: disc; }
+  .doc ol { list-style: decimal; }
+  .doc li { margin-block: .4rem; }
+  .doc .updated { font-family: var(--sans); font-size: var(--t-micro);
+                  letter-spacing: .14em; text-transform: uppercase;
+                  color: var(--ink-faint); margin-bottom: 1.4rem; }
+  .doc table { width: 100%; border-collapse: collapse; margin-block: 1.2rem;
+               font-size: var(--t-small); }
+  .doc th { text-align: left; font-family: var(--sans); font-size: var(--t-micro);
+            letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+            font-weight: 500; padding: .5rem .8rem .5rem 0;
+            border-bottom: 1px solid var(--rule); }
+  .doc td { padding: .7rem .8rem .7rem 0; border-bottom: 1px solid var(--rule);
+            vertical-align: top; }
+  .doc td:last-child, .doc th:last-child { padding-right: 0; }
+  .doc .rule-box { border-inline-start: 2px solid var(--ink-faint);
+                   padding-inline-start: 1.1rem; margin-block: 1.4rem; }
+  .doc .rule-box p:first-child { margin-top: 0; }
+  .doc .rule-box p:last-child { margin-bottom: 0; }
+  .doc figure { margin: 1.4rem 0; }
+  .doc figure { color: var(--ink-2); margin-block: 1.6rem; }
+  /* Presentation attributes do not resolve custom properties; this does. */
+  .doc figure svg text { font-family: var(--sans); }
+  .doc .home { font-family: var(--sans); font-size: var(--t-small);
+               display: inline-block; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<main class="wrap doc" id="main">
+  <p class="updated">Updated 23 August 2026</p>
+  <h1>Syncing a vault</h1>
+
+  <p>A vault is a folder of Markdown files. Nothing about it is proprietary, so
+  there is more than one sensible way to get it onto a second device. Inkstone
+  offers two, and they are good at different things.</p>
+
+  <table>
+    <thead>
+      <tr><th>&nbsp;</th><th>iCloud Drive</th><th>GitHub</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Set-up</td><td>Put the folder in iCloud Drive</td><td>A repository and an access token</td></tr>
+      <tr><td>Speed</td><td>Seconds</td><td>Minutes, on a schedule</td></tr>
+      <tr><td>History</td><td>None you can browse</td><td>Every change, as commits</td></tr>
+      <tr><td>Works with</td><td>Your Apple devices</td><td>Anything that can reach GitHub</td></tr>
+      <tr><td>Costs</td><td>iCloud storage</td><td>Free for private repositories</td></tr>
+    </tbody>
+  </table>
+
+  <p>They are not exclusive. A vault can sit in iCloud Drive <em>and</em> push to
+  GitHub; iCloud moves it between your own devices quickly, GitHub keeps the
+  history and the off-Apple copy.</p>
+
+  <h2>iCloud Drive</h2>
+
+  <p>There is no switch to turn on. Put the vault folder in iCloud Drive and open
+  it, and iCloud does the rest — it is the system moving files, not Inkstone.</p>
+
+  <p>The one setting that exists is <strong>Keep files downloaded</strong>, and it
+  is on by default. iCloud saves disk space by evicting the contents of files you
+  have not opened recently, leaving a placeholder behind. To Inkstone a placeholder
+  is an empty note, so a vault that has been sitting idle can look like a vault
+  that has lost its notes. With the setting on, an iCloud-backed vault asks for its
+  files back when you open it. Turn it off only on a machine genuinely short of
+  disk.</p>
+
+  <div class="rule-box">
+    <p><strong>iCloud makes its own conflict copies.</strong> If the same file is
+    edited on two devices before either has finished syncing, iCloud keeps both
+    and marks one. That is Apple's mechanism, not Inkstone's, and it looks
+    different from the ones described below.</p>
+  </div>
+
+  <h2>GitHub</h2>
+
+  <p>You need a repository — private is fine, and normal — and a fine-grained
+  personal access token with <strong>Contents: read and write</strong> for that
+  repository. The token is stored in your Keychain, never in the vault and never
+  in the settings file.</p>
+
+  <h3>First device</h3>
+  <ol>
+    <li>Open the vault you want to sync.</li>
+    <li>Settings › Sync, turn on <strong>Sync this vault with GitHub</strong>.</li>
+    <li>Paste the token, choose the repository and branch.</li>
+    <li><strong>Sync now</strong>.</li>
+  </ol>
+
+  <h3>Second device</h3>
+  <p>Start with an <strong>empty folder</strong>. This matters more than anything
+  else on this page.</p>
+  <ol>
+    <li>Make a new, empty folder and open it as a vault.</li>
+    <li>Enter the same repository and branch.</li>
+    <li>Sync. You will be asked which side wins — choose <strong>Keep
+    GitHub's</strong>.</li>
+  </ol>
+  <p>Pointing a folder that already has notes in it at a repository that has
+  different notes in it is asking two unrelated sets of files to become one. The
+  app cannot know which is which, so it keeps both, and you get a conflict copy of
+  every file that differs.</p>
+
+  <div class="rule-box">
+    <p><strong>The repository belongs to the vault, not to the app.</strong> Each
+    vault has its own repository setting. Opening a different vault does not
+    inherit the last one's, and a vault that has not been given a repository does
+    not sync at all.</p>
+  </div>
+
+  <h2>When a conflict happens</h2>
+
+  <p>Exactly one situation produces one:</p>
+
+  <div class="rule-box">
+    <p>The same file was changed <strong>on both devices</strong> since the last
+    time they agreed.</p>
+  </div>
+
+  <p>That is the whole rule. Each sync compares three things for every file: what
+  is here, what is on GitHub, and what the last completed sync recorded. If only
+  one side moved, that side wins and nothing is ambiguous. If both moved, there is
+  no answer the app can pick for you.</p>
+
+  <p>Which means:</p>
+  <ul>
+    <li>Editing on one device, letting it sync, then editing on the other —
+    <strong>never conflicts</strong>, however long you leave it.</li>
+    <li>Editing <em>different</em> notes on two devices — never conflicts, however
+    stale either side is.</li>
+    <li>Editing the <em>same</em> note on two devices before a sync — conflicts,
+    and should.</li>
+  </ul>
+
+  <p><strong>A conflict never overwrites anything.</strong> GitHub's copy is
+  written beside yours as
+  <code>Note (conflict 2026-08-23 1420).md</code> and both survive. Open them,
+  keep what you want, delete the other. The copy is made once, not once per sync.</p>
+
+  <h3>The first sync is the exception</h3>
+  <p>Before the first sync there is no record of the two sides ever agreeing, so
+  every file that exists on both and differs looks like "both changed". Rather
+  than making a conflict copy of each, the app asks you once — keep this device's,
+  keep GitHub's, or keep both — and remembers the answer.</p>
+
+  <h3>Having fewer of them</h3>
+  <ul>
+    <li><strong>Sync before you switch devices.</strong> On iOS the sync keeps
+    running after you leave the app, and the system shows its progress until it
+    finishes.</li>
+    <li><strong>Let the phone finish before you edit on it.</strong> The Sync pane
+    shows a progress bar and a file count while it works.</li>
+  </ul>
+
+  <h2>How often it actually runs</h2>
+
+  <p>The interval you choose is a floor, not a promise.</p>
+  <p>On macOS the app is running, so it holds. On iOS the system decides: it
+  budgets background time from how often you open the app, and it will not wake an
+  app you have force-quit from the app switcher until you open it again. Expect a
+  few background runs a day rather than one every interval. Background App Refresh
+  must be on, and Low Power Mode suspends it entirely.</p>
+  <p>Settings › Sync shows what the system has actually been doing — when it last
+  woke the app, and a log of each attempt.</p>
+
+  <h2>If the vault is a git working copy</h2>
+
+  <p>If the folder has a <code>.git</code> directory in it, Inkstone's GitHub sync
+  switches itself off and says so.</p>
+  <p>This is not a limitation, it is the two mechanisms disagreeing. Git merges:
+  three-way, with a history, and conflict markers a person resolves. Inkstone's
+  sync works file by file and last write wins. Run both over one folder and each
+  undoes the other's results.</p>
+  <p>The arrangement that works is one writer per mechanism:</p>
+  <figure aria-label="Git on the desktop and Inkstone on the phone, both reaching one repository">
+    <svg viewBox="0 0 600 150" role="img" width="100%" style="max-width:36rem;height:auto">
+      <g fill="none" stroke="currentColor" stroke-width="1" opacity=".3">
+        <path d="M232 30 H430"/>
+        <path d="M232 120 H430"/>
+        <path d="M430 30 V120"/>
+        <path d="M430 75 H454"/>
+      </g>
+      <g fill="currentColor" font-size="12">
+        <text x="0" y="34" opacity=".5" letter-spacing=".1em">DESKTOP</text>
+        <text x="0" y="124" opacity=".5" letter-spacing=".1em">PHONE</text>
+        <text x="78" y="34">vault with .git</text>
+        <text x="78" y="124">Inkstone vault</text>
+        <text x="246" y="21" opacity=".6">git pull / push</text>
+        <text x="246" y="111" opacity=".6">Inkstone sync</text>
+        <text x="462" y="79" font-size="13">repository</text>
+      </g>
+    </svg>
+  </figure>
+  <p>Git on the desktop, Inkstone on the phone. The phone's changes arrive on the
+  desktop through <code>git pull</code>; the desktop's reach the phone once
+  pushed. Pull before you commit — the phone writes to the same branch.</p>
+  <p>There is a per-vault override if you want to sync a git working copy anyway.
+  It is off unless you ask for it.</p>
+
+  <h2>What Inkstone refuses to do</h2>
+
+  <p>A few situations look like an instruction and are almost always an accident,
+  so the sync stops instead of carrying them out.</p>
+  <ul>
+    <li><strong>The repository has gone empty</strong> but files were recorded
+    there before. An empty listing is far more often a wrong branch or a token
+    that lost access than a deliberate wipe — and the response to a deleted remote
+    file is to delete the local one.</li>
+    <li><strong>The branch does not exist.</strong> The message names the branches
+    that do.</li>
+    <li><strong>The vault is a git working copy</strong>, as above.</li>
+  </ul>
+  <p>An interrupted sync is safe: what it moved is kept and the next run continues
+  from there rather than starting over.</p>
+
+  <h2>Which files travel</h2>
+
+  <p>Notes and canvases always sync. Attachments sync by kind — images, audio,
+  PDFs, video, everything else — each with its own switch, plus a size limit.
+  Settings › Sync has them.</p>
+  <p>A <code>.gitignore</code> in the vault root is obeyed, and travels with the
+  vault, so a second device gets the same rules rather than uploading everything
+  the first one deliberately left out.</p>
+
+  <a class="home" href="/">← Inkstone</a>
+</main>
+</body>
+</html>
