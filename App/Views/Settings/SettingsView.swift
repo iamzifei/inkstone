@@ -597,9 +597,13 @@ private struct SyncSettings: View {
                 }
             }
         case .interrupted:
+            // Reads as a failure otherwise, and it is not one: a first sync of a
+            // large vault takes more than one turn, and the system decides how
+            // long each turn is. Saying that it continues by itself is the part
+            // that stops someone tapping Sync over and over.
             Label(
-                "Sync paused before it finished. What was transferred is kept — the next run continues from there.",
-                systemImage: "pause.circle"
+                "Sync ran out of time and will carry on by itself. Everything transferred so far is kept — the next run picks up where this one stopped, and a first sync of a large vault usually takes several.",
+                systemImage: "hourglass"
             )
             .font(.callout)
             .foregroundStyle(.secondary)

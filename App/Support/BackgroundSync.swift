@@ -244,6 +244,16 @@ enum BackgroundSync {
 
     // MARK: - A sync the user can see, that survives leaving the app
 
+    /// How far the last continued run got, so the next one can tell whether
+    /// carrying on is making progress or spinning.
+    private static var lastContinuedPercent = -1
+
+    /// Consecutive expiries that moved nothing. Three is enough to conclude the
+    /// work is not going to fit, and stopping beats a loop the user cannot see
+    /// the end of.
+    private static var fruitlessExpiries = 0
+    private static let fruitlessLimit = 3
+
     /// Which side wins, handed to the handler that actually runs the sync.
     /// Static because the request carries no payload: the system launches the
     /// registered handler and the only channel between submission and handler is
@@ -327,11 +337,25 @@ enum BackgroundSync {
             return
         }
 
-        // Indeterminate until the plan exists. The phases before it — verifying
-        // the repository, listing the remote, walking the vault — have no
-        // meaningful denominator, and a bar pinned at 0/1 through them reads as
-        // stuck to both the user and, per the header, the scheduler.
-        task.progress.totalUnitCount = -1
+        // Determinate from the first second, on a 0…100 scale.
+        //
+        // This was indeterminate until the plan existed, on the reasoning that
+        // the phases before it have no meaningful denominator. True, and it got
+        // the task killed: iOS forcibly expires a continued-processing task that
+        // looks stalled, and listing a large remote outlasts its patience. Two
+        // runs died that way, at 31 seconds and at 3½ minutes, with the bar
+        // never having moved.
+        //
+        // `SyncProgress.percent` gives the phases before the plan a small fixed
+        // share each rather than a fabricated crawl: the number moves when the
+        // run moves, and never sits at zero for minutes.
+        task.progress.totalUnitCount = 100
+        task.progress.completedUnitCount = 0
+
+        // Kept so an expiry can say how far it got. "Expired" alone cannot tell
+        // a task killed while listing from one killed with two files to go, and
+        // those need opposite fixes.
+        var lastReported: SyncProgress?
 
         let completion = Completion()
         func finish(_ success: Bool) {
@@ -347,10 +371,13 @@ enum BackgroundSync {
         let pump = Task { @MainActor in
             while !Task.isCancelled, workspace.isSyncing {
                 if let update = workspace.syncProgress {
-                    if update.total > 0 {
-                        task.progress.totalUnitCount = Int64(update.total)
-                        task.progress.completedUnitCount = Int64(update.completed)
+                    // Never backwards: `Progress` treats a decrease as a reset,
+                    // and a bar that jumps back reads as a restart.
+                    let percent = Int64(update.percent)
+                    if percent > task.progress.completedUnitCount {
+                        task.progress.completedUnitCount = percent
                     }
+                    lastReported = update
                     task.updateTitle(workspace.vault?.name ?? "Vault", subtitle: update.message)
                 }
                 try? await Task.sleep(for: .milliseconds(400))
@@ -369,15 +396,50 @@ enum BackgroundSync {
                 finish(false)
             default:
                 BackgroundSyncLog.record(.finished, "continued")
+                lastContinuedPercent = -1
+                fruitlessExpiries = 0
                 finish(true)
             }
         }
 
         task.expirationHandler = {
-            BackgroundSyncLog.record(.expired, "continued (system)")
+            let reached = lastReported?.percent ?? 0
+            let where_ = lastReported.map { "\($0.percent)% — \($0.message)" } ?? "before it started"
+            BackgroundSyncLog.record(.expired, "continued (system) at \(where_)")
             pump.cancel()
             work.cancel()
             finish(false)
+
+            // Carry on rather than stop here.
+            //
+            // A first sync of a real vault does not fit in one of these — the
+            // system grants what it grants, and for a few hundred megabytes that
+            // is several goes. The engine already resumes rather than restarts,
+            // so the only thing missing was asking for the next turn. Without
+            // it the run stalls until iOS happens to grant a background refresh,
+            // and the user is left looking at "failed".
+            //
+            // Guarded against spinning: three expiries that move nothing and it
+            // stops, leaving the periodic tasks to try later.
+            if reached > lastContinuedPercent {
+                fruitlessExpiries = 0
+            } else {
+                fruitlessExpiries += 1
+            }
+            lastContinuedPercent = reached
+
+            guard fruitlessExpiries < fruitlessLimit else {
+                BackgroundSyncLog.record(.skipped, "continued made no progress \(fruitlessLimit)× — leaving it to the periodic tasks")
+                return
+            }
+            if syncVisibly(workspace: workspace, firstSyncDirection: direction) {
+                BackgroundSyncLog.record(.scheduled, "continued (carrying on from \(reached)%)")
+            } else {
+                // Submission is only allowed on behalf of the frontmost app, so
+                // this fails whenever the expiry caught the app in the
+                // background. The periodic tasks are already queued for that.
+                BackgroundSyncLog.record(.scheduleFailed, "continued (could not carry on from \(reached)%)")
+            }
         }
     }
 

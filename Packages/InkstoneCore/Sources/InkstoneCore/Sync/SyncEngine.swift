@@ -62,6 +62,33 @@ public enum SyncError: LocalizedError, Sendable {
 /// stalled, and "Downloading notes/2026-08-14.md…" says nothing about whether
 /// that is the second file of eight hundred or the last.
 public struct SyncProgress: Sendable {
+    /// Which part of a run this is.
+    ///
+    /// Carried because the phases before the plan exists have no counts, and a
+    /// task that reports no movement through them is not merely uninformative —
+    /// iOS forcibly expires a continued-processing task that looks stalled. On a
+    /// vault of any size, listing the remote alone can outlast the scheduler's
+    /// patience, and that is exactly what it did: two runs killed at 31 seconds
+    /// and 3½ minutes with nothing on the bar.
+    public enum Phase: Int, Sendable, CaseIterable {
+        case verifying, listing, scanning, planning, transferring
+
+        /// Where this phase begins on a 0…100 scale. The first four are given
+        /// small, fixed shares because their duration is unknowable; the work
+        /// that can be counted gets the rest.
+        public var start: Int {
+            switch self {
+            case .verifying: return 0
+            case .listing: return 2
+            case .scanning: return 8
+            case .planning: return 12
+            case .transferring: return 15
+            }
+        }
+    }
+
+    public let phase: Phase
+
     /// What is happening, for a status line.
     public let message: String
     /// Actions finished so far, and how many there are in total. Both zero
@@ -71,10 +98,24 @@ public struct SyncProgress: Sendable {
     public let completed: Int
     public let total: Int
 
-    public init(message: String, completed: Int = 0, total: Int = 0) {
+    public init(phase: Phase = .transferring, message: String,
+                completed: Int = 0, total: Int = 0) {
+        self.phase = phase
         self.message = message
         self.completed = completed
         self.total = total
+    }
+
+    /// The run's position on a 0…100 scale, always determinate.
+    ///
+    /// Deliberately never a fabricated crawl: within a phase that has no counts
+    /// the number sits at that phase's start and moves when the phase does. What
+    /// it must not do is stay at zero for minutes, which is the shape a
+    /// scheduler reads as a hung task.
+    public var percent: Int {
+        guard phase == .transferring, total > 0 else { return phase.start }
+        let span = 100 - Phase.transferring.start
+        return Phase.transferring.start + Int(Double(span) * Double(completed) / Double(total))
     }
 
     /// `nil` while the total is unknown, so a caller can show an indeterminate
@@ -184,14 +225,14 @@ public struct SyncEngine: Sendable {
         confirmingLargeDeletion: Bool = false,
         progress: (@Sendable (SyncProgress) -> Void)? = nil
     ) async throws -> SyncReport {
-        progress?(SyncProgress(message: "Checking repository…"))
+        progress?(SyncProgress(phase: .verifying, message: "Checking repository…"))
         _ = try await client.verify()
 
-        progress?(SyncProgress(message: "Listing remote files…"))
+        progress?(SyncProgress(phase: .listing, message: "Listing remote files…"))
         let remote = try await client.listFiles()
         let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
 
-        progress?(SyncProgress(message: "Scanning vault…"))
+        progress?(SyncProgress(phase: .scanning, message: "Scanning vault…"))
         let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
 
@@ -219,6 +260,7 @@ public struct SyncEngine: Sendable {
             )
         }
 
+        progress?(SyncProgress(phase: .planning, message: "Working out what changed…"))
         var report = SyncReport()
         var actions = SyncPlanner.plan(
             entries: entries, policy: policy, excludedLocally: excludedLocally

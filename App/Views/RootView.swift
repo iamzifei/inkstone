@@ -113,7 +113,7 @@ struct RootView: View {
                 : String(localized: "\(report.changeCount) change(s) synced")
         // Says what actually happened. "Failed" would be wrong — the run was cut
         // short by the system, what it moved is kept, and the next one resumes.
-        case .interrupted: String(localized: "Sync paused — it will continue")
+        case .interrupted: String(localized: "Sync ran out of time — carrying on")
         }
     }
 
