@@ -648,6 +648,29 @@ private struct SyncSettings: View {
 
     var body: some View {
         Form {
+            // Its own row, before anything that could confuse someone.
+            //
+            // This was a link inside a section footer, and it was invisible for
+            // a reason worth keeping: the footer carried
+            // `.foregroundStyle(.secondary)`, which overrides a Link's tint, so
+            // it rendered as one more line of small grey prose. A link that does
+            // not look like a link is not a link — and a footer is the part of a
+            // settings pane people skip.
+            Section {
+                Link(destination: SyncHelp.url(for: locale)) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("How syncing works")
+                            Text("Setting up iCloud or GitHub, and when a conflict happens")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                }
+            }
+
             Section {
                 @Bindable var settings = workspace.settings
                 // Named for what it does. It used to say "Sync this vault with
@@ -678,12 +701,9 @@ private struct SyncSettings: View {
             } footer: {
                 // Worth stating plainly, because the switch does less than it
                 // looks like it does: iCloud moves the files, not this app.
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Whether iCloud carries this vault depends on where the folder is, not on a switch here — a folder in iCloud Drive is synced by the system. This setting only decides whether its notes stay on this device or may be evicted to placeholders to save space.")
-                    Link("How syncing works", destination: SyncHelp.url(for: locale))
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                Text("Whether iCloud carries this vault depends on where the folder is, not on a switch here — a folder in iCloud Drive is synced by the system. This setting only decides whether its notes stay on this device or may be evicted to placeholders to save space.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 @Bindable var settings = workspace.settings
@@ -890,15 +910,9 @@ private struct SyncSettings: View {
             } header: {
                 Text("GitHub")
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.")
-                    // Placed where someone reads when they are stuck: under the
-                    // section that asks for a token and a repository, next to
-                    // the sentence explaining what they are for.
-                    Link("Setting up sync, and when it conflicts", destination: SyncHelp.url(for: locale))
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                Text("Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             #if os(iOS)
