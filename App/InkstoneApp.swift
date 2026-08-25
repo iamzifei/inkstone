@@ -825,8 +825,10 @@ struct InkstoneApp: App {
         // "View" sitting next to the built-in one in the menu bar.
         CommandGroup(after: .toolbar) {
             Divider()
-            Button("Graph View") { workspace.open(.graph) }
+            Button("Graph View") { workspace.open(.graph(focus: workspace.activeTab?.url)) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
+            Button("Whole Vault Graph") { workspace.open(.graph(focus: nil)) }
+                .keyboardShortcut("g", modifiers: [.command, .option])
             Button("Calendar") { workspace.open(.calendar) }
             Divider()
             Button("Live Preview") { workspace.settings.data.editorMode = .livePreview }

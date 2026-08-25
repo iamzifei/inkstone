@@ -15,6 +15,12 @@ struct GraphSettingsPanel: View {
     /// being asked now, not a preference. Obsidian persists it; a filter you
     /// cannot see the reason for, days later, is worse than retyping it.
     @Binding var search: String
+    /// The note the graph is centred on, if any.
+    var focus: URL?
+    /// Hops out from `focus`. Ignored when showing the whole vault.
+    @Binding var depth: Int
+    /// Switches between this note's neighbourhood and the whole vault.
+    var onScopeChange: (URL?) -> Void
     /// Called whenever a change means the graph has to be rebuilt or re-run.
     /// Display-only changes redraw on their own and do not use this.
     var onStructuralChange: () -> Void
@@ -22,6 +28,7 @@ struct GraphSettingsPanel: View {
     var onReset: () -> Void
     var onClose: () -> Void
 
+    @State private var showScope = true
     @State private var showFilters = true
     @State private var showGroups = true
     @State private var showDisplay = true
@@ -33,6 +40,56 @@ struct GraphSettingsPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
+
+                if let focus {
+                    section("Scope", isExpanded: $showScope) {
+                        Picker("", selection: Binding(
+                            get: { true },
+                            set: { isLocal in if !isLocal { onScopeChange(nil) } }
+                        )) {
+                            Text("This note").tag(true)
+                            Text("Whole vault").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+
+                        Text(focus.deletingPathExtension().lastPathComponent)
+                            .font(.caption)
+                            .foregroundStyle(style.secondaryText)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        // Obsidian's local graph calls this Depth and offers the
+                        // same 1–5. One hop is what links to this note and what
+                        // it links to; each step past that is a ring further out.
+                        Stepper(value: Binding(
+                            get: { depth },
+                            set: {
+                                depth = $0
+                                onStructuralChange()
+                            }
+                        ), in: 1...5) {
+                            Text("Depth: \(depth)")
+                        }
+                        .help("How many links out from this note to follow")
+                    }
+                } else {
+                    section("Scope", isExpanded: $showScope) {
+                        Picker("", selection: Binding(
+                            get: { false },
+                            set: { isLocal in if isLocal { onScopeChange(currentNote) } }
+                        )) {
+                            Text("This note").tag(true)
+                            Text("Whole vault").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .disabled(currentNote == nil)
+                        .help(currentNote == nil
+                              ? String(localized: "Open a note to centre the graph on it")
+                              : String(localized: "Centre the graph on the note you have open"))
+                    }
+                }
 
                 section("Filters", isExpanded: $showFilters) {
                     TextField("Search files…", text: $search)
@@ -124,6 +181,10 @@ struct GraphSettingsPanel: View {
         .foregroundStyle(style.secondaryText)
         .padding(.bottom, 6)
     }
+
+    /// The note that "This note" would centre on: whatever the workspace has
+    /// open, if it is a file at all.
+    private var currentNote: URL? { workspace.activeTab?.url }
 
     /// "Existing files only" is the same switch as "show unresolved", read the
     /// other way round. Obsidian words it this way and the wording is clearer,

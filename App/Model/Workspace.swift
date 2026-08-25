@@ -10,7 +10,11 @@ enum TabContent: Hashable, Identifiable {
     /// A file to look at rather than edit. The kind is carried so the tab can
     /// pick a viewer and an icon without reading the file again.
     case attachment(URL, AttachmentKind)
-    case graph
+    /// The link graph. With a `focus` it is that note's neighbourhood; without
+    /// one, the whole vault. They are separate tabs on purpose — a local graph
+    /// is read beside the note it belongs to, and swapping it for the vault's
+    /// would lose the place.
+    case graph(focus: URL?)
     case calendar
 
     var id: String {
@@ -18,7 +22,7 @@ enum TabContent: Hashable, Identifiable {
         case .note(let url): return "note:" + url.path(percentEncoded: false)
         case .canvas(let url): return "canvas:" + url.path(percentEncoded: false)
         case .attachment(let url, _): return "file:" + url.path(percentEncoded: false)
-        case .graph: return "graph"
+        case .graph(let focus): return "graph:" + (focus?.path(percentEncoded: false) ?? "")
         case .calendar: return "calendar"
         }
     }
@@ -27,6 +31,9 @@ enum TabContent: Hashable, Identifiable {
         switch self {
         case .note(let url), .canvas(let url): return url
         case .attachment(let url, _): return url
+        // Deliberately not the focus: this is "which file is this tab editing",
+        // and a local graph edits nothing. Reporting one here would put the
+        // graph into the navigation history as if it were the note.
         case .graph, .calendar: return nil
         }
     }

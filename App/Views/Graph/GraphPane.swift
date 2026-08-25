@@ -1,15 +1,23 @@
 import SwiftUI
 import InkstoneCore
 
-/// Interactive force-directed graph of the whole vault.
+/// Interactive force-directed graph.
 ///
 /// One node per note, one edge per link between notes: this is a map of the
 /// vault, not of any note's insides.
+///
+/// With a `focus` it shows only what is within `depth` hops of that note, which
+/// is what opening the graph from an open note gives you — "how does this note
+/// sit in the vault" is a far more common question than "show me all nine
+/// thousand of them". Without one it shows everything.
 ///
 /// Drawn with SwiftUI `Canvas` rather than a stack of views: at a few thousand
 /// nodes, one immediate-mode draw call per frame is the difference between a
 /// smooth graph and a slideshow.
 struct GraphPane: View {
+    /// The note this graph is centred on, or nil for the whole vault.
+    var focus: URL?
+
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
 
@@ -20,7 +28,14 @@ struct GraphPane: View {
     @State private var generation = 0
     @State private var isSettling = false
     @State private var search = ""
-    @State private var isShowingSettings = false
+    /// Persisted rather than per-pane: switching scope opens a different tab,
+    /// and a panel that closed itself every time you did that would have to be
+    /// reopened to switch back. Obsidian remembers this too — it is the `close`
+    /// key in its own `graph.json`.
+    @AppStorage("graphSettingsPanelOpen") private var isShowingSettings = false
+    /// How many hops out from `focus` to include. Obsidian's local graph calls
+    /// this Depth and offers 1–5; so does this.
+    @State private var depth = 1
 
     @State private var zoom: CGFloat = 1
     @State private var pan: CGSize = .zero
@@ -153,8 +168,20 @@ struct GraphPane: View {
         isSettling = true
         defer { isSettling = false }
 
+        let focus = focus
+        let depth = depth
+
         let built = await Task.detached(priority: .userInitiated) {
-            let graph = GraphData.build(
+            let graph = focus.map { url in
+                GraphData.local(
+                    from: snapshot,
+                    attachments: attachments,
+                    around: url,
+                    depth: depth,
+                    filters: filters,
+                    vaultRoot: root
+                )
+            } ?? GraphData.build(
                 from: snapshot,
                 attachments: attachments,
                 filters: filters,
@@ -397,11 +424,17 @@ struct GraphPane: View {
 
     /// What decides a node's colour: its group if it has one, else its kind.
     private enum ColourKey: Hashable {
+        case focus
         case group(Int)
         case kind(GraphNode.Kind.Grouping)
     }
 
     private func colourKey(for slot: Int, frame: Frame) -> ColourKey {
+        // The note the graph is centred on is drawn in the accent, so the eye
+        // lands on it first. It is the one node the reader already knows.
+        if let focus, frame.simulation?.data.nodes[slot].id == focus.path(percentEncoded: false) {
+            return .focus
+        }
         if slot < frame.groups.count, let group = frame.groups[slot], group < frame.groupColours.count {
             return .group(group)
         }
@@ -410,6 +443,7 @@ struct GraphPane: View {
 
     private func colour(for key: ColourKey, frame: Frame) -> Color {
         switch key {
+        case .focus: return style.accent
         case .group(let index): return frame.groupColours[index]
         // The body text colour, as Obsidian does it, rather than the accent: a
         // field of several thousand accent-coloured dots is a wall of one loud
@@ -429,7 +463,9 @@ struct GraphPane: View {
             ContentUnavailableView(
                 "Nothing to graph",
                 systemImage: "point.3.filled.connected.trianglepath.dotted",
-                description: Text("Link notes with [[wikilinks]], or loosen the filters.")
+                description: Text(focus == nil
+                                  ? "Link notes with [[wikilinks]], or loosen the filters."
+                                  : "Nothing links to this note yet. Try a greater depth, or the whole vault.")
             )
         }
     }
@@ -542,6 +578,11 @@ struct GraphPane: View {
         if isShowingSettings {
             GraphSettingsPanel(
                 search: $search,
+                focus: focus,
+                depth: $depth,
+                onScopeChange: { newFocus in
+                    workspace.open(.graph(focus: newFocus))
+                },
                 onStructuralChange: { generation += 1 },
                 onAnimate: { generation += 1 },
                 onReset: {
@@ -563,11 +604,16 @@ struct GraphPane: View {
                     // should not silently throw away someone's saved queries.
                     workspace.settings.data = data
                     search = ""
+                    depth = 1
                     generation += 1
                 },
                 onClose: { isShowingSettings = false }
             )
             .padding(16)
+            // Kept clear of the zoom controls in the opposite corner, which the
+            // panel would otherwise run underneath — leaving them visible but
+            // unclickable, which is worse than hiding them.
+            .padding(.bottom, 58)
             .frame(maxHeight: .infinity, alignment: .top)
         }
     }
@@ -734,15 +780,21 @@ struct LocalGraphThumbnail: View {
     private func rebuild() async {
         let snapshot = workspace.index
         let url = url
+        let root = workspace.root ?? url.deletingLastPathComponent()
         simulation = await Task.detached(priority: .userInitiated) {
             // Straight from the index. Building the whole vault's graph and then
             // discarding all but this note's neighbours — which is what this did
             // — cost seconds per note opened on a large vault.
+            //
+            // Its own filters, not the graph tab's: a thumbnail is there to show
+            // the shape of this note's links, and hiding some of them because a
+            // search is still typed into a pane somewhere else would be baffling.
             var simulation = GraphSimulation(data: GraphData.local(
                 from: snapshot,
                 around: url,
                 depth: 1,
-                includeUnresolved: true
+                filters: GraphData.Filters(showTags: false, showUnresolved: true),
+                vaultRoot: root
             ))
             var alpha = 1.0
             while alpha > 0.01 {

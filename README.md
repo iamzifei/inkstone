@@ -28,14 +28,14 @@ vault on disk, and is green.
 | Tags (inline + frontmatter, nested) | ✅ implemented, tested |
 | Live-preview editor (TextKit) | ✅ implemented |
 | Quick switcher (fuzzy) + full-text search | ✅ implemented, tested |
-| Graph view — filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
+| Graph view — local + whole vault, filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
 | Canvas (JSON Canvas 1.0) | ✅ implemented, tested |
 | Calendar + daily notes | ✅ implemented |
 | Math, Mermaid, transclusion, image/PDF embeds | ✅ implemented |
 | Bookmarks, version history, tabs, split view | ✅ implemented |
 | GitHub sync, background sync on iOS | ✅ implemented, tested |
 | Themes, typography, CJK settings | ✅ implemented |
-| i18n (en / 简体 / 繁體) | ✅ 167 strings |
+| i18n (en / 简体 / 繁體) | ✅ 176 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred |
 | Reading-mode renderer | ⚠️ falls back to live preview |
 | Plugin API | ❌ not started |
@@ -43,11 +43,19 @@ vault on disk, and is green.
 ## Graph view
 
 One node per note, one edge per link between notes — the vault's shape, not any
-one note's. The settings panel mirrors Obsidian's, section for section, so a
-number you noted there means the same thing here:
+one note's.
+
+**Opened from a note (⇧⌘G) it centres on that note**, showing what links to it
+and what it links to, with a Depth of 1–5 for how far out to follow. The note
+itself is drawn in the accent colour. ⌥⌘G, or the switch in the panel, gives the
+whole vault instead.
+
+The settings panel mirrors Obsidian's, section for section, so a number you noted
+there means the same thing here:
 
 | Section | Controls |
 | --- | --- |
+| Scope | This note / Whole vault, Depth |
 | Filters | Search files…, Tags, Attachments, Existing files only, Orphans |
 | Groups | a search query and a colour per group |
 | Display | Arrows, Text fade threshold, Node size, Link thickness, Animate |

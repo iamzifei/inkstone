@@ -1,6 +1,6 @@
 # Graph view: stop it hanging, then bring it up to Obsidian's
 
-**Status:** done 2026-08-25. Tooltips unverified — see HUMAN QUEUE.
+**Status:** done 2026-08-25. Tooltips confirmed working by James.
 
 ## What was reported
 
@@ -68,10 +68,11 @@ first heading — became two circles with the same name. Now the file name.
 `.help()` on every toolbar button, and on the canvas toolbar and graph controls,
 which are all icon-only too.
 
-**Not verified visually.** `.help()` on a toolbar button does not surface as
-`AXHelp` — but neither does macOS's own "Hide Sidebar" item, so that proves
-nothing either way, and the hover rig could not hold focus long enough to
-photograph a tooltip. Needs a human to hover and say.
+**Confirmed working** by James on the installed build. Worth recording why it
+could not be confirmed from here: `.help()` on a toolbar button does not surface
+as `AXHelp` — and neither does macOS's own "Hide Sidebar" item, so an absent
+`AXHelp` says nothing about whether a tooltip appears. Do not read that signal
+as a failure again.
 
 ## Phase 3 — Obsidian parity
 
@@ -157,11 +158,33 @@ Three changes, each aimed at what the profile actually said:
 Panning a settled graph was not measured: the synthetic drag never reached the
 window, and the numbers above are for the settle only.
 
+## Phase 4 — the graph follows the note you are reading
+
+Reported after phase 3: with a note open, the graph should show *that note's*
+neighbourhood, not nine thousand dots.
+
+`TabContent.graph` now carries an optional focus, so a local graph and the vault
+graph are separate tabs rather than one view with a mode. Opening the graph from
+the toolbar or ⇧⌘G focuses on whatever is open; ⌥⌘G, or the Scope switch in the
+panel, gives the whole vault. Depth is 1–5, as Obsidian's local graph has it, and
+the focused note is drawn in the accent colour so the eye finds it first.
+
+`GraphData.local` grew the full filter set — it was honouring only
+`includeUnresolved`, so tags, attachments and the search box did nothing in a
+local graph. One exception, deliberate: **the focused note is kept whatever the
+search says.** A local graph of a note that filtered itself out is an empty box
+with no explanation of why.
+
+Two smaller things that came out of looking at it running:
+
+- the panel ran underneath the zoom controls in the opposite corner, leaving them
+  visible but unclickable;
+- switching scope opens a different tab, so a pane-local "is the panel open" flag
+  closed the panel every time — it is `@AppStorage` now, which is also what
+  Obsidian does with the `close` key in its `graph.json`.
+
 ## HUMAN QUEUE
 
-- Hover a toolbar button and confirm the tooltip appears. If it does not, the
-  `ToolbarItemGroup` needs splitting into individual `ToolbarItem`s — see above
-  for why this could not be settled from here.
 - Look at the graph beside Obsidian's on the same vault and say what still differs.
 - Obsidian was left with a Graph view tab open on the 詹有才 vault, from driving
   it for the comparison. Nothing in the vault was touched.

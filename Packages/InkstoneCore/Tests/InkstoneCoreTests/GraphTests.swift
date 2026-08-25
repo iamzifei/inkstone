@@ -216,7 +216,8 @@ struct VaultGraphTests {
             from: snapshot,
             around: root.appending(path: "Centre.md"),
             depth: 1,
-            includeUnresolved: true
+            filters: .init(showTags: false, showUnresolved: true),
+            vaultRoot: root
         )
 
         let labels = Set(data.nodes.map(\.label))
@@ -239,7 +240,8 @@ struct VaultGraphTests {
             from: snapshot,
             around: root.appending(path: "Centre.md"),
             depth: 1,
-            includeUnresolved: false
+            filters: .init(showTags: false, showUnresolved: false),
+            vaultRoot: root
         )
 
         let ids = Set(data.nodes.map(\.id))
@@ -249,6 +251,73 @@ struct VaultGraphTests {
             #expect(ids.contains(link.source))
             #expect(ids.contains(link.target))
         }
+    }
+
+    @Test("Depth decides how many rings out the local graph reaches")
+    func honoursLocalDepth() {
+        // Centre → Out → Beyond → Further: one chain, so each extra hop should
+        // add exactly one more note.
+        let snapshot = IndexBuilder.assemble([
+            note("Centre.md", text: "[[Out]]"),
+            note("Out.md", text: "[[Beyond]]"),
+            note("Beyond.md", text: "[[Further]]"),
+            note("Further.md", text: ""),
+        ], vaultRoot: root)
+
+        func labels(depth: Int) -> Set<String> {
+            Set(GraphData.local(
+                from: snapshot,
+                around: root.appending(path: "Centre.md"),
+                depth: depth,
+                filters: .init(showTags: false),
+                vaultRoot: root
+            ).nodes.map(\.label))
+        }
+
+        #expect(labels(depth: 1) == ["Centre", "Out"])
+        #expect(labels(depth: 2) == ["Centre", "Out", "Beyond"])
+        #expect(labels(depth: 3) == ["Centre", "Out", "Beyond", "Further"])
+    }
+
+    @Test("The local graph keeps its own note however the search is set")
+    func alwaysKeepsTheFocus() {
+        let snapshot = IndexBuilder.assemble([
+            note("Centre.md", text: "[[Out]]"),
+            note("Out.md", text: ""),
+        ], vaultRoot: root)
+
+        let data = GraphData.local(
+            from: snapshot,
+            around: root.appending(path: "Centre.md"),
+            depth: 1,
+            filters: .init(search: "nothing-matches-this", showTags: false),
+            vaultRoot: root
+        )
+
+        // A local graph of a note that filtered itself out is an empty box with
+        // no explanation of why.
+        #expect(data.nodes.map(\.label) == ["Centre"])
+    }
+
+    @Test("The local graph shows tags when the filter asks for them")
+    func showsTagsLocally() {
+        let snapshot = IndexBuilder.assemble([
+            note("Centre.md", text: "#project [[Out]]"),
+            note("Out.md", text: ""),
+        ], vaultRoot: root)
+
+        func labels(showTags: Bool) -> Set<String> {
+            Set(GraphData.local(
+                from: snapshot,
+                around: root.appending(path: "Centre.md"),
+                depth: 1,
+                filters: .init(showTags: showTags),
+                vaultRoot: root
+            ).nodes.map(\.label))
+        }
+
+        #expect(labels(showTags: false) == ["Centre", "Out"])
+        #expect(labels(showTags: true) == ["Centre", "Out", "#project"])
     }
 
     @Test("The local graph excludes unresolved links when asked to")
@@ -261,7 +330,8 @@ struct VaultGraphTests {
             from: snapshot,
             around: root.appending(path: "Centre.md"),
             depth: 1,
-            includeUnresolved: false
+            filters: .init(showTags: false, showUnresolved: false),
+            vaultRoot: root
         )
 
         #expect(data.nodes.map(\.label) == ["Centre"])

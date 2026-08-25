@@ -211,38 +211,59 @@ public struct GraphData: Sendable {
     /// then throw all but a handful of nodes away — on every note it opened. On
     /// a vault of a few thousand notes that is seconds of work per click for a
     /// thumbnail showing five circles.
+    ///
+    /// `filters.showOrphans` is not consulted: every node here is within `depth`
+    /// hops of the focus, so by construction none of them is an orphan.
     public static func local(
         from snapshot: IndexSnapshot,
+        attachments: AttachmentIndex = AttachmentIndex(),
         around url: URL,
         depth: Int,
-        includeUnresolved: Bool
+        filters: Filters,
+        vaultRoot: URL
     ) -> GraphData {
         var visited: Set<URL> = [url]
         var frontier: [URL] = [url]
-        /// Unresolved targets are leaves — they have no links of their own to
+        /// Leaves — a ghost link and an attachment have no links of their own to
         /// follow — so they are collected separately and never expanded.
         var unresolved: Set<String> = []
+        var files: Set<URL> = []
         var links: Set<GraphLink> = []
+        var tags: Set<String> = []
 
+        let query = SearchQuery(raw: filters.search)
         func id(_ url: URL) -> String { url.path(percentEncoded: false) }
+
+        /// The focus is always kept, whatever the search says: a local graph of
+        /// a note that filtered itself out is an empty box with no explanation.
+        func admits(_ candidate: URL) -> Bool {
+            candidate == url || snapshot.metadata(for: candidate).map(query.matchesWithoutBody) == true
+        }
 
         for _ in 0..<max(1, depth) {
             var next: [URL] = []
             for note in frontier {
                 for edge in snapshot.outgoing(from: note) {
                     if let destination = edge.destination {
-                        guard destination != note else { continue }
+                        guard destination != note, admits(destination) else { continue }
                         links.insert(GraphLink(source: id(note), target: id(destination)))
                         if visited.insert(destination).inserted { next.append(destination) }
-                    } else if includeUnresolved, !edge.unresolvedTarget.isEmpty {
-                        unresolved.insert(edge.unresolvedTarget)
-                        links.insert(GraphLink(
-                            source: id(note),
-                            target: "unresolved:" + edge.unresolvedTarget.lowercased()
-                        ))
+                    } else if !edge.unresolvedTarget.isEmpty {
+                        if let file = attachments.resolve(edge.unresolvedTarget, from: note, vaultRoot: vaultRoot) {
+                            guard filters.showAttachments else { continue }
+                            files.insert(file)
+                            links.insert(GraphLink(source: id(note), target: id(file)))
+                        } else if filters.showUnresolved {
+                            unresolved.insert(edge.unresolvedTarget)
+                            links.insert(GraphLink(
+                                source: id(note),
+                                target: "unresolved:" + edge.unresolvedTarget.lowercased()
+                            ))
+                        }
                     }
                 }
                 for edge in snapshot.incoming(to: note) where edge.source != note {
+                    guard admits(edge.source) else { continue }
                     links.insert(GraphLink(source: id(edge.source), target: id(note)))
                     if visited.insert(edge.source).inserted { next.append(edge.source) }
                 }
@@ -251,15 +272,31 @@ public struct GraphData: Sendable {
             frontier = next
         }
 
+        if filters.showTags {
+            for note in visited {
+                for tag in snapshot.metadata(for: note)?.tags ?? [] {
+                    tags.insert(tag)
+                    links.insert(GraphLink(source: id(note), target: "tag:" + tag))
+                }
+            }
+        }
+
         var nodes: [GraphNode] = visited.map { url in
             GraphNode(
                 id: id(url),
                 kind: .note(url),
-                label: snapshot.metadata(for: url).map(label(for:)) ?? url.deletingPathExtension().lastPathComponent
+                label: snapshot.metadata(for: url).map(label(for:))
+                    ?? url.deletingPathExtension().lastPathComponent
             )
         }
         nodes += unresolved.map { target in
             GraphNode(id: "unresolved:" + target.lowercased(), kind: .unresolved(target), label: target)
+        }
+        nodes += files.map { file in
+            GraphNode(id: id(file), kind: .attachment(file), label: file.lastPathComponent)
+        }
+        nodes += tags.map { tag in
+            GraphNode(id: "tag:" + tag, kind: .tag(tag), label: "#" + tag)
         }
 
         var byID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })

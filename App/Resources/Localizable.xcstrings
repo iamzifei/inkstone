@@ -392,6 +392,29 @@
         }
       }
     },
+    "Centre the graph on the note you have open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Centre the graph on the note you have open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以当前打开的笔记为中心"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以目前開啟的筆記為中心"
+          }
+        }
+      }
+    },
     "Check spelling": {
       "extractionState": "manual",
       "localizations": {
@@ -779,6 +802,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除選取的卡片"
+          }
+        }
+      }
+    },
+    "Depth: %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depth: %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度：%lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度：%lld"
           }
         }
       }
@@ -1561,6 +1607,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "連線畫多粗"
+          }
+        }
+      }
+    },
+    "How many links out from this note to follow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many links out from this note to follow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从这篇笔记向外追几层链接"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從這篇筆記向外追幾層連結"
           }
         }
       }
@@ -2370,6 +2439,29 @@
         }
       }
     },
+    "Nothing links to this note yet. Try a greater depth, or the whole vault.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing links to this note yet. Try a greater depth, or the whole vault."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有笔记连到这一篇。试试加大深度，或者看整个知识库。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還沒有筆記連到這一篇。試試加大深度，或者看整個知識庫。"
+          }
+        }
+      }
+    },
     "Nothing recorded for this day.": {
       "extractionState": "manual",
       "localizations": {
@@ -2504,6 +2596,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "開啟快速切換"
+          }
+        }
+      }
+    },
+    "Open a note to centre the graph on it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a note to centre the graph on it"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先打开一篇笔记，才能以它为中心"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先開啟一篇筆記，才能以它為中心"
           }
         }
       }
@@ -2991,6 +3106,29 @@
         }
       }
     },
+    "Scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scope"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "範圍"
+          }
+        }
+      }
+    },
     "Search": {
       "extractionState": "manual",
       "localizations": {
@@ -3428,6 +3566,29 @@
         }
       }
     },
+    "This note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This note"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前筆記"
+          }
+        }
+      }
+    },
     "This vault is stored locally. Move it into iCloud Drive to sync across devices.": {
       "extractionState": "manual",
       "localizations": {
@@ -3700,6 +3861,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "每週從週一開始"
+          }
+        }
+      }
+    },
+    "Whole Vault Graph": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole Vault Graph"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整库关系图"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整庫關係圖"
+          }
+        }
+      }
+    },
+    "Whole vault": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole vault"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个知识库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整個知識庫"
           }
         }
       }

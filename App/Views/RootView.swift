@@ -151,7 +151,10 @@ struct RootView: View {
             .help("Find a note by name (⌘O)")
 
             Button {
-                workspace.open(.graph)
+                // Focused on whatever is open, which is nearly always what is
+                // wanted: "show me how this note sits in the vault". The pane
+                // has a switch to the whole vault.
+                workspace.open(.graph(focus: workspace.activeTab?.url))
             } label: {
                 Label("Graph View", systemImage: "point.3.filled.connected.trianglepath.dotted")
             }
@@ -259,8 +262,9 @@ private struct PaneView: View {
             case .attachment(let url, let kind):
                 AttachmentView(url: url, kind: kind)
                     .id(url)
-            case .graph:
-                GraphPane()
+            case .graph(let focus):
+                GraphPane(focus: focus)
+                    .id(focus)
             case .calendar:
                 CalendarPane()
             case nil:
@@ -335,7 +339,11 @@ private struct TabStrip: View {
         // The extension stays: two files can differ only by it, and for
         // something being looked at rather than edited it is half the identity.
         case .attachment(let url, _): return url.lastPathComponent
-        case .graph: return String(localized: "Graph")
+        // Named after the note, because a strip of tabs all saying "Graph" is
+        // no help in telling them apart.
+        case .graph(let focus):
+            return focus.map { $0.deletingPathExtension().lastPathComponent }
+                ?? String(localized: "Graph")
         case .calendar: return String(localized: "Calendar")
         }
     }
