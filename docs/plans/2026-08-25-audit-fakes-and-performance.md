@@ -141,9 +141,25 @@ dictionary when the snapshot is assembled.
 4. **Make `outgoing(from:)` a dictionary** before a vault appears that needs it.
 5. Footnote jump on iOS; the three `print`s; the `try!`.
 
+## What happened to all this
+
+Items 1–5 were done on 2026-08-25 and shipped in 0.1.3 — the search, the six
+settings (all honoured, none removed), the reading renderer and the `outgoing`
+dictionary. Written up in
+[`2026-08-26-audit-followup.md`](2026-08-26-audit-followup.md).
+
+**Still open, all of it from §6:**
+
+| | where |
+| --- | --- |
+| Three `print()` calls ship in release | `InkstoneApp.swift:618`, `BackgroundSync.swift:240` and `:323` |
+| One `try!` | `MarkdownEditorView.swift:1286` |
+| Footnote jump does nothing on iOS | `MarkdownEditorView.swift:358` — the scroll is inside `#if os(macOS)` |
+
+None of them is user-visible except the last, and none was in the batch that was
+asked for. Together they are a few minutes' work.
+
 ## HUMAN QUEUE
 
-- Decide on the six dead settings: honour them, or take the controls out? Two of
-  them (`newLinkFormat`, `useShortestPathLinks`) are unfinished features rather
-  than forgotten wiring, and finishing them is a bigger job than the other four
-  put together.
+- The three above: worth doing, not worth a release of their own. They can ride
+  along with whatever ships next.
