@@ -107,6 +107,11 @@ siblings:
   clipstack: Un historique du presse-papiers qui ne gêne pas
 footer:
   tagline: Une application de notes qui laisse vos fichiers tranquilles.
+  guides: "Guides"
+  sync_guide: "Guide de synchronisation"
+  compare: "Comparé à Obsidian"
+  sync_free: "Synchroniser un coffre gratuitement"
+  privacy: "Confidentialité"
   project: Projet
   issues: Tickets
   also: De la même main

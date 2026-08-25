@@ -29,6 +29,7 @@ vault on disk, and is green.
 | Live-preview editor (TextKit) | ✅ implemented |
 | Frontmatter as a properties table | ✅ implemented, tested |
 | Plain-text file paths auto-linked | ✅ implemented, tested |
+| Reveal the open note in the file tree | ✅ implemented |
 | Quick switcher (fuzzy) + full-text search | ✅ implemented, tested |
 | Graph view — local + whole vault, filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
 | Canvas (JSON Canvas 1.0) | ✅ implemented, tested |
@@ -37,7 +38,7 @@ vault on disk, and is green.
 | Bookmarks, version history, tabs, split view | ✅ implemented |
 | GitHub sync, background sync on iOS | ✅ implemented, tested |
 | Themes, typography, CJK settings | ✅ implemented |
-| i18n (en / 简体 / 繁體) | ✅ 180 strings |
+| i18n (en / 简体 / 繁體) | ✅ 183 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred |
 | Reading-mode renderer | ⚠️ falls back to live preview |
 | Plugin API | ❌ not started |

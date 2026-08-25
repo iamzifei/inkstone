@@ -107,6 +107,11 @@ siblings:
   clipstack: Zwischenablage-Verlauf, der nicht im Weg steht
 footer:
   tagline: Eine Notizapp, die Ihre Dateien in Ruhe lässt.
+  guides: "Anleitungen"
+  sync_guide: "Sync-Anleitung"
+  compare: "Im Vergleich zu Obsidian"
+  sync_free: "Einen Vault kostenlos synchronisieren"
+  privacy: "Datenschutz"
   project: Projekt
   issues: Issues
   also: Ebenfalls von derselben Hand

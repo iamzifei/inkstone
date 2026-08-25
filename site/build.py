@@ -281,6 +281,26 @@ def footer(page: Page, by_slug: dict) -> str:
         f'<span class="sib-note">{e(get(d, f"siblings.{name.lower()}"))}</span></span></a></li>'
         for name, url in SIBLINGS
     )
+    # The guides column. Without it the static pages were orphans: nothing on the
+    # site linked to the sync guide, the privacy statement or either landing page,
+    # so the only way to reach them was to already know the URL. A page nothing
+    # links to is a page search engines treat as an afterthought, which for a
+    # landing page is the whole point missed.
+    #
+    # The sync guide exists in the three languages the app ships; the rest fall
+    # back to English. The two landing pages are English-only by design — they
+    # answer English queries — so they are marked `hreflang="en"` rather than
+    # pretending to be translated.
+    guide_dir = guide.LANGS[page.lang][0] if page.lang in guide.LANGS else ""
+    guides = "".join([
+        f'<li><a href="{page.up}{guide_dir}sync.html">{e(get(d, "footer.sync_guide"))}</a></li>',
+        f'<li><a href="{page.up}obsidian-alternative.html" hreflang="en">'
+        f'{e(get(d, "footer.compare"))}</a></li>',
+        f'<li><a href="{page.up}obsidian-sync-free.html" hreflang="en">'
+        f'{e(get(d, "footer.sync_free"))}</a></li>',
+        f'<li><a href="{page.up}privacy.html" hreflang="en">{e(get(d, "footer.privacy"))}</a></li>',
+    ])
+
     return f"""<footer class="site-footer">
   <div class="footer-grid">
     <div class="footer-brand">
@@ -294,6 +314,10 @@ def footer(page: Page, by_slug: dict) -> str:
         <li><a href="{REPO}/issues" rel="noopener">{e(get(d, 'footer.issues'))}</a></li>
         <li><a href="{KOFI}" rel="noopener">Ko-fi</a></li>
       </ul>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">{e(get(d, 'footer.guides'))}</h2>
+      <ul>{guides}</ul>
     </div>
     <div class="footer-col footer-siblings">
       <h2 class="footer-h">{e(get(d, 'footer.also'))}</h2>

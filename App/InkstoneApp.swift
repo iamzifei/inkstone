@@ -829,6 +829,11 @@ struct InkstoneApp: App {
                 .keyboardShortcut("g", modifiers: [.command, .shift])
             Button("Whole Vault Graph") { workspace.open(.graph(focus: nil)) }
                 .keyboardShortcut("g", modifiers: [.command, .option])
+            Button("Reveal in Sidebar") {
+                if let url = workspace.activeTab?.url { workspace.revealInTree(url) }
+            }
+            .keyboardShortcut("r", modifiers: [.command, .option])
+            .disabled(workspace.activeTab?.url == nil)
             Button("Calendar") { workspace.open(.calendar) }
             Divider()
             Button("Live Preview") { workspace.settings.data.editorMode = .livePreview }

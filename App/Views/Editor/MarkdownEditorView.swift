@@ -754,6 +754,22 @@ final class InkstoneTextView: NSTextView {
         // Pointing hand over links, so they read as interactive.
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
 
+        // Only over what is on screen. A cursor rect outside the visible area
+        // can never be hovered, so asking for one is pure cost — and it is a
+        // large one: every rect here makes TextKit lay out that part of the
+        // document, and AppKit calls this on *every* tracking-area update. A
+        // split-view animation issues those continuously, so dragging the
+        // sidebar open re-laid-out a 198KB note dozens of times a second.
+        // `sample` during that animation put this method at **54% of the main
+        // thread** — more than drawing, scrolling and typing put together.
+        let visible = visibleRect.insetBy(dx: 0, dy: -200)
+        let visibleGlyphs = layoutManager.glyphRange(
+            forBoundingRect: visible.offsetBy(dx: -textContainerOrigin.x, dy: -textContainerOrigin.y),
+            in: container
+        )
+        let scope = layoutManager.characterRange(forGlyphRange: visibleGlyphs, actualGlyphRange: nil)
+        guard scope.length > 0 else { return }
+
         // And over the copy button, which had no cursor change, no hover state
         // and no confirmation — three separate reasons to think it was a picture
         // rather than a control.
@@ -765,7 +781,7 @@ final class InkstoneTextView: NSTextView {
                 )
             }
             storage.enumerateAttribute(
-                .inkstoneBlockFill, in: NSRange(location: 0, length: storage.length)
+                .inkstoneBlockFill, in: scope
             ) { value, range, _ in
                 guard value != nil,
                       let button = MainActor.assumeIsolated({ renderer.copyButtonRect(for: range) })
@@ -775,7 +791,7 @@ final class InkstoneTextView: NSTextView {
         }
         storage.enumerateAttribute(
             .inkstoneWikiLink,
-            in: NSRange(location: 0, length: storage.length)
+            in: scope
         ) { value, range, _ in
             guard value != nil else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -916,6 +932,8 @@ private struct TextViewRepresentable: NSViewRepresentable {
         /// written once during `makeNSView` on the main actor, and only read
         /// again when the coordinator is being torn down.
         nonisolated(unsafe) var frameObserver: (any NSObjectProtocol)?
+        /// Pending re-highlight for a width that is still changing.
+        var widthSettleTask: Task<Void, Never>?
         nonisolated(unsafe) var scrollObserver: (any NSObjectProtocol)?
 
         deinit {
@@ -960,9 +978,28 @@ private struct TextViewRepresentable: NSViewRepresentable {
             // Inline images are scaled to the measure. Only re-highlight when the
             // width has moved enough to matter — the image cache buckets by 32pt,
             // so re-running on every pixel of a live resize would be wasted work.
+            //
+            // And even then, not straight away. Opening the sidebar moves the
+            // measure ~260pt over a quarter of a second, which crosses the 32pt
+            // bucket eight times — eight full highlight passes over the document,
+            // seven of them for a width that was obsolete before the pass
+            // finished. The work is deferred until the width stops moving.
             if abs(inlineImageWidth - measure) >= 32 {
                 inlineImageWidth = measure
-                rehighlight()
+                scheduleWidthRehighlight()
+            }
+        }
+
+        /// Re-highlights once the width has settled, not on every frame of an
+        /// animation that is still running.
+        private func scheduleWidthRehighlight() {
+            widthSettleTask?.cancel()
+            widthSettleTask = Task { @MainActor [weak self] in
+                // Longer than a frame, shorter than a person notices: an inline
+                // image is briefly scaled to its old width and then correct.
+                try? await Task.sleep(for: .milliseconds(120))
+                guard !Task.isCancelled else { return }
+                self?.rehighlight()
             }
         }
 

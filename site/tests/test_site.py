@@ -260,3 +260,39 @@ class LLMsFile(BuiltSite):
             target = url or "index.html"
             self.assertTrue((self.out / target).exists(),
                             f"llms.txt names {url}, which is not in the build")
+
+
+class NoOrphanPages(BuiltSite):
+    """Every page has something linking to it.
+
+    A page nothing links to is reachable only by knowing its URL. That was true
+    of the sync guide, the privacy statement and both landing pages: they were in
+    the sitemap and in no navigation anywhere, which for a page whose whole
+    purpose is to be found in search is the point missed.
+    """
+
+    def test_every_static_page_is_linked_from_the_home_page(self) -> None:
+        home = (self.out / "index.html").read_text(encoding="utf-8")
+        for page in build.static_pages():
+            name = page.removeprefix(f"{build.SITE}/")
+            self.assertIn(f'href="{name}"', home,
+                          f"{name} is in the sitemap but nothing on the home page links to it")
+
+    def test_the_sync_guide_is_linked_in_every_language(self) -> None:
+        for lang, meta in build.LANGS.items():
+            index = self.out / meta["dir"] / "index.html"
+            html = index.read_text(encoding="utf-8")
+            self.assertRegex(html, r'href="[^"]*sync\.html"',
+                             f"{lang}: home page does not link to the sync guide")
+
+    def test_english_only_pages_declare_their_language(self) -> None:
+        # Linked from all eight home pages, but written in English only. Saying so
+        # is the difference between "we have no translation" and "this page is
+        # the German one", which is the reading that gets penalised.
+        for meta in build.LANGS.values():
+            html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+            for name in ("obsidian-alternative.html", "obsidian-sync-free.html"):
+                match = re.search(rf'<a href="[^"]*{re.escape(name)}"([^>]*)>', html)
+                self.assertIsNotNone(match, f"{name} not linked")
+                self.assertIn('hreflang="en"', match.group(1),
+                              f"{name} is linked without hreflang=en")

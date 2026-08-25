@@ -39,11 +39,72 @@ struct EditorRenderer {
     var copiedCopyBlock: NSRange?
     /// What is selected, so the highlight can be drawn as continuous bands.
     var selectedRange = NSRange(location: 0, length: 0)
+
+    /// One draw pass asks for the visible range a dozen times — once per element
+    /// it paints — and the answer cannot change between them, because the rect
+    /// and the layout are both fixed for the duration.
+    ///
+    /// Recomputing it each time made things *worse* than the whole-document scan
+    /// it replaced: `glyphRange(forBoundingRect:)` lays out to reach its answer,
+    /// so twelve calls were twelve layout passes, and
+    /// `enumerateLineFragmentsForGlyphRange` went from 31% of the main thread to
+    /// 77%. A reference type, so the memoised value survives being read through
+    /// a `let` copy of this struct.
+    private let visibleRangeCache = VisibleRangeCache()
+
+    private final class VisibleRangeCache {
+        var rect: CGRect?
+        var range = NSRange(location: 0, length: 0)
+    }
     /// Whether this view is the one being typed in, in the window the user is
     /// looking at. A selection in a background pane is still drawn — macOS keeps
     /// showing one, and losing it when you switch apps is disorienting — but in a
     /// muted colour, so the active one is never in doubt.
     var isSelectionActive = true
+
+    /// The characters on screen in `rect`, widened to whole paragraphs.
+    ///
+    /// Used by one caller — `drawSelection`, and only for a selection big enough
+    /// to be worth clipping. It is deliberately *not* used to narrow the other
+    /// draw passes, which was tried and measured and made things worse:
+    ///
+    /// - `boundingRect(forGlyphRange:)` — what those passes ask — lays out the
+    ///   range it is given and nothing else.
+    /// - `glyphRange(forBoundingRect:)` — what this asks — has to know where
+    ///   every line above the rect sits to answer at all, so it lays out
+    ///   sequentially from the top of the document.
+    ///
+    /// Narrowing thirteen cheap questions into one expensive one took
+    /// `EditorRenderer.draw` from a rounding error to **38.5% of the main
+    /// thread** during a sidebar animation. Attribute enumeration over the whole
+    /// storage is O(runs) and costs nothing; the layout is the expensive part,
+    /// and asking about it by rect is the expensive direction.
+    func visibleCharacterRange(in rect: CGRect) -> NSRange {
+        if visibleRangeCache.rect == rect { return visibleRangeCache.range }
+
+        let full = NSRange(location: 0, length: storage.length)
+        guard storage.length > 0 else { return full }
+
+        let target = rect.offsetBy(dx: -origin.x, dy: -origin.y)
+        let glyphs = layoutManager.glyphRange(forBoundingRect: target, in: container)
+        guard glyphs.length > 0 else {
+            visibleRangeCache.rect = rect
+            visibleRangeCache.range = NSRange(location: 0, length: 0)
+            return visibleRangeCache.range
+        }
+
+        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        // Rounded out to paragraph boundaries: a line half off the top of the
+        // screen still has to be painted, and its attribute run starts above the
+        // rect.
+        let text = storage.string as NSString
+        let start = text.paragraphRange(for: NSRange(location: characters.location, length: 0)).location
+        let endOfLast = NSMaxRange(text.paragraphRange(
+            for: NSRange(location: min(NSMaxRange(characters), text.length - 1), length: 0)))
+        visibleRangeCache.rect = rect
+        visibleRangeCache.range = NSRange(location: start, length: max(0, endOfLast - start))
+        return visibleRangeCache.range
+    }
 
     /// Draws every hand-painted element that intersects `rect`.
     ///
@@ -72,7 +133,7 @@ struct EditorRenderer {
     /// counts. Shared, so the two can never disagree.
     func calloutDisclosureRect(for range: NSRange) -> CGRect? {
         let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+        guard glyphRange.length > 0 else { return nil }
         let fragment = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
             .offsetBy(dx: origin.x, dy: origin.y)
         let side: CGFloat = 12
@@ -224,7 +285,7 @@ struct EditorRenderer {
             guard let font else { return }
 
             let glyph = self.layoutManager.glyphIndexForCharacter(at: probe)
-            guard glyph < self.layoutManager.numberOfGlyphs else { return }
+            guard glyph < NSMaxRange(self.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)) else { return }
             let baseline = fragment.minY + self.layoutManager.location(forGlyphAt: glyph).y + self.origin.y
             let top = baseline - font.ascender
             let bottom = baseline - font.descender
@@ -340,7 +401,7 @@ struct EditorRenderer {
         storage.enumerateAttribute(.inkstoneTableSeparator, in: range) { value, pipe, _ in
             guard value != nil else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: pipe, actualCharacterRange: nil)
-            guard glyphRange.location < layoutManager.numberOfGlyphs else { return }
+            guard glyphRange.length > 0 else { return }
             // The glyph's own box, the same way the checkbox hit test finds one.
             // Computing an x from the fragment plus the glyph's offset was tried
             // and put the rules above the table: the fragment had already been
@@ -442,7 +503,21 @@ struct EditorRenderer {
     func drawSelection(in rect: CGRect) {
         guard selectedRange.length > 0 else { return }
 
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+        // A big selection is clipped to what is on screen first: select-all on a
+        // long note otherwise walks every line fragment in the document on every
+        // draw. A small one is not, because working out what is on screen costs
+        // more than drawing the handful of lines it would have saved.
+        let onScreen = selectedRange.length > 20_000
+            ? NSIntersectionRange(selectedRange, visibleCharacterRange(in: rect))
+            : selectedRange
+        guard onScreen.length > 0 else { return }
+        // The whole selection's glyph range, only for deciding whether a line's
+        // highlight runs to the line end. Clipping that test to the visible slice
+        // would drop the tail off the last line on screen.
+        let fullGlyphRange = layoutManager.glyphRange(
+            forCharacterRange: selectedRange, actualCharacterRange: nil)
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: onScreen, actualCharacterRange: nil)
         guard glyphRange.length > 0 else { return }
 
         let colour = isSelectionActive
@@ -475,7 +550,7 @@ struct EditorRenderer {
             // A line the selection continues past is highlighted to its end, so
             // the newline reads as included — which is what every other editor
             // on the platform does.
-            if NSMaxRange(onThisLine) < NSMaxRange(glyphRange) {
+            if NSMaxRange(onThisLine) < NSMaxRange(fullGlyphRange) {
                 band.size.width = max(band.width, used.maxX - band.minX + 6)
             }
             band.size.width = min(band.width, maxWidth - band.minX + self.container.lineFragmentPadding)
@@ -619,7 +694,7 @@ struct EditorRenderer {
         ) { value, range, _ in
             guard value != nil else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-            guard glyphRange.location < layoutManager.numberOfGlyphs else { return }
+            guard glyphRange.length > 0 else { return }
             let box = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
                 .offsetBy(dx: origin.x, dy: origin.y)
             guard box.intersects(rect) else { return }
@@ -675,7 +750,7 @@ struct EditorRenderer {
     /// The panel a block is painted into: the union of its line fragments.
     private func blockPanel(for range: NSRange) -> CGRect? {
         let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+        guard glyphRange.length > 0 else { return nil }
 
         var panel = CGRect.null
         layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in
@@ -1039,7 +1114,7 @@ struct EditorRenderer {
     /// other than the box the user is looking at.
     func checkboxBox(for range: NSRange) -> CGRect? {
         let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-        guard glyphRange.location < layoutManager.numberOfGlyphs else { return nil }
+        guard glyphRange.length > 0 else { return nil }
         let markerRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
             .offsetBy(dx: origin.x, dy: origin.y)
 

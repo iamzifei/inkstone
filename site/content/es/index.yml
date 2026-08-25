@@ -107,6 +107,11 @@ siblings:
   clipstack: Un historial del portapapeles que no estorba
 footer:
   tagline: Una app de notas que deja tus archivos en paz.
+  guides: "Guías"
+  sync_guide: "Guía de sincronización"
+  compare: "Comparado con Obsidian"
+  sync_free: "Sincronizar un vault gratis"
+  privacy: "Privacidad"
   project: Proyecto
   issues: Incidencias
   also: También de la misma mano

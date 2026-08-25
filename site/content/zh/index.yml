@@ -107,6 +107,11 @@ siblings:
   clipstack: 不碍事的剪贴板历史
 footer:
   tagline: 一个不动你文件的笔记应用。
+  guides: "指南"
+  sync_guide: "同步指南"
+  compare: "与 Obsidian 的对比"
+  sync_free: "免费同步知识库"
+  privacy: "隐私"
   project: 项目
   issues: 问题反馈
   also: 同一双手做的其他东西

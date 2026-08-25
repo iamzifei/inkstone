@@ -107,6 +107,11 @@ siblings:
   clipstack: 거슬리지 않는 클립보드 기록
 footer:
   tagline: 당신의 파일을 건드리지 않는 노트 앱.
+  guides: "가이드"
+  sync_guide: "동기화 가이드"
+  compare: "Obsidian과 비교"
+  sync_free: "볼트를 무료로 동기화하기"
+  privacy: "개인정보"
   project: 프로젝트
   issues: 이슈
   also: 같은 사람이 만든 다른 것

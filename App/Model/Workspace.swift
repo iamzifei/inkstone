@@ -143,6 +143,31 @@ final class Workspace {
     private(set) var revealTarget: RevealTarget?
     private var revealToken = 0
 
+    /// A request to find a file in the sidebar's tree: expand every folder above
+    /// it, scroll to it, and let the row's own "is this the open note" styling
+    /// mark it. VS Code calls this Reveal in Explorer, and the reason it exists
+    /// there is the reason it exists here — after following links for a while you
+    /// know what you are reading and not where it lives.
+    ///
+    /// A value with a token rather than a method call, for the same reason as
+    /// `RevealTarget`: the tree is a SwiftUI view several layers down, and the
+    /// way to reach it is to change something it observes. The token makes two
+    /// requests for the same file distinct, so pressing the button twice works
+    /// twice.
+    struct TreeRevealTarget: Equatable {
+        let url: URL
+        let token: Int
+    }
+
+    private(set) var treeReveal: TreeRevealTarget?
+
+    /// Shows `url` in the file tree, switching the sidebar to it first.
+    func revealInTree(_ url: URL) {
+        sidebarSection = .files
+        revealToken += 1
+        treeReveal = TreeRevealTarget(url: url, token: revealToken)
+    }
+
     /// Scrolls the editor to `range` in `url`, opening the note first if needed.
     func reveal(_ range: NSRange, in url: URL) {
         if activeTab?.url != url { openNote(at: url) }

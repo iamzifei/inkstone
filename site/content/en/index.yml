@@ -107,6 +107,11 @@ siblings:
   clipstack: Clipboard history that stays out of the way
 footer:
   tagline: A notes app that leaves your files alone.
+  guides: "Guides"
+  sync_guide: "Sync guide"
+  compare: "Compared with Obsidian"
+  sync_free: "Syncing a vault for free"
+  privacy: "Privacy"
   project: Project
   issues: Issues
   also: Also by the same hand

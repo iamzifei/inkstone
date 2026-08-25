@@ -207,23 +207,60 @@ struct FileTreeView: View {
     @State private var renameText = ""
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 1) {
-                if let tree = workspace.tree, let children = tree.children {
-                    ForEach(children) { node in
-                        FileRow(
-                            node: node,
-                            depth: 0,
-                            expanded: $expanded,
-                            renaming: $renaming,
-                            renameText: $renameText
-                        )
+        ScrollViewReader { scroller in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 1) {
+                    if let tree = workspace.tree, let children = tree.children {
+                        ForEach(children) { node in
+                            FileRow(
+                                node: node,
+                                depth: 0,
+                                expanded: $expanded,
+                                renaming: $renaming,
+                                renameText: $renameText
+                            )
+                        }
                     }
                 }
+                .padding(.vertical, 6)
             }
-            .padding(.vertical, 6)
+            .scrollIndicators(.automatic)
+            .onChange(of: workspace.treeReveal) { _, target in
+                guard let target else { return }
+                reveal(target.url, using: scroller)
+            }
         }
-        .scrollIndicators(.automatic)
+    }
+
+    /// Opens every folder above `url` and scrolls the row into view.
+    ///
+    /// The expansion has to happen before the scroll, and in a `LazyVStack` the
+    /// row does not exist until its parents are open — so the scroll waits for
+    /// one turn of the run loop rather than asking for an id that is not there
+    /// yet.
+    private func reveal(_ url: URL, using scroller: ScrollViewProxy) {
+        guard let root = workspace.root else { return }
+        var folder = url.deletingLastPathComponent()
+        let rootPath = root.path(percentEncoded: false)
+        var ancestors: [URL] = []
+        // Upwards to the vault root, and no further: a path outside the vault
+        // would otherwise walk to `/`.
+        while folder.path(percentEncoded: false).hasPrefix(rootPath),
+              folder.path(percentEncoded: false) != rootPath {
+            ancestors.append(folder)
+            let parent = folder.deletingLastPathComponent()
+            guard parent != folder else { break }
+            folder = parent
+        }
+        expanded.formUnion(ancestors)
+
+        Task { @MainActor in
+            // One hop, so the rows the expansion just created exist to scroll to.
+            await Task.yield()
+            withAnimation(.easeOut(duration: 0.2)) {
+                scroller.scrollTo(url, anchor: .center)
+            }
+        }
     }
 }
 
@@ -294,6 +331,7 @@ private struct FileRow: View {
                 .padding(.horizontal, 4)
         )
         .contentShape(.rect)
+        .id(node.url)
         .onTapGesture {
             if node.isDirectory {
                 if isExpanded { expanded.remove(node.url) } else { expanded.insert(node.url) }

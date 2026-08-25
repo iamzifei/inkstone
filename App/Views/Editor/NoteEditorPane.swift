@@ -82,6 +82,19 @@ struct NoteEditorPane: View {
 
             Spacer()
 
+            Button {
+                workspace.revealInTree(url)
+            } label: {
+                Image(systemName: "sidebar.leading")
+                    .font(.system(size: 12))
+                    .frame(width: 26, height: 22)
+                    .foregroundStyle(style.secondaryText)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help("Find this note in the sidebar (⌥⌘R)")
+            .accessibilityLabel(Text("Reveal in sidebar"))
+
             // A segmented picker shows one tooltip for the whole control, not
             // one per segment, so these are three buttons that look like a
             // picker. Three unlabelled glyphs with nothing explaining them was

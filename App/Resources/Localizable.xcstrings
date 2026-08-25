@@ -1128,6 +1128,29 @@
         }
       }
     },
+    "Find this note in the sidebar (⌥⌘R)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find this note in the sidebar (⌥⌘R)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在左侧文件树中展开并选中这篇笔记（⌥⌘R）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在左側檔案樹中展開並選取這篇筆記（⌥⌘R）"
+          }
+        }
+      }
+    },
     "Fit the whole canvas on screen": {
       "extractionState": "manual",
       "localizations": {
@@ -3125,6 +3148,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "斥力"
+          }
+        }
+      }
+    },
+    "Reveal in Sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in Sidebar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在侧边栏中定位"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在側邊欄中定位"
+          }
+        }
+      }
+    },
+    "Reveal in sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in sidebar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在侧边栏中定位"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在側邊欄中定位"
           }
         }
       }

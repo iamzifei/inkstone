@@ -7,7 +7,7 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
-## Unreleased
+## 0.1.2 — 2026-08-25
 
 ### Graph view
 
@@ -33,6 +33,9 @@ work. This file is the summary; those are the reasoning.
 
 ### Editor
 
+- **Reveal in sidebar** (⌥⌘R, or the button beside the mode picker) expands the
+  file tree down to the note you are reading and scrolls to it. After following
+  links for a while you know what you are reading and not where it lives.
 - **Frontmatter is shown as a properties table** at the top of the note, in file
   order. It used to be concealed outright, and the
   `showFrontmatterAsProperties` setting — on by default, with a toggle in
@@ -52,8 +55,23 @@ work. This file is the summary; those are the reasoning.
   the graph controls, and the three editor modes. Reading mode's says what it
   actually does — locked, not a separate renderer.
 
+### Performance
+
+- **Opening and closing the sidebar is no longer heavy.** `resetCursorRects`
+  scanned the whole document and asked the layout manager for a rect per code
+  block — and AppKit calls it on every tracking-area update, which a split-view
+  animation issues continuously. On a 198KB note it was **54% of the main
+  thread**; it is now **1.6%**, because a cursor rect outside the visible area
+  can never be hovered.
+- A width change no longer triggers a full re-highlight mid-animation. Opening
+  the sidebar moves the text measure ~260pt, crossing the 32pt image-scaling
+  bucket eight times; the pass now waits for the width to stop moving.
+
 ### Website
 
+- **Every page is linked from the home page.** The sync guide, the privacy
+  statement and both landing pages were in the sitemap and in no navigation
+  anywhere — reachable only by knowing the URL.
 - Two landing pages: [an honest Obsidian
   comparison](https://inkslab.app/obsidian-alternative.html), and [what syncing a
   vault actually costs](https://inkslab.app/obsidian-sync-free.html).

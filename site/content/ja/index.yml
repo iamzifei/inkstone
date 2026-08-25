@@ -107,6 +107,11 @@ siblings:
   clipstack: 邪魔をしないクリップボード履歴
 footer:
   tagline: あなたのファイルに手を出さないノートアプリ。
+  guides: "ガイド"
+  sync_guide: "同期ガイド"
+  compare: "Obsidian との比較"
+  sync_free: "保管庫を無料で同期する"
+  privacy: "プライバシー"
   project: プロジェクト
   issues: 課題
   also: 同じ作り手の別のもの
