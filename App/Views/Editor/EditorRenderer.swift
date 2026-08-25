@@ -62,6 +62,11 @@ struct EditorRenderer {
     /// muted colour, so the active one is never in doubt.
     var isSelectionActive = true
 
+    /// Draw a line number beside each line. Off by default, and until now the
+    /// setting had neither a control nor a reader — a field that existed and did
+    /// nothing.
+    var showLineNumbers = false
+
     /// The characters on screen in `rect`, widened to whole paragraphs.
     ///
     /// Used by one caller — `drawSelection`, and only for a selection big enough
@@ -112,6 +117,7 @@ struct EditorRenderer {
     /// behind glyphs, and the checkbox after the bullet so a task in a bulleted
     /// list is not drawn twice.
     func draw(in rect: CGRect) {
+        drawLineNumbers(in: rect)
         drawProperties(in: rect)
         drawBlockFills(in: rect)
         drawHorizontalRules(in: rect)
@@ -483,6 +489,71 @@ struct EditorRenderer {
             // WKWebView snapshot does not always carry a usable `cgImage`.
             image.draw(in: target)
             #endif
+        }
+    }
+
+    /// Width reserved at the left for line numbers, in points.
+    ///
+    /// Fixed rather than measured from the widest number: a gutter that changes
+    /// width as you scroll past line 1000 makes the whole column of text jump.
+    static let lineNumberGutter: CGFloat = 44
+
+    /// Numbers the lines down the left margin.
+    ///
+    /// Only the *visible* fragments, and this is the one place in the class where
+    /// asking by rect is right: without it there is nothing to iterate but the
+    /// whole document, and unlike the other passes there is no attribute run to
+    /// enumerate instead.
+    ///
+    /// Soft-wrapped continuations are left blank. A wrapped paragraph is one
+    /// line of the file however many rows it occupies, and numbering the rows
+    /// would disagree with every other tool the reader uses.
+    func drawLineNumbers(in rect: CGRect) {
+        guard showLineNumbers, storage.length > 0 else { return }
+
+        let text = storage.string as NSString
+        let target = rect.offsetBy(dx: -origin.x, dy: -origin.y)
+        let glyphs = layoutManager.glyphRange(forBoundingRect: target, in: container)
+        guard glyphs.length > 0 else { return }
+
+        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        // Counting newlines from the top is O(characters above the screen), and
+        // it is the only way to know which line the first visible one is.
+        var number = 1
+        if characters.location > 0 {
+            text.enumerateSubstrings(
+                in: NSRange(location: 0, length: characters.location),
+                options: [.byLines, .substringNotRequired]
+            ) { _, _, _, _ in number += 1 }
+        }
+
+        let font = style.typography.codeFont.platformFont(size: style.typography.codeFontSize * 0.85)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: style.palette.faintText.platformColor,
+        ]
+
+        var lastLineStart = -1
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { _, used, _, lineGlyphs, _ in
+            let lineCharacters = self.layoutManager.characterRange(
+                forGlyphRange: lineGlyphs, actualGlyphRange: nil)
+            let paragraph = text.paragraphRange(for: NSRange(location: lineCharacters.location, length: 0))
+            // A soft-wrapped continuation of the paragraph above gets no number.
+            guard paragraph.location != lastLineStart else { return }
+            if lastLineStart >= 0 { number += 1 }
+            lastLineStart = paragraph.location
+
+            let label = "\(number)" as NSString
+            let size = label.size(withAttributes: attributes)
+            let point = CGPoint(
+                // Right-aligned against the text column, so the digits line up.
+                x: self.origin.x + self.container.lineFragmentPadding + 8,
+                y: self.origin.y + used.minY + (used.height - size.height) / 2
+            )
+            var box = CGRect(origin: point, size: size)
+            box.origin.x = self.origin.x + Self.lineNumberGutter - size.width - 12
+            guard box.intersects(rect) else { return }
+            label.draw(at: box.origin, withAttributes: attributes)
         }
     }
 

@@ -35,7 +35,7 @@ features:
     live_preview:
       kicker: Escribir
       title: Vista viva, no una pantalla partida
-      body: Títulos, negritas, citas, avisos, casillas, tablas y código se componen sobre la marcha mientras escribes; la sintaxis solo se asoma en la línea donde está el cursor. El modo lectura es una vista aparte, de solo lectura. La letra del texto, la del código y sus cuerpos se ajustan por separado.
+      body: "Títulos, negritas, citas, avisos, casillas, tablas y código se componen sobre la marcha mientras escribes; la sintaxis solo se asoma en la línea donde está el cursor. El modo lectura es una vista aparte, de solo lectura. La letra del texto, la del código y sus cuerpos se ajustan por separado. En modo lectura los caracteres de sintaxis se eliminan en lugar de ocultarse: un párrafo copiado contiene solo el texto."
       alt: 'El editor de Inkstone en vista viva: un título, un párrafo que mezcla chino y latín, una lista de tareas, una cita, un aviso, una tabla alineada y un bloque de código.'
     links:
       kicker: Enlazar
@@ -55,7 +55,7 @@ features:
     search:
       kicker: Encontrar
       title: Selector difuso, y búsqueda con operadores
-      body: 'Una tecla abre un selector difuso sobre todas las notas. La búsqueda de texto completo entiende tag: y path:, y las etiquetas funcionan en el cuerpo o en el frontmatter, anidadas, en cualquier escritura: #项目/进行中 se indexa exactamente igual que #project/active.'
+      body: "Una tecla abre un selector difuso sobre todas las notas. La búsqueda de texto completo entiende tag: y path:, y las etiquetas funcionan en el cuerpo o en el frontmatter, anidadas, en cualquier escritura: #项目/进行中 se indexa exactamente igual que #project/active. Nada espera, ni en un vault de diez mil notas: la búsqueda corre fuera del hilo principal."
       alt: El selector rápido abierto sobre una nota, filtrando la bóveda carácter a carácter.
     sync:
       kicker: Dos máquinas

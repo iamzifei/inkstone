@@ -606,3 +606,48 @@ struct VaultPathDetectorPerformanceTests {
         #expect(VaultPathDetector.candidates(in: text).count == 100)
     }
 }
+
+/// `outgoing(from:)` is a dictionary lookup now, not a filter over every edge.
+@Suite("Outgoing link index")
+struct OutgoingLinkIndexTests {
+    let root = URL(fileURLWithPath: "/vault")
+
+    private func note(_ path: String, text: String) -> NoteMetadata {
+        NoteParser.parse(text: text, url: root.appending(path: path))
+    }
+
+    @Test("It returns exactly what filtering the edges would have")
+    func matchesTheOldFilter() {
+        // The property that matters when replacing an implementation: the new
+        // one answers the same question. Checked for *every* note, including the
+        // ones with no outgoing links at all.
+        let snapshot = IndexBuilder.assemble([
+            note("A.md", text: "[[B]] then [[C]] then [[Ghost]] and [[B]] again"),
+            note("B.md", text: "[[C]]"),
+            note("C.md", text: "no links here"),
+            note("D.md", text: "[Markdown](C.md)"),
+        ], vaultRoot: root)
+
+        for url in snapshot.notes.keys {
+            #expect(snapshot.outgoing(from: url) == snapshot.edges.filter { $0.source == url })
+        }
+    }
+
+    @Test("Order within a note is document order")
+    func keepsDocumentOrder() {
+        // The inspector lists outgoing links, and a list that reorders itself
+        // between openings of the same note is worse than an unsorted one.
+        let snapshot = IndexBuilder.assemble([
+            note("A.md", text: "[[First]] [[Second]] [[Third]]"),
+        ], vaultRoot: root)
+        let targets = snapshot.outgoing(from: root.appending(path: "A.md")).map(\.unresolvedTarget)
+        #expect(targets == ["First", "Second", "Third"])
+    }
+
+    @Test("A note nothing links out of returns empty, not nil-ish nonsense")
+    func handlesNotesWithNoLinks() {
+        let snapshot = IndexBuilder.assemble([note("Alone.md", text: "plain")], vaultRoot: root)
+        #expect(snapshot.outgoing(from: root.appending(path: "Alone.md")).isEmpty)
+        #expect(snapshot.outgoing(from: root.appending(path: "DoesNotExist.md")).isEmpty)
+    }
+}

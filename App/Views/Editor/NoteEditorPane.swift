@@ -20,7 +20,13 @@ struct NoteEditorPane: View {
                 header(for: document)
                 Divider().overlay(style.divider)
 
-                MarkdownEditorView(
+                if workspace.settings.data.editorMode == .reading {
+                    // A separate view, not the editor with editing switched off.
+                    // The editor's text storage *is* the file, so rendering into
+                    // it would rewrite the note on disk.
+                    ReadingView(markdown: document.text)
+                } else {
+                    MarkdownEditorView(
                     text: $document.text,
                     style: style,
                     mode: workspace.settings.data.editorMode,
@@ -55,9 +61,11 @@ struct NoteEditorPane: View {
                     ),
                     spellCheck: workspace.settings.data.spellCheck,
                     showProperties: workspace.settings.data.showFrontmatterAsProperties,
+                    editing: EditingBehaviour(workspace.settings.data),
                     reveal: workspace.revealTarget?.url == url ? workspace.revealTarget : nil,
                     indexGeneration: workspace.indexGeneration
-                )
+                    )
+                }
 
                 Divider().overlay(style.divider)
                 statusLine(for: document)

@@ -276,6 +276,7 @@ private struct EditorSettings: View {
                 Text("Reading").tag(EditorMode.reading)
             }
             Toggle("Continue lists on Return", isOn: $settings.data.smartLists)
+            Toggle("Show line numbers", isOn: $settings.data.showLineNumbers)
             Toggle("Auto-close brackets and quotes", isOn: $settings.data.autoPairBrackets)
             Toggle("Check spelling", isOn: $settings.data.spellCheck)
             Toggle("Show frontmatter as properties", isOn: $settings.data.showFrontmatterAsProperties)

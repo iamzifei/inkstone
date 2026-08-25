@@ -35,7 +35,7 @@ features:
     live_preview:
       kicker: Schreiben
       title: Live-Vorschau statt geteiltem Fenster
-      body: Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt.
+      body: "Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt. Im Lesemodus sind die Syntaxzeichen entfernt statt versteckt — ein kopierter Absatz enthält nur den Text."
       alt: 'Der Editor von Inkstone mit Live-Vorschau: Überschrift, ein Absatz aus gemischt chinesischer und lateinischer Schrift, eine Checkliste, ein Zitat, ein Callout, eine ausgerichtete Tabelle und ein Codeblock.'
     links:
       kicker: Verknüpfen
@@ -55,7 +55,7 @@ features:
     search:
       kicker: Finden
       title: Unscharfer Umschalter, und Suche mit Operatoren
-      body: 'Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #项目/进行中 wird genau wie #project/active indiziert.'
+      body: "Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #项目/进行中 wird genau wie #project/active indiziert. Auch bei zehntausend Notizen wartet nichts: Die Suche läuft außerhalb des Hauptthreads."
       alt: Der Schnellumschalter über einer Notiz, der den Tresor beim Tippen Zeichen für Zeichen filtert.
     sync:
       kicker: Zwei Geräte

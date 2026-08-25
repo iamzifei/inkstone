@@ -32,6 +32,32 @@ struct EditorActions {
     var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
 
+/// The editing behaviours a reader can switch off.
+///
+/// Grouped rather than passed as five loose booleans because they travel
+/// together through four layers, and four `Bool` parameters in a row is how one
+/// ends up silently swapped for another.
+struct EditingBehaviour: Equatable {
+    var autoPairBrackets = true
+    var smartLists = true
+    var indentWithTabs = false
+    var tabSize = 4
+    var showLineNumbers = false
+
+    init(_ data: SettingsData) {
+        autoPairBrackets = data.autoPairBrackets
+        smartLists = data.smartLists
+        indentWithTabs = data.indentWithTabs
+        tabSize = data.tabSize
+        showLineNumbers = data.showLineNumbers
+    }
+
+    init() {}
+
+    /// What one Tab press inserts.
+    var indentation: String { Indentation.unit(useTabs: indentWithTabs, tabSize: tabSize) }
+}
+
 /// The Markdown editor.
 ///
 /// Wraps the platform text view rather than SwiftUI's `TextEditor` because we
@@ -46,6 +72,7 @@ struct MarkdownEditorView: View {
     var spellCheck: Bool = false
     /// Show a note's frontmatter as a properties table rather than hiding it.
     var showProperties: Bool = true
+    var editing = EditingBehaviour()
     /// A range to scroll into view, set by the outline pane.
     var reveal: Workspace.RevealTarget?
     /// Changes when the vault index is rebuilt, so link resolution can be redone.
@@ -54,7 +81,7 @@ struct MarkdownEditorView: View {
     var body: some View {
         TextViewRepresentable(
             text: $text, style: style, mode: mode, actions: actions,
-            spellCheck: spellCheck, showProperties: showProperties,
+            spellCheck: spellCheck, showProperties: showProperties, editing: editing,
             reveal: reveal, indexGeneration: indexGeneration
         )
         .background(style.background)
@@ -74,6 +101,22 @@ class EditorCoordinator: NSObject {
     /// hard-coded — the preference existed but nothing consulted it.
     var spellCheck: Bool
     var showProperties: Bool
+    /// Editing behaviours that had a switch in Settings and no reader: both ran
+    /// unconditionally, so turning either off did nothing at all.
+    var editingBehaviour: EditingBehaviour {
+        didSet {
+            autoPairBrackets = editingBehaviour.autoPairBrackets
+            smartLists = editingBehaviour.smartLists
+            indentWithTabs = editingBehaviour.indentWithTabs
+            tabSize = editingBehaviour.tabSize
+            showLineNumbers = editingBehaviour.showLineNumbers
+        }
+    }
+    private(set) var autoPairBrackets: Bool
+    private(set) var smartLists: Bool
+    private(set) var indentWithTabs: Bool
+    private(set) var tabSize: Int
+    private(set) var showLineNumbers: Bool
     /// Guards against the re-entrant highlight → didChange → highlight loop.
     var isApplyingAttributes = false
 
@@ -83,7 +126,8 @@ class EditorCoordinator: NSObject {
         mode: EditorMode,
         actions: EditorActions,
         spellCheck: Bool,
-        showProperties: Bool
+        showProperties: Bool,
+        editing: EditingBehaviour
     ) {
         self.text = text
         self.style = style
@@ -91,6 +135,12 @@ class EditorCoordinator: NSObject {
         self.actions = actions
         self.spellCheck = spellCheck
         self.showProperties = showProperties
+        self.editingBehaviour = editing
+        self.autoPairBrackets = editing.autoPairBrackets
+        self.smartLists = editing.smartLists
+        self.indentWithTabs = editing.indentWithTabs
+        self.tabSize = editing.tabSize
+        self.showLineNumbers = editing.showLineNumbers
     }
 
     var highlighter: MarkdownHighlighter {
@@ -315,6 +365,17 @@ class EditorCoordinator: NSObject {
     /// Set by the AppKit coordinator; nil elsewhere.
     var textViewForScrolling: NSTextView? { nil }
     #endif
+
+    /// What Tab should do at `selection`, or nil to let the system handle it.
+    ///
+    /// The rule itself is `Indentation` in the core, where a blank line inside a
+    /// block and a file with both tabs and spaces in it can be tested.
+    func tabEdit(in text: String, selection: NSRange, outdent: Bool) -> (range: NSRange, replacement: String)? {
+        Indentation.edit(
+            in: text, selection: selection, outdent: outdent,
+            useTabs: editingBehaviour.indentWithTabs, tabSize: editingBehaviour.tabSize
+        )
+    }
 
     /// Continues Markdown lists on Return: `- item` → `- `, `1. item` → `2. `,
     /// `- [ ] task` → `- [ ] `. Pressing Return on an empty list item ends the
@@ -729,7 +790,8 @@ final class InkstoneTextView: NSTextView {
             hoveredCopyBlock: hoveredCopyBlock,
             copiedCopyBlock: copiedCopyBlock,
             selectedRange: selectedRange(),
-            isSelectionActive: isSelectionVisible
+            isSelectionActive: isSelectionVisible,
+            showLineNumbers: MainActor.assumeIsolated { coordinator.showLineNumbers }
         ).draw(in: rect)
     }
 
@@ -747,6 +809,34 @@ final class InkstoneTextView: NSTextView {
 
     override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
         [.fileURL, .png, .tiff] + super.readablePasteboardTypes
+    }
+
+    /// Tab and Shift-Tab indent, using the width the reader chose.
+    ///
+    /// Intercepted here rather than in `shouldChangeTextIn`, because AppKit sends
+    /// Tab as a command (`insertTab:`) and never as a text replacement, which is
+    /// why `indentWithTabs` and `tabSize` could sit in Settings for months
+    /// reading as features while doing nothing.
+    override func doCommand(by selector: Selector) {
+        let outdent = selector == #selector(NSStandardKeyBindingResponding.insertBacktab(_:))
+        guard selector == #selector(NSStandardKeyBindingResponding.insertTab(_:)) || outdent,
+              let coordinator,
+              let edit = MainActor.assumeIsolated({
+                  coordinator.tabEdit(in: string, selection: selectedRange(), outdent: outdent)
+              })
+        else {
+            super.doCommand(by: selector)
+            return
+        }
+        guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
+        let hadSelection = selectedRange().length > 0
+        textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
+        didChangeText()
+        // A block indent keeps the block selected so it can be indented again;
+        // a plain insert leaves the caret after what was inserted.
+        setSelectedRange(hadSelection
+                         ? NSRange(location: edit.range.location, length: (edit.replacement as NSString).length)
+                         : NSRange(location: edit.range.location + (edit.replacement as NSString).length, length: 0))
     }
 
     override func resetCursorRects() {
@@ -809,12 +899,13 @@ private struct TextViewRepresentable: NSViewRepresentable {
     let actions: EditorActions
     let spellCheck: Bool
     let showProperties: Bool
+    let editing: EditingBehaviour
     let reveal: Workspace.RevealTarget?
     let indexGeneration: Int
 
     func makeCoordinator() -> MacCoordinator {
         MacCoordinator(text: $text, style: style, mode: mode, actions: actions,
-                       spellCheck: spellCheck, showProperties: showProperties)
+                       spellCheck: spellCheck, showProperties: showProperties, editing: editing)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -910,11 +1001,13 @@ private struct TextViewRepresentable: NSViewRepresentable {
             || coordinator.style.isDark != style.isDark
             || coordinator.mode != mode
             || coordinator.spellCheck != spellCheck
-            || coordinator.showProperties != showProperties {
+            || coordinator.showProperties != showProperties
+            || coordinator.editingBehaviour != editing {
             coordinator.style = style
             coordinator.mode = mode
             coordinator.spellCheck = spellCheck
             coordinator.showProperties = showProperties
+            coordinator.editingBehaviour = editing
             coordinator.applyStyle()
             coordinator.rehighlight()
         }
@@ -972,7 +1065,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let measure = style.typography.isReadableLineWidthEnabled
                 ? min(available - 48, style.typography.readableLineWidth)
                 : available - 48
-            let horizontal = max(24, (available - measure) / 2)
+            // The gutter is a floor on the left inset, not an addition to it:
+            // on a wide window the centring inset is already far wider than the
+            // numbers need, and adding to it would push the text off centre.
+            let floor = showLineNumbers ? EditorRenderer.lineNumberGutter : 24
+            let horizontal = max(floor, (available - measure) / 2)
             textView.textContainerInset = NSSize(width: horizontal, height: 32)
 
             // Inline images are scaled to the measure. Only re-highlight when the
@@ -1097,7 +1194,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
         ) -> Bool {
             guard let replacementString else { return true }
 
-            if replacementString == "\n" {
+            if replacementString == "\n", smartLists {
                 let string = textView.string as NSString
                 let lineRange = string.paragraphRange(for: NSRange(location: affectedCharRange.location, length: 0))
                 let line = string.substring(with: lineRange).trimmingCharacters(in: .newlines)
@@ -1115,7 +1212,8 @@ private struct TextViewRepresentable: NSViewRepresentable {
                 }
             }
 
-            if let closing = EditorCoordinator.pairs[replacementString], affectedCharRange.length == 0 {
+            if autoPairBrackets, let closing = EditorCoordinator.pairs[replacementString],
+               affectedCharRange.length == 0 {
                 textView.insertText(replacementString + closing, replacementRange: affectedCharRange)
                 textView.setSelectedRange(NSRange(location: affectedCharRange.location + 1, length: 0))
                 return false
@@ -1123,7 +1221,8 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
             // Wrap the selection instead of replacing it: select text, press `*`,
             // get `*text*`. Small thing, used constantly.
-            if let closing = EditorCoordinator.pairs[replacementString], affectedCharRange.length > 0 {
+            if autoPairBrackets, let closing = EditorCoordinator.pairs[replacementString],
+               affectedCharRange.length > 0 {
                 let selected = (textView.string as NSString).substring(with: affectedCharRange)
                 textView.insertText(replacementString + selected + closing, replacementRange: affectedCharRange)
                 return false
@@ -1343,7 +1442,8 @@ final class InkstonePhoneTextView: UITextView {
             origin: CGPoint(x: textContainerInset.left, y: textContainerInset.top),
             style: MainActor.assumeIsolated { coordinator.style },
             // No hover on a touch screen; the confirmation still matters.
-            copiedCopyBlock: copiedCopyBlock
+            copiedCopyBlock: copiedCopyBlock,
+            showLineNumbers: MainActor.assumeIsolated { coordinator.showLineNumbers }
         ).draw(in: rect)
     }
 }
@@ -1355,12 +1455,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
     let actions: EditorActions
     let spellCheck: Bool
     let showProperties: Bool
+    let editing: EditingBehaviour
     let reveal: Workspace.RevealTarget?
     let indexGeneration: Int
 
     func makeCoordinator() -> PhoneCoordinator {
         PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions,
-                         spellCheck: spellCheck, showProperties: showProperties)
+                         spellCheck: spellCheck, showProperties: showProperties, editing: editing)
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -1455,11 +1556,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
             || coordinator.style.isDark != style.isDark
             || coordinator.mode != mode
             || coordinator.spellCheck != spellCheck
-            || coordinator.showProperties != showProperties {
+            || coordinator.showProperties != showProperties
+            || coordinator.editingBehaviour != editing {
             coordinator.style = style
             coordinator.mode = mode
             coordinator.spellCheck = spellCheck
             coordinator.showProperties = showProperties
+            coordinator.editingBehaviour = editing
             coordinator.applyStyle()
             coordinator.rehighlight()
         }

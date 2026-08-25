@@ -30,6 +30,7 @@ vault on disk, and is green.
 | Frontmatter as a properties table | ✅ implemented, tested |
 | Plain-text file paths auto-linked | ✅ implemented, tested |
 | Reveal the open note in the file tree | ✅ implemented |
+| Tab indentation, line numbers, link format | ✅ implemented, tested |
 | Quick switcher (fuzzy) + full-text search | ✅ implemented, tested |
 | Graph view — local + whole vault, filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
 | Canvas (JSON Canvas 1.0) | ✅ implemented, tested |
@@ -38,9 +39,9 @@ vault on disk, and is green.
 | Bookmarks, version history, tabs, split view | ✅ implemented |
 | GitHub sync, background sync on iOS | ✅ implemented, tested |
 | Themes, typography, CJK settings | ✅ implemented |
-| i18n (en / 简体 / 繁體) | ✅ 183 strings |
+| i18n (en / 简体 / 繁體) | ✅ 184 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred |
-| Reading-mode renderer | ⚠️ falls back to live preview |
+| Reading-mode renderer | ✅ implemented, tested |
 | Plugin API | ❌ not started |
 
 ## Graph view
@@ -165,10 +166,8 @@ makes every local build fail to sign. The keys are commented in
 already shows an alert instead of failing silently. Create the container, then
 uncomment.
 
-**Reading mode falls back to live preview.** The AST is there — swift-markdown
-parses every note already — but nothing renders it as a separate mode yet: the
-mode's only effect today is that the note is locked against editing, which is
-what its tooltip says rather than promising a renderer that is not there.
+**Reading mode does not draw math, Mermaid diagrams or image embeds.** Live
+preview does. They are listed as absent there rather than half-drawn.
 
 **No UI tests.** `scripts/test-all.sh` covers the engine, the sync end to end,
 the website and a headless smoke run, and says so; what needs a mouse — context

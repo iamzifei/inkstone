@@ -35,7 +35,7 @@ features:
     live_preview:
       kicker: Editing
       title: Live preview, not a split screen
-      body: Headings, bold, quotes, callouts, checkboxes, tables and code all render in place as you type, with the syntax revealed on the line the cursor is on. Reading mode is a separate, read-only view when you want the page without the scaffolding. Body font, code font and their sizes are set independently.
+      body: "Headings, bold, quotes, callouts, checkboxes, tables and code all render in place as you type, with the syntax revealed on the line the cursor is on. Reading mode is a separate, read-only view when you want the page without the scaffolding. Body font, code font and their sizes are set independently. In reading mode the syntax characters are gone rather than hidden, so copying a paragraph gives you prose."
       alt: 'The Inkstone editor showing live preview: a heading, a mixed Chinese-English paragraph, a checklist, a quote, a callout, an aligned table and a code block, all rendered in place.'
     links:
       kicker: Linking
@@ -55,7 +55,7 @@ features:
     search:
       kicker: Finding things
       title: Fuzzy switcher, and search that takes operators
-      body: 'One keystroke opens a fuzzy switcher over every note. Full-text search understands tag: and path:, and tags work inline or in frontmatter, nested, in any script — #项目/进行中 indexes exactly like #project/active.'
+      body: "One keystroke opens a fuzzy switcher over every note. Full-text search understands tag: and path:, and tags work inline or in frontmatter, nested, in any script — #项目/进行中 indexes exactly like #project/active. Both stay out of the way on a vault of ten thousand notes: the search runs off the main thread, so typing never waits for the disk."
       alt: The quick switcher open over a note, filtering the vault as characters are typed.
     sync:
       kicker: Two machines

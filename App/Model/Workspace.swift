@@ -801,12 +801,23 @@ final class Workspace {
     ///
     /// Uses a path relative to the vault root when the file sits in a subfolder,
     /// so the link keeps working if two attachments ever share a name.
-    func embedMarkup(for url: URL) -> String {
+    /// The markup to insert for a file dropped or pasted into `source`.
+    ///
+    /// Honours `newLinkFormat` and `useShortestPathLinks`, which is new — both
+    /// had a control in Settings and no reader at all. The rule itself lives in
+    /// `LinkMarkup`, in the core, where "is this short name still unambiguous?"
+    /// can be tested.
+    func embedMarkup(for url: URL, from source: URL? = nil) -> String {
         guard let root else { return "![[\(url.lastPathComponent)]]" }
-        let relative = url.path.hasPrefix(root.path + "/")
-            ? String(url.path.dropFirst(root.path.count + 1))
-            : url.lastPathComponent
-        return "![[\(relative)]]"
+        return LinkMarkup.markup(
+            for: url,
+            from: source ?? activeTab?.url ?? root,
+            vaultRoot: root,
+            format: settings.data.newLinkFormat,
+            shortest: settings.data.useShortestPathLinks,
+            isEmbed: true,
+            snapshot: index
+        )
     }
 
     /// Resolves an embed target to a file on disk, note or attachment.

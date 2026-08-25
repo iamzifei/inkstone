@@ -3428,6 +3428,29 @@
         }
       }
     },
+    "Show line numbers": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show line numbers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示行号"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示行號"
+          }
+        }
+      }
+    },
     "Show the inspector — properties, backlinks, local graph": {
       "extractionState": "manual",
       "localizations": {

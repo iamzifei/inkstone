@@ -35,7 +35,7 @@ features:
     live_preview:
       kicker: Écrire
       title: Aperçu vivant, pas un écran scindé
-      body: Titres, gras, citations, encadrés, cases à cocher, tableaux et code se composent à mesure que vous tapez ; la syntaxe ne se montre que sur la ligne où se trouve le curseur. Le mode lecture est une vue distincte, en lecture seule. Police du texte, police du code et leurs corps se règlent séparément.
+      body: "Titres, gras, citations, encadrés, cases à cocher, tableaux et code se composent à mesure que vous tapez ; la syntaxe ne se montre que sur la ligne où se trouve le curseur. Le mode lecture est une vue distincte, en lecture seule. Police du texte, police du code et leurs corps se règlent séparément. En mode lecture, les caractères de syntaxe sont supprimés et non masqués : un paragraphe copié ne contient que le texte."
       alt: 'L’éditeur d’Inkstone en aperçu vivant : un titre, un paragraphe mêlant chinois et latin, une liste de tâches, une citation, un encadré, un tableau aligné et un bloc de code.'
     links:
       kicker: Relier
@@ -55,7 +55,7 @@ features:
     search:
       kicker: Retrouver
       title: Sélecteur flou, et recherche à opérateurs
-      body: 'Une frappe ouvre un sélecteur flou sur toutes les notes. La recherche plein texte comprend tag: et path:, et les étiquettes fonctionnent dans le corps comme dans l’en-tête, imbriquées, dans n’importe quelle écriture : #项目/进行中 s’indexe exactement comme #project/active.'
+      body: "Une frappe ouvre un sélecteur flou sur toutes les notes. La recherche plein texte comprend tag: et path:, et les étiquettes fonctionnent dans le corps comme dans l’en-tête, imbriquées, dans n’importe quelle écriture : #项目/进行中 s’indexe exactement comme #project/active. Rien ne fait attendre, même sur un coffre de dix mille notes : la recherche tourne hors du fil principal."
       alt: Le sélecteur rapide ouvert par-dessus une note, filtrant le coffre au fil des caractères saisis.
     sync:
       kicker: Deux machines

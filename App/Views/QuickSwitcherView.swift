@@ -74,11 +74,10 @@ struct QuickSwitcherView: View {
         }
         .frame(minWidth: 440, minHeight: 380)
         .background(style.background)
-        .onAppear {
-            isFieldFocused = true
-            refresh()
-        }
-        .onChange(of: query) { _, _ in refresh() }
+        .onAppear { isFieldFocused = true }
+        // Also covers the first appearance, so the switcher opens showing the
+        // whole vault rather than an empty list.
+        .task(id: query) { await refresh() }
     }
 
     private var createRow: some View {
@@ -94,9 +93,23 @@ struct QuickSwitcherView: View {
         .buttonStyle(.plain)
     }
 
-    private func refresh() {
+    /// Ranks the vault off the main actor.
+    ///
+    /// Measured at **100 ms per keystroke** on an 8,852-note vault, and it ran
+    /// synchronously from `onChange` — so the switcher fell behind the typing on
+    /// exactly the vaults it is most needed in. No debounce here, unlike the
+    /// search pane: this reads no files, and a switcher that waits before showing
+    /// anything is a switcher that feels broken. `.task(id:)` cancels the
+    /// previous ranking when the next character arrives, which is enough.
+    private func refresh() async {
         guard let root = workspace.root else { return }
-        results = SearchEngine.quickSwitch(query: query, in: workspace.index, vaultRoot: root)
+        let snapshot = workspace.index
+        let query = query
+        let ranked = await Task.detached(priority: .userInitiated) {
+            SearchEngine.quickSwitch(query: query, in: snapshot, vaultRoot: root)
+        }.value
+        guard !Task.isCancelled else { return }
+        results = ranked
         highlighted = 0
     }
 

@@ -7,6 +7,56 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.1.3 — 2026-08-25
+
+Four things the 2026-08-25 audit found, done.
+
+### Search no longer waits for the disk
+
+- **Search runs off the main thread, and only after you stop typing.** It used to
+  run synchronously on every keystroke and read every note in the vault: on
+  8,852 notes a query matching nothing cost **783 ms of frozen window**, and
+  every prefix of a real query matches nothing while you type it.
+- **And it is genuinely faster.** Reading the vault in parallel batches, and
+  sorting the note order once when the index is built rather than on every
+  search: a query matching nothing **778 ms → 115 ms**, a query matching plenty
+  **257 ms → 21 ms**.
+- The quick switcher (⌘O) is off the main thread too — it was 100 ms per
+  keystroke.
+
+### Reading mode is a reading mode
+
+Its only effect used to be `isEditable = false`; it rendered identically to live
+preview. Now the Markdown syntax is **removed** rather than hidden, so:
+
+- headings, quotes and frontmatter lose their markers instead of dimming them;
+- a bullet is a bullet, a task is ☐ or ☑, a link reads as what it shows;
+- **copying a paragraph gives prose.** In live preview the syntax characters are
+  still in the document at 0.01pt, so a copy hands back `**bold**`.
+
+It renders into its own view, never into the editor's storage — that storage is
+the file on disk.
+
+### Six settings that were switches wired to nothing
+
+Every one now does what it says, and each has tests:
+
+- **Auto-close brackets** and **Continue lists on Return** ran unconditionally;
+  turning them off did nothing at all.
+- **Tab size** and **Indent with tabs** were read by nothing. Tab and Shift-Tab
+  now indent, including a whole selection, keeping blank lines blank.
+- **New link format** and **Shortest path links** were read by nothing. An
+  inserted link now honours both — and a short name is used only when it is
+  unambiguous, because a bare `[[Plan]]` with two Plans in the vault is a link
+  that silently points at the wrong file.
+- **Show line numbers** was a field with no control at all. It has both.
+
+### Faster
+
+- `outgoing(from:)` filtered every edge in the vault on every call — and the
+  inspector calls it once per note opened. It is a dictionary now, like
+  `backlinks` always was.
+
 ## 0.1.2 — 2026-08-25
 
 ### Graph view

@@ -29,10 +29,25 @@ public struct IndexSnapshot: Sendable {
     /// Lowercased link name (basename or alias) → notes answering to it.
     public var namesToNotes: [String: [URL]] = [:]
     public var edges: [LinkEdge] = []
+    /// Outgoing links keyed by the note they leave, in document order.
+    ///
+    /// `backlinks` has always been a dictionary; `outgoing` used to filter the
+    /// whole `edges` array on every call, which is O(E) — and the inspector calls
+    /// it once for every note opened. Built once in `assemble` instead.
+    public var outgoingLinks: [URL: [LinkEdge]] = [:]
     public var backlinks: [URL: [LinkEdge]] = [:]
     public var tagCounts: [String: Int] = [:]
     /// Link targets that don't resolve to a file, with how many times they appear.
     public var unresolved: [String: Int] = [:]
+    /// Every note, in a stable order, sorted once when the snapshot is built.
+    ///
+    /// `notes` is a dictionary and Swift seeds its iteration order per process,
+    /// so anything that walks the vault and wants reproducible output has to
+    /// sort — and sorting by `url.path` builds a String per comparison. Doing
+    /// that inside search cost more than the search did: it is most of why a
+    /// batched parallel read first came out *slower* than reading one file at a
+    /// time.
+    public var orderedNotes: [URL] = []
 
     public init() {}
 
@@ -41,7 +56,7 @@ public struct IndexSnapshot: Sendable {
     public func metadata(for url: URL) -> NoteMetadata? { notes[url] }
 
     public func outgoing(from url: URL) -> [LinkEdge] {
-        edges.filter { $0.source == url }
+        outgoingLinks[url] ?? []
     }
 
     public func incoming(to url: URL) -> [LinkEdge] {
@@ -152,6 +167,7 @@ public actor IndexBuilder {
                     fragment: link.fragment
                 )
                 snapshot.edges.append(edge)
+                snapshot.outgoingLinks[note.url, default: []].append(edge)
                 if let destination {
                     snapshot.backlinks[destination, default: []].append(edge)
                 } else if !link.target.isEmpty {
@@ -170,9 +186,16 @@ public actor IndexBuilder {
                     fragment: nil
                 )
                 snapshot.edges.append(edge)
+                snapshot.outgoingLinks[note.url, default: []].append(edge)
                 if let destination { snapshot.backlinks[destination, default: []].append(edge) }
             }
         }
+
+        // Once, here, rather than at every call site that wants a stable order.
+        snapshot.orderedNotes = snapshot.notes.keys
+            .map { (path: $0.path(percentEncoded: false), url: $0) }
+            .sorted { $0.path < $1.path }
+            .map(\.url)
 
         return snapshot
     }
