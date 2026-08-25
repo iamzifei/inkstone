@@ -27,6 +27,7 @@ vault on disk, and is green.
 | Rename with link rewriting | ✅ implemented, tested |
 | Tags (inline + frontmatter, nested) | ✅ implemented, tested |
 | Live-preview editor (TextKit) | ✅ implemented |
+| Frontmatter as a properties table | ✅ implemented, tested |
 | Quick switcher (fuzzy) + full-text search | ✅ implemented, tested |
 | Graph view — local + whole vault, filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
 | Canvas (JSON Canvas 1.0) | ✅ implemented, tested |
@@ -35,7 +36,7 @@ vault on disk, and is green.
 | Bookmarks, version history, tabs, split view | ✅ implemented |
 | GitHub sync, background sync on iOS | ✅ implemented, tested |
 | Themes, typography, CJK settings | ✅ implemented |
-| i18n (en / 简体 / 繁體) | ✅ 176 strings |
+| i18n (en / 简体 / 繁體) | ✅ 180 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred |
 | Reading-mode renderer | ⚠️ falls back to live preview |
 | Plugin API | ❌ not started |
@@ -153,7 +154,9 @@ already shows an alert instead of failing silently. Create the container, then
 uncomment.
 
 **Reading mode falls back to live preview.** The AST is there — swift-markdown
-parses every note already — but nothing renders it as a separate mode yet.
+parses every note already — but nothing renders it as a separate mode yet: the
+mode's only effect today is that the note is locked against editing, which is
+what its tooltip says rather than promising a renderer that is not there.
 
 **No UI tests.** `scripts/test-all.sh` covers the engine, the sync end to end,
 the website and a headless smoke run, and says so; what needs a mouse — context

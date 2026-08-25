@@ -74,6 +74,10 @@ struct MarkdownHighlighter {
     /// Text width available for inline images, so a photo is scaled to the
     /// measure rather than overflowing the column.
     var availableWidth: CGFloat = 680
+    /// Draw the frontmatter as a properties table rather than hiding it.
+    /// Mirrors `SettingsData.showFrontmatterAsProperties`, injected rather than
+    /// read directly so the highlighter stays free of app state.
+    var showProperties = true
 
     /// Font size used to visually collapse syntax markers. Zero is rejected by
     /// TextKit, so we use the smallest size that still lays out.
@@ -405,15 +409,21 @@ struct MarkdownHighlighter {
 
         switch token.kind {
         case .frontmatter:
-            // In live preview the properties are already presented by the
-            // inspector, so showing the raw YAML as well pushed the actual note
-            // below the fold on every single file. It reappears in source mode,
-            // and the moment the caret moves onto one of its lines.
+            // Editing it shows the YAML, the same as any other syntax the caret
+            // is sitting in.
             if isBeingEdited {
                 storage.addAttribute(
                     .foregroundColor, value: palette.faintText.platformColor, range: token.range
                 )
                 setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
+            } else if showProperties,
+                      let block = propertiesBlock(for: token.range, in: fullText) {
+                // Otherwise it becomes a properties table, as in Obsidian. It
+                // used to be concealed outright on the grounds that the
+                // inspector already showed the properties — which is only true
+                // when the inspector happens to be open, and left a note's tags
+                // and status invisible the rest of the time.
+                reserveBlock(block, to: storage, in: token.range, fullText: fullText)
             } else {
                 concealLines(token.range)
             }
@@ -1197,6 +1207,56 @@ struct MarkdownHighlighter {
         let last = NSRange(location: range.location + range.length - 1, length: 1)
         storage.addAttribute(.kern, value: image.size.width + 4, range: last)
         storage.addAttribute(.inkstoneInlineMath, value: image, range: range)
+    }
+
+    /// Parses the frontmatter under `range` into a drawable properties table.
+    private func propertiesBlock(for range: NSRange, in fullText: NSString) -> PropertiesBlock? {
+        let source = fullText.substring(with: range)
+        let (frontmatter, _) = FrontmatterParser.parse(source)
+        return PropertiesBlock(frontmatter: frontmatter, source: source, style: style)
+    }
+
+    /// Collapses `range` and reserves `block.height` for the renderer to paint into.
+    ///
+    /// Same mechanism as `inlineImage`: the first line carries the whole height
+    /// and every line after it is flattened, so the reserved space is one gap
+    /// rather than one gap plus a column of empty lines.
+    private func reserveBlock(
+        _ block: PropertiesBlock,
+        to storage: NSTextStorage,
+        in range: NSRange,
+        fullText: NSString
+    ) {
+        guard range.length > 0 else { return }
+
+        let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
+        storage.addAttribute(.font, value: tiny, range: range)
+        storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = block.height
+        paragraph.maximumLineHeight = block.height
+        paragraph.paragraphSpacing = style.typography.paragraphSpacing
+
+        let firstLine = fullText.lineRange(for: NSRange(location: range.location, length: 0))
+        storage.addAttribute(.paragraphStyle, value: paragraph, range: firstLine)
+
+        let flattened = NSMutableParagraphStyle()
+        flattened.minimumLineHeight = 0.01
+        flattened.maximumLineHeight = 0.01
+        flattened.paragraphSpacing = 0
+        flattened.paragraphSpacingBefore = 0
+        var location = NSMaxRange(firstLine)
+        let end = NSMaxRange(range)
+        while location < end {
+            let line = fullText.lineRange(for: NSRange(location: location, length: 0))
+            let clipped = NSRange(location: line.location, length: min(line.length, end - line.location))
+            guard clipped.length > 0 else { break }
+            storage.addAttribute(.paragraphStyle, value: flattened, range: clipped)
+            location = max(NSMaxRange(line), location + 1)
+        }
+
+        storage.addAttribute(.inkstoneProperties, value: block, range: range)
     }
 
     /// Makes room for an inline image and tags the run so the text view can draw it.
@@ -1986,6 +2046,9 @@ extension NSAttributedString.Key {
     static let inkstoneAttachment = NSAttributedString.Key("inkstoneAttachment")
     /// Carries the decoded image for an embed the text view should paint itself.
     static let inkstoneInlineImage = NSAttributedString.Key("inkstoneInlineImage")
+
+    /// The properties table standing in for a note's YAML frontmatter.
+    static let inkstoneProperties = NSAttributedString.Key("inkstoneProperties")
     /// Marks a callout header so its disclosure can be drawn and clicked.
     /// Value is a Bool: whether the callout is currently folded.
     static let inkstoneCalloutFold = NSAttributedString.Key("inkstoneCalloutFold")

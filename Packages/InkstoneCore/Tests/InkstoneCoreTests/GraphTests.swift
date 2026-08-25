@@ -471,3 +471,54 @@ struct GraphPerformanceTests {
         #expect(width < 1_000_000)
     }
 }
+
+/// Frontmatter is shown as a properties table at the top of the note, so the
+/// order the rows come out in is the order the author wrote them.
+@Suite("Note properties")
+struct NotePropertiesTests {
+    @Test("Property rows keep the order they were written in")
+    func keepsFileOrder() {
+        // `Frontmatter.properties` is a dictionary, and Swift seeds its hashing
+        // per process — so reading `keys` directly would reorder someone's own
+        // table differently on every launch. The order comes from the source.
+        let source = """
+        ---
+        status: draft
+        aliases: [第二个名字]
+        tags: [对标, 采集]
+        配套: 对标采集-爬虫需求.md
+        ---
+        """
+        let (frontmatter, _) = FrontmatterParser.parse(source)
+        #expect(NotePropertyOrder.keys(of: frontmatter, in: source)
+                == ["status", "aliases", "tags", "配套"])
+    }
+
+    @Test("A list value indented under its key is still one property")
+    func handlesBlockLists() {
+        let source = """
+        ---
+        tags:
+          - 对标
+          - 采集
+        title: A note
+        ---
+        """
+        let (frontmatter, _) = FrontmatterParser.parse(source)
+        // The `- 对标` lines belong to `tags`; they are not properties of their own.
+        #expect(NotePropertyOrder.keys(of: frontmatter, in: source) == ["tags", "title"])
+    }
+
+    @Test("A key the line scan misses is still listed, not dropped")
+    func doesNotDropQuotedKeys() {
+        let source = """
+        ---
+        "quoted key": yes
+        plain: no
+        ---
+        """
+        let (frontmatter, _) = FrontmatterParser.parse(source)
+        let keys = NotePropertyOrder.keys(of: frontmatter, in: source)
+        #expect(Set(keys) == Set(frontmatter.properties.keys))
+    }
+}

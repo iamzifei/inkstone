@@ -49,6 +49,7 @@ struct NoteEditorPane: View {
                         openAttachment: { openURL($0) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,
+                    showProperties: workspace.settings.data.showFrontmatterAsProperties,
                     reveal: workspace.revealTarget?.url == url ? workspace.revealTarget : nil,
                     indexGeneration: workspace.indexGeneration
                 )
@@ -79,17 +80,58 @@ struct NoteEditorPane: View {
 
             Spacer()
 
-            Picker("", selection: editorModeBinding) {
-                Image(systemName: "eye").tag(EditorMode.livePreview)
-                Image(systemName: "chevron.left.forwardslash.chevron.right").tag(EditorMode.source)
-                Image(systemName: "book").tag(EditorMode.reading)
+            // A segmented picker shows one tooltip for the whole control, not
+            // one per segment, so these are three buttons that look like a
+            // picker. Three unlabelled glyphs with nothing explaining them was
+            // the complaint — and the third, reading mode, is the one nobody
+            // guesses.
+            HStack(spacing: 0) {
+                modeButton(.livePreview, symbol: "eye",
+                           help: "Live preview — formatting shown, syntax only on the line you're editing")
+                modeButton(.source, symbol: "chevron.left.forwardslash.chevron.right",
+                           help: "Source — the raw Markdown exactly as it is on disk")
+                modeButton(.reading, symbol: "book",
+                           help: "Reading — the same as live preview but locked, so nothing is changed by a stray keystroke")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 130)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(style.secondaryBackground)
+            )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    private func modeButton(
+        _ target: EditorMode,
+        symbol: String,
+        help: LocalizedStringKey
+    ) -> some View {
+        let isActive = workspace.settings.data.editorMode == target
+        return Button {
+            workspace.settings.data.editorMode = target
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 12))
+                .frame(width: 38, height: 22)
+                .foregroundStyle(isActive ? Color.white : style.secondaryText)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isActive ? style.accent : .clear)
+                )
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(Text(label(for: target)))
+    }
+
+    private func label(for mode: EditorMode) -> LocalizedStringKey {
+        switch mode {
+        case .livePreview: "Live preview"
+        case .source: "Source"
+        case .reading: "Reading"
+        }
     }
 
     private var editorModeBinding: Binding<EditorMode> {

@@ -37,6 +37,13 @@ struct EditorRenderer {
     /// moment afterwards, because a copy that gives no acknowledgement leaves
     /// you wondering whether it happened.
     var copiedCopyBlock: NSRange?
+    /// What is selected, so the highlight can be drawn as continuous bands.
+    var selectedRange = NSRange(location: 0, length: 0)
+    /// Whether this view is the one being typed in, in the window the user is
+    /// looking at. A selection in a background pane is still drawn — macOS keeps
+    /// showing one, and losing it when you switch apps is disorienting — but in a
+    /// muted colour, so the active one is never in doubt.
+    var isSelectionActive = true
 
     /// Draws every hand-painted element that intersects `rect`.
     ///
@@ -44,10 +51,15 @@ struct EditorRenderer {
     /// behind glyphs, and the checkbox after the bullet so a task in a bulleted
     /// list is not drawn twice.
     func draw(in rect: CGRect) {
+        drawProperties(in: rect)
         drawBlockFills(in: rect)
         drawHorizontalRules(in: rect)
         drawInlineImages(in: rect)
         drawInlineFills(in: rect)
+        // After the fills, so a selected code block or inline chip still reads as
+        // selected; before the glyphs and the drawn furniture, so the text and
+        // the bullets stay on top of it.
+        drawSelection(in: rect)
         drawBullets(in: rect)
         drawQuoteRules(in: rect)
         drawCheckboxes(in: rect)
@@ -410,6 +422,168 @@ struct EditorRenderer {
             // WKWebView snapshot does not always carry a usable `cgImage`.
             image.draw(in: target)
             #endif
+        }
+    }
+
+    /// Paints the selection as one continuous band per visual line.
+    ///
+    /// AppKit's own selection is a *text attribute background*: the layout
+    /// manager fills a rect per glyph run, using each run's own metrics. In an
+    /// ordinary text view that is invisible; in this one it is not. Live preview
+    /// collapses syntax markers to a 0.01pt clear font and gives whole lines a
+    /// 0.01pt line height, and code blocks and headings each carry their own line
+    /// height — so the per-run rects came out at wildly different heights and
+    /// widths, and a selection dragged down the page arrived as a row of ragged,
+    /// disconnected pink bars with gaps between them.
+    ///
+    /// `enumerateEnclosingRects` asks the layout manager the question actually
+    /// being asked — "what area does this selection cover" — and answers it per
+    /// line fragment rather than per run, which is what makes the band continuous.
+    func drawSelection(in rect: CGRect) {
+        guard selectedRange.length > 0 else { return }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+        guard glyphRange.length > 0 else { return }
+
+        let colour = isSelectionActive
+            ? style.palette.selection.platformColor.withAlphaComponent(0.85)
+            : style.palette.divider.platformColor.withAlphaComponent(0.7)
+        colour.setFill()
+
+        layoutManager.enumerateEnclosingRects(
+            forGlyphRange: glyphRange,
+            withinSelectedGlyphRange: glyphRange,
+            in: container
+        ) { band, _ in
+            var band = band.offsetBy(dx: origin.x, dy: origin.y)
+            guard band.intersects(rect) else { return }
+
+            // A collapsed line — hidden frontmatter, a table's separator row —
+            // is a hairline the selection has no business drawing. It carries no
+            // text anyone can see, and a 1pt stripe across the page reads as a
+            // rendering fault rather than as a selection.
+            guard band.height > 3 else { return }
+
+            // Trailing whitespace can push the band a long way past the text on a
+            // wrapped line; clamp it to the measure so the right edge stays
+            // straight down the page.
+            band.size.width = min(band.width, container.size.width - container.lineFragmentPadding * 2)
+            PlatformBezierPath(roundedRect: band.insetBy(dx: 0, dy: 0.5), cornerRadius: 3).fill()
+        }
+    }
+
+    /// Paints the properties table into the space reserved where a note's
+    /// frontmatter is.
+    ///
+    /// See `PropertiesBlock` for why this is hand-drawn rather than a text
+    /// attachment: the text storage is the file, and the file must not gain
+    /// characters the author did not type.
+    func drawProperties(in rect: CGRect) {
+        storage.enumerateAttribute(
+            .inkstoneProperties,
+            in: NSRange(location: 0, length: storage.length)
+        ) { value, range, _ in
+            guard let block = MainActor.assumeIsolated({ value as? PropertiesBlock }) else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard lineRect.intersects(rect) else { return }
+
+            let inset = container.lineFragmentPadding
+            let panel = CGRect(
+                x: origin.x + inset,
+                y: lineRect.minY,
+                width: max(0, container.size.width - inset * 2),
+                height: block.height
+            )
+            MainActor.assumeIsolated { draw(block, in: panel) }
+        }
+    }
+
+    @MainActor
+    private func draw(_ block: PropertiesBlock, in panel: CGRect) {
+        let palette = style.palette
+
+        // A rule under the table rather than a filled card: the properties are
+        // part of the note, not a box bolted to the top of it, and a filled
+        // panel at the very top of every file is a lot of furniture before the
+        // first sentence.
+        palette.divider.platformColor.setFill()
+        CGRect(x: panel.minX, y: panel.maxY - 1, width: panel.width, height: 1).fillPlatform()
+
+        var y = panel.minY + PropertiesBlock.verticalPadding
+        let keyAttributes: [NSAttributedString.Key: Any] = [
+            .font: block.font,
+            .foregroundColor: palette.secondaryText.platformColor,
+        ]
+        let valueAttributes: [NSAttributedString.Key: Any] = [
+            .font: block.font,
+            .foregroundColor: palette.text.platformColor,
+        ]
+
+        for row in block.rows {
+            let keyRect = CGRect(
+                x: panel.minX,
+                y: y,
+                width: PropertiesBlock.keyColumnWidth - 12,
+                height: block.rowHeight
+            )
+            (row.key as NSString).draw(in: keyRect, withAttributes: keyAttributes)
+
+            let valueX = panel.minX + PropertiesBlock.keyColumnWidth
+            let available = max(0, panel.maxX - valueX)
+
+            if row.asChips.isEmpty {
+                (row.value as NSString).draw(
+                    in: CGRect(x: valueX, y: y, width: available, height: block.rowHeight),
+                    withAttributes: valueAttributes
+                )
+            } else {
+                drawChips(row.asChips, from: CGPoint(x: valueX, y: y), width: available, block: block)
+            }
+            y += block.rowHeight + PropertiesBlock.rowSpacing
+        }
+    }
+
+    /// Draws a row of values as pills, the way tags read everywhere else.
+    ///
+    /// Clipped to one line: a note with forty tags would otherwise push its own
+    /// first paragraph off the screen, and the height was reserved for one row.
+    @MainActor
+    private func drawChips(_ chips: [String], from origin: CGPoint, width: CGFloat, block: PropertiesBlock) {
+        let palette = style.palette
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: block.font,
+            .foregroundColor: palette.tag.platformColor,
+        ]
+        var x = origin.x
+
+        for (index, chip) in chips.enumerated() {
+            let text = chip as NSString
+            let size = text.size(withAttributes: attributes)
+            let pill = CGRect(
+                x: x,
+                y: origin.y - PropertiesBlock.chipPaddingY,
+                width: size.width + PropertiesBlock.chipPaddingX * 2,
+                height: block.rowHeight + PropertiesBlock.chipPaddingY
+            )
+            // Out of room: say how many are left rather than running off the edge.
+            guard pill.maxX <= origin.x + width else {
+                let remaining = "+\(chips.count - index)" as NSString
+                remaining.draw(
+                    at: CGPoint(x: x, y: origin.y),
+                    withAttributes: [.font: block.font, .foregroundColor: palette.faintText.platformColor]
+                )
+                return
+            }
+
+            let path = PlatformBezierPath(roundedRect: pill, cornerRadius: pill.height / 2)
+            palette.tag.platformColor.withAlphaComponent(0.14).setFill()
+            path.fill()
+            text.draw(at: CGPoint(x: pill.minX + PropertiesBlock.chipPaddingX, y: origin.y),
+                      withAttributes: attributes)
+
+            x = pill.maxX + PropertiesBlock.chipSpacing
         }
     }
 

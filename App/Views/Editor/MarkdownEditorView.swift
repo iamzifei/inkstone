@@ -40,6 +40,8 @@ struct MarkdownEditorView: View {
     let mode: EditorMode
     let actions: EditorActions
     var spellCheck: Bool = false
+    /// Show a note's frontmatter as a properties table rather than hiding it.
+    var showProperties: Bool = true
     /// A range to scroll into view, set by the outline pane.
     var reveal: Workspace.RevealTarget?
     /// Changes when the vault index is rebuilt, so link resolution can be redone.
@@ -48,7 +50,8 @@ struct MarkdownEditorView: View {
     var body: some View {
         TextViewRepresentable(
             text: $text, style: style, mode: mode, actions: actions,
-            spellCheck: spellCheck, reveal: reveal, indexGeneration: indexGeneration
+            spellCheck: spellCheck, showProperties: showProperties,
+            reveal: reveal, indexGeneration: indexGeneration
         )
         .background(style.background)
     }
@@ -66,15 +69,24 @@ class EditorCoordinator: NSObject {
     /// Whether the system spell checker runs. Read from settings rather than
     /// hard-coded — the preference existed but nothing consulted it.
     var spellCheck: Bool
+    var showProperties: Bool
     /// Guards against the re-entrant highlight → didChange → highlight loop.
     var isApplyingAttributes = false
 
-    init(text: Binding<String>, style: Style, mode: EditorMode, actions: EditorActions, spellCheck: Bool) {
+    init(
+        text: Binding<String>,
+        style: Style,
+        mode: EditorMode,
+        actions: EditorActions,
+        spellCheck: Bool,
+        showProperties: Bool
+    ) {
         self.text = text
         self.style = style
         self.mode = mode
         self.actions = actions
         self.spellCheck = spellCheck
+        self.showProperties = showProperties
     }
 
     var highlighter: MarkdownHighlighter {
@@ -82,6 +94,7 @@ class EditorCoordinator: NSObject {
         highlighter.resolveAttachment = actions.resolveAttachment
         highlighter.resolveNoteEmbed = actions.resolveNoteEmbed
         highlighter.availableWidth = inlineImageWidth
+        highlighter.showProperties = showProperties
         return highlighter
     }
 
@@ -499,7 +512,23 @@ final class InkstoneTextView: NSTextView {
         // A tracking area with `.mouseMoved` is documented to deliver without
         // this, but setting it costs nothing and removes the doubt.
         window?.acceptsMouseMovedEvents = true
+
+        // The selection is drawn by hand, and an active one is a different
+        // colour from an inactive one, so both edges of the window's key state
+        // have to repaint. AppKit would have done this for its own selection.
+        for observer in keyStateObservers { NotificationCenter.default.removeObserver(observer) }
+        keyStateObservers = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification]
+            .map { name in
+                NotificationCenter.default.addObserver(
+                    forName: name, object: window, queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.needsDisplay = true }
+                }
+            }
     }
+
+    /// Held so they can be replaced when the view moves to another window.
+    private var keyStateObservers: [any NSObjectProtocol] = []
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -643,6 +672,35 @@ final class InkstoneTextView: NSTextView {
     /// than with `NSTextAttachment`: the layout manager only renders attachments
     /// for the U+FFFC character, and adding one to the note's text would change
     /// the file on disk.
+    /// Whether the selection is the *active* one: this view is being typed in,
+    /// in the window the user is looking at. An inactive selection is still
+    /// drawn, in a muted colour, as everywhere else on the platform.
+    private var isSelectionVisible: Bool {
+        window?.isKeyWindow == true && window?.firstResponder === self
+    }
+
+    /// The selection is drawn by hand, so the view has to be told to repaint
+    /// when it moves — AppKit only invalidates what *its* own selection drawing
+    /// would have covered, which is nothing now.
+    override func setSelectedRanges(
+        _ ranges: [NSValue],
+        affinity: NSSelectionAffinity,
+        stillSelecting: Bool
+    ) {
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        needsDisplay = true
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        defer { needsDisplay = true }
+        return super.becomeFirstResponder()
+    }
+
+    override func resignFirstResponder() -> Bool {
+        defer { needsDisplay = true }
+        return super.resignFirstResponder()
+    }
+
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
         guard let storage = textStorage, let layoutManager, let container = textContainer else { return }
@@ -656,7 +714,9 @@ final class InkstoneTextView: NSTextView {
             origin: textContainerOrigin,
             style: MainActor.assumeIsolated { coordinator.style },
             hoveredCopyBlock: hoveredCopyBlock,
-            copiedCopyBlock: copiedCopyBlock
+            copiedCopyBlock: copiedCopyBlock,
+            selectedRange: selectedRange(),
+            isSelectionActive: isSelectionVisible
         ).draw(in: rect)
     }
 
@@ -719,11 +779,13 @@ private struct TextViewRepresentable: NSViewRepresentable {
     let mode: EditorMode
     let actions: EditorActions
     let spellCheck: Bool
+    let showProperties: Bool
     let reveal: Workspace.RevealTarget?
     let indexGeneration: Int
 
     func makeCoordinator() -> MacCoordinator {
-        MacCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
+        MacCoordinator(text: $text, style: style, mode: mode, actions: actions,
+                       spellCheck: spellCheck, showProperties: showProperties)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -818,10 +880,12 @@ private struct TextViewRepresentable: NSViewRepresentable {
         if coordinator.style.typography != style.typography
             || coordinator.style.isDark != style.isDark
             || coordinator.mode != mode
-            || coordinator.spellCheck != spellCheck {
+            || coordinator.spellCheck != spellCheck
+            || coordinator.showProperties != showProperties {
             coordinator.style = style
             coordinator.mode = mode
             coordinator.spellCheck = spellCheck
+            coordinator.showProperties = showProperties
             coordinator.applyStyle()
             coordinator.rehighlight()
         }
@@ -849,8 +913,13 @@ private struct TextViewRepresentable: NSViewRepresentable {
         func applyStyle() {
             guard let textView else { return }
             textView.insertionPointColor = style.palette.accent.platformColor
+            // Clear, because the selection is drawn by `EditorRenderer` instead.
+            // AppKit's own is a per-glyph-run background, and in a live-preview
+            // layout — where syntax markers are 0.01pt and every block has its
+            // own line height — those runs came out at different heights and left
+            // the selection looking like a row of disconnected bars.
             textView.selectedTextAttributes = [
-                .backgroundColor: style.palette.selection.platformColor
+                .backgroundColor: PlatformColor.clear
             ]
             textView.isContinuousSpellCheckingEnabled = spellCheck && mode != .reading
 
@@ -1235,11 +1304,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
     let mode: EditorMode
     let actions: EditorActions
     let spellCheck: Bool
+    let showProperties: Bool
     let reveal: Workspace.RevealTarget?
     let indexGeneration: Int
 
     func makeCoordinator() -> PhoneCoordinator {
-        PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions, spellCheck: spellCheck)
+        PhoneCoordinator(text: $text, style: style, mode: mode, actions: actions,
+                         spellCheck: spellCheck, showProperties: showProperties)
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -1333,10 +1404,12 @@ private struct TextViewRepresentable: UIViewRepresentable {
         if coordinator.style.typography != style.typography
             || coordinator.style.isDark != style.isDark
             || coordinator.mode != mode
-            || coordinator.spellCheck != spellCheck {
+            || coordinator.spellCheck != spellCheck
+            || coordinator.showProperties != showProperties {
             coordinator.style = style
             coordinator.mode = mode
             coordinator.spellCheck = spellCheck
+            coordinator.showProperties = showProperties
             coordinator.applyStyle()
             coordinator.rehighlight()
         }

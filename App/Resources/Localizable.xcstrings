@@ -2048,6 +2048,52 @@
         }
       }
     },
+    "Live preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时预览"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時預覽"
+          }
+        }
+      }
+    },
+    "Live preview — formatting shown, syntax only on the line you're editing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live preview — formatting shown, syntax only on the line you're editing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时预览——显示排版效果，只在光标所在行显示语法符号"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時預覽——顯示排版效果，只在游標所在行顯示語法符號"
+          }
+        }
+      }
+    },
     "Local graph": {
       "extractionState": "manual",
       "localizations": {
@@ -2922,6 +2968,29 @@
         }
       }
     },
+    "Reading — the same as live preview but locked, so nothing is changed by a stray keystroke": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading — the same as live preview but locked, so nothing is changed by a stray keystroke"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阅读——和实时预览一样，但锁定不可编辑，误触也改不到内容"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閱讀——和即時預覽一樣，但鎖定不可編輯，誤觸也改不到內容"
+          }
+        }
+      }
+    },
     "Rebuild the graph and lay it out again": {
       "extractionState": "manual",
       "localizations": {
@@ -3401,6 +3470,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "原始碼模式"
+          }
+        }
+      }
+    },
+    "Source — the raw Markdown exactly as it is on disk": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source — the raw Markdown exactly as it is on disk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源码——磁盘上原样的 Markdown"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始碼——磁碟上原樣的 Markdown"
           }
         }
       }
