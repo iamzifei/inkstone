@@ -201,37 +201,47 @@ struct ReadingRendererTests {
         #expect(!text.contains("[!note]"))
     }
 
-    @Test("A table becomes columns that line up")
+    @Test("A table's cells come out as a grid")
     func rendersTables() {
-        // `| --- | --- |` carries no content — it exists to tell a parser where
-        // the header ends. Showing it to a reader is showing them scaffolding.
-        let text = rendered("| one | two |\n| --- | --- |\n| a | b |")
-        #expect(text.contains("one"))
-        #expect(text.contains("a"))
-        #expect(!text.contains("---"))
-        #expect(!text.contains("|"))
+        // `| --- | --- |` carries no content of its own — it says where the
+        // header ends, which is the one thing kept from it.
+        let parsed = ReadingRenderer.tableRows("| one | two |\n| --- | --- |\n| a | b |")
+        #expect(parsed?.rows == [["one", "two"], ["a", "b"]])
+        #expect(parsed?.headerRows == 1)
     }
 
-    @Test("Columns line up when the cells are Chinese")
-    func alignsWideCharacters() {
-        // A CJK character is two columns wide in a monospaced font. Padding one
-        // as though it were one column leaves every column after it out of true,
-        // which is the entire point of laying the table out at all.
-        //
-        // `列一` is four columns, so `a` is padded to four and both second cells
-        // begin at column seven.
-        #expect(ReadingRenderer.alignedTable("| 列一 | b |\n| --- | --- |\n| a | 乙 |")
-                == "列一  b\na     乙")
+    @Test("A table with no alignment row has no header")
+    func handlesTablesWithoutAHeaderRule() {
+        #expect(ReadingRenderer.tableRows("| a | b |\n| c | d |")?.headerRows == 0)
+    }
+
+    @Test("A ragged row is squared off")
+    func squaresRaggedRows() {
+        // A short row would otherwise leave the table a column open, and
+        // `NSTextTable` would lay out a hole where the cell should be.
+        let parsed = ReadingRenderer.tableRows("| a | b | c |\n| --- | --- | --- |\n| x |")
+        #expect(parsed?.rows == [["a", "b", "c"], ["x", "", ""]])
     }
 
     @Test("Something that is not a table is left alone")
     func leavesNonTablesAlone() {
-        // A single `|` in prose, and a block with a blank line through the
-        // middle, are not tables and must not be rearranged as though they were.
-        #expect(ReadingRenderer.alignedTable("| just one row |") == nil)
-        #expect(ReadingRenderer.alignedTable("| a |\n\n| b |") == nil)
-        #expect(ReadingRenderer.alignedTable("not a table at all") == nil)
+        // A single row, a block with a blank line through it, and prose with a
+        // pipe in it are not tables and must not be rearranged as though they were.
+        #expect(ReadingRenderer.tableRows("| just one row |") == nil)
+        #expect(ReadingRenderer.tableRows("| a |\n\n| b |") == nil)
+        #expect(ReadingRenderer.tableRows("not a table at all") == nil)
     }
+
+    @Test("Cell text survives whatever is in it")
+    func keepsCellContents() {
+        // Whatever a cell holds ends up in the grid. How wide a CJK glyph is on
+        // screen is the view's problem, and deliberately not the parser's: this
+        // used to pad by counting characters, and a CJK glyph in a monospaced
+        // font is 1.61× an ASCII one, not 2×.
+        let parsed = ReadingRenderer.tableRows("| 列一 | b |\n| --- | --- |\n| a | 乙 |")
+        #expect(parsed?.rows == [["列一", "b"], ["a", "乙"]])
+    }
+
 
     @Test("A display formula keeps its maths and loses its fences")
     func rendersDisplayMath() {

@@ -7,6 +7,15 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.1.5 — 2026-08-26
+
+- **Tables in reading mode are drawn with rules.** A real `NSTextTable` on macOS;
+  on iOS, tab stops placed by measuring each cell. Not box-drawing characters —
+  a CJK glyph in a monospaced font is 1.61× the width of an ASCII one rather than
+  2×, because the font has no CJK and the fallback is not a multiple of its
+  advance, so a table padded by counting characters lines up in a string and not
+  on screen.
+
 ## 0.1.4 — 2026-08-26
 
 ### Reading mode renders everything

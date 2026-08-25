@@ -163,17 +163,7 @@ enum ReadingTypesetter {
                 result.addAttribute(.foregroundColor,
                                     value: palette.secondaryText.platformColor, range: span.range)
             case .table:
-                // Same reason as a code block: one paragraph per row.
-                let rows = NSMutableParagraphStyle()
-                rows.lineHeightMultiple = 1.2
-                rows.paragraphSpacing = 0
-                rows.paragraphSpacingBefore = 0
-                result.addAttribute(.paragraphStyle, value: rows, range: span.range)
-                result.addAttribute(
-                    .font,
-                    value: typography.codeFont.platformFont(size: typography.codeFontSize),
-                    range: span.range
-                )
+                break   // rebuilt as a real table below
 
             case .properties:
                 // A note's own metadata, set as the aside it is: smaller, quieter
@@ -195,12 +185,152 @@ enum ReadingTypesetter {
                 break
             }
         }
+        drawTables(into: result, document: document, style: style)
         drawAttachments(
             into: result, document: document, style: style,
             resolveAttachment: resolveAttachment, availableWidth: availableWidth
         )
         return result
     }
+
+    /// Rebuilds each table as a real `NSTextTable`, with rules.
+    ///
+    /// Not box-drawing characters, which was the first attempt: a CJK glyph in a
+    /// monospaced font is 1.61× the width of an ASCII one, not 2×, because the
+    /// font has no CJK and the fallback is not a multiple of its advance. A table
+    /// padded by counting characters lines up perfectly in a string and not at
+    /// all on screen. TextKit lays out a real table by measuring, so a column of
+    /// mixed Chinese and English comes out square.
+    ///
+    /// Back to front, so the ranges of the tables not yet replaced stay valid.
+    private static func drawTables(
+        into result: NSMutableAttributedString,
+        document: ReadingDocument,
+        style: Style
+    ) {
+        let tables = document.spans.filter { $0.style == .table }
+        for span in tables.sorted(by: { $0.range.location > $1.range.location }) {
+            guard NSMaxRange(span.range) <= result.length else { continue }
+            let source = (document.text as NSString).substring(with: span.range)
+            guard let parsed = ReadingRenderer.tableRows(source) else { continue }
+
+            guard let built = table(parsed.rows, headerRows: parsed.headerRows, style: style)
+            else { continue }
+            result.replaceCharacters(in: span.range, with: built)
+        }
+    }
+
+    #if os(macOS)
+    /// A real `NSTextTable`: TextKit measures the columns and draws the rules.
+    private static func table(
+        _ rows: [[String]], headerRows: Int, style: Style
+    ) -> NSAttributedString? {
+        let table = NSTextTable()
+        table.numberOfColumns = rows.first?.count ?? 0
+        table.layoutAlgorithm = .automaticLayoutAlgorithm
+        table.collapsesBorders = true
+        guard table.numberOfColumns > 0 else { return nil }
+
+        let built = NSMutableAttributedString()
+        for (rowIndex, row) in rows.enumerated() {
+            for (columnIndex, cell) in row.enumerated() {
+                let block = NSTextTableBlock(
+                    table: table, startingRow: rowIndex, rowSpan: 1,
+                    startingColumn: columnIndex, columnSpan: 1
+                )
+                block.setBorderColor(style.palette.divider.platformColor)
+                block.setWidth(1, type: .absoluteValueType, for: .border)
+                block.setWidth(6, type: .absoluteValueType, for: .padding)
+
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.textBlocks = [block]
+                paragraph.paragraphSpacing = 0
+                paragraph.paragraphSpacingBefore = 0
+
+                // The newline is what ends a cell; TextKit needs one per cell.
+                built.append(NSAttributedString(string: cell + "\n", attributes: [
+                    .font: style.typography.editorFont.platformFont(
+                        size: style.typography.editorFontSize,
+                        weight: rowIndex < headerRows ? .semibold : .regular),
+                    .foregroundColor: style.palette.text.platformColor,
+                    .paragraphStyle: paragraph,
+                ]))
+            }
+        }
+        return built
+    }
+    #else
+    /// UIKit has no `NSTextTable`, so the columns are held apart by tab stops
+    /// and separated by a rule character.
+    ///
+    /// The stops are placed by *measuring* each cell, not by counting its
+    /// characters — the same reason the Mac side uses a real table. A vertical
+    /// bar between columns and a rule under the header is not a drawn table, but
+    /// it is a table with lines in it, and it is square.
+    private static func table(
+        _ rows: [[String]], headerRows: Int, style: Style
+    ) -> NSAttributedString? {
+        let columns = rows.first?.count ?? 0
+        guard columns > 0 else { return nil }
+
+        let body = style.typography.editorFont.platformFont(size: style.typography.editorFontSize)
+        let header = style.typography.editorFont.platformFont(
+            size: style.typography.editorFontSize, weight: .semibold)
+
+        func width(_ text: String, _ font: PlatformFont) -> CGFloat {
+            (text as NSString).size(withAttributes: [.font: font]).width
+        }
+
+        var widths = [CGFloat](repeating: 0, count: columns)
+        for (rowIndex, row) in rows.enumerated() {
+            for (columnIndex, cell) in row.enumerated() where columnIndex < columns {
+                widths[columnIndex] = max(widths[columnIndex],
+                                          width(cell, rowIndex < headerRows ? header : body))
+            }
+        }
+
+        let gutter: CGFloat = 18
+        var stops: [NSTextTab] = []
+        var x: CGFloat = 0
+        for columnWidth in widths.dropLast() {
+            x += columnWidth + gutter
+            stops.append(NSTextTab(textAlignment: .left, location: x, options: [:]))
+        }
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.tabStops = stops
+        paragraph.defaultTabInterval = 40
+        paragraph.paragraphSpacing = 0
+        paragraph.paragraphSpacingBefore = 0
+
+        let built = NSMutableAttributedString()
+        for (rowIndex, row) in rows.enumerated() {
+            let isHeader = rowIndex < headerRows
+            built.append(NSAttributedString(
+                string: row.joined(separator: "\t") + "\n",
+                attributes: [
+                    .font: isHeader ? header : body,
+                    .foregroundColor: style.palette.text.platformColor,
+                    .paragraphStyle: paragraph,
+                ]
+            ))
+            if isHeader, rowIndex == headerRows - 1 {
+                // A rule under the header, as wide as the widest row.
+                let total = widths.reduce(0, +) + gutter * CGFloat(columns - 1)
+                let dashes = max(4, Int(total / max(1, width("─", body))))
+                built.append(NSAttributedString(
+                    string: String(repeating: "─", count: dashes) + "\n",
+                    attributes: [
+                        .font: body,
+                        .foregroundColor: style.palette.divider.platformColor,
+                        .paragraphStyle: paragraph,
+                    ]
+                ))
+            }
+        }
+        return built
+    }
+    #endif
 
     /// Swaps embeds, formulas and Mermaid blocks for the pictures of themselves.
     ///

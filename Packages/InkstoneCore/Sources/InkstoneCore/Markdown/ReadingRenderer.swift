@@ -144,15 +144,10 @@ public enum ReadingRenderer {
             case .horizontalRule:
                 substitutions.append((lineRange(token.range, in: source), "───"))
 
-            // A table becomes columns that line up, in the monospaced font the
-            // styling gives it. Leaving the pipes in showed the reader the
-            // scaffolding — including the `| --- | --- |` row, which is the one
-            // row of a table containing no content at all.
+            // A table is left as its source here and rebuilt as a real table by
+            // whoever draws this. The span says where it is.
             case .table:
-                let block = lineRange(token.range, in: source)
-                if let laid = alignedTable(source.substring(with: block)) {
-                    substitutions.append((block, laid))
-                }
+                break
 
             default:
                 break
@@ -233,79 +228,56 @@ public enum ReadingRenderer {
         }
     }
 
-    /// A table laid out in columns, or nil if it does not parse as one.
+    /// A table's cells, or nil if the block does not parse as one.
     ///
-    /// Padded with spaces rather than drawn with rules, because the result is one
-    /// run of an attributed string and a real table would need a view. The
-    /// styling sets a monospaced font over it, which is what makes the padding
-    /// line up.
+    /// Only the structure. Drawing it is the view's job, and it draws a real
+    /// `NSTextTable` — **not** box-drawing characters, which was the first
+    /// attempt and does not work. Measured with `NSAttributedString`, a CJK
+    /// character in SF Mono is **1.61×** the width of an ASCII one and in Menlo
+    /// **1.66×**, because neither font contains CJK glyphs and the fallback is
+    /// not a multiple of the monospaced advance. Padding `列一` as though it were
+    /// two ASCII columns puts every rule after it out of true on screen, however
+    /// neatly the characters line up in a string.
     ///
-    /// Widths count a CJK character as two columns: `列一` is as wide as four
-    /// Latin letters in a monospaced font, and padding it as though it were two
-    /// leaves every column after it out of true.
-    static func alignedTable(_ block: String) -> String? {
+    /// - Returns: the rows, and how many of them are header rows (0 when the
+    ///   source had no `| --- |` line).
+    public static func tableRows(_ block: String) -> (rows: [[String]], headerRows: Int)? {
         let lines = block.components(separatedBy: "\n")
         var rows: [[String]] = []
-        var trailingNewlines = ""
+        var headerRows = 0
 
         for (offset, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
                 // Blank lines only at the very end; one in the middle means this
                 // is not a single table and it is left alone.
-                if offset == lines.count - 1 { trailingNewlines = "\n" ; continue }
+                if offset == lines.count - 1 { continue }
                 return nil
             }
             guard trimmed.hasPrefix("|") else { return nil }
-            // The alignment row carries no content and is dropped entirely.
+            // The alignment row carries no content of its own. It says where the
+            // header ends, which is the one thing worth keeping from it.
             if trimmed.contains("-"),
                trimmed.allSatisfy({ $0 == "|" || $0 == "-" || $0 == ":" || $0 == " " }) {
+                headerRows = rows.count
                 continue
             }
-            let cells = trimmed
+            rows.append(trimmed
                 .trimmingCharacters(in: CharacterSet(charactersIn: "|"))
                 .components(separatedBy: "|")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-            rows.append(cells)
+                .map { $0.trimmingCharacters(in: .whitespaces) })
         }
         guard rows.count > 1 else { return nil }
 
+        // Ragged rows are squared off, so a short one cannot leave the table
+        // open at the end.
         let columns = rows.map(\.count).max() ?? 0
-        var widths = [Int](repeating: 0, count: columns)
-        for row in rows {
-            for (index, cell) in row.enumerated() {
-                widths[index] = max(widths[index], displayWidth(cell))
-            }
+        let squared = rows.map { row in
+            row + [String](repeating: "", count: columns - row.count)
         }
-
-        let laid = rows.map { row -> String in
-            row.enumerated().map { index, cell in
-                index == row.count - 1
-                    ? cell   // no trailing padding on the last column
-                    : cell + String(repeating: " ", count: max(0, widths[index] - displayWidth(cell)))
-            }.joined(separator: "  ")
-        }.joined(separator: "\n")
-
-        return laid + trailingNewlines
+        return (squared, headerRows)
     }
 
-    /// How many monospaced columns a string occupies.
-    private static func displayWidth(_ text: String) -> Int {
-        text.unicodeScalars.reduce(0) { total, scalar in
-            total + (isWide(scalar) ? 2 : 1)
-        }
-    }
-
-    private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x1100...0x115F, 0x2E80...0xA4CF, 0xAC00...0xD7A3,
-             0xF900...0xFAFF, 0xFE30...0xFE6F, 0xFF00...0xFF60,
-             0xFFE0...0xFFE6, 0x1F300...0x1F9FF:
-            true
-        default:
-            false
-        }
-    }
 
     /// The `[!type]` marker at the head of a callout, and the space after it.
     private static func calloutMarker(of token: SyntaxToken, in source: NSString) -> NSRange? {
