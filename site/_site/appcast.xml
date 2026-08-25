@@ -6,6 +6,14 @@
     <description>Most recent Inkstone updates.</description>
     <language>en</language>
     <item>
+      <title>0.1.3</title>
+      <pubDate>Tue, 25 Aug 2026 10:07:53 GMT</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/iamzifei/inkstone/releases/download/v0.1.3/Inkstone-0.1.3.dmg" sparkle:edSignature="eWiEobhstscYgnyQJ1LQy0XKAzqvmTdfOJZMRmJ3iU9ip56BQ9Na5rG+YcjJx4HSqU777n+bMYkXwaSLqPI7Ag==" length="11516014" type="application/octet-stream" />
+    </item>
+    <item>
       <title>0.1.2</title>
       <pubDate>Tue, 25 Aug 2026 09:20:18 GMT</pubDate>
       <sparkle:version>4</sparkle:version>
