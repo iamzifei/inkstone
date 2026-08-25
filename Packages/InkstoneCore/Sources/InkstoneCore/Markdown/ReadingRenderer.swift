@@ -25,6 +25,12 @@ public struct ReadingDocument: Sendable, Equatable {
             case inlineCode
             case codeBlock(language: String?)
             case link(target: String)
+            /// `![[file]]` — a picture, a PDF, or another note's content. The
+            /// renderer leaves the target's name as text; whoever draws this can
+            /// swap in the file itself and fall back to the name if it cannot.
+            case embed(target: String)
+            /// LaTeX, with the delimiters already removed.
+            case math(display: Bool)
             case tag(String)
             case quote(depth: Int)
             case table
@@ -138,12 +144,14 @@ public enum ReadingRenderer {
             case .horizontalRule:
                 substitutions.append((lineRange(token.range, in: source), "───"))
 
-            // A table's `| --- | --- |` row carries no content at all — it is
-            // there to tell a parser where the header ends. Rendering it is
-            // showing the reader the scaffolding.
+            // A table becomes columns that line up, in the monospaced font the
+            // styling gives it. Leaving the pipes in showed the reader the
+            // scaffolding — including the `| --- | --- |` row, which is the one
+            // row of a table containing no content at all.
             case .table:
-                if let separator = tableSeparatorLine(of: token, in: source) {
-                    cuts.append(separator)
+                let block = lineRange(token.range, in: source)
+                if let laid = alignedTable(source.substring(with: block)) {
+                    substitutions.append((block, laid))
                 }
 
             default:
@@ -183,7 +191,7 @@ public enum ReadingRenderer {
             // A link was replaced whole, so its content range no longer describes
             // anything — the span is the substituted text, starting where the
             // token did.
-            if case .link = style, let replacement = displayText(of: token) {
+            if let replacement = displayText(of: token) {
                 let start = map(token.range.location)
                 let length = (replacement as NSString).length
                 guard length > 0, start + length <= rendered.length else { continue }
@@ -212,7 +220,9 @@ public enum ReadingRenderer {
         case .inlineCode: .inlineCode
         case .codeBlock(let language): .codeBlock(language: language)
         case .wikiLink(let link): .link(target: link.target)
-        case .embed(let link): .link(target: link.target)
+        case .embed(let link): .embed(target: link.target)
+        case .mathInline: .math(display: false)
+        case .mathBlock: .math(display: true)
         case .markdownLink(let destination): .link(target: destination)
         case .tag(let name): .tag(name)
         case .blockquote(let depth): .quote(depth: depth)
@@ -223,23 +233,78 @@ public enum ReadingRenderer {
         }
     }
 
-    /// A table's alignment row, including the newline that ends it.
-    private static func tableSeparatorLine(of token: SyntaxToken, in source: NSString) -> NSRange? {
-        let block = lineRange(token.range, in: source)
-        var location = block.location
-        while location < NSMaxRange(block) {
-            let line = source.lineRange(for: NSRange(location: location, length: 0))
-            let text = source.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
-            // Only pipes, dashes, colons and spaces: that is an alignment row and
-            // nothing else is.
-            if !text.isEmpty,
-               text.contains("-"),
-               text.allSatisfy({ $0 == "|" || $0 == "-" || $0 == ":" || $0 == " " }) {
-                return line
+    /// A table laid out in columns, or nil if it does not parse as one.
+    ///
+    /// Padded with spaces rather than drawn with rules, because the result is one
+    /// run of an attributed string and a real table would need a view. The
+    /// styling sets a monospaced font over it, which is what makes the padding
+    /// line up.
+    ///
+    /// Widths count a CJK character as two columns: `列一` is as wide as four
+    /// Latin letters in a monospaced font, and padding it as though it were two
+    /// leaves every column after it out of true.
+    static func alignedTable(_ block: String) -> String? {
+        let lines = block.components(separatedBy: "\n")
+        var rows: [[String]] = []
+        var trailingNewlines = ""
+
+        for (offset, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                // Blank lines only at the very end; one in the middle means this
+                // is not a single table and it is left alone.
+                if offset == lines.count - 1 { trailingNewlines = "\n" ; continue }
+                return nil
             }
-            location = max(NSMaxRange(line), location + 1)
+            guard trimmed.hasPrefix("|") else { return nil }
+            // The alignment row carries no content and is dropped entirely.
+            if trimmed.contains("-"),
+               trimmed.allSatisfy({ $0 == "|" || $0 == "-" || $0 == ":" || $0 == " " }) {
+                continue
+            }
+            let cells = trimmed
+                .trimmingCharacters(in: CharacterSet(charactersIn: "|"))
+                .components(separatedBy: "|")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            rows.append(cells)
         }
-        return nil
+        guard rows.count > 1 else { return nil }
+
+        let columns = rows.map(\.count).max() ?? 0
+        var widths = [Int](repeating: 0, count: columns)
+        for row in rows {
+            for (index, cell) in row.enumerated() {
+                widths[index] = max(widths[index], displayWidth(cell))
+            }
+        }
+
+        let laid = rows.map { row -> String in
+            row.enumerated().map { index, cell in
+                index == row.count - 1
+                    ? cell   // no trailing padding on the last column
+                    : cell + String(repeating: " ", count: max(0, widths[index] - displayWidth(cell)))
+            }.joined(separator: "  ")
+        }.joined(separator: "\n")
+
+        return laid + trailingNewlines
+    }
+
+    /// How many monospaced columns a string occupies.
+    private static func displayWidth(_ text: String) -> Int {
+        text.unicodeScalars.reduce(0) { total, scalar in
+            total + (isWide(scalar) ? 2 : 1)
+        }
+    }
+
+    private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x1100...0x115F, 0x2E80...0xA4CF, 0xAC00...0xD7A3,
+             0xF900...0xFAFF, 0xFE30...0xFE6F, 0xFF00...0xFF60,
+             0xFFE0...0xFFE6, 0x1F300...0x1F9FF:
+            true
+        default:
+            false
+        }
     }
 
     /// The `[!type]` marker at the head of a callout, and the space after it.

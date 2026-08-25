@@ -18,22 +18,45 @@ import UIKit
 /// preview the syntax characters are still there at 0.01pt, so copying a
 /// paragraph hands you `**bold**` back. Here they do not exist.
 ///
-/// Not yet rendered here: math, Mermaid diagrams and image embeds, which live
-/// preview does draw. They are listed as absent rather than half-drawn.
+/// Everything the editor draws, this draws too.
+///
+/// Pictures, Mermaid diagrams and formulas are drawn here as `NSTextAttachment`s
+/// — which the *editor* cannot do, because its storage is the file on disk and
+/// TextKit only makes an attachment glyph for a U+FFFC character it would have to
+/// insert. This view's storage is built from scratch and belongs to nobody, so
+/// the attachment character is free.
+///
+/// Every one of them falls back to text. A picture that will not load leaves the
+/// file's name, a formula that will not typeset leaves its LaTeX. Reading mode
+/// may restyle anything; it may not lose anything.
 struct ReadingView: View {
     let markdown: String
+    /// Resolves an embed target to a file in the vault.
+    var resolveAttachment: (String) -> URL? = { _ in nil }
     @Environment(\.style) private var style
+    /// Bumped when a Mermaid diagram finishes rendering.
+    ///
+    /// The image caches for pictures and formulas answer synchronously; Mermaid
+    /// cannot, because it draws through a web view. Without this the first look
+    /// at a note showed the diagram's source and went on showing it for ever,
+    /// since nothing else would ever ask again.
+    @State private var mermaidGeneration = 0
 
     var body: some View {
-        ReadingTextView(attributed: attributed, style: style)
-            .background(style.background)
-    }
-
-    private var attributed: NSAttributedString {
-        ReadingTypesetter.attributed(
-            ReadingRenderer.render(markdown),
-            style: style
+        // No `GeometryReader`: wrapping the representable in one collapsed it to
+        // nothing and reading mode rendered a blank page. The text view knows its
+        // own width in `updateNSView`, which is where a picture's size has to be
+        // decided anyway.
+        ReadingTextView(
+            document: ReadingRenderer.render(markdown),
+            style: style,
+            resolveAttachment: resolveAttachment,
+            generation: mermaidGeneration
         )
+        .background(style.background)
+        .onAppear {
+            MermaidRenderer.shared.onRendered = { mermaidGeneration += 1 }
+        }
     }
 }
 
@@ -41,8 +64,14 @@ struct ReadingView: View {
 ///
 /// Split out from the view so the mapping from span to attribute is one place,
 /// and so the renderer in the core stays free of fonts and colours.
+@MainActor
 enum ReadingTypesetter {
-    static func attributed(_ document: ReadingDocument, style: Style) -> NSAttributedString {
+    static func attributed(
+        _ document: ReadingDocument,
+        style: Style,
+        resolveAttachment: (String) -> URL? = { _ in nil },
+        availableWidth: CGFloat = 680
+    ) -> NSAttributedString {
         let typography = style.typography
         let palette = style.palette
         let body = typography.editorFont.platformFont(size: typography.editorFontSize)
@@ -109,8 +138,25 @@ enum ReadingTypesetter {
                 code.paragraphSpacing = 0
                 code.paragraphSpacingBefore = 0
                 result.addAttribute(.paragraphStyle, value: code, range: span.range)
-            case .link:
+            case .link, .embed:
                 result.addAttribute(.foregroundColor, value: palette.link.platformColor, range: span.range)
+
+            case .math(let display):
+                result.addAttribute(
+                    .font,
+                    value: typography.codeFont.platformFont(size: typography.codeFontSize),
+                    range: span.range
+                )
+                // A formula that will not parse keeps its source, in the colour
+                // the editor uses for the same thing — silently rendering nothing
+                // leaves the author with no idea which formula is wrong.
+                let latex = (document.text as NSString).substring(with: span.range)
+                if MathRenderer.shared.error(
+                    latex: latex, fontSize: typography.editorFontSize,
+                    isDisplay: display, colour: palette.text.platformColor) != nil {
+                    result.addAttribute(.foregroundColor,
+                                        value: palette.unresolvedLink.platformColor, range: span.range)
+                }
             case .tag:
                 result.addAttribute(.foregroundColor, value: palette.tag.platformColor, range: span.range)
             case .quote:
@@ -149,7 +195,75 @@ enum ReadingTypesetter {
                 break
             }
         }
+        drawAttachments(
+            into: result, document: document, style: style,
+            resolveAttachment: resolveAttachment, availableWidth: availableWidth
+        )
         return result
+    }
+
+    /// Swaps embeds, formulas and Mermaid blocks for the pictures of themselves.
+    ///
+    /// Back to front, so the ranges of the ones not yet replaced stay valid, and
+    /// each one silently leaves its text alone when the picture is not available:
+    /// the caches answer nil while they are still working, and a note that shows
+    /// a file name until the thumbnail arrives is better than one that shows a
+    /// gap.
+    private static func drawAttachments(
+        into result: NSMutableAttributedString,
+        document: ReadingDocument,
+        style: Style,
+        resolveAttachment: (String) -> URL?,
+        availableWidth: CGFloat
+    ) {
+        struct Replacement {
+            let range: NSRange
+            let image: PlatformImage
+        }
+
+        var replacements: [Replacement] = []
+        for span in document.spans {
+            guard NSMaxRange(span.range) <= result.length else { continue }
+            let text = (document.text as NSString).substring(with: span.range)
+
+            let image: PlatformImage?
+            switch span.style {
+            case .embed(let target):
+                image = resolveAttachment(target).flatMap {
+                    AttachmentImageCache.shared.image(for: $0, maxWidth: availableWidth)
+                }
+            case .math(let display):
+                image = MathRenderer.shared.image(
+                    latex: text,
+                    fontSize: style.typography.editorFontSize,
+                    isDisplay: display,
+                    colour: style.palette.text.platformColor
+                )
+            case .codeBlock(let language) where language?.lowercased() == "mermaid":
+                image = MermaidRenderer.shared.image(for: text, isDark: style.isDark)
+            default:
+                continue
+            }
+            guard let image else { continue }
+            replacements.append(Replacement(range: span.range, image: image))
+        }
+
+        for replacement in replacements.sorted(by: { $0.range.location > $1.range.location }) {
+            let attachment = NSTextAttachment()
+            attachment.image = replacement.image
+            attachment.bounds = CGRect(origin: .zero, size: replacement.image.size)
+            let attributed = NSMutableAttributedString(attachment: attachment)
+            // Attachments sit on their own line, centred, the way live preview
+            // draws a block image.
+            let centred = NSMutableParagraphStyle()
+            centred.alignment = .center
+            centred.paragraphSpacing = style.typography.paragraphSpacing
+            attributed.addAttribute(
+                .paragraphStyle, value: centred,
+                range: NSRange(location: 0, length: attributed.length)
+            )
+            result.replaceCharacters(in: replacement.range, with: attributed)
+        }
     }
 
     private static func bolded(_ font: PlatformFont) -> PlatformFont {
@@ -173,8 +287,11 @@ enum ReadingTypesetter {
 /// A read-only, selectable text view. Selectable because reading a note and
 /// wanting to quote a line from it is the same activity.
 private struct ReadingTextView: NSViewRepresentable {
-    let attributed: NSAttributedString
+    let document: ReadingDocument
     let style: Style
+    let resolveAttachment: (String) -> URL?
+    /// Changes when a Mermaid diagram finishes, so SwiftUI runs `updateNSView`.
+    let generation: Int
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
@@ -189,8 +306,7 @@ private struct ReadingTextView: NSViewRepresentable {
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let textView = scroll.documentView as? NSTextView else { return }
-        textView.textStorage?.setAttributedString(attributed)
-        textView.selectedTextAttributes = [.backgroundColor: style.palette.selection.platformColor]
+
         // Centred and capped, the same measure the editor uses — the readable
         // line width is a typography setting, not an editor one.
         let available = scroll.contentSize.width
@@ -198,12 +314,23 @@ private struct ReadingTextView: NSViewRepresentable {
             ? min(available - 48, style.typography.readableLineWidth)
             : available - 48
         textView.textContainerInset = NSSize(width: max(24, (available - measure) / 2), height: 32)
+
+        // Typeset here rather than in `body`, because the measure a picture is
+        // scaled to is only known once the view has a width.
+        textView.textStorage?.setAttributedString(ReadingTypesetter.attributed(
+            document, style: style,
+            resolveAttachment: resolveAttachment,
+            availableWidth: max(120, measure)
+        ))
+        textView.selectedTextAttributes = [.backgroundColor: style.palette.selection.platformColor]
     }
 }
 #else
 private struct ReadingTextView: UIViewRepresentable {
-    let attributed: NSAttributedString
+    let document: ReadingDocument
     let style: Style
+    let resolveAttachment: (String) -> URL?
+    let generation: Int
 
     func makeUIView(context: Context) -> UITextView {
         let textView = UITextView()
@@ -215,7 +342,12 @@ private struct ReadingTextView: UIViewRepresentable {
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
-        textView.attributedText = attributed
+        let measure = max(120, textView.bounds.width - 32)
+        textView.attributedText = ReadingTypesetter.attributed(
+            document, style: style,
+            resolveAttachment: resolveAttachment,
+            availableWidth: measure
+        )
     }
 }
 #endif

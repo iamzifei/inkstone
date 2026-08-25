@@ -24,7 +24,10 @@ struct NoteEditorPane: View {
                     // A separate view, not the editor with editing switched off.
                     // The editor's text storage *is* the file, so rendering into
                     // it would rewrite the note on disk.
-                    ReadingView(markdown: document.text)
+                    ReadingView(
+                        markdown: document.text,
+                        resolveAttachment: { workspace.resolveEmbed($0, from: url) }
+                    )
                 } else {
                     MarkdownEditorView(
                     text: $document.text,

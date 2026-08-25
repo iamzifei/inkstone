@@ -7,6 +7,27 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## Unreleased
+
+### Reading mode renders everything
+
+- **Pictures, Mermaid diagrams and formulas are drawn**, not left as text. The
+  editor cannot use `NSTextAttachment` — its storage is the file on disk and
+  TextKit would need a U+FFFC character inserted into it — but reading mode's
+  storage belongs to nobody, so the attachment character is free. Each one falls
+  back to text: a picture that will not load leaves the file's name, a formula
+  that will not parse leaves its LaTeX in the warning colour.
+- **Tables are laid out in columns** instead of showing their pipes, with CJK
+  counted as two columns wide so the alignment actually holds.
+- **Nothing is lost any more.** Frontmatter used to be deleted whole — including
+  a header written with full-width colons, which YAML reads as a scalar rather
+  than a mapping, so a dozen lines of the author's own text vanished. A
+  `%%comment%%` used to delete its entire line, prose either side included. Both
+  fixed, and `losesNoContent` is now a property test: every run of letters,
+  digits or CJK in the source must survive into the output.
+- Callout markers, `$$` fences and a table's `| --- |` row are removed rather
+  than passed through as text.
+
 ## 0.1.3 — 2026-08-25
 
 Four things the 2026-08-25 audit found, done.

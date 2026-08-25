@@ -41,7 +41,7 @@ vault on disk, and is green.
 | Themes, typography, CJK settings | ✅ implemented |
 | i18n (en / 简体 / 繁體) | ✅ 184 strings |
 | iCloud vault storage | ⚠️ code done, entitlement deferred |
-| Reading-mode renderer | ✅ implemented, tested |
+| Reading-mode renderer (math, Mermaid, embeds) | ✅ implemented, tested |
 | Plugin API | ❌ not started |
 
 ## Graph view
@@ -165,9 +165,6 @@ makes every local build fail to sign. The keys are commented in
 `App/Resources/Inkstone.entitlements` with instructions; `createICloudVault()`
 already shows an alert instead of failing silently. Create the container, then
 uncomment.
-
-**Reading mode does not draw math, Mermaid diagrams or image embeds.** Live
-preview does. They are listed as absent there rather than half-drawn.
 
 **No UI tests.** `scripts/test-all.sh` covers the engine, the sync end to end,
 the website and a headless smoke run, and says so; what needs a mouse — context

@@ -201,14 +201,36 @@ struct ReadingRendererTests {
         #expect(!text.contains("[!note]"))
     }
 
-    @Test("A table keeps its cells and loses its alignment row")
+    @Test("A table becomes columns that line up")
     func rendersTables() {
         // `| --- | --- |` carries no content — it exists to tell a parser where
         // the header ends. Showing it to a reader is showing them scaffolding.
-        let text = rendered("| 列一 | 列二 |\n| --- | --- |\n| 甲 | 乙 |")
-        #expect(text.contains("列一"))
-        #expect(text.contains("甲"))
+        let text = rendered("| one | two |\n| --- | --- |\n| a | b |")
+        #expect(text.contains("one"))
+        #expect(text.contains("a"))
         #expect(!text.contains("---"))
+        #expect(!text.contains("|"))
+    }
+
+    @Test("Columns line up when the cells are Chinese")
+    func alignsWideCharacters() {
+        // A CJK character is two columns wide in a monospaced font. Padding one
+        // as though it were one column leaves every column after it out of true,
+        // which is the entire point of laying the table out at all.
+        //
+        // `列一` is four columns, so `a` is padded to four and both second cells
+        // begin at column seven.
+        #expect(ReadingRenderer.alignedTable("| 列一 | b |\n| --- | --- |\n| a | 乙 |")
+                == "列一  b\na     乙")
+    }
+
+    @Test("Something that is not a table is left alone")
+    func leavesNonTablesAlone() {
+        // A single `|` in prose, and a block with a blank line through the
+        // middle, are not tables and must not be rearranged as though they were.
+        #expect(ReadingRenderer.alignedTable("| just one row |") == nil)
+        #expect(ReadingRenderer.alignedTable("| a |\n\n| b |") == nil)
+        #expect(ReadingRenderer.alignedTable("not a table at all") == nil)
     }
 
     @Test("A display formula keeps its maths and loses its fences")
