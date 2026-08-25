@@ -1,6 +1,6 @@
 # Inkstone 墨砚
 
-**[inkslab.app](https://inkslab.app)** · [Download](https://github.com/iamzifei/inkstone/releases/latest) · [Sync guide](https://inkslab.app/sync.html) · [中文](https://inkslab.app/zh/)
+**[inkslab.app](https://inkslab.app)** · [Download](https://github.com/iamzifei/inkstone/releases/latest) · [Changelog](CHANGELOG.md) · [Sync guide](https://inkslab.app/sync.html) · [中文](https://inkslab.app/zh/)
 
 An Obsidian-class notes app for macOS 26 and iOS 26. Plain Markdown files on disk,
 wikilinks, graph, canvas, daily notes — native SwiftUI, no Electron.
@@ -28,6 +28,7 @@ vault on disk, and is green.
 | Tags (inline + frontmatter, nested) | ✅ implemented, tested |
 | Live-preview editor (TextKit) | ✅ implemented |
 | Frontmatter as a properties table | ✅ implemented, tested |
+| Plain-text file paths auto-linked | ✅ implemented, tested |
 | Quick switcher (fuzzy) + full-text search | ✅ implemented, tested |
 | Graph view — local + whole vault, filters, groups, forces | ✅ implemented, tested — [see below](#graph-view) |
 | Canvas (JSON Canvas 1.0) | ✅ implemented, tested |
@@ -114,6 +115,16 @@ the same engine could back a CLI or a share extension later.
 `site/_site` and published to GitHub Pages by `.github/workflows/site.yml`. Eight
 languages; the page structure lives in the generator and only the copy is
 translated, so a missing key fails the build instead of dropping a section.
+
+Two of the pages are keyword landing pages rather than marketing: [an Obsidian
+comparison](https://inkslab.app/obsidian-alternative.html) and [what syncing a
+vault costs](https://inkslab.app/obsidian-sync-free.html). They live in
+`site/static/` because they answer English queries and forcing them through the
+eight-language rule would produce seven pages of thin translation. The research
+behind them, with the numbers it was based on, is in
+[`docs/growth/`](docs/growth). `site/tests/test_site.py` asserts they stay in the
+sitemap, that their structured data parses, and — because the repository has no
+LICENSE — that they never claim the app is open source.
 
 The hero recording and the screenshots are reproducible: `scripts/record-demo.sh`
 drives a Debug build against `assets/demo-vault`, and `scripts/encode-demo.sh`

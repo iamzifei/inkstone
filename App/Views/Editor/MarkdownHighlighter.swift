@@ -74,6 +74,10 @@ struct MarkdownHighlighter {
     /// Text width available for inline images, so a photo is scaled to the
     /// measure rather than overflowing the column.
     var availableWidth: CGFloat = 680
+    /// Resolves a vault-relative path written as plain text to the file it names,
+    /// or nil when there is no such file. Nil paths stay plain text: a link that
+    /// goes nowhere is worse than no link.
+    var resolveVaultPath: ((String) -> URL?)?
     /// Draw the frontmatter as a properties table rather than hiding it.
     /// Mirrors `SettingsData.showFrontmatterAsProperties`, injected rather than
     /// read directly so the highlighter stays free of app state.
@@ -190,6 +194,11 @@ struct MarkdownHighlighter {
                 #endif
             }
         }
+
+        // After the tokens, so a path inside a wikilink or a Markdown link keeps
+        // the styling that syntax already gave it, and before the blank-line
+        // pass, which does not touch colours.
+        linkVaultPaths(in: storage, text: text as NSString, within: scope, tokens: tokens)
 
         compressBlankLines(in: storage, text: text as NSString, within: scope)
 
@@ -409,23 +418,28 @@ struct MarkdownHighlighter {
 
         switch token.kind {
         case .frontmatter:
-            // Editing it shows the YAML, the same as any other syntax the caret
-            // is sitting in.
-            if isBeingEdited {
+            if !isBeingEdited, showProperties,
+               let block = propertiesBlock(for: token.range, in: fullText) {
+                // A properties table, as in Obsidian. This used to be concealed
+                // outright on the grounds that the inspector already showed the
+                // properties — which is only true when the inspector happens to
+                // be open, and left a note's tags and status invisible the rest
+                // of the time.
+                reserveBlock(block, to: storage, in: token.range, fullText: fullText)
+            } else {
+                // Everything else — the caret is in it, the setting is off, or
+                // the block is not parseable as properties — shows the source.
+                //
+                // Never concealed. The previous version hid it whenever it could
+                // not be turned into properties, so a header written with
+                // full-width colons (`编号：N19`), which YAML reads as one long
+                // scalar rather than a mapping, simply vanished from the preview:
+                // a dozen lines of the author's own text, gone, with nothing
+                // saying why. Content this cannot render is content it shows.
                 storage.addAttribute(
                     .foregroundColor, value: palette.faintText.platformColor, range: token.range
                 )
                 setFont(typography.codeFont.platformFont(size: typography.codeFontSize), range: token.range)
-            } else if showProperties,
-                      let block = propertiesBlock(for: token.range, in: fullText) {
-                // Otherwise it becomes a properties table, as in Obsidian. It
-                // used to be concealed outright on the grounds that the
-                // inspector already showed the properties — which is only true
-                // when the inspector happens to be open, and left a note's tags
-                // and status invisible the rest of the time.
-                reserveBlock(block, to: storage, in: token.range, fullText: fullText)
-            } else {
-                concealLines(token.range)
             }
 
         case .heading(let level):
@@ -1207,6 +1221,55 @@ struct MarkdownHighlighter {
         let last = NSRange(location: range.location + range.length - 1, length: 1)
         storage.addAttribute(.kern, value: image.size.width + 4, range: last)
         storage.addAttribute(.inkstoneInlineMath, value: image, range: range)
+    }
+
+    /// Turns plain-text file paths into links.
+    ///
+    /// Notes that keep an index refer to other files by path constantly, usually
+    /// in backticks because that is how a path is written. Markdown has no syntax
+    /// for it, so none of them were clickable — the reader had to read the path,
+    /// remember it, and go and find the file by hand.
+    ///
+    /// Only paths that resolve to a file that exists are linked. `VaultPathDetector`
+    /// finds the candidates and this decides; a string that looks like a path but
+    /// is not one stays plain text.
+    private func linkVaultPaths(
+        in storage: NSTextStorage,
+        text: NSString,
+        within scope: NSRange,
+        tokens: [SyntaxToken]
+    ) {
+        guard let resolveVaultPath else { return }
+        let palette = style.palette
+
+        // Ranges that already mean something as a link, so a path inside
+        // `[[…]]`, `[…](…)` or an embed is not linked twice — the two would
+        // disagree about where a click goes.
+        var claimed = IndexSet()
+        for token in tokens {
+            switch token.kind {
+            case .wikiLink, .embed, .markdownLink, .codeBlock:
+                claimed.insert(integersIn: token.range.location..<NSMaxRange(token.range))
+            default:
+                break
+            }
+        }
+
+        for range in VaultPathDetector.candidates(in: text.substring(with: scope)) {
+            let absolute = NSRange(location: scope.location + range.location, length: range.length)
+            guard absolute.length > 0, NSMaxRange(absolute) <= text.length else { continue }
+            guard !claimed.contains(integersIn: absolute.location..<NSMaxRange(absolute)) else { continue }
+
+            let path = text.substring(with: absolute)
+            guard let url = resolveVaultPath(path) else { continue }
+
+            storage.addAttribute(.foregroundColor, value: palette.link.platformColor, range: absolute)
+            storage.addAttribute(.inkstoneVaultFile, value: url, range: absolute)
+            storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: absolute)
+            storage.addAttribute(
+                .underlineColor, value: palette.link.platformColor.withAlphaComponent(0.35), range: absolute
+            )
+        }
     }
 
     /// Parses the frontmatter under `range` into a drawable properties table.
@@ -2049,6 +2112,10 @@ extension NSAttributedString.Key {
 
     /// The properties table standing in for a note's YAML frontmatter.
     static let inkstoneProperties = NSAttributedString.Key("inkstoneProperties")
+
+    /// A file in the vault, named by a plain-text path in the note. The value is
+    /// the resolved `URL`, so a click opens exactly the file that was matched.
+    static let inkstoneVaultFile = NSAttributedString.Key("inkstoneVaultFile")
     /// Marks a callout header so its disclosure can be drawn and clicked.
     /// Value is a Bool: whether the callout is currently folded.
     static let inkstoneCalloutFold = NSAttributedString.Key("inkstoneCalloutFold")

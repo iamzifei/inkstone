@@ -176,3 +176,87 @@ class AppHelpLink(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LandingPages(BuiltSite):
+    """The keyword landing pages, and the claims they are allowed to make.
+
+    These pages exist to be found in search, which means two things have to hold
+    every build: they have to be *in* the site (a page missing from the sitemap
+    is a page that does not exist), and they must not drift into claims that are
+    not true. The second is the one worth a test — a marketing page that says the
+    app is open source when the repository has no licence is a lie the build
+    should refuse to ship.
+    """
+
+    PAGES = ["obsidian-alternative.html", "obsidian-sync-free.html"]
+
+    def test_pages_are_built(self) -> None:
+        for name in self.PAGES:
+            self.assertTrue((self.out / name).is_file(), f"{name} was not built")
+
+    def test_pages_are_in_the_sitemap(self) -> None:
+        sitemap = (self.out / "sitemap.xml").read_text(encoding="utf-8")
+        for name in self.PAGES:
+            self.assertIn(f"{build.SITE}/{name}", sitemap, f"{name} missing from sitemap")
+
+    def test_pages_have_a_canonical_and_one_h1(self) -> None:
+        for name in self.PAGES:
+            html = (self.out / name).read_text(encoding="utf-8")
+            self.assertIn(f'rel="canonical" href="{build.SITE}/{name}"', html)
+            self.assertEqual(len(re.findall(r"<h1[ >]", html)), 1, f"{name}: expected one h1")
+
+    def test_structured_data_parses(self) -> None:
+        import json
+        for name in self.PAGES:
+            html = (self.out / name).read_text(encoding="utf-8")
+            blocks = re.findall(
+                r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+            self.assertTrue(blocks, f"{name}: no structured data")
+            for block in blocks:
+                data = json.loads(block)  # raises if malformed
+                self.assertEqual(data["@type"], "FAQPage")
+                self.assertTrue(data["mainEntity"], f"{name}: empty FAQ")
+
+    def test_internal_links_resolve(self) -> None:
+        for name in self.PAGES:
+            html = (self.out / name).read_text(encoding="utf-8")
+            for href in re.findall(r'href="([^"#]+)"', html):
+                if href.startswith(("http://", "https://", "mailto:")):
+                    continue
+                target = href if href != "./" else "index.html"
+                self.assertTrue((self.out / target).exists(),
+                                f"{name} links to {href}, which is not in the build")
+
+    def test_no_open_source_claim_without_a_licence(self) -> None:
+        # The repository has no LICENSE file, so the app is source-available and
+        # not open source. The pages are allowed to *discuss* open source — one
+        # of them answers "is Obsidian open source?" — but never to assert it of
+        # Inkstone. This catches the specific phrasings that would.
+        forbidden = [
+            "inkstone is open source",
+            "inkstone is an open source",
+            "inkstone is an open-source",
+            "open source obsidian alternative for macos",
+        ]
+        licensed = any((ROOT / n).exists() for n in ("LICENSE", "LICENSE.md", "LICENSE.txt"))
+        if licensed:
+            self.skipTest("a licence exists now; the claim would be true")
+        for name in self.PAGES:
+            text = (self.out / name).read_text(encoding="utf-8").lower()
+            for phrase in forbidden:
+                self.assertNotIn(phrase, text, f"{name} claims to be open source")
+
+
+class LLMsFile(BuiltSite):
+    """`llms.txt` — the plain-text summary crawlers and assistants read."""
+
+    def test_is_published(self) -> None:
+        self.assertTrue((self.out / "llms.txt").is_file())
+
+    def test_every_page_it_names_exists(self) -> None:
+        text = (self.out / "llms.txt").read_text(encoding="utf-8")
+        for url in re.findall(rf"{re.escape(build.SITE)}/([^)\s]*)", text):
+            target = url or "index.html"
+            self.assertTrue((self.out / target).exists(),
+                            f"llms.txt names {url}, which is not in the build")

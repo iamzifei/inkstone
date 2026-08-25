@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to sync Obsidian notes for free — and what Sync costs</title>
+<meta name="description" content="Obsidian Sync is $4 per user per month billed annually. Here are the free ways to sync a Markdown vault, what each one costs you in practice, and where each one breaks.">
+<link rel="canonical" href="https://inkslab.app/obsidian-sync-free.html">
+<link rel="icon" href="assets/icon.png">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to sync Obsidian notes for free — and what Sync costs">
+<meta property="og:description" content="The real price of Obsidian Sync, the free alternatives, and where each of them breaks.">
+<meta property="og:url" content="https://inkslab.app/obsidian-sync-free.html">
+<meta property="og:image" content="https://inkslab.app/assets/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .page { max-width: 46rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
+  .page h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
+  .page h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 3rem; margin-bottom: .7rem; }
+  .page h3 { font-size: 1.05rem; font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
+  .page p, .page li, .page td { color: var(--ink-2); }
+  .page ul, .page ol { padding-inline-start: 1.2rem; margin-block: .8rem; }
+  .page ul { list-style: disc; } .page ol { list-style: decimal; }
+  .page li { margin-block: .4rem; }
+  .lede { font-size: 1.15rem; margin-block: 1.2rem 2rem; }
+  .cmp { width: 100%; border-collapse: collapse; margin-block: 1.2rem; font-size: .95rem; }
+  .cmp th, .cmp td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .cmp th { font-family: var(--sans); font-size: var(--t-micro); letter-spacing: .1em;
+            text-transform: uppercase; color: var(--ink-faint); font-weight: 500; }
+  .cmp td:first-child { color: var(--ink); }
+  .scroller { overflow-x: auto; }
+  .actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-block: 2rem; }
+  .note { font-size: .9rem; color: var(--ink-faint); margin-top: 2.5rem;
+          border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is Obsidian Sync free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Obsidian itself is free and needs no account, but Sync is a paid add-on: $4 USD per user per month billed annually, or $5 per month billed monthly, read from obsidian.md/pricing on 25 August 2026. Syncing a vault by other means — iCloud Drive, a git repository, Syncthing — is free, and those are what this page compares."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much is Obsidian Sync?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "$4 USD per user per month billed annually, which is $48 a year, or $5 per month billed monthly, which is $60 a year. Obsidian Publish is separate again at $8 per site per month billed annually."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I sync Obsidian for free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three ways that work: iCloud Drive, which is simplest on Apple devices and has no conflict resolution of its own; a git repository, which gives you history and explicit conflicts but has no good story on iOS; and Syncthing, which is peer-to-peer and needs both machines awake at once. Each is described on this page along with where it breaks."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I sync Obsidian with GitHub?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On a desktop, yes — the community Obsidian Git plugin drives a local git repository. On iOS it is the hard part, because iOS has no usable libgit2 story, which is why most git-based setups end at the desktop. Inkstone takes a different route: it talks to the GitHub Contents API directly and keeps a local shadow index, so the same sync works on iPhone and iPad."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Obsidian Sync worth it?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "If you want end-to-end encryption, version history you do not have to think about, and a vendor to hold responsible when a sync goes wrong, then $48 a year is a fair price and the free routes will not match it. If your vault is text you already back up and you would rather not add a subscription, the free routes are genuinely sufficient."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<main class="wrap page">
+  <p class="kicker">Guide</p>
+  <h1>How to sync a Markdown vault for free</h1>
+
+  <p class="lede">Obsidian is free. Obsidian&nbsp;Sync is not — it is
+  <strong>$4 per user per month billed annually</strong>, or $5 billed monthly.
+  That is $48 or $60 a year for moving text files between two machines you
+  already own. Here is what the free routes actually are, and where each one
+  breaks.</p>
+
+  <h2>What Obsidian charges, exactly</h2>
+
+  <div class="scroller">
+  <table class="cmp">
+    <thead><tr><th>Plan</th><th>Billed annually</th><th>Billed monthly</th></tr></thead>
+    <tbody>
+      <tr><td>Obsidian itself</td><td>Free</td><td>Free</td></tr>
+      <tr><td>Sync</td><td>$4 / user / month ($48 a year)</td><td>$5 / user / month ($60 a year)</td></tr>
+      <tr><td>Publish</td><td>$8 / site / month</td><td>$10 / site / month</td></tr>
+      <tr><td>Commercial licence</td><td colspan="2">$50 / user / year, if you use it at a company of 2+ people</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Worth saying plainly, because a lot of pages on this query get it wrong:
+  <strong>the Obsidian app is free without limits and needs no sign-up.</strong>
+  Only Sync and Publish are paid. If the thing stopping you is the app's price,
+  there is nothing to stop.</p>
+
+  <h2>The free routes, and where each breaks</h2>
+
+  <h3>1. iCloud Drive</h3>
+  <p>Put the vault in iCloud Drive and both Macs and both iPhones see it. Free
+  with the storage you already have, and the simplest thing that works.</p>
+  <p><strong>Where it breaks:</strong> iCloud has no conflict resolution for this.
+  Edit the same note on two devices while one is offline and you get two files,
+  or one silently winning. There is no history to recover from, and files can sit
+  un-downloaded until something asks for them, which an indexer will do at the
+  worst moment.</p>
+
+  <h3>2. A git repository</h3>
+  <p>Version history, explicit conflicts, a remote you control, and free private
+  repositories on GitHub. For a vault of text this is close to ideal — text is
+  what git was built for.</p>
+  <p><strong>Where it breaks:</strong> iOS. There is no usable libgit2 story on
+  iPhone, so the community <em>Obsidian Git</em> plugin is a desktop arrangement
+  with a gap where your phone should be. And a merge conflict in a note is
+  resolved by reading conflict markers in your own prose.</p>
+
+  <h3>3. Syncthing</h3>
+  <p>Peer-to-peer, no cloud, nothing to pay, nothing to trust.</p>
+  <p><strong>Where it breaks:</strong> both machines have to be awake at the same
+  time, which a laptop in a bag is not. And the iOS story is the same gap again.</p>
+
+  <h2>What Inkstone does instead</h2>
+
+  <p><a href="./">Inkstone</a> is a native Markdown notes app for
+  macOS&nbsp;26 and iOS&nbsp;26 that reads the same vault Obsidian does. Its sync
+  goes to <strong>a GitHub repository you own</strong>, and it is not a plugin —
+  it is how the app syncs:</p>
+
+  <ul>
+    <li><strong>It works on iOS.</strong> Rather than fight libgit2 on a phone, it
+    talks to the GitHub Contents API and keeps a local shadow index. The same sync
+    runs on a Mac, an iPad and an iPhone.</li>
+    <li><strong>Conflicts are settled once</strong>, in the app, rather than left
+    as two files for you to find later.</li>
+    <li><strong>You decide what travels.</strong> Per-file-type filters keep a
+    vault of screen recordings from becoming a repository of screen recordings,
+    and the vault's own <code>.gitignore</code> is respected.</li>
+    <li><strong>It is free</strong>, on GitHub's own free tier for private
+    repositories. There is no account with us, because there is no us to have an
+    account with.</li>
+  </ul>
+
+  <p>The <a href="sync.html">sync guide</a> is the step-by-step version, including
+  how to point two devices at one repository without them fighting.</p>
+
+  <h2>So is Obsidian Sync worth paying for?</h2>
+
+  <p>Sometimes, and it is worth saying so. You are buying end-to-end encryption,
+  version history you never have to think about, and someone to hold responsible
+  when a sync goes wrong. If your notes are the kind where that matters, $48 a
+  year is not a lot for it, and none of the free routes above will match it.</p>
+
+  <p>What the free routes are for is the much more common case: a vault of text,
+  two devices you own, and no wish to add another subscription to the pile.</p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest">Download for macOS</a>
+    <a class="btn btn-quiet" href="obsidian-alternative.html">How it compares to Obsidian</a>
+  </div>
+
+  <p class="note">Prices read from
+  <a href="https://obsidian.md/pricing">obsidian.md/pricing</a> on 25&nbsp;August
+  2026 and quoted in USD; check there for the current figure. Obsidian is a
+  trademark of Dynalist Inc.; this page is not affiliated with or endorsed by
+  them. Inkstone requires macOS&nbsp;26 or iOS&nbsp;26 on Apple silicon.</p>
+</main>
+</body>
+</html>

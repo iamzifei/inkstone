@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An Obsidian alternative for macOS and iOS — Inkstone</title>
+<meta name="description" content="A native Markdown notes app for macOS 26 and iOS 26. Reads the vault you already have, keeps your notes as plain files, and syncs through your own GitHub repository at no cost.">
+<link rel="canonical" href="https://inkslab.app/obsidian-alternative.html">
+<link rel="icon" href="assets/icon.png">
+<meta property="og:type" content="article">
+<meta property="og:title" content="An Obsidian alternative for macOS and iOS — Inkstone">
+<meta property="og:description" content="Plain Markdown files, wikilinks, a graph, a canvas, and sync through your own GitHub repository. Native SwiftUI, no Electron, no account.">
+<meta property="og:url" content="https://inkslab.app/obsidian-alternative.html">
+<meta property="og:image" content="https://inkslab.app/assets/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .page { max-width: 46rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
+  .page h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
+  .page h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 3rem; margin-bottom: .7rem; }
+  .page h3 { font-size: 1.05rem; font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
+  .page p, .page li, .page td { color: var(--ink-2); }
+  .page ul { list-style: disc; padding-inline-start: 1.2rem; margin-block: .8rem; }
+  .page li { margin-block: .4rem; }
+  .lede { font-size: 1.15rem; margin-block: 1.2rem 2rem; }
+  .cmp { width: 100%; border-collapse: collapse; margin-block: 1.2rem; font-size: .95rem; }
+  .cmp th, .cmp td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .cmp th { font-family: var(--sans); font-size: var(--t-micro); letter-spacing: .1em;
+            text-transform: uppercase; color: var(--ink-faint); font-weight: 500; }
+  .cmp td:first-child { color: var(--ink); }
+  .scroller { overflow-x: auto; }
+  .actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-block: 2rem; }
+  .note { font-size: .9rem; color: var(--ink-faint); margin-top: 2.5rem;
+          border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is Inkstone open source?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The source is public and readable at github.com/iamzifei/inkstone, but there is no open-source licence on it yet, so the accurate description is source-available rather than open source. What does not depend on that: your notes are plain Markdown files in a folder you choose, in no proprietary format, so nothing is locked to the app whatever its licence says."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Obsidian open source?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Obsidian is free to use and does not require an account, but the application itself is closed source. Its file format is not: an Obsidian vault is Markdown files on disk, which is why other apps can read one."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can Inkstone open a vault Obsidian created?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Point it at the folder. There is no import step because there is nothing to import — wikilinks, embeds, aliases in frontmatter, block references, nested tags and JSON Canvas files are read in place. The reverse works too: a vault Inkstone created opens in Obsidian."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does Inkstone cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Nothing. There is no account, no subscription and no paid sync add-on. Sync goes through a GitHub repository you own, on GitHub's own free tier."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does Inkstone not have?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No plugin API, which is the single biggest difference — Obsidian's plugin ecosystem is its greatest strength and Inkstone has nothing equivalent. No mobile Android build. No published-site feature. If you rely on community plugins, Inkstone will not replace Obsidian for you."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<main class="wrap page">
+  <p class="kicker">Comparison</p>
+  <h1>An Obsidian alternative that keeps your notes as files</h1>
+
+  <p class="lede">Inkstone is a native Markdown notes app for macOS&nbsp;26 and
+  iOS&nbsp;26. It opens the vault you already have, writes nothing you cannot read
+  in any other editor, and syncs through a GitHub repository you own — at no
+  cost.</p>
+
+  <p>If you are looking for an alternative to Obsidian, it is worth being precise
+  about what you are actually looking for, because Obsidian is a good app and
+  most of the reasons to leave it are specific ones.</p>
+
+  <h2>Reasons people look, and whether Inkstone answers them</h2>
+
+  <div class="scroller">
+  <table class="cmp">
+    <thead>
+      <tr><th>What you want</th><th>Inkstone</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Sync without a subscription</td>
+        <td><strong>Yes.</strong> Your vault pushes to a GitHub repository you
+        own. Obsidian Sync is $4&nbsp;per user per month billed annually
+        (<a href="obsidian-sync-free.html">the arithmetic, in full</a>).</td>
+      </tr>
+      <tr>
+        <td>A native app rather than Electron</td>
+        <td><strong>Yes.</strong> SwiftUI and TextKit. It launches like a Mac app
+        because it is one.</td>
+      </tr>
+      <tr>
+        <td>No account, no telemetry</td>
+        <td><strong>Yes.</strong> Nothing to sign up for and nothing sent
+        anywhere. See the <a href="privacy.html">privacy statement</a>.</td>
+      </tr>
+      <tr>
+        <td>Chinese and English set properly on one line</td>
+        <td><strong>Yes</strong>, and this is unusual. Hair spacing at the
+        CJK–Latin boundary, punctuation compression, independent body and code
+        fonts.</td>
+      </tr>
+      <tr>
+        <td>Your files to stay yours</td>
+        <td><strong>Yes.</strong> No database, no import, no export. A folder of
+        Markdown, which is what it was before you started.</td>
+      </tr>
+      <tr>
+        <td>Community plugins</td>
+        <td><strong>No.</strong> There is no plugin API. If Dataview, Templater or
+        Excalidraw are load-bearing for you, stay with Obsidian.</td>
+      </tr>
+      <tr>
+        <td>Windows, Linux or Android</td>
+        <td><strong>No.</strong> macOS and iOS only.</td>
+      </tr>
+      <tr>
+        <td>Publishing a vault as a website</td>
+        <td><strong>No.</strong> There is no equivalent of Obsidian Publish.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>What Inkstone has</h2>
+
+  <p>Everything here is implemented and running, not planned:</p>
+
+  <ul>
+    <li><strong>Live preview</strong> — headings, bold, quotes, callouts,
+    checkboxes, tables and code render in place as you type, with the syntax
+    revealed on the line the cursor is on.</li>
+    <li><strong>Wikilinks and backlinks</strong> — <code>[[Note]]</code>,
+    <code>[[Note#Heading]]</code>, <code>[[Note^block]]</code>,
+    <code>![[Embeds]]</code>, aliases in frontmatter. Renaming a note rewrites
+    every link that pointed at it, across the vault, in the same action.</li>
+    <li><strong>A graph</strong> of the whole vault or of one note's
+    neighbourhood, with filters, colour groups and force controls.</li>
+    <li><strong>Canvas</strong> in the open JSON Canvas 1.0 format — the same
+    file the format's other implementations read.</li>
+    <li><strong>Properties</strong>, tags inline or in frontmatter, nested, in any
+    script, daily notes, a calendar, bookmarks, version history and split view.</li>
+    <li><strong>Math, Mermaid diagrams, transclusion, image and PDF embeds.</strong></li>
+  </ul>
+
+  <h2>Is Obsidian open source?</h2>
+
+  <p>No. Obsidian is free to use and needs no account, but the application is
+  closed source. What <em>is</em> open is the part that matters most: an Obsidian
+  vault is Markdown files in a folder, in no proprietary format, which is exactly
+  why another app can read one.</p>
+
+  <p>And to answer the same question about this app rather than let you find out
+  later: <strong>Inkstone's source is public but is not under an open-source
+  licence</strong>, so the honest word is <em>source-available</em>. You can read
+  every line at
+  <a href="https://github.com/iamzifei/inkstone">github.com/iamzifei/inkstone</a>.
+  If an open-source licence is what you are looking for specifically, neither app
+  is that today — <a href="https://joplinapp.org">Joplin</a> and
+  <a href="https://logseq.com">Logseq</a> are, and they are honest recommendations
+  if that is the deciding factor.</p>
+
+  <h2>Trying it costs you nothing to undo</h2>
+
+  <p>This is the real argument. Because both apps read the same folder, you do not
+  have to choose. Open your existing vault in Inkstone; if you do not like it,
+  close it. Nothing was converted, nothing was moved, and Obsidian will open the
+  same folder tomorrow exactly as it did yesterday.</p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest">Download for macOS</a>
+    <a class="btn btn-quiet" href="./">See what it does</a>
+  </div>
+
+  <p class="note">Obsidian Sync pricing read from
+  <a href="https://obsidian.md/pricing">obsidian.md/pricing</a> on 25&nbsp;August
+  2026. Obsidian is a trademark of Dynalist Inc.; this page is not affiliated with
+  or endorsed by them. Inkstone requires macOS&nbsp;26 or iOS&nbsp;26 on Apple
+  silicon.</p>
+</main>
+</body>
+</html>

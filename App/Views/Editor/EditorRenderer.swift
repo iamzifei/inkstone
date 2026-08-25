@@ -450,24 +450,45 @@ struct EditorRenderer {
             : style.palette.divider.platformColor.withAlphaComponent(0.7)
         colour.setFill()
 
-        layoutManager.enumerateEnclosingRects(
-            forGlyphRange: glyphRange,
-            withinSelectedGlyphRange: glyphRange,
-            in: container
-        ) { band, _ in
-            var band = band.offsetBy(dx: origin.x, dy: origin.y)
-            guard band.intersects(rect) else { return }
+        let maxWidth = container.size.width - container.lineFragmentPadding * 2
+
+        // Line fragments, and the *used* rect of each one.
+        //
+        // Not `enumerateEnclosingRects`, which was the first attempt: those rects
+        // are the full line fragment, and this editor puts 16pt of paragraph
+        // spacing and a 1.6 line-height multiple into every fragment. Selecting a
+        // few paragraphs filled all of that in, so the selection arrived as one
+        // solid slab of colour with the text floating inside it rather than as
+        // something wrapped around the words. The used rect is the part the
+        // glyphs actually occupy.
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, used, _, lineRange, _ in
+            let onThisLine = NSIntersectionRange(lineRange, glyphRange)
+            guard onThisLine.length > 0 else { return }
+
+            var band = self.layoutManager.boundingRect(forGlyphRange: onThisLine, in: self.container)
+            // Vertical extent from the used rect: a run of concealed 0.01pt
+            // syntax has almost no height of its own, and a band that shrank to
+            // it would break the line of colour.
+            band.origin.y = used.minY
+            band.size.height = used.height
+
+            // A line the selection continues past is highlighted to its end, so
+            // the newline reads as included — which is what every other editor
+            // on the platform does.
+            if NSMaxRange(onThisLine) < NSMaxRange(glyphRange) {
+                band.size.width = max(band.width, used.maxX - band.minX + 6)
+            }
+            band.size.width = min(band.width, maxWidth - band.minX + self.container.lineFragmentPadding)
+
+            band = band.offsetBy(dx: self.origin.x, dy: self.origin.y)
+            guard band.intersects(rect), band.width > 0 else { return }
 
             // A collapsed line — hidden frontmatter, a table's separator row —
             // is a hairline the selection has no business drawing. It carries no
-            // text anyone can see, and a 1pt stripe across the page reads as a
+            // text anyone can see, and a stripe across the page reads as a
             // rendering fault rather than as a selection.
             guard band.height > 3 else { return }
 
-            // Trailing whitespace can push the band a long way past the text on a
-            // wrapped line; clamp it to the measure so the right edge stays
-            // straight down the page.
-            band.size.width = min(band.width, container.size.width - container.lineFragmentPadding * 2)
             PlatformBezierPath(roundedRect: band.insetBy(dx: 0, dy: 0.5), cornerRadius: 3).fill()
         }
     }

@@ -26,6 +26,10 @@ struct EditorActions {
     var importAttachmentData: (Data, String) -> String? = { _, _ in nil }
     /// Opens an attachment with the system handler.
     var openAttachment: (URL) -> Void = { _ in }
+    /// Opens a file in the vault named by a plain-text path in the note.
+    var openVaultFile: (URL) -> Void = { _ in }
+    /// Resolves such a path to a file that exists, or nil.
+    var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
 
 /// The Markdown editor.
@@ -95,6 +99,7 @@ class EditorCoordinator: NSObject {
         highlighter.resolveNoteEmbed = actions.resolveNoteEmbed
         highlighter.availableWidth = inlineImageWidth
         highlighter.showProperties = showProperties
+        highlighter.resolveVaultPath = actions.resolveVaultPath
         return highlighter
     }
 
@@ -259,6 +264,14 @@ class EditorCoordinator: NSObject {
         // and back again — which is the whole point of numbering them.
         if let id = attributes[.inkstoneFootnote] as? String {
             jumpToFootnote(id: id, from: index, in: storage)
+            return true
+        }
+        // A plain-text path that resolved to a real file. Checked before the
+        // wikilink branch because the resolved URL is exact — following the path
+        // as a link target would resolve it a second time and could land on a
+        // different file with the same name.
+        if let file = attributes[.inkstoneVaultFile] as? URL {
+            actions.openVaultFile(file)
             return true
         }
         if let link = attributes[.inkstoneWikiLink] as? WikiLink {

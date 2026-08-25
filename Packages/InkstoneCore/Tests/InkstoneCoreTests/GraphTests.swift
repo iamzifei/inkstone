@@ -522,3 +522,87 @@ struct NotePropertiesTests {
         #expect(Set(keys) == Set(frontmatter.properties.keys))
     }
 }
+
+/// Plain file paths written in prose become links, so an index note's rows can
+/// be clicked instead of read out and typed into the switcher.
+@Suite("Vault path detection")
+struct VaultPathDetectorTests {
+    private func found(in text: String) -> [String] {
+        VaultPathDetector.candidates(in: text).map {
+            (text as NSString).substring(with: $0)
+        }
+    }
+
+    @Test("A path in prose is found, whatever punctuation is against it")
+    func findsPathsInProse() {
+        #expect(found(in: "见 _已发布/已发布内容库.md 那一条") == ["_已发布/已发布内容库.md"])
+        // CJK punctuation sits straight up against the path with no space, so a
+        // space-only split would swallow the closing bracket into the file name.
+        #expect(found(in: "（见 06-选题装配/选题池.md）") == ["06-选题装配/选题池.md"])
+        #expect(found(in: "`01-原始素材区/知识库/10-Polanyi.md`") == ["01-原始素材区/知识库/10-Polanyi.md"])
+    }
+
+    @Test("Two paths on one line are both found")
+    func findsSeveral() {
+        #expect(found(in: "a/b.md 和 c/d.canvas") == ["a/b.md", "c/d.canvas"])
+    }
+
+    @Test("Things that merely contain a dot are left alone")
+    func ignoresNonPaths() {
+        // Prose is full of these, and offering every one as a file would turn a
+        // paragraph into a field of false links.
+        #expect(found(in: "版本 v3.2 发布于 1966. 见 google.com 与 3.14") == [])
+        #expect(found(in: "https://example.com/a.md") == [])
+        #expect(found(in: "/etc/hosts.md") == [])
+        #expect(found(in: "~/notes/a.md") == [])
+        #expect(found(in: ".md") == [])
+    }
+
+    @Test("Ranges are UTF-16, so CJK and emoji do not shift them")
+    func returnsUTF16Ranges() {
+        let text = "前面的中文📌 docs/plan.md 后面"
+        let ranges = VaultPathDetector.candidates(in: text)
+        #expect(ranges.count == 1)
+        // The proof that the offsets are right: slicing the NSString by the
+        // range gives the path back.
+        #expect((text as NSString).substring(with: ranges[0]) == "docs/plan.md")
+    }
+}
+
+/// The path scan runs on every highlight pass, so its cost has to be linear in
+/// the text and small enough not to be felt while typing.
+@Suite("Vault path detection performance")
+struct VaultPathDetectorPerformanceTests {
+    static func document(paragraphs: Int) -> String {
+        (0..<paragraphs).map { index in
+            """
+            这是第 \(index) 段，提到 docs/plans/note-\(index).md 与 assets/shot-\(index).png，
+            还有一些不该被当成路径的东西：v3.\(index)、1966. 与 example.com。
+            """
+        }.joined(separator: "\n\n")
+    }
+
+    @Test("Cost is linear in document size, not quadratic")
+    func staysLinear() {
+        func cost(_ paragraphs: Int) -> Double {
+            let text = Self.document(paragraphs: paragraphs)
+            let start = Date()
+            for _ in 0..<5 { _ = VaultPathDetector.candidates(in: text) }
+            return Date().timeIntervalSince(start) / 5 * 1000
+        }
+        let small = cost(200)
+        let large = cost(800)
+
+        print(String(format: "path scan: 200¶ %.2f ms | 800¶ %.2f ms | %.1f×", small, large, large / small))
+        // Four times the text. Linear is 4×; the ceiling leaves room for a noisy
+        // machine and still catches a return to anything quadratic.
+        #expect(large / small < 10)
+    }
+
+    @Test("Every path in the document is found")
+    func findsThemAll() {
+        let text = Self.document(paragraphs: 50)
+        // Two per paragraph, and none of the decoys.
+        #expect(VaultPathDetector.candidates(in: text).count == 100)
+    }
+}

@@ -785,6 +785,46 @@ final class Workspace {
     }
 
     /// Resolves an embed target to a file on disk, note or attachment.
+    /// Resolves a plain-text path written in a note to the file it names.
+    ///
+    /// Stricter than `resolveEmbed` on purpose. That one falls back to matching a
+    /// unique *basename* anywhere in the vault, which is right for `![[diagram.png]]`
+    /// — the author named a file, not a place. A path is different: someone who
+    /// wrote `06-选题装配/选题池.md` meant that file, and quietly linking to a
+    /// same-named file in another folder would be worse than not linking at all.
+    ///
+    /// Answered from the in-memory indexes rather than the file system, because
+    /// this runs on every highlight pass and a `FileManager` call per candidate
+    /// per keystroke is not something a large note can afford.
+    func resolveVaultPath(_ path: String, from source: URL) -> URL? {
+        guard let root else { return nil }
+        let candidates = [
+            root.appending(path: path),
+            source.deletingLastPathComponent().appending(path: path),
+        ]
+
+        let isNote = ["md", "markdown", "canvas"].contains(path.lowercased().split(separator: ".").last.map(String.init) ?? "")
+        for candidate in candidates {
+            if isNote {
+                if index.metadata(for: candidate) != nil { return candidate }
+                // A canvas is not in the note index; fall through to the file
+                // check below rather than reporting it missing.
+            }
+            if let resolved = attachments.resolve(path, from: source, vaultRoot: root),
+               // The attachment index also matches on basename alone. Accept it
+               // only when what came back really is the path that was written.
+               resolved.path(percentEncoded: false).hasSuffix(path) {
+                return resolved
+            }
+        }
+        return nil
+    }
+
+    /// Opens a file the reader clicked on, whatever kind it is.
+    func openFile(at url: URL) {
+        openNote(at: url)
+    }
+
     func resolveEmbed(_ target: String, from source: URL) -> URL? {
         guard let root else { return nil }
         if let attachment = attachments.resolve(target, from: source, vaultRoot: root) {

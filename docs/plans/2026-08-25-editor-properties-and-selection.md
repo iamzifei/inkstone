@@ -88,9 +88,57 @@ live preview replaces a range with a **widget decoration**. Collapsing the
 frontmatter and reserving height for something drawn in its place is the same
 idea; only the mechanics differ, because TextKit is not CodeMirror.
 
+## Round two — what the screenshots showed
+
+### The selection was still wrong, in the opposite direction
+
+`enumerateEnclosingRects` returns the *full line fragment*, and this editor puts
+16pt of paragraph spacing and a 1.6 line-height multiple into every one. So the
+first fix traded a row of disconnected bars for one solid slab of colour with the
+text floating inside it. It now enumerates line fragments and uses each one's
+**used rect** — the part the glyphs actually occupy — with the horizontal extent
+from `boundingRect(forGlyphRange:)`, extended to the line end only where the
+selection carries on past it. Per-line bands, gaps between paragraphs.
+
+### Frontmatter that is not YAML was being hidden
+
+The note that showed this has a header written with **full-width colons**
+(`编号：N19`). YAML reads that as one long scalar, not a mapping, so
+`Frontmatter.properties` came back empty, `PropertiesBlock` returned nil, and the
+old code fell through to concealing the whole block: a dozen lines of the
+author's own text, gone from the preview, with nothing to say why.
+
+Now the only thing that concealment path does is *render the source*. Three cases
+share it — the caret is in the block, the setting is off, or it will not parse —
+and the rule behind all three is one line: **content this cannot render is
+content it shows.**
+
+### File paths in prose were not links
+
+Notes that keep an index refer to other files by path constantly, usually inside
+backticks because that is how a path is written. Markdown has no syntax for it,
+so none of them were clickable — the path had to be read, remembered, and typed
+into the switcher.
+
+`VaultPathDetector` (in the core, with tests) finds path-shaped runs;
+`Workspace.resolveVaultPath` decides. Two deliberate constraints:
+
+- **Only paths that resolve are linked.** A link that goes nowhere is worse than
+  no link, and prose is full of `v3.2`, `1966.` and `example.com` — offering
+  every one of those as a file would turn a paragraph into a field of false
+  links.
+- **Resolution is stricter than an embed's.** `AttachmentIndex` falls back to
+  matching a unique *basename* anywhere in the vault, which is right for
+  `![[diagram.png]]` — the author named a file, not a place. Someone who wrote
+  `06-选题装配/选题池.md` meant that file, and quietly linking to a same-named
+  file in another folder would be worse than not linking.
+
+Answered from the in-memory indexes rather than the file system, because it runs
+on every highlight pass; the detector has a linearity test for the same reason.
+
 ## HUMAN QUEUE
 
-- Select across a heading, a code block and a paragraph, and say whether the band
-  is now one shape. It could not be photographed from here — the automation
-  cannot hold focus on the window long enough — so it was proved with a
-  temporarily forced selection instead, then the hook removed.
+- Select across a heading, a code block and a paragraph and say whether it looks
+  right now. Both rounds were proved with a temporarily forced selection and a
+  screenshot, then the hook removed — the automation cannot hold focus on the
+  window long enough to make a real one.

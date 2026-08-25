@@ -46,7 +46,9 @@ struct NoteEditorPane: View {
                             }
                             return workspace.embedMarkup(for: imported)
                         },
-                        openAttachment: { openURL($0) }
+                        openAttachment: { openURL($0) },
+                        openVaultFile: { file in workspace.openFile(at: file) },
+                        resolveVaultPath: { path in workspace.resolveVaultPath(path, from: url) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,
                     showProperties: workspace.settings.data.showFrontmatterAsProperties,

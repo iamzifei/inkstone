@@ -1,0 +1,65 @@
+# Inkstone
+
+> A native Markdown notes app for macOS 26 and iOS 26. Plain Markdown files in a
+> folder you choose — no database, no proprietary format, no account, no
+> Electron. Reads and writes the same vaults Obsidian does.
+
+Inkstone is free. Its source is public at https://github.com/iamzifei/inkstone
+but carries no open-source licence, so the accurate description is
+source-available rather than open source.
+
+Three decisions the rest follows from:
+
+- **The files are the truth.** No database and no import step. A vault Obsidian
+  created opens in Inkstone and vice versa. App state lives in a hidden
+  `.inkstone` folder you are free to delete.
+- **A broken link is permanent.** With no database to repair one, renaming a note
+  rewrites every wikilink pointing at it across the whole vault, in the same
+  action.
+- **The engine knows nothing about screens.** Parsing, indexing, search and the
+  graph live in a Swift package that imports no UI framework, so they are covered
+  by real tests rather than a simulator.
+
+## What it does
+
+- Live preview editing — syntax renders in place and is revealed on the line the
+  cursor is on. Source and reading modes as well.
+- Wikilinks, embeds, block references, aliases in frontmatter, backlinks, and
+  unresolved-link tracking.
+- Frontmatter shown as a properties table at the top of the note.
+- Graph view of the whole vault or one note's neighbourhood, with filters, colour
+  groups and force controls.
+- Canvas in the open JSON Canvas 1.0 format.
+- Tags inline or in frontmatter, nested, in any script. Fuzzy quick switcher and
+  full-text search with `tag:` and `path:` operators.
+- Math, Mermaid diagrams, transclusion, image and PDF embeds.
+- Daily notes, a calendar, bookmarks, version history, split view.
+- Typography built for setting Chinese and English on one line: hair spacing at
+  the CJK–Latin boundary, punctuation compression, independent body and code
+  fonts.
+- Sync through iCloud, or through a GitHub repository you own — including on
+  iPhone and iPad, via the GitHub Contents API rather than libgit2.
+
+## What it does not do
+
+- No plugin API. Obsidian's plugin ecosystem has no equivalent here.
+- macOS and iOS only. No Windows, Linux or Android build.
+- No published-site feature equivalent to Obsidian Publish.
+
+## Pages
+
+- [Home](https://inkslab.app/): what the app is, with a screen recording.
+- [Obsidian alternative](https://inkslab.app/obsidian-alternative.html): an
+  honest comparison, including what Inkstone does not have.
+- [Syncing a vault for free](https://inkslab.app/obsidian-sync-free.html): what
+  Obsidian Sync costs, the free routes, and where each one breaks.
+- [Sync guide](https://inkslab.app/sync.html): setting up GitHub sync across two
+  devices.
+- [Privacy](https://inkslab.app/privacy.html): nothing is collected. No account,
+  no analytics, no server of ours.
+- [Source](https://github.com/iamzifei/inkstone)
+- [Releases](https://github.com/iamzifei/inkstone/releases/latest)
+
+## Requirements
+
+macOS 26 or iOS 26, Apple silicon. Interface in English, 简体中文 and 繁體中文.
