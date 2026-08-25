@@ -355,16 +355,16 @@ class EditorCoordinator: NSObject {
             stop.pointee = true
         }
         guard let destination else { return }
-        #if os(macOS)
-        textViewForScrolling?.scrollRangeToVisible(destination)
-        textViewForScrolling?.setSelectedRange(NSRange(location: destination.location, length: 0))
-        #endif
+        scroll(to: destination)
     }
 
-    #if os(macOS)
-    /// Set by the AppKit coordinator; nil elsewhere.
-    var textViewForScrolling: NSTextView? { nil }
-    #endif
+    /// Brings a range into view and puts the caret at it.
+    ///
+    /// Overridden by whichever coordinator is in use. It exists on the shared
+    /// class rather than only on the AppKit one because the footnote jump used
+    /// it — and, being inside `#if os(macOS)`, tapping a footnote marker on an
+    /// iPhone found its destination and then silently did nothing.
+    func scroll(to range: NSRange) {}
 
     /// What Tab should do at `selection`, or nil to let the system handle it.
     ///
@@ -1016,7 +1016,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
     @MainActor
     final class MacCoordinator: EditorCoordinator, NSTextViewDelegate {
         weak var textView: InkstoneTextView?
-        override var textViewForScrolling: NSTextView? { textView }
+
+        override func scroll(to range: NSRange) {
+            textView?.scrollRangeToVisible(range)
+            textView?.setSelectedRange(NSRange(location: range.location, length: 0))
+        }
         /// Token for the scroll view's frame-change observation; removed on
         /// deinit so a closed tab does not keep re-laying-out a dead editor.
         ///
@@ -1279,12 +1283,8 @@ final class MarkdownAccessoryView: UIInputView {
     ///
     /// Built once: constructing it per tap would mean either a force-try or an
     /// optional to unwrap on every keystroke.
-    private static let existingMarker: NSRegularExpression = {
-        // Safe to force here and nowhere else: the pattern is a literal, so a
-        // failure would be a programming error caught the first time this runs.
-        // swiftlint:disable:next force_try
-        try! NSRegularExpression(pattern: "^[ \\t]*(?:#{1,6} |[-*+] (?:\\[.\\] )?|> )")
-    }()
+    private static let existingMarker: NSRegularExpression? =
+        try? NSRegularExpression(pattern: "^[ \\t]*(?:#{1,6} |[-*+] (?:\\[.\\] )?|> )")
 
     private weak var textView: UITextView?
 
@@ -1334,11 +1334,17 @@ final class MarkdownAccessoryView: UIInputView {
             let line = text.lineRange(for: NSRange(location: selection.location, length: 0))
             let existing = text.substring(with: line)
             // Replace an existing marker rather than stacking a second one.
-            let stripped = Self.existingMarker.stringByReplacingMatches(
-                in: existing,
-                range: NSRange(location: 0, length: (existing as NSString).length),
-                withTemplate: ""
-            )
+            //
+            // The pattern is a literal, so it compiles or the app is broken —
+            // but "the app is broken" used to be spelled `try!`, and a crash in
+            // the format bar is a worse answer than a heading with two hashes.
+            let stripped = Self.existingMarker.map {
+                $0.stringByReplacingMatches(
+                    in: existing,
+                    range: NSRange(location: 0, length: (existing as NSString).length),
+                    withTemplate: ""
+                )
+            } ?? existing
             textView.replace(range: line, with: prefix + stripped)
             let moved = prefix.utf16.count - (existing.utf16.count - stripped.utf16.count)
             textView.selectedRange = NSRange(location: max(0, selection.location + moved), length: 0)
@@ -1571,6 +1577,15 @@ private struct TextViewRepresentable: UIViewRepresentable {
     @MainActor
     final class PhoneCoordinator: EditorCoordinator, UITextViewDelegate, UIGestureRecognizerDelegate {
         weak var textView: UITextView?
+
+        override func scroll(to range: NSRange) {
+            guard let textView else { return }
+            textView.scrollRangeToVisible(range)
+            // The caret goes to the destination as it does on a Mac, but the
+            // keyboard is not summoned for it: a footnote jump is reading, and
+            // half the screen disappearing is not what was asked for.
+            textView.selectedRange = NSRange(location: range.location, length: 0)
+        }
 
         /// Our tap recogniser must not exclude the text view's own.
         nonisolated func gestureRecognizer(

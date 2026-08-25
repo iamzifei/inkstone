@@ -148,18 +148,36 @@ settings (all honoured, none removed), the reading renderer and the `outgoing`
 dictionary. Written up in
 [`2026-08-26-audit-followup.md`](2026-08-26-audit-followup.md).
 
-**Still open, all of it from §6:**
+**§6 is done too, and doing it showed the audit had three mistakes in it.** All
+three came from the same place: a grep that answered a narrower question than the
+one being asked.
 
-| | where |
+| what §6 claimed | what was actually true |
 | --- | --- |
-| Three `print()` calls ship in release | `InkstoneApp.swift:618`, `BackgroundSync.swift:240` and `:323` |
-| One `try!` | `MarkdownEditorView.swift:1286` |
-| Footnote jump does nothing on iOS | `MarkdownEditorView.swift:358` — the scroll is inside `#if os(macOS)` |
+| "Three `print()` calls ship in release builds" | **One.** The other two are already inside `#if DEBUG`. The grep excluded lines *containing* `#if DEBUG`, which says nothing about whether a line sits inside such a block. |
+| "One `try!` … a `static let` built once with a fallback costs nothing" | It **was already** a `static let` with that exact reasoning written above it. It only lacked the fallback. |
+| "One `try!`" | **Three.** The grep covered `App/` and not `Packages/`. |
 
-None of them is user-visible except the last, and none was in the batch that was
-asked for. Together they are a few minutes' work.
+What was changed:
+
+- The one real release-build `print` — the continued-task probe — now writes to
+  `BackgroundSyncLog`, which the Sync settings pane displays. That line is the
+  probe's entire purpose, so it needed to reach somewhere a person can read.
+- The app's `try!` has a fallback. A crash in the format bar is a worse answer
+  than a heading with two hashes.
+- **Footnote jump works on iOS.** `scroll(to:)` is on the shared coordinator now
+  rather than an AppKit-only `textViewForScrolling`, so the destination is reached
+  on both platforms. Not verified on a device — it is a code path that was
+  excluded by a `#if` and no longer is.
+
+Deliberately **not** changed: the two `try!`s in `ObsidianSyntax` and
+`LegacyScanner`. They are the scanner's own pattern factory, and the comment
+above them is right — a constant pattern that fails to compile is a programmer
+error with no sensible degradation, and returning a fallback would silently break
+every parse instead of failing loudly in a test. The app one was different: it is
+a convenience in the format bar, and it has somewhere useful to fall back to.
 
 ## HUMAN QUEUE
 
-- The three above: worth doing, not worth a release of their own. They can ride
-  along with whatever ships next.
+- Tap a footnote marker on the iPhone build and confirm it jumps. It could not be
+  checked from here.

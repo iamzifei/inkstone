@@ -320,7 +320,12 @@ enum BackgroundSync {
     private static func runContinued(_ task: BGContinuedProcessingTask, workspace: Workspace) {
         if task.identifier == probeIdentifier {
             probeIdentifier = nil
-            print("[bg] continued probe launched: \(task.identifier)")
+            // Into the log the Sync settings pane shows, not into a `print` that
+            // ships in release builds and that nobody with the app installed can
+            // read anyway. This line is the whole point of the probe — it is the
+            // one proof that iOS really launched a continued task — so it needs
+            // to survive to somewhere it can be looked at.
+            BackgroundSyncLog.record(.launched, "continued probe \(task.identifier)")
             task.setTaskCompleted(success: true)
             return
         }
