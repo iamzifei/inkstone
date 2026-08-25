@@ -168,10 +168,73 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// between devices can tell which side is newer. Bookkeeping, not a setting.
     public var gitHubConfigurationUpdatedAt: Date?
 
-    // Graph
-    public var graphShowTags = true
+    // Graph. Named and scaled to match Obsidian's graph panel, so a reading
+    // taken there means the same thing here.
+    /// Off, as in Obsidian: a tag node joins every note carrying it, which on a
+    /// vault that tags consistently buries the actual link structure.
+    public var graphShowTags = false
     public var graphShowAttachments = false
+    /// Obsidian words this the other way round, as "Existing files only".
     public var graphShowUnresolved = true
+    /// Notes with no links at all. Most vaults are mostly orphans, so this is
+    /// the toggle that decides whether the graph is a map or a dust cloud.
+    public var graphShowOrphans = true
+    /// Draw links as arrows rather than plain lines.
+    public var graphArrows = false
+    /// Zoom below which labels fade out. 0 keeps them on at every zoom.
+    public var graphTextFadeThreshold = 0.0
+    /// Multiplier on node radius, 0.1…5.
+    public var graphNodeSize = 1.0
+    /// Multiplier on link width, 0.1…5.
+    public var graphLinkThickness = 1.0
+    /// Pull toward the centre, 0…1.
+    public var graphCentreForce = 0.52
+    /// Node-to-node repulsion, 0…20.
+    public var graphRepelForce = 10.0
+    /// Spring stiffness along links, 0…1.
+    public var graphLinkForce = 1.0
+    /// Spring rest length, 30…500.
+    public var graphLinkDistance = 250.0
+    /// Colour groups: a search query and the colour nodes matching it take.
+    public var graphGroups: [GraphGroup] = []
+
+    /// One colour group in the graph: everything matching `query` is drawn in
+    /// `colour` instead of its usual colour.
+    ///
+    /// The query is the same one the search pane takes — plain text matches the
+    /// path, `tag:` matches a tag — so there is one thing to learn rather than two.
+    public struct GraphGroup: Codable, Hashable, Sendable, Identifiable {
+        public var id: UUID
+        public var query: String
+        /// sRGB, 0…1.
+        public var red: Double
+        public var green: Double
+        public var blue: Double
+
+        public init(id: UUID = UUID(), query: String = "", red: Double, green: Double, blue: Double) {
+            self.id = id
+            self.query = query
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+
+        /// The colours new groups cycle through, so two groups made in a row are
+        /// told apart without anyone reaching for a colour picker.
+        public static let palette: [(red: Double, green: Double, blue: Double)] = [
+            (0.42, 0.36, 0.90),   // indigo
+            (0.90, 0.49, 0.24),   // orange
+            (0.24, 0.68, 0.44),   // green
+            (0.85, 0.32, 0.48),   // rose
+            (0.28, 0.62, 0.85),   // sky
+            (0.76, 0.62, 0.20),   // amber
+        ]
+
+        public static func next(after existing: [GraphGroup]) -> GraphGroup {
+            let colour = palette[existing.count % palette.count]
+            return GraphGroup(query: "", red: colour.red, green: colour.green, blue: colour.blue)
+        }
+    }
 
     public enum LinkFormat: String, Codable, CaseIterable, Sendable, Identifiable {
         case wikilink      // [[Note]]
@@ -243,6 +306,16 @@ public struct SettingsData: Codable, Hashable, Sendable {
         graphShowTags = value(.graphShowTags, defaults.graphShowTags)
         graphShowAttachments = value(.graphShowAttachments, defaults.graphShowAttachments)
         graphShowUnresolved = value(.graphShowUnresolved, defaults.graphShowUnresolved)
+        graphShowOrphans = value(.graphShowOrphans, defaults.graphShowOrphans)
+        graphArrows = value(.graphArrows, defaults.graphArrows)
+        graphTextFadeThreshold = value(.graphTextFadeThreshold, defaults.graphTextFadeThreshold)
+        graphNodeSize = value(.graphNodeSize, defaults.graphNodeSize)
+        graphLinkThickness = value(.graphLinkThickness, defaults.graphLinkThickness)
+        graphCentreForce = value(.graphCentreForce, defaults.graphCentreForce)
+        graphRepelForce = value(.graphRepelForce, defaults.graphRepelForce)
+        graphLinkForce = value(.graphLinkForce, defaults.graphLinkForce)
+        graphLinkDistance = value(.graphLinkDistance, defaults.graphLinkDistance)
+        graphGroups = value(.graphGroups, defaults.graphGroups)
     }
 }
 

@@ -212,6 +212,18 @@ struct SearchQuery {
         }
     }
 
+    /// Whether a note matches without reading its body.
+    ///
+    /// The index deliberately keeps note text on disk, so the graph has no
+    /// bodies to search: a bare word there means "somewhere in the file's path",
+    /// which is what Obsidian's graph filter matches on too.
+    func matchesWithoutBody(_ note: NoteMetadata) -> Bool {
+        guard matchesMetadata(note) else { return false }
+        guard !terms.isEmpty else { return true }
+        let path = note.url.path(percentEncoded: false)
+        return terms.allSatisfy { path.localizedCaseInsensitiveContains($0) }
+    }
+
     func matchesMetadata(_ note: NoteMetadata) -> Bool {
         for tag in tags {
             // `tag:project` matches `#project` and `#project/inkstone`.

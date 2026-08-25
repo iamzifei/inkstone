@@ -209,21 +209,33 @@ struct CanvasPane: View {
     // MARK: - Toolbar
 
     private var toolbar: some View {
+        // `.labelStyle(.iconOnly)` below, so each of these is a bare glyph with
+        // nothing naming it. Every one carries a `.help`; on the two that are
+        // conditionally disabled it says what would enable them, which is the
+        // question a dimmed button actually raises.
         HStack(spacing: 14) {
             Button { addNode(.text) } label: { Label("Card", systemImage: "plus.rectangle") }
+                .help("Add a card")
             Button { addNode(.group) } label: { Label("Group", systemImage: "rectangle.dashed") }
+                .help("Add a group")
             Button {
                 connectSelection()
             } label: {
                 Label("Connect", systemImage: "arrow.right")
             }
             .disabled(selection.count != 2)
+            .help(selection.count == 2
+                  ? String(localized: "Draw an arrow between the two selected cards")
+                  : String(localized: "Select two cards to connect them"))
 
             Divider().frame(height: 16)
 
             Button { zoom = max(0.2, zoom / 1.2) } label: { Image(systemName: "minus.magnifyingglass") }
+                .help("Zoom out")
             Button { fitToContent() } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                .help("Fit the whole canvas on screen")
             Button { zoom = min(3, zoom * 1.2) } label: { Image(systemName: "plus.magnifyingglass") }
+                .help("Zoom in")
 
             Button(role: .destructive) {
                 document.nodes.removeAll { selection.contains($0.id) }
@@ -234,6 +246,9 @@ struct CanvasPane: View {
                 Image(systemName: "trash")
             }
             .disabled(selection.isEmpty)
+            .help(selection.isEmpty
+                  ? String(localized: "Select a card to delete it")
+                  : String(localized: "Delete the selected cards"))
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)

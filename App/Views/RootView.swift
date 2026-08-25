@@ -119,6 +119,11 @@ struct RootView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Every button here shows an icon and nothing else, so every one of them
+        // carries a `.help`. Without it the only way to learn what the toolbar
+        // does is to press things and find out. The text names the keyboard
+        // shortcut too where there is one, since that is the other thing a
+        // hovering user is usually after.
         ToolbarItemGroup(placement: .navigation) {
             Button {
                 workspace.goBack()
@@ -126,6 +131,7 @@ struct RootView: View {
                 Label("Back", systemImage: "chevron.backward")
             }
             .disabled(!workspace.canGoBack)
+            .help("Back to the previous note (⌘[)")
 
             Button {
                 workspace.goForward()
@@ -133,6 +139,7 @@ struct RootView: View {
                 Label("Forward", systemImage: "chevron.forward")
             }
             .disabled(!workspace.canGoForward)
+            .help("Forward (⌘])")
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
@@ -141,18 +148,21 @@ struct RootView: View {
             } label: {
                 Label("Quick Switcher", systemImage: "magnifyingglass")
             }
+            .help("Find a note by name (⌘O)")
 
             Button {
                 workspace.open(.graph)
             } label: {
                 Label("Graph View", systemImage: "point.3.filled.connected.trianglepath.dotted")
             }
+            .help("Graph view — every note in the vault and the links between them (⇧⌘G)")
 
             Button {
                 workspace.open(.calendar)
             } label: {
                 Label("Calendar", systemImage: "calendar")
             }
+            .help("Calendar of daily notes")
 
             Menu {
                 Button("New Note", systemImage: "doc.badge.plus") { workspace.createNote() }
@@ -161,6 +171,7 @@ struct RootView: View {
             } label: {
                 Label("New", systemImage: "plus")
             }
+            .help("New note (⌘N), canvas (⇧⌘N), or today's daily note (⇧⌘D)")
 
             // Only present once GitHub sync is switched on: a sync button that
             // can never do anything is worse than no button.
@@ -180,6 +191,9 @@ struct RootView: View {
             } label: {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
+            .help(isInspectorPresented
+                  ? String(localized: "Hide the inspector")
+                  : String(localized: "Show the inspector — properties, backlinks, local graph"))
         }
     }
 }
