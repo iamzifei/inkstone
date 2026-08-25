@@ -129,6 +129,22 @@ enum ReadingTypesetter {
                     range: span.range
                 )
 
+            case .properties:
+                // A note's own metadata, set as the aside it is: smaller, quieter
+                // and tighter than the prose, but present. It used to be deleted.
+                result.addAttribute(
+                    .font,
+                    value: typography.codeFont.platformFont(size: typography.codeFontSize * 0.92),
+                    range: span.range
+                )
+                result.addAttribute(.foregroundColor,
+                                    value: palette.secondaryText.platformColor, range: span.range)
+                let aside = NSMutableParagraphStyle()
+                aside.lineHeightMultiple = 1.25
+                aside.paragraphSpacing = 0
+                aside.paragraphSpacingBefore = 0
+                result.addAttribute(.paragraphStyle, value: aside, range: span.range)
+
             case .horizontalRule:
                 break
             }

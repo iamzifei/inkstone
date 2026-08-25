@@ -29,6 +29,8 @@ public struct ReadingDocument: Sendable, Equatable {
             case quote(depth: Int)
             case table
             case horizontalRule
+            /// A note's frontmatter, kept as text and styled as the aside it is.
+            case properties
         }
 
         public let style: Style
@@ -68,18 +70,37 @@ public enum ReadingRenderer {
 
         for token in tokens {
             switch token.kind {
-            // Whole blocks that are not prose.
-            case .frontmatter, .comment:
-                cuts.append(lineRange(token.range, in: source))
+            // Frontmatter keeps its contents and loses its `---` rules.
+            //
+            // It used to be deleted whole, which threw away a note's properties
+            // — and on a header written with full-width colons (`编号：N19`),
+            // which YAML reads as one long scalar rather than a mapping, it threw
+            // away a dozen lines of the author's own text. The same mistake had
+            // already been made once in live preview. Reading mode may restyle
+            // anything; it may not lose anything.
+            case .frontmatter:
+                cuts.append(contentsOf: fenceLines(of: token, in: source))
+
+            // A comment is the one thing here that is *meant* to disappear —
+            // `%%like this%%` is Obsidian's "don't render me". Only the comment,
+            // though: cutting its whole line took the prose either side of it
+            // with it, so `text %%note%% more` rendered as nothing at all.
+            case .comment:
+                cuts.append(token.range)
 
             // Fences go; the code between them stays.
-            case .codeBlock:
+            case .codeBlock, .mathBlock:
                 cuts.append(contentsOf: fenceLines(of: token, in: source))
 
             // Inline pairs: drop the delimiters either side of the content.
             case .bold, .italic, .strikethrough, .highlight, .inlineCode,
                  .superscript, .subscript, .mathInline:
                 cuts.append(contentsOf: delimiters(of: token))
+
+            // `> [!note] Title` reads as `Title`. The marker is scaffolding; the
+            // title is the author's words.
+            case .callout:
+                if let marker = calloutMarker(of: token, in: source) { cuts.append(marker) }
 
             // `# ` at the head of a heading.
             case .heading:
@@ -116,6 +137,14 @@ public enum ReadingRenderer {
 
             case .horizontalRule:
                 substitutions.append((lineRange(token.range, in: source), "───"))
+
+            // A table's `| --- | --- |` row carries no content at all — it is
+            // there to tell a parser where the header ends. Rendering it is
+            // showing the reader the scaffolding.
+            case .table:
+                if let separator = tableSeparatorLine(of: token, in: source) {
+                    cuts.append(separator)
+                }
 
             default:
                 break
@@ -189,8 +218,49 @@ public enum ReadingRenderer {
         case .blockquote(let depth): .quote(depth: depth)
         case .table: .table
         case .horizontalRule: .horizontalRule
+        case .frontmatter: .properties
         default: nil
         }
+    }
+
+    /// A table's alignment row, including the newline that ends it.
+    private static func tableSeparatorLine(of token: SyntaxToken, in source: NSString) -> NSRange? {
+        let block = lineRange(token.range, in: source)
+        var location = block.location
+        while location < NSMaxRange(block) {
+            let line = source.lineRange(for: NSRange(location: location, length: 0))
+            let text = source.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+            // Only pipes, dashes, colons and spaces: that is an alignment row and
+            // nothing else is.
+            if !text.isEmpty,
+               text.contains("-"),
+               text.allSatisfy({ $0 == "|" || $0 == "-" || $0 == ":" || $0 == " " }) {
+                return line
+            }
+            location = max(NSMaxRange(line), location + 1)
+        }
+        return nil
+    }
+
+    /// The `[!type]` marker at the head of a callout, and the space after it.
+    private static func calloutMarker(of token: SyntaxToken, in source: NSString) -> NSRange? {
+        let line = source.lineRange(for: NSRange(location: token.range.location, length: 0))
+        let text = source.substring(with: line)
+        guard let open = text.range(of: "[!"), let close = text.range(of: "]", range: open.upperBound..<text.endIndex)
+        else { return nil }
+        var end = text.index(after: close.lowerBound)
+        // Take the space after it too, and the `+`/`-` fold marker if present.
+        while end < text.endIndex, text[end] == "+" || text[end] == "-" || text[end] == " " {
+            end = text.index(after: end)
+        }
+        let start = text.distance(from: text.startIndex, to: open.lowerBound)
+        let length = text.distance(from: open.lowerBound, to: end)
+        // Distances are in Characters; the range has to be in UTF-16.
+        let prefix = String(text[text.startIndex..<open.lowerBound])
+        let body = String(text[open.lowerBound..<end])
+        _ = start
+        return NSRange(location: line.location + (prefix as NSString).length,
+                       length: (body as NSString).length)
     }
 
     /// The `>` characters, and the space after them, at the head of a quote line.
