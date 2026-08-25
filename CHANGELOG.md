@@ -7,7 +7,7 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
-## Unreleased
+## 0.1.4 — 2026-08-26
 
 ### Reading mode renders everything
 

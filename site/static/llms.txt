@@ -23,7 +23,10 @@ Three decisions the rest follows from:
 ## What it does
 
 - Live preview editing — syntax renders in place and is revealed on the line the
-  cursor is on. Source and reading modes as well.
+  cursor is on. Source mode shows the raw Markdown.
+- Reading mode, where the syntax is *removed* rather than hidden: pictures,
+  Mermaid diagrams and formulas are drawn, tables are laid out in columns, and
+  copying a paragraph gives prose rather than markup.
 - Wikilinks, embeds, block references, aliases in frontmatter, backlinks, and
   unresolved-link tracking.
 - Frontmatter shown as a properties table at the top of the note.
