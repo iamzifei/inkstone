@@ -20,13 +20,19 @@
 <style>
   .page { max-width: 46rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 6rem); }
   .page h1 { font-size: var(--t-h2); font-weight: 400; letter-spacing: -.02em; line-height: 1.15; }
-  .page h2 { font-size: var(--t-h3); font-weight: 600; margin-top: 3rem; margin-bottom: .7rem; }
-  .page h3 { font-size: 1.05rem; font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
+  /* Three heading levels, on a 1.25-or-better step at every size. The site's
+     own scale jumps straight from --t-h3 to body because the pages it was built
+     for have two levels; these have three, and an h3 set at the old 1.05rem came
+     out *smaller* than --t-body — a subheading quieter than the prose under it. */
+  .page h2 { font-size: clamp(1.45rem, 1.2rem + .95vw, 1.95rem);
+             font-weight: 600; margin-top: 3rem; margin-bottom: .7rem; }
+  .page h3 { font-size: clamp(1.16rem, 1.06rem + .35vw, 1.3rem);
+             font-weight: 600; margin-top: 1.8rem; margin-bottom: .4rem; }
   .page p, .page li, .page td { color: var(--ink-2); }
   .page ul, .page ol { padding-inline-start: 1.2rem; margin-block: .8rem; }
   .page ul { list-style: disc; } .page ol { list-style: decimal; }
   .page li { margin-block: .4rem; }
-  .lede { font-size: 1.15rem; margin-block: 1.2rem 2rem; }
+  .lede { font-size: var(--t-lede); margin-block: 1.2rem 2rem; }
   .cmp { width: 100%; border-collapse: collapse; margin-block: 1.2rem; font-size: .95rem; }
   .cmp th, .cmp td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
   .cmp th { font-family: var(--sans); font-size: var(--t-micro); letter-spacing: .1em;
