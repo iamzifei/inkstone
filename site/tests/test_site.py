@@ -296,3 +296,126 @@ class NoOrphanPages(BuiltSite):
                 self.assertIsNotNone(match, f"{name} not linked")
                 self.assertIn('hreflang="en"', match.group(1),
                               f"{name} is linked without hreflang=en")
+
+
+class ExternalLinks(BuiltSite):
+    """Links that leave the site, and the one that matters most.
+
+    The download button was a 404 for four releases and no test noticed, for two
+    compounding reasons that are worth naming rather than quietly fixing:
+
+    1. `LandingPages.test_internal_links_resolve` skips anything starting `http`.
+       It was written to check that a page does not link to a file missing from
+       the build, and it does that — but it means the *download* link, which is
+       the single most important link on the site, was never in scope.
+    2. That test only ran over `LandingPages.PAGES`. The home page, where the
+       download button actually lives, was not being checked at all.
+
+    Both are fixed here: every page is walked, and external links are really
+    fetched. A network failure skips; a 404 fails.
+    """
+
+    #: Hosts worth a real request. Anything else — a competitor's site, a font
+    #: CDN, someone's licence page — is out of our control, and a broken link
+    #: there is not a bug this suite can fix.
+    #:
+    #: `inkslab.app` is deliberately absent even though it is ours: an absolute
+    #: self-link (canonical, hreflang) points at the *deployed* site, so a page
+    #: added in this commit would 404 until the deploy that this very test is
+    #: gating. Those are checked against the local build instead, below.
+    OURS = ("github.com",)
+
+    SITE_PREFIX = build.SITE.rstrip("/") + "/"
+
+    def _pages(self) -> list[Path]:
+        return sorted(self.out.rglob("*.html"))
+
+    def _links(self) -> dict[str, set[str]]:
+        """Every http(s) link on the site, grouped by the page carrying it."""
+        found: dict[str, set[str]] = {}
+        for page in self._pages():
+            name = str(page.relative_to(self.out))
+            found[name] = set(re.findall(r'href="(https?://[^"]+)"',
+                                         page.read_text(encoding="utf-8")))
+        return found
+
+    @staticmethod
+    def _status(url: str) -> int | None:
+        """HEAD the URL. `None` means the network is unavailable, not a 404."""
+        import urllib.error
+        import urllib.request
+
+        request = urllib.request.Request(url, method="HEAD",
+                                         headers={"User-Agent": "inkstone-site-tests"})
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                return response.status
+        except urllib.error.HTTPError as error:
+            return error.code
+        except (urllib.error.URLError, TimeoutError, OSError):
+            return None
+
+    def test_the_download_link_is_a_real_file(self) -> None:
+        """The one that was broken, asserted on its own and first.
+
+        `releases/latest/download/<name>` resolves only if the latest release
+        carries an asset called exactly `<name>` — and the packaging script
+        names its output `Inkstone-<version>.dmg`, so the stable name has to be
+        uploaded alongside it. `Tools/release-mac.sh` does that now, and checks
+        this same URL before it exits. This is the second line: if the two ever
+        drift apart again, the site build fails rather than the download.
+        """
+        status = self._status(build.DOWNLOAD)
+        if status is None:
+            self.skipTest("no network")
+        self.assertEqual(
+            status, 200,
+            f"{build.DOWNLOAD} returned {status}. The latest GitHub release "
+            "must carry an asset named exactly Inkstone.dmg — see Tools/release-mac.sh.")
+
+    def test_our_own_links_resolve(self) -> None:
+        """Every link into our own GitHub, not only the download button."""
+        urls = {url.split("#")[0] for links in self._links().values() for url in links
+                if any(host in url for host in self.OURS)}
+        broken = []
+        for url in sorted(urls):
+            status = self._status(url)
+            if status is None:
+                self.skipTest("no network")
+            if status >= 400:
+                broken.append(f"{url} -> {status}")
+        self.assertEqual(broken, [], "\n".join(broken))
+
+    def test_absolute_self_links_point_at_pages_this_build_produces(self) -> None:
+        """Canonicals and hreflang, checked against the build rather than the web.
+
+        These are the links most likely to be quietly wrong: they are built by
+        concatenating a language prefix onto a host, and nothing renders them for
+        a human to notice.
+        """
+        missing = []
+        for page, links in self._links().items():
+            for url in links:
+                if not url.startswith(self.SITE_PREFIX):
+                    continue
+                rest = url[len(self.SITE_PREFIX):].split("#")[0].split("?")[0]
+                target = self.out / (rest if rest.endswith(".html") else rest + "index.html")
+                if not target.exists():
+                    missing.append(f"{page} -> {url}")
+        self.assertEqual(missing, [], "\n".join(sorted(missing)))
+
+    def test_every_page_has_its_internal_links_checked(self) -> None:
+        """The second half of the miss: only two pages were being walked."""
+        for page in self._pages():
+            html = page.read_text(encoding="utf-8")
+            base = page.parent
+            for href in re.findall(r'href="([^"#]+)"', html):
+                if href.startswith(("http://", "https://", "mailto:")):
+                    continue
+                # Assets carry a `?v=<hash>` cache-busting suffix, which is not
+                # part of the filename on disk.
+                path = href.split("?")[0]
+                target = base / (path if path not in ("", "./") else "index.html")
+                self.assertTrue(target.exists(),
+                                f"{page.relative_to(self.out)} links to {href}, "
+                                "which is not in the build")
