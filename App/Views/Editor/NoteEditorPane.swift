@@ -8,6 +8,9 @@ struct NoteEditorPane: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
     @Environment(\.openURL) private var openURL
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         if let document = workspace.document(for: url) {
@@ -82,18 +85,12 @@ struct NoteEditorPane: View {
 
             Spacer()
 
-            Button {
-                workspace.revealInTree(url)
-            } label: {
-                Image(systemName: "sidebar.leading")
-                    .font(.system(size: 12))
-                    .frame(width: 26, height: 22)
-                    .foregroundStyle(style.secondaryText)
-                    .contentShape(.rect)
+            // Not at a compact width. There is no sidebar on screen to reveal
+            // anything *into* — the file tree is a separate screen you navigate
+            // back to — so the button would look like it did nothing.
+            if canRevealInTree {
+                revealButton
             }
-            .buttonStyle(.plain)
-            .help("Find this note in the sidebar (⌥⌘R)")
-            .accessibilityLabel(Text("Reveal in sidebar"))
 
             // A segmented picker shows one tooltip for the whole control, not
             // one per segment, so these are three buttons that look like a
@@ -115,6 +112,30 @@ struct NoteEditorPane: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    /// Whether the file tree is on screen beside the editor at all.
+    private var canRevealInTree: Bool {
+        #if os(iOS)
+        sizeClass != .compact
+        #else
+        true
+        #endif
+    }
+
+    private var revealButton: some View {
+        Button {
+            workspace.revealInTree(url)
+        } label: {
+            Image(systemName: "sidebar.leading")
+                .font(.system(size: 12))
+                .frame(width: 26, height: 22)
+                .foregroundStyle(style.secondaryText)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help("Find this note in the sidebar (⌥⌘R)")
+        .accessibilityLabel(Text("Reveal in sidebar"))
     }
 
     private func modeButton(
