@@ -9,6 +9,10 @@ let package = Package(
     ],
     products: [
         .library(name: "InkstoneCore", targets: ["InkstoneCore"]),
+        // A smoke check that actually calls the model providers. Not a test
+        // target: it needs credentials and a network, so it must be runnable
+        // deliberately rather than as part of `swift test`.
+        .executable(name: "provider-check", targets: ["ProviderCheck"]),
     ],
     dependencies: [
         // Apple's cmark-gfm based Markdown parser. Gives us GitHub Flavored Markdown
@@ -25,6 +29,11 @@ let package = Package(
                 .product(name: "Markdown", package: "swift-markdown"),
                 "Yams",
             ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "ProviderCheck",
+            dependencies: ["InkstoneCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
