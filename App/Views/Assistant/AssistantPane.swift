@@ -21,6 +21,7 @@ struct AssistantPane: View {
     private var settings: AppSettings { workspace.settings }
 
     @State private var conversation = Conversation()
+    @State private var catalogue = ModelCatalogue()
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
 
@@ -35,7 +36,11 @@ struct AssistantPane: View {
         .background(style.background)
         .onChange(of: workspace.activeTab?.url) { attachCurrentNote() }
         .onChange(of: settings.data.assistant.includesCurrentNote) { attachCurrentNote() }
-        .onAppear { attachCurrentNote() }
+        .onAppear {
+            attachCurrentNote()
+            if let profile { catalogue.load(profile) }
+        }
+        .onChange(of: profile?.id) { if let profile { catalogue.load(profile) } }
     }
 
     // MARK: - Header
@@ -273,31 +278,37 @@ struct AssistantPane: View {
         .animation(.easeOut(duration: 0.12), value: inputFocused)
     }
 
-    /// Model and thinking effort, as one unobtrusive menu.
+    /// Channel, model, and thinking effort, in one menu.
     ///
-    /// Reads as a label until pointed at, the way the model name does in both
-    /// ChatGPT and Claude — it is a setting people change rarely and read often,
-    /// so it should be legible without drawing the eye.
+    /// Three levels because they are three decisions and only the first is
+    /// rare: the channel is a key and an endpoint, set once; the model changes
+    /// with the task; the effort changes with the question. Binding a model to a
+    /// channel — which is what the first version did — meant changing model was
+    /// a trip to Settings.
+    ///
+    /// The model list is fetched from the endpoint rather than hard-coded. A
+    /// baked-in list is wrong the day a model ships, and a custom endpoint
+    /// serves models this app has never heard of.
     private var modelPicker: some View {
         Menu {
-            Picker(String(localized: "Model"), selection: profileBinding) {
-                ForEach(settings.data.assistant.profiles) { candidate in
-                    Text(candidate.name).tag(candidate.id as UUID?)
+            if settings.data.assistant.profiles.count > 1 {
+                Picker(String(localized: "Channel"), selection: profileBinding) {
+                    ForEach(settings.data.assistant.profiles) { candidate in
+                        Text(candidate.name).tag(candidate.id as UUID?)
+                    }
                 }
+                .pickerStyle(.inline)
+                Divider()
             }
-            .pickerStyle(.inline)
+
+            modelSection
             Divider()
-            Picker(String(localized: "Thinking"), selection: thinkingBinding) {
-                ForEach(ThinkingEffort.allCases, id: \.self) { effort in
-                    Text(Self.thinkingLabel(effort)).tag(effort)
-                }
-            }
-            .pickerStyle(.inline)
+            thinkingSection
         } label: {
             HStack(spacing: 3) {
-                Text(profile?.name ?? String(localized: "No model"))
+                Text(modelLabel)
                     .foregroundStyle(style.secondaryText)
-                if let profile, profile.thinking != .off {
+                if let profile, profile.thinking != .off, thinkingIsAvailable {
                     Text(Self.thinkingShortLabel(profile.thinking))
                         .foregroundStyle(style.faintText)
                 }
@@ -312,6 +323,90 @@ struct AssistantPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .disabled(settings.data.assistant.profiles.isEmpty)
+    }
+
+    @ViewBuilder
+    private var modelSection: some View {
+        if let profile {
+            switch catalogue.state(for: profile) {
+            case .loading:
+                Text("Loading models…")
+            case .failed(let message):
+                // Shown in the menu rather than swallowed: a channel that
+                // cannot list its models usually has a bad key, and this is
+                // where someone will look first.
+                Text(message)
+                Button(String(localized: "Try again")) { catalogue.load(profile, force: true) }
+            case .idle, .loaded:
+                let models = catalogue.models(for: profile)
+                if models.isEmpty {
+                    Text("No models")
+                } else {
+                    Picker(String(localized: "Model"), selection: modelBinding) {
+                        ForEach(models) { model in
+                            Text(model.displayName).tag(model.id)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+            }
+        }
+    }
+
+    /// The effort control, which is not offered where it would fail.
+    ///
+    /// Sending a reasoning parameter to a model that does not take one is a
+    /// **400, not an ignored field** — `gpt-4.1-mini` answers `Unrecognized
+    /// request argument supplied: reasoning_effort`. So offering the control
+    /// everywhere meant the message simply would not send. The provider retries
+    /// without it when the guess is wrong; this stops the guess being offered.
+    @ViewBuilder
+    private var thinkingSection: some View {
+        if thinkingIsAvailable {
+            Picker(String(localized: "Thinking"), selection: thinkingBinding) {
+                ForEach(ThinkingEffort.allCases, id: \.self) { effort in
+                    Text(Self.thinkingLabel(effort)).tag(effort)
+                }
+            }
+            .pickerStyle(.inline)
+        } else {
+            Text("This model does not support extended thinking")
+        }
+    }
+
+    private var thinkingIsAvailable: Bool {
+        guard let profile, !profile.model.isEmpty else { return false }
+        if conversation.modelsRefusingThinking.contains(profile.model) { return false }
+        return ModelCapabilities.supportsThinking(model: profile.model, kind: profile.kind)
+    }
+
+    /// What the composer shows: the model, since that is what a person is
+    /// choosing. The channel appears only when there is more than one, because
+    /// with a single channel its name is noise.
+    private var modelLabel: String {
+        guard let profile else { return String(localized: "No model") }
+        let model = profile.model.isEmpty
+            ? String(localized: "Choose a model")
+            : ModelCapabilities.displayName(for: profile.model)
+        return settings.data.assistant.profiles.count > 1
+            ? "\(profile.name) · \(model)"
+            : model
+    }
+
+    private var modelBinding: Binding<String> {
+        Binding(
+            get: { profile?.model ?? "" },
+            set: { model in
+                guard let id = profile?.id,
+                      let index = settings.data.assistant.profiles
+                        .firstIndex(where: { $0.id == id }) else { return }
+                settings.data.assistant.profiles[index].model = model
+                // A model that refuses to reason cannot carry an effort setting.
+                if !ModelCapabilities.supportsThinking(
+                    model: model, kind: settings.data.assistant.profiles[index].kind) {
+                    settings.data.assistant.profiles[index].thinking = .off
+                }
+            })
     }
 
     @ViewBuilder

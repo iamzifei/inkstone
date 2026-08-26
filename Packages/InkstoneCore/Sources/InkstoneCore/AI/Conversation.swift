@@ -272,6 +272,13 @@ public enum ProviderError: Error, Sendable, Equatable {
     case unauthorized
     case rateLimited(retryAfter: TimeInterval?)
     case contextTooLong
+    /// The model refused the thinking/reasoning parameter.
+    ///
+    /// Its own case because it is the one 400 worth retrying: the request is
+    /// otherwise fine and succeeds without that one field. Measured against
+    /// `gpt-4.1-mini`, which answers `Unrecognized request argument supplied:
+    /// reasoning_effort` rather than ignoring it.
+    case unsupportedThinking
     case serverError(status: Int, body: String)
     case network(String)
     case decoding(String)

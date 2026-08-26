@@ -595,3 +595,68 @@ struct TurnAccumulatorTests {
         #expect(!accumulate([.toolUseStarted(id: "t", name: "read_note")]).isEmpty)
     }
 }
+
+/// What a model will accept, which neither provider will tell us.
+@Suite("Model capabilities")
+struct ModelCapabilityTests {
+    @Test("Reasoning families take an effort; chat families reject it")
+    func knowsWhoReasons() {
+        // Measured: gpt-4.1-mini answers a reasoning_effort with
+        // "Unrecognized request argument supplied", a 400 — so a wrong answer
+        // here does not degrade the reply, it loses the message.
+        #expect(ModelCapabilities.supportsThinking(model: "gpt-5", kind: .openAICompatible))
+        #expect(ModelCapabilities.supportsThinking(model: "o3-mini", kind: .openAICompatible))
+        #expect(!ModelCapabilities.supportsThinking(model: "gpt-4.1-mini", kind: .openAICompatible))
+        #expect(!ModelCapabilities.supportsThinking(model: "gpt-4o", kind: .openAICompatible))
+    }
+
+    @Test("Claude 4 and later reason; Claude 3 does not")
+    func knowsTheClaudeGenerations() {
+        // Measured against this key's list: all ten models it can reach, down to
+        // claude-sonnet-4-5, accept a thinking block.
+        #expect(ModelCapabilities.supportsThinking(model: "claude-opus-5", kind: .anthropic))
+        #expect(ModelCapabilities.supportsThinking(
+            model: "claude-sonnet-4-5-20250929", kind: .anthropic))
+        #expect(!ModelCapabilities.supportsThinking(
+            model: "claude-3-5-haiku-20241022", kind: .anthropic))
+    }
+
+    @Test("An unknown model is assumed not to reason")
+    func failsClosed() {
+        // The asymmetry that decides the default: a model that would have
+        // reasoned and was not asked to simply answers plainly, while one that
+        // would not have reasoned and was asked to refuses the whole request.
+        #expect(!ModelCapabilities.supportsThinking(model: "llama-3.3-70b", kind: .openAICompatible))
+        #expect(!ModelCapabilities.supportsThinking(model: "mistral-large", kind: .openAICompatible))
+        // Except where the name says so outright.
+        #expect(ModelCapabilities.supportsThinking(model: "qwq-32b", kind: .openAICompatible))
+        #expect(ModelCapabilities.supportsThinking(model: "deepseek-reasoner", kind: .openAICompatible))
+    }
+
+    @Test("The on-device model never takes an effort")
+    func onDeviceNeverReasons() {
+        #expect(!ModelCapabilities.supportsThinking(model: "apple-on-device", kind: .appleOnDevice))
+    }
+
+    @Test("Identifiers become names a person can scan")
+    func namesModels() {
+        #expect(ModelCapabilities.displayName(for: "claude-opus-4-5-20251101") == "Claude Opus 4.5")
+        #expect(ModelCapabilities.displayName(for: "claude-sonnet-5") == "Claude Sonnet 5")
+        // A date stamp is a fine key and a poor label; in a narrow menu it
+        // pushes the part that distinguishes one model from another off the end.
+        #expect(!ModelCapabilities.displayName(for: "claude-haiku-4-5-20251001").contains("2025"))
+    }
+
+    @Test("The picker offers chat models and nothing else")
+    func filtersTheList() {
+        // The official endpoint lists 130 models, most of which cannot hold a
+        // conversation. A picker containing whisper-1 is a picker nobody can
+        // find a chat model in.
+        #expect(ModelCapabilities.isChatModel("gpt-5"))
+        #expect(ModelCapabilities.isChatModel("claude-opus-5"))
+        #expect(!ModelCapabilities.isChatModel("text-embedding-3-small"))
+        #expect(!ModelCapabilities.isChatModel("whisper-1"))
+        #expect(!ModelCapabilities.isChatModel("dall-e-3"))
+        #expect(!ModelCapabilities.isChatModel("omni-moderation-latest"))
+    }
+}

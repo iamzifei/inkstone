@@ -94,7 +94,7 @@ final class Conversation {
         run(using: profile)
     }
 
-    private func run(using profile: AssistantProfile) {
+    private func run(using profile: AssistantProfile, thinkingOverride: ThinkingEffort? = nil) {
         let provider: any ModelProvider
         do {
             provider = try ProviderFactory.provider(for: profile)
@@ -111,7 +111,7 @@ final class Conversation {
             system: systemPrompt(),
             messages: messages,
             maxTokens: 8_192,
-            thinking: profile.thinking)
+            thinking: thinkingOverride ?? profile.thinking)
 
         isRunning = true
         streaming = ChatMessage(role: .assistant, blocks: [])
@@ -125,6 +125,12 @@ final class Conversation {
                     self?.streaming = accumulator.message
                 }
                 self?.finish(accumulator, error: nil)
+            } catch ProviderError.unsupportedThinking where thinkingOverride == nil {
+                // The model refused the reasoning parameter. Guessing which
+                // models take it is a pattern over names, and new models are
+                // under no obligation to follow it — so a wrong guess retries
+                // without it rather than costing the person their message.
+                await self?.retryWithoutThinking(using: profile)
             } catch let error as ProviderError {
                 self?.finish(accumulator, error: error)
             } catch {
@@ -156,6 +162,20 @@ final class Conversation {
         isRunning = false
         task = nil
     }
+
+    /// Re-runs the turn with thinking off, and remembers not to ask again.
+    ///
+    /// The note is per conversation rather than saved: a provider may add
+    /// support at any time, and a preference file is a bad place to record a
+    /// fact that expires.
+    private func retryWithoutThinking(using profile: AssistantProfile) async {
+        modelsRefusingThinking.insert(profile.model)
+        streaming = ChatMessage(role: .assistant, blocks: [])
+        run(using: profile, thinkingOverride: .off)
+    }
+
+    /// Models that answered a thinking request with a 400, this session.
+    private(set) var modelsRefusingThinking: Set<String> = []
 
     func stop() {
         task?.cancel()
@@ -219,6 +239,10 @@ final class Conversation {
             return String(localized: "Rate limited by the provider. Try again shortly.")
         case .contextTooLong:
             return String(localized: "This conversation is too long for the model. Start a new one.")
+        case .unsupportedThinking:
+            // Reached only if the retry without thinking also failed, since the
+            // first one is handled rather than reported.
+            return String(localized: "This model does not support extended thinking. Turn it off in the model menu.")
         case .serverError(let status, let body):
             let detail = body.prefix(200)
             return detail.isEmpty

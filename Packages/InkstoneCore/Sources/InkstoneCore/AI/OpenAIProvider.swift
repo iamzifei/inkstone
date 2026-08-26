@@ -229,6 +229,8 @@ public struct OpenAICompatibleProvider: ModelProvider {
         case 429:
             let retry = (headers["retry-after"] as? String).flatMap(TimeInterval.init)
             return .rateLimited(retryAfter: retry)
+        case 400 where body.contains("reasoning_effort") && (body.contains("Unrecognized") || body.contains("unsupported") || body.contains("not supported") || body.contains("does not support")):
+            return .unsupportedThinking
         case 400 where body.contains("context_length") || body.contains("maximum context"):
             return .contextTooLong
         default:
