@@ -553,9 +553,26 @@ struct VaultPathDetectorTests {
         // paragraph into a field of false links.
         #expect(found(in: "版本 v3.2 发布于 1966. 见 google.com 与 3.14") == [])
         #expect(found(in: "https://example.com/a.md") == [])
-        #expect(found(in: "/etc/hosts.md") == [])
-        #expect(found(in: "~/notes/a.md") == [])
         #expect(found(in: ".md") == [])
+    }
+
+    @Test("Absolute paths are candidates now; whether they are inside is asked later")
+    func offersAbsolutePaths() {
+        // This assertion is the reverse of what it used to be, deliberately.
+        // The detector rejected anything starting `/` or `~` on the stated
+        // grounds that it was "outside the vault" — an assumption that is wrong
+        // exactly when someone writes out where a file in their vault lives,
+        // which is the case where a link helps most.
+        //
+        // Deciding what is inside needs the vault root, which this function does
+        // not have, so it now offers the candidate and `vaultRelative` refuses
+        // the ones that point elsewhere.
+        #expect(found(in: "/etc/hosts.md") == ["/etc/hosts.md"])
+        #expect(found(in: "~/notes/a.md") == ["~/notes/a.md"])
+
+        let root = URL(fileURLWithPath: "/vault")
+        #expect(VaultPathDetector.vaultRelative("/etc/hosts.md", vaultRoot: root) == nil)
+        #expect(VaultPathDetector.vaultRelative("/vault/a.md", vaultRoot: root) == "a.md")
     }
 
     @Test("Ranges are UTF-16, so CJK and emoji do not shift them")
@@ -649,5 +666,160 @@ struct OutgoingLinkIndexTests {
         let snapshot = IndexBuilder.assemble([note("Alone.md", text: "plain")], vaultRoot: root)
         #expect(snapshot.outgoing(from: root.appending(path: "Alone.md")).isEmpty)
         #expect(snapshot.outgoing(from: root.appending(path: "DoesNotExist.md")).isEmpty)
+    }
+}
+
+/// Paths written as prose, now that they are links rather than decoration.
+///
+/// The reported symptoms were three, and two of them had one cause: an absolute
+/// path was never clickable anywhere, and a note joined to another by a dozen
+/// path references stood alone in the graph. The detector was only ever called
+/// by the editor's highlighter — never by the index, so no edge existed, and
+/// never by reading mode, so nothing was clickable there.
+@Suite("Paths as links")
+struct PathLinkTests {
+    let root = URL(fileURLWithPath: "/vault")
+
+    private func note(_ path: String, text: String = "") -> NoteMetadata {
+        NoteParser.parse(text: text, url: root.appending(path: path))
+    }
+
+    // MARK: - Absolute paths
+
+    @Test("An absolute path inside the vault becomes a vault-relative one")
+    func acceptsAbsolutePathsInside() {
+        // The case that was rejected outright, on the assumption that a leading
+        // slash means "outside". A note recording where something lives writes
+        // the whole path, and that file is very much inside.
+        #expect(VaultPathDetector.vaultRelative("/vault/_published/index.md", vaultRoot: root)
+                == "_published/index.md")
+    }
+
+    @Test("An absolute path outside the vault is refused")
+    func refusesAbsolutePathsOutside() {
+        #expect(VaultPathDetector.vaultRelative("/etc/passwd.md", vaultRoot: root) == nil)
+        // A sibling directory whose name merely starts the same way. String
+        // prefixing without the separator would accept this.
+        #expect(VaultPathDetector.vaultRelative("/vault-backup/a.md", vaultRoot: root) == nil)
+    }
+
+    @Test("A relative path passes through untouched")
+    func passesRelativePathsThrough() {
+        #expect(VaultPathDetector.vaultRelative("_drafts/pool.md", vaultRoot: root)
+                == "_drafts/pool.md")
+    }
+
+    @Test("A tilde path is expanded before being judged")
+    func expandsTilde() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let vault = home.appending(path: "notes")
+        #expect(VaultPathDetector.vaultRelative("~/notes/a.md", vaultRoot: vault) == "a.md")
+    }
+
+    @Test("An absolute path is now path-like at all")
+    func recognisesAbsolutePaths() {
+        #expect(VaultPathDetector.isPathLike("/Users/j/vault/a.md"))
+        #expect(VaultPathDetector.isPathLike("~/vault/a.md"))
+        // Still not a URL.
+        #expect(!VaultPathDetector.isPathLike("https://example.com/a.md"))
+    }
+
+    // MARK: - The index
+
+    @Test("A path in prose is an edge in the graph")
+    func makesAnEdge() {
+        // The reported symptom: a note referring to three files by path showed
+        // as an isolated dot.
+        let source = note("N20.md", text: """
+            对照 `/vault/_published/index.md` 与 `_drafts/pool.md`。
+            """)
+        let snapshot = IndexBuilder.assemble(
+            [source, note("_published/index.md"), note("_drafts/pool.md")], vaultRoot: root)
+
+        let targets = Set(snapshot.outgoing(from: source.url).compactMap(\.destination))
+        #expect(targets == [root.appending(path: "_published/index.md"),
+                            root.appending(path: "_drafts/pool.md")])
+    }
+
+    @Test("The destination gets a backlink")
+    func makesABacklink() {
+        let source = note("N20.md", text: "见 `_drafts/pool.md`")
+        let target = note("_drafts/pool.md")
+        let snapshot = IndexBuilder.assemble([source, target], vaultRoot: root)
+        #expect(snapshot.backlinks[target.url]?.map(\.source) == [source.url])
+    }
+
+    @Test("A path pointing nowhere makes no edge and no noise")
+    func ignoresUnresolvedPaths() {
+        // Unlike a wikilink, which is a note waiting to be written, a path that
+        // resolves to nothing is usually prose that happened to look like one.
+        let source = note("N20.md", text: "参考 `_drafts/absent.md` 和 v3.2 与 google.com")
+        let snapshot = IndexBuilder.assemble([source], vaultRoot: root)
+        #expect(snapshot.outgoing(from: source.url).isEmpty)
+        #expect(snapshot.unresolved.isEmpty)
+    }
+
+    @Test("A note that names its own file does not link to itself")
+    func ignoresSelfReferences() {
+        // The reported note opens by saying its own filename is out of date.
+        // A self-loop would put a stray edge on every such note.
+        let source = note("N20.md", text: "文件名仍是旧名（`N20.md`）")
+        let snapshot = IndexBuilder.assemble([source], vaultRoot: root)
+        #expect(snapshot.outgoing(from: source.url).isEmpty)
+    }
+
+    @Test("Paths inside backticks count, because that is how paths are written")
+    func findsPathsInsideCode() {
+        let source = note("A.md", text: "对照 `_drafts/pool.md`，按核心结论比对")
+        #expect(source.pathTargets.contains("_drafts/pool.md"))
+    }
+
+    // MARK: - Reading mode
+
+    @Test("Reading mode links a path only when it resolves")
+    func linksResolvablePathsOnly() {
+        let document = ReadingRenderer.render(
+            "对照 `_drafts/pool.md` 和 `_drafts/absent.md`",
+            isLinkable: { $0 == "_drafts/pool.md" })
+        let links = document.spans.compactMap { span -> String? in
+            if case .link(let target) = span.style { return target }
+            return nil
+        }
+        #expect(links == ["_drafts/pool.md"])
+    }
+
+    @Test("By default reading mode invents no links at all")
+    func inventsNothingByDefault() {
+        // The default predicate says "no", so a caller without the vault gets a
+        // document with no fabricated destinations.
+        let document = ReadingRenderer.render("见 `_drafts/pool.md`")
+        #expect(!document.spans.contains { if case .link = $0.style { return true }; return false })
+    }
+
+    @Test("A path in a code block is a sample, not a destination")
+    func skipsCodeBlocks() {
+        let document = ReadingRenderer.render("""
+            ```sh
+            cat _drafts/pool.md
+            ```
+            """, isLinkable: { _ in true })
+        #expect(!document.spans.contains { if case .link = $0.style { return true }; return false })
+    }
+
+    @Test("A path linked by Markdown is not linked twice")
+    func doesNotDoubleLink() {
+        let document = ReadingRenderer.render("[池](_drafts/pool.md)", isLinkable: { _ in true })
+        let links = document.spans.filter { if case .link = $0.style { return true }; return false }
+        #expect(links.count == 1)
+    }
+
+    @Test("Linking a path does not change a single character of the text")
+    func changesNoText() {
+        // The property that matters most: this pass adds spans, and a span is a
+        // range over text that must still say what it said.
+        let markdown = "对照 `/vault/_published/index.md` + `06-选题装配/` 各池"
+        let plain = ReadingRenderer.render(markdown)
+        let linked = ReadingRenderer.render(markdown, isLinkable: { _ in true })
+        #expect(plain.text == linked.text)
     }
 }

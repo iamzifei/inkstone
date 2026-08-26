@@ -64,7 +64,16 @@ public enum ReadingRenderer {
     /// Reuses the same `SyntaxScanner` the editor and the index use, so "what is
     /// a tag" keeps one definition. What this adds is the deletion pass and the
     /// coordinate mapping that has to come with it.
-    public static func render(_ markdown: String, scanner: SyntaxScanner = SyntaxScanner()) -> ReadingDocument {
+    /// - Parameter isLinkable: Answers whether a path written as prose points at
+    ///   a file that exists. Defaults to "no", which keeps this a pure function
+    ///   and means the renderer never invents a link on its own — the existing
+    ///   rule is that a link going nowhere is worse than no link, and only a
+    ///   caller holding the vault can tell the difference.
+    public static func render(
+        _ markdown: String,
+        scanner: SyntaxScanner = SyntaxScanner(),
+        isLinkable: (String) -> Bool = { _ in false }
+    ) -> ReadingDocument {
         let source = markdown as NSString
         let tokens = scanner.scan(markdown)
 
@@ -199,6 +208,8 @@ public enum ReadingRenderer {
             guard end > start else { continue }
             spans.append(.init(style: style, range: NSRange(location: start, length: end - start)))
         }
+
+        spans += pathSpans(in: rendered, avoiding: spans, isLinkable: isLinkable)
 
         return ReadingDocument(text: rendered as String, spans: spans)
     }
@@ -399,5 +410,38 @@ public enum ReadingRenderer {
             kept.append(edit)
         }
         return kept
+    }
+
+    /// Link spans for paths written as prose.
+    ///
+    /// Run over the *rendered* text, not the source: by this point the backticks
+    /// around a path are gone, which is exactly why the path is now a bare run of
+    /// characters the detector can see. Running it on the source would have to
+    /// re-do the coordinate mapping for no gain.
+    ///
+    /// Skips anything overlapping a span that already means something. A path
+    /// inside a fenced code block is a sample, not a destination, and a path that
+    /// is already the target of a Markdown link does not need a second link laid
+    /// over the first.
+    private static func pathSpans(
+        in rendered: NSString,
+        avoiding existing: [ReadingDocument.Span],
+        isLinkable: (String) -> Bool
+    ) -> [ReadingDocument.Span] {
+        let occupied = existing.compactMap { span -> NSRange? in
+            switch span.style {
+            case .link, .embed, .codeBlock, .math, .properties: return span.range
+            default: return nil
+            }
+        }
+        var found: [ReadingDocument.Span] = []
+        for range in VaultPathDetector.candidates(in: rendered as String) {
+            guard !occupied.contains(where: { NSIntersectionRange($0, range).length > 0 })
+            else { continue }
+            let written = rendered.substring(with: range)
+            guard isLinkable(written) else { continue }
+            found.append(.init(style: .link(target: written), range: range))
+        }
+        return found
     }
 }

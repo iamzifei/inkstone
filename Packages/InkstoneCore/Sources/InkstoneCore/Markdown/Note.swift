@@ -32,6 +32,17 @@ public struct NoteMetadata: Identifiable, Hashable, Sendable {
     public let outgoingLinks: [WikiLink]
     /// Bare URLs and `[text](path.md)` links pointing at other notes.
     public let markdownLinkTargets: [String]
+    /// Paths written as plain prose — `_drafts/pool.md`, or a whole
+    /// `/Users/…/vault/_published/index.md` — which Markdown has no syntax for.
+    ///
+    /// A note that keeps an index refers to files this way constantly, and until
+    /// now none of it counted: the paths were highlighted in the editor and were
+    /// invisible to everything else, so two notes joined by a dozen path
+    /// references appeared unconnected in the graph.
+    ///
+    /// Stored as written. Deciding whether one points inside the vault needs the
+    /// vault root, which the parser does not have.
+    public let pathTargets: [String]
     public let headings: [Heading]
     /// `^block-id` anchors defined in this note.
     public let blockIdentifiers: [String]
@@ -91,6 +102,13 @@ public enum NoteParser {
             }
         }
 
+        // Paths written as prose. Scanned over the whole text rather than over
+        // prose tokens only: the commonest place a path appears is inside
+        // backticks, because that is how one writes a path.
+        let pathTargets = VaultPathDetector.candidates(in: text).map {
+            nsText.substring(with: $0)
+        }
+
         let basename = url.deletingPathExtension().lastPathComponent
         let title = frontmatter.properties["title"]?.stringValue
             ?? headings.first(where: { $0.level == 1 })?.text
@@ -107,6 +125,7 @@ public enum NoteParser {
             tags: allTags,
             outgoingLinks: links,
             markdownLinkTargets: markdownTargets,
+            pathTargets: pathTargets,
             headings: headings,
             blockIdentifiers: blockIdentifiers,
             modified: modified,

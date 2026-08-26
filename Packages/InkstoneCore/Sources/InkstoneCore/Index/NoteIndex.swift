@@ -175,6 +175,39 @@ public actor IndexBuilder {
                 }
             }
 
+            // Paths written as prose. Same edge as any other link, so the
+            // graph, the backlinks pane and the inspector all see them without
+            // knowing where they came from.
+            // De-duplicated by destination. The same file is routinely written
+            // both ways in one note — once as `/Users/…/vault/a/b.md` and once
+            // as `a/b.md` — and each spelling would otherwise be its own edge,
+            // drawing two lines on top of each other in the graph and counting
+            // twice in the backlinks.
+            var linkedByPath: Set<URL> = []
+            for written in note.pathTargets {
+                guard let target = VaultPathDetector.vaultRelative(written, vaultRoot: vaultRoot),
+                      let destination = snapshot.resolve(target, from: note.url,
+                                                         vaultRoot: vaultRoot)
+                else { continue }
+                guard linkedByPath.insert(destination).inserted else { continue }
+                // Unresolved paths are dropped rather than recorded. A wikilink
+                // that resolves to nothing is a note waiting to be written; a
+                // path that resolves to nothing is usually just prose that
+                // happened to look like a path, and counting it would fill the
+                // unresolved list with noise.
+                guard destination != note.url else { continue }
+                let edge = LinkEdge(
+                    source: note.url,
+                    destination: destination,
+                    unresolvedTarget: target,
+                    isEmbed: false,
+                    fragment: nil
+                )
+                snapshot.edges.append(edge)
+                snapshot.outgoingLinks[note.url, default: []].append(edge)
+                snapshot.backlinks[destination, default: []].append(edge)
+            }
+
             for target in note.markdownLinkTargets {
                 guard target.hasSuffix(".md") else { continue }
                 let destination = snapshot.resolve(target, from: note.url, vaultRoot: vaultRoot)

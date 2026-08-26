@@ -85,15 +85,24 @@ public struct AssistantSettings: Codable, Hashable, Sendable {
     public var activeProfileID: UUID?
     /// Whether the note on screen is attached to each new conversation.
     public var includesCurrentNote: Bool
-    /// Off until the user turns it on, since it is a new panel in a familiar
-    /// window and appearing unbidden in the inspector would be a surprise.
+    /// Whether the Assistant tab appears in the inspector.
+    ///
+    /// On. It was off at first, reasoning that a new panel appearing unbidden in
+    /// a familiar window is a surprise — but that trades a small surprise for a
+    /// feature nobody finds. Someone who installs a version that adds an
+    /// assistant and sees no assistant concludes it is broken, not that there is
+    /// a switch five tabs into Settings.
+    ///
+    /// The panel costs nothing until it is used: with no key configured it shows
+    /// how to add one instead of a chat box, and it makes no request until
+    /// asked. Anyone who wants it gone has one switch, in the pane it names.
     public var isEnabled: Bool
 
     public init(
         profiles: [AssistantProfile] = [],
         activeProfileID: UUID? = nil,
         includesCurrentNote: Bool = true,
-        isEnabled: Bool = false
+        isEnabled: Bool = true
     ) {
         self.profiles = profiles
         self.activeProfileID = activeProfileID
@@ -104,6 +113,17 @@ public struct AssistantSettings: Codable, Hashable, Sendable {
     public var activeProfile: AssistantProfile? {
         guard let id = activeProfileID else { return profiles.first }
         return profiles.first { $0.id == id } ?? profiles.first
+    }
+
+    /// Fills in the starting profiles if there are none.
+    ///
+    /// Called when settings load rather than when the switch is flipped, since
+    /// the switch now starts on and nobody would ever flip it.
+    public mutating func seedIfEmpty() {
+        guard profiles.isEmpty else { return }
+        let seeded = Self.seeded()
+        profiles = seeded.profiles
+        activeProfileID = seeded.profiles.first?.id
     }
 
     /// The profiles offered on a fresh install: one per kind, unconfigured.

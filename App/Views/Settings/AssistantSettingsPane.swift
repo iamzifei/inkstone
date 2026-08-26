@@ -16,17 +16,7 @@ struct AssistantSettingsPane: View {
         Form {
             Section {
                 Toggle("Show the assistant", isOn: $settings.data.assistant.isEnabled)
-                    .onChange(of: settings.data.assistant.isEnabled) { _, on in
-                        // Seed the list the first time it is switched on. An
-                        // empty list behind an "Add a model" button hides the
-                        // fact that a local model is an option at all, and
-                        // makes the first screen a form rather than a choice.
-                        if on, settings.data.assistant.profiles.isEmpty {
-                            let seeded = InkstoneCore.AssistantSettings.seeded()
-                            settings.data.assistant.profiles = seeded.profiles
-                            settings.data.assistant.activeProfileID = seeded.profiles.first?.id
-                        }
-                    }
+
                 Text("Adds an Assistant tab to the inspector, beside the note's properties and backlinks.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

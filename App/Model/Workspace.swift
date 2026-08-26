@@ -834,6 +834,11 @@ final class Workspace {
     /// per keystroke is not something a large note can afford.
     func resolveVaultPath(_ path: String, from source: URL) -> URL? {
         guard let root else { return nil }
+        // Normalise first. An absolute path would otherwise be appended to the
+        // vault root and look for `/vault/Users/…/vault/a.md`; one pointing
+        // outside the vault is refused here rather than resolved to a file the
+        // vault does not contain.
+        guard let path = VaultPathDetector.vaultRelative(path, vaultRoot: root) else { return nil }
         let candidates = [
             root.appending(path: path),
             source.deletingLastPathComponent().appending(path: path),

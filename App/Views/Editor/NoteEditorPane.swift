@@ -26,7 +26,20 @@ struct NoteEditorPane: View {
                     // it would rewrite the note on disk.
                     ReadingView(
                         markdown: document.text,
-                        resolveAttachment: { workspace.resolveEmbed($0, from: url) }
+                        resolveAttachment: { workspace.resolveEmbed($0, from: url) },
+                        // The same actions the editor gets. Reading mode used to
+                        // colour links and ignore clicks on them, which made it
+                        // the one mode a vault could not be navigated in.
+                        actions: EditorActions(
+                            followWikiLink: { workspace.follow(link: $0, from: url) },
+                            followTag: { tag in
+                                workspace.sidebarSection = .tags
+                                workspace.searchQuery = "tag:" + tag
+                            },
+                            openExternal: { openURL($0) },
+                            openVaultFile: { workspace.openFile(at: $0) }
+                        ),
+                        resolveVaultPath: { workspace.resolveVaultPath($0, from: url) }
                     )
                 } else {
                     MarkdownEditorView(

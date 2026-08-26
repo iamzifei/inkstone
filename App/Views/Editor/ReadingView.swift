@@ -33,6 +33,14 @@ struct ReadingView: View {
     let markdown: String
     /// Resolves an embed target to a file in the vault.
     var resolveAttachment: (String) -> URL? = { _ in nil }
+    /// What a click does. Reading mode used to colour links and do nothing when
+    /// one was clicked — including wikilinks, not only paths — so following a
+    /// link meant leaving reading mode first.
+    var actions = EditorActions()
+    /// Resolves a path written as prose to a file, or nil if there is none.
+    /// Paths are linked only when this answers, since a link going nowhere is
+    /// worse than no link.
+    var resolveVaultPath: (String) -> URL? = { _ in nil }
     @Environment(\.style) private var style
     /// Bumped when a Mermaid diagram finishes rendering.
     ///
@@ -48,9 +56,12 @@ struct ReadingView: View {
         // own width in `updateNSView`, which is where a picture's size has to be
         // decided anyway.
         ReadingTextView(
-            document: ReadingRenderer.render(markdown),
+            document: ReadingRenderer.render(
+                markdown, isLinkable: { resolveVaultPath($0) != nil }),
             style: style,
             resolveAttachment: resolveAttachment,
+            resolveVaultPath: resolveVaultPath,
+            actions: actions,
             generation: mermaidGeneration
         )
         .background(style.background)
@@ -70,6 +81,7 @@ enum ReadingTypesetter {
         _ document: ReadingDocument,
         style: Style,
         resolveAttachment: (String) -> URL? = { _ in nil },
+        resolveVaultPath: (String) -> URL? = { _ in nil },
         availableWidth: CGFloat = 680
     ) -> NSAttributedString {
         let typography = style.typography
@@ -138,8 +150,20 @@ enum ReadingTypesetter {
                 code.paragraphSpacing = 0
                 code.paragraphSpacingBefore = 0
                 result.addAttribute(.paragraphStyle, value: code, range: span.range)
-            case .link, .embed:
+            case .link(let target), .embed(let target):
                 result.addAttribute(.foregroundColor, value: palette.link.platformColor, range: span.range)
+                // The same attributes the editor uses, so one activation path
+                // serves both modes rather than reading mode growing its own.
+                if target.contains("://") {
+                    result.addAttribute(.inkstoneLinkDestination, value: target, range: span.range)
+                } else if let file = resolveVaultPath(target) {
+                    result.addAttribute(.inkstoneVaultFile, value: file, range: span.range)
+                } else {
+                    result.addAttribute(
+                        .inkstoneWikiLink,
+                        value: WikiLink(target: target),
+                        range: span.range)
+                }
 
             case .math(let display):
                 result.addAttribute(
@@ -420,22 +444,37 @@ private struct ReadingTextView: NSViewRepresentable {
     let document: ReadingDocument
     let style: Style
     let resolveAttachment: (String) -> URL?
+    let resolveVaultPath: (String) -> URL?
+    let actions: EditorActions
     /// Changes when a Mermaid diagram finishes, so SwiftUI runs `updateNSView`.
     let generation: Int
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSTextView.scrollableTextView()
-        guard let textView = scroll.documentView as? NSTextView else { return scroll }
+        // Built by hand rather than by `NSTextView.scrollableTextView()`, which
+        // returns the base class and cannot be asked for a subclass. Same
+        // arrangement the editor uses.
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.autohidesScrollers = true
+
+        let textView = ReadingNSTextView()
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
-        scroll.drawsBackground = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
         textView.textContainerInset = NSSize(width: 24, height: 32)
+
+        scroll.documentView = textView
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        guard let textView = scroll.documentView as? NSTextView else { return }
+        guard let textView = scroll.documentView as? ReadingNSTextView else { return }
+        textView.actions = actions
 
         // Centred and capped, the same measure the editor uses — the readable
         // line width is a typography setting, not an editor one.
@@ -450,6 +489,7 @@ private struct ReadingTextView: NSViewRepresentable {
         textView.textStorage?.setAttributedString(ReadingTypesetter.attributed(
             document, style: style,
             resolveAttachment: resolveAttachment,
+            resolveVaultPath: resolveVaultPath,
             availableWidth: max(120, measure)
         ))
         textView.selectedTextAttributes = [.backgroundColor: style.palette.selection.platformColor]
@@ -460,24 +500,130 @@ private struct ReadingTextView: UIViewRepresentable {
     let document: ReadingDocument
     let style: Style
     let resolveAttachment: (String) -> URL?
+    let resolveVaultPath: (String) -> URL?
+    let actions: EditorActions
     let generation: Int
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        let textView = ReadingUITextView()
         textView.isEditable = false
         textView.isSelectable = true
         textView.backgroundColor = .clear
         textView.textContainerInset = UIEdgeInsets(top: 24, left: 16, bottom: 24, right: 16)
+        // A tap recogniser rather than UITextView's own link handling: the
+        // destinations here are vault files and wikilinks carried on custom
+        // attributes, not the `.link` URLs UIKit knows how to follow.
+        let tap = UITapGestureRecognizer(target: textView, action: #selector(ReadingUITextView.handleTap(_:)))
+        textView.addGestureRecognizer(tap)
         return textView
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
+        (textView as? ReadingUITextView)?.actions = actions
         let measure = max(120, textView.bounds.width - 32)
         textView.attributedText = ReadingTypesetter.attributed(
             document, style: style,
             resolveAttachment: resolveAttachment,
+            resolveVaultPath: resolveVaultPath,
             availableWidth: measure
         )
+    }
+}
+#endif
+
+
+#if os(macOS)
+/// A read-only text view whose links can be followed.
+///
+/// Reading mode coloured links and did nothing with a click — wikilinks
+/// included, not only the paths that prompted this. Following a link meant
+/// switching back to live preview first, which makes reading mode the one place
+/// a knowledge base cannot be navigated.
+///
+/// The activation logic is not duplicated here: the typesetter marks links with
+/// the same `.inkstoneVaultFile` / `.inkstoneWikiLink` / `.inkstoneLinkDestination`
+/// attributes the editor uses, so both modes dispatch on the same three keys.
+private final class ReadingNSTextView: NSTextView {
+    var actions = EditorActions()
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let index = characterIndexForInsertion(at: point)
+        if !event.modifierFlags.contains(.option), follow(at: index) { return }
+        super.mouseDown(with: event)
+    }
+
+    /// The pointer becomes a hand over a link, which is how a reader can tell
+    /// there is one without clicking to find out.
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard let storage = textStorage, let layoutManager, let container = textContainer
+        else { return }
+        let visible = visibleRect
+        let glyphs = layoutManager.glyphRange(forBoundingRect: visible, in: container)
+        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        guard characters.length > 0 else { return }
+
+        storage.enumerateAttributes(in: characters) { attributes, range, _ in
+            guard attributes[.inkstoneVaultFile] != nil
+                    || attributes[.inkstoneWikiLink] != nil
+                    || attributes[.inkstoneLinkDestination] != nil
+            else { return }
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: range,
+                                                      actualCharacterRange: nil)
+            layoutManager.enumerateEnclosingRects(
+                forGlyphRange: glyphRange,
+                withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                in: container
+            ) { rect, _ in
+                var rect = rect
+                rect.origin.x += self.textContainerOrigin.x
+                rect.origin.y += self.textContainerOrigin.y
+                self.addCursorRect(rect, cursor: .pointingHand)
+            }
+        }
+    }
+
+    private func follow(at index: Int) -> Bool {
+        guard let storage = textStorage, index >= 0, index < storage.length else { return false }
+        let attributes = storage.attributes(at: index, effectiveRange: nil)
+        if let file = attributes[.inkstoneVaultFile] as? URL {
+            actions.openVaultFile(file)
+            return true
+        }
+        if let link = attributes[.inkstoneWikiLink] as? WikiLink {
+            actions.followWikiLink(link)
+            return true
+        }
+        if let destination = attributes[.inkstoneLinkDestination] as? String,
+           destination.contains("://"), let url = URL(string: destination) {
+            actions.openExternal(url)
+            return true
+        }
+        return false
+    }
+}
+#else
+/// The same, for UIKit. See the macOS version for why this exists.
+private final class ReadingUITextView: UITextView {
+    var actions = EditorActions()
+
+    @objc func handleTap(_ recogniser: UITapGestureRecognizer) {
+        var point = recogniser.location(in: self)
+        point.x -= textContainerInset.left
+        point.y -= textContainerInset.top
+        let index = layoutManager.characterIndex(for: point, in: textContainer,
+                                                 fractionOfDistanceBetweenInsertionPoints: nil)
+        guard index >= 0, index < textStorage.length else { return }
+        let attributes = textStorage.attributes(at: index, effectiveRange: nil)
+        if let file = attributes[.inkstoneVaultFile] as? URL {
+            actions.openVaultFile(file)
+        } else if let link = attributes[.inkstoneWikiLink] as? WikiLink {
+            actions.followWikiLink(link)
+        } else if let destination = attributes[.inkstoneLinkDestination] as? String,
+                  destination.contains("://"), let url = URL(string: destination) {
+            actions.openExternal(url)
+        }
     }
 }
 #endif

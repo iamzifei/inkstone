@@ -350,6 +350,9 @@ public final class AppSettings {
         } else {
             data = SettingsData()
         }
+        // Settings saved before the assistant existed decode with an empty
+        // profile list, which would leave the panel offering nothing to pick.
+        data.assistant.seedIfEmpty()
     }
 
     public var theme: Theme {
