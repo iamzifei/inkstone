@@ -50,7 +50,13 @@ struct AssistantPane: View {
             // Wire the transcript to the store, then load whatever was open.
             conversation.onChange = { store.update(messages: $0) }
             if let stored = store.active { conversation.load(stored.messages) }
+            refreshToolbox()
         }
+        // The snapshot is a value, so a toolbox built once would keep answering
+        // from the vault as it was when the panel opened — including for notes
+        // the assistant itself had just been told about.
+        .onChange(of: workspace.index.notes.count) { refreshToolbox() }
+        .onChange(of: workspace.root) { refreshToolbox() }
         .onChange(of: profile?.id) { if let profile { catalogue.load(profile) } }
     }
 
@@ -587,6 +593,18 @@ struct AssistantPane: View {
         .overlay { Capsule().strokeBorder(style.divider, lineWidth: 1) }
     }
 
+    /// Hands the assistant the vault it can currently see.
+    private func refreshToolbox() {
+        guard let root = workspace.root, let store = workspace.store else {
+            // No vault means no tools, rather than tools that fail on every
+            // call: a model given a broken tool keeps trying it.
+            conversation.toolbox = nil
+            return
+        }
+        conversation.toolbox = NoteToolbox(
+            snapshot: workspace.index, store: store, vaultRoot: root)
+    }
+
     private func beginEditing(_ message: ChatMessage) {
         guard message.role == .user, !conversation.isRunning else { return }
         editDraft = message.text
@@ -771,14 +789,12 @@ private struct MessageRow: View {
 /// One block of an assistant turn.
 private struct BlockView: View {
     let block: ContentBlock
-    @State private var thinkingExpanded = false
-    @State private var toolExpanded = false
+    @Environment(\.style) private var style
+    @State private var expanded = false
 
     var body: some View {
         switch block {
         case .text(let markdown):
-            // The same renderer as reading mode. Tables, code, formulas and
-            // Mermaid diagrams all work without another line of code here.
             // The note renderer, without the page margins it uses when a note
             // fills the window.
             ReadingView(markdown: markdown, isCompact: true)
@@ -786,41 +802,124 @@ private struct BlockView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
         case .thinking(let text):
-            DisclosureGroup(isExpanded: $thinkingExpanded) {
+            DisclosureGroup(isExpanded: $expanded) {
                 Text(text)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(style.secondaryText)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
                 Label(String(localized: "Thinking"), systemImage: "brain")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(style.faintText)
             }
 
         case .toolUse(_, let name, let input):
-            DisclosureGroup(isExpanded: $toolExpanded) {
-                Text(input.jsonString)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } label: {
-                Label(name, systemImage: "wrench.and.screwdriver")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            // One line saying what it is doing, in the vocabulary of the vault
+            // rather than of the API. "Searching for 拖延" is a step someone can
+            // follow; `search_notes({"query":"拖延"})` is a payload.
+            ToolStepView(summary: Self.summarise(name: name, input: input),
+                         detail: input.jsonString,
+                         symbol: Self.symbol(for: name),
+                         isError: false)
 
         case .toolResult(_, let content, let isError):
-            Label(content, systemImage: isError ? "xmark.circle" : "checkmark.circle")
-                .font(.caption)
-                .foregroundStyle(isError ? .orange : .secondary)
-                .lineLimit(3)
+            ToolStepView(summary: Self.summariseResult(content, isError: isError),
+                         detail: content,
+                         symbol: isError ? "exclamationmark.triangle" : "text.alignleft",
+                         isError: isError)
 
         case .image:
             Label(String(localized: "Image"), systemImage: "photo")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(style.faintText)
+        }
+    }
+
+    static func symbol(for name: String) -> String {
+        switch name {
+        case "search_notes": return "magnifyingglass"
+        case "read_note": return "doc.text"
+        case "list_links": return "link"
+        case "list_notes": return "folder"
+        default: return "wrench.and.screwdriver"
+        }
+    }
+
+    static func summarise(name: String, input: JSONValue) -> String {
+        switch name {
+        case "search_notes":
+            let query = input["query"]?.stringValue ?? ""
+            return String(localized: "Searching for \(query)")
+        case "read_note":
+            return String(localized: "Reading \(input["path"]?.stringValue ?? "")")
+        case "list_links":
+            return String(localized: "Links of \(input["path"]?.stringValue ?? "")")
+        case "list_notes":
+            let folder = input["folder"]?.stringValue ?? ""
+            return folder.isEmpty
+                ? String(localized: "Listing the vault")
+                : String(localized: "Listing \(folder)")
+        default:
+            return name
+        }
+    }
+
+    /// The first line of a result, which is where the tools put the count.
+    static func summariseResult(_ content: String, isError: Bool) -> String {
+        let first = content.split(separator: "\n").first.map(String.init) ?? content
+        return first.count > 80 ? String(first.prefix(80)) + "…" : first
+    }
+}
+
+/// One step of the agent's work: a line, expandable to what it actually said.
+///
+/// Collapsed by default. A transcript that shows every tool payload in full is
+/// unreadable, and the payloads are almost never what someone wants to see —
+/// but "almost never" is not never, which is why they are one click away rather
+/// than absent.
+private struct ToolStepView: View {
+    let summary: String
+    let detail: String
+    let symbol: String
+    let isError: Bool
+
+    @Environment(\.style) private var style
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                expanded.toggle()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: symbol)
+                        .font(.caption2)
+                        .frame(width: 12)
+                    Text(summary)
+                        .lineLimit(1)
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 8))
+                    Spacer(minLength: 0)
+                }
+                .font(.caption)
+                .foregroundStyle(isError ? Color.orange : style.faintText)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                ScrollView(.vertical) {
+                    Text(detail)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(style.secondaryText)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                }
+                .frame(maxHeight: 200)
+                .background(style.codeBackground, in: .rect(cornerRadius: 6))
+            }
         }
     }
 }

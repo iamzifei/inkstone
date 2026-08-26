@@ -75,6 +75,20 @@ final class Conversation {
     /// nothing on screen saying why.
     var skillInstructions: String?
 
+    /// The vault, as tools. Nil until a vault is open, in which case the model
+    /// is given no tools rather than tools that fail.
+    var toolbox: NoteToolbox?
+
+    /// How many times one question may go round the loop.
+    ///
+    /// A limit, not a target: a model that keeps searching without converging
+    /// spends money and time on a question it is not answering. Twelve is well
+    /// past what a real question takes — following a chain of links four notes
+    /// deep is about six — and short enough that a loop is noticed in seconds.
+    private let maximumRounds = 12
+    /// Rounds used by the question in flight, for the limit and for the UI.
+    private(set) var round = 0
+
     private var task: Task<Void, Never>?
 
     var isEmpty: Bool { messages.isEmpty && streaming == nil }
@@ -120,6 +134,7 @@ final class Conversation {
             model: profile.model,
             system: systemPrompt(),
             messages: messages,
+            tools: toolbox == nil ? [] : NoteToolbox.definitions,
             maxTokens: 8_192,
             thinking: thinkingOverride ?? profile.thinking)
 
@@ -134,7 +149,7 @@ final class Conversation {
                     accumulator.consume(event)
                     self?.streaming = accumulator.message
                 }
-                self?.finish(accumulator, error: nil)
+                await self?.finish(accumulator, error: nil, profile: profile)
             } catch ProviderError.unsupportedThinking where thinkingOverride == nil {
                 // The model refused the reasoning parameter. Guessing which
                 // models take it is a pattern over names, and new models are
@@ -142,19 +157,30 @@ final class Conversation {
                 // without it rather than costing the person their message.
                 await self?.retryWithoutThinking(using: profile)
             } catch let error as ProviderError {
-                self?.finish(accumulator, error: error)
+                await self?.finish(accumulator, error: error, profile: profile)
             } catch {
-                self?.finish(accumulator, error: .network(error.localizedDescription))
+                await self?.finish(accumulator, error: .network(error.localizedDescription),
+                                   profile: profile)
             }
         }
     }
 
-    /// Moves the streamed turn into the transcript.
+    /// Moves the streamed turn into the transcript, and runs its tools.
+    ///
+    /// A turn that ends in `toolUse` has not finished — it is waiting. So this
+    /// is where the agent loop lives: append what the model said, run what it
+    /// asked for, append the results, and go round again. The loop ends when the
+    /// model answers without asking for anything, which is the only signal that
+    /// it considers the question dealt with.
     ///
     /// A cancelled turn keeps whatever arrived rather than being discarded:
     /// pressing stop usually means "that is enough", not "throw it away", and
     /// the half-answer is often the useful part.
-    private func finish(_ accumulator: TurnAccumulator, error: ProviderError?) {
+    private func finish(
+        _ accumulator: TurnAccumulator,
+        error: ProviderError?,
+        profile: AssistantProfile
+    ) async {
         var message = accumulator.message
         if let error, error != .cancelled {
             message.failure = Self.describe(error)
@@ -163,15 +189,60 @@ final class Conversation {
         if !accumulator.isEmpty || message.failure != nil {
             messages.append(message)
         } else if error == nil {
-            // Nothing arrived and nothing failed. Silence is not an answer, so
-            // it is reported rather than left as an empty bubble.
             failure = .decoding("the model returned nothing")
         }
         lastUsage = accumulator.usage
         streaming = nil
-        isRunning = false
-        task = nil
+
+        // Tools run only when the turn asked for them and nothing went wrong.
+        // A cancelled turn does not run its tools: stop means stop, and a
+        // half-streamed call is the least likely one to have been meant.
+        guard error == nil, accumulator.needsToolResults, let toolbox else {
+            isRunning = false
+            task = nil
+            round = 0
+            publish()
+            return
+        }
+
+        guard round < maximumRounds else {
+            // Reported in the transcript, not swallowed. A question that hit
+            // the ceiling produced work worth seeing, and silence here looks
+            // like the model simply stopped.
+            messages.append(ChatMessage(
+                role: .assistant, blocks: [],
+                failure: String(localized: "Stopped after \(maximumRounds) rounds of tool use without an answer.")))
+            isRunning = false
+            task = nil
+            round = 0
+            publish()
+            return
+        }
+
+        round += 1
         publish()
+
+        var results: [ContentBlock] = []
+        for call in message.toolUses {
+            guard !Task.isCancelled else { break }
+            let outcome = await toolbox.run(call.name, input: call.input)
+            results.append(.toolResult(id: call.id, content: outcome.content,
+                                       isError: outcome.isError))
+        }
+        guard !Task.isCancelled, !results.isEmpty else {
+            isRunning = false
+            task = nil
+            round = 0
+            publish()
+            return
+        }
+
+        // Results go back as a user turn, which is what both APIs expect: the
+        // model's turn asked, and the reply to it is ours to give.
+        messages.append(ChatMessage(role: .user, blocks: results))
+        publish()
+        streaming = ChatMessage(role: .assistant, blocks: [])
+        run(using: profile)
     }
 
     /// Re-runs the turn with thinking off, and remembers not to ask again.
@@ -238,6 +309,8 @@ final class Conversation {
     func stop() {
         task?.cancel()
         task = nil
+        round = 0
+        isRunning = false
     }
 
     func clear() {
@@ -246,6 +319,7 @@ final class Conversation {
         streaming = nil
         failure = nil
         lastUsage = nil
+        round = 0
         publish()
     }
 

@@ -166,6 +166,91 @@ func checkTools(_ provider: any ModelProvider, named label: String, model: Strin
     return true
 }
 
+/// Runs the whole agent loop against a real vault and a real model.
+///
+/// The part no unit test reaches: the tools work in isolation and the loop works
+/// on recorded events, but whether a model given these descriptions actually
+/// finds an answer in a vault is a question only a real model can settle.
+func checkAgent(_ provider: any ModelProvider, named label: String, model: String) async -> Bool {
+    print("\n── \(label) · agent loop ──")
+
+    // A vault with the answer in one note and decoys in the others, so an
+    // answer from the model's own knowledge is distinguishable from one it read.
+    let root = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appending(path: "agent-check-\(UUID().uuidString)")
+    let files = [
+        "brewing/oolong.md": "# 乌龙茶\n\n水温 92 度，第一泡 25 秒。",
+        "brewing/green.md": "# 绿茶\n\n水温 80 度，第一泡 15 秒。",
+        "unrelated/receipts.md": "# 发票\n\n三月报销 420 元。",
+    ]
+    var notes: [NoteMetadata] = []
+    do {
+        for (name, text) in files {
+            let url = root.appending(path: name)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            notes.append(NoteParser.parse(text: text, url: url))
+        }
+    } catch {
+        print("  ✘ could not build the vault: \(error)"); return false
+    }
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let snapshot = IndexBuilder.assemble(notes, vaultRoot: root)
+    let toolbox = NoteToolbox(snapshot: snapshot, store: NoteStore(root: root), vaultRoot: root)
+
+    var messages: [ChatMessage] = [
+        .init(role: .user, text: "泡乌龙茶用多少度的水？只回答温度。")
+    ]
+    var steps: [String] = []
+    var answer = ""
+    var rounds = 0
+
+    while rounds < 6 {
+        rounds += 1
+        let request = CompletionRequest(
+            model: model,
+            system: "Answer using the user's notes. Use the tools to find them; do not answer from memory.",
+            messages: messages,
+            tools: NoteToolbox.definitions,
+            maxTokens: 2_048)
+
+        var accumulator = TurnAccumulator()
+        do {
+            for try await event in provider.stream(request) { accumulator.consume(event) }
+        } catch {
+            print("  ✘ \(error)"); return false
+        }
+
+        let turn = accumulator.message
+        messages.append(turn)
+        answer = turn.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard accumulator.needsToolResults else { break }
+
+        var results: [ContentBlock] = []
+        for call in turn.toolUses {
+            let outcome = await toolbox.run(call.name, input: call.input)
+            let brief = outcome.content.split(separator: "\n").first.map(String.init) ?? ""
+            steps.append("\(call.name)(\(call.input.jsonString.prefix(50))) → \(brief.prefix(60))")
+            results.append(.toolResult(id: call.id, content: outcome.content,
+                                       isError: outcome.isError))
+        }
+        messages.append(ChatMessage(role: .user, blocks: results))
+    }
+
+    for step in steps { print("  · \(step)") }
+    print("  answer   \(answer)")
+    print("  rounds   \(rounds)")
+
+    guard !steps.isEmpty else { print("  ✘ answered without using the vault"); return false }
+    // 92 is in the vault; a model answering from memory says 90 or 95.
+    guard answer.contains("92") else { print("  ✘ wrong or unread answer"); return false }
+    print("  ✔ ok")
+    return true
+}
+
 // MARK: - Run
 
 let environment = environmentIncludingDotEnv()
@@ -178,6 +263,7 @@ if let key = environment["CLAUDE_API_KEY"], !key.isEmpty {
     let model = models.first?.id ?? "claude-sonnet-5"
     results.append(("anthropic/text", await check(provider, named: "Anthropic", model: model)))
     results.append(("anthropic/tools", await checkTools(provider, named: "Anthropic", model: model)))
+    results.append(("anthropic/agent", await checkAgent(provider, named: "Anthropic", model: model)))
 } else {
     print("Anthropic: no CLAUDE_API_KEY, skipped")
 }
@@ -189,6 +275,7 @@ if let key = environment["OPENAI_API_KEY"], !key.isEmpty {
     let model = "gpt-4.1-mini"
     results.append(("openai/text", await check(provider, named: "OpenAI", model: model)))
     results.append(("openai/tools", await checkTools(provider, named: "OpenAI", model: model)))
+    results.append(("openai/agent", await checkAgent(provider, named: "OpenAI", model: model)))
 } else {
     print("OpenAI: no OPENAI_API_KEY, skipped")
 }
