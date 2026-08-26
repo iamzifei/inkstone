@@ -65,6 +65,24 @@ final class Workspace {
     private(set) var store: NoteStore?
     private(set) var tree: FileNode?
     private(set) var index = IndexSnapshot()
+    /// What is selected in the editor right now.
+    ///
+    /// Held here because the assistant panel is a sibling of the editor, not a
+    /// child, and "attach what I have selected" is a normal thing to want.
+    var editorSelection: String?
+    /// Called when a note is saved, with its URL and new text.
+    ///
+    /// A closure rather than a reference to the index: the workspace should not
+    /// have to know what semantic search is in order to save a file.
+    var onNoteSaved: ((URL, String) -> Void)?
+    /// Replaces the editor's current selection.
+    ///
+    /// Set by the editor while it is on screen. A closure, because the thing
+    /// that wants to replace a selection — a rewrite sheet — has no business
+    /// holding a text view.
+    var replaceEditorSelection: ((String) -> Void)?
+    /// Set when ⌥⌘K should open the rewrite sheet.
+    var isQuickRewritePresented = false
 
     /// Bumped whenever the index is replaced.
     ///
@@ -900,6 +918,11 @@ final class Workspace {
         // wrong half of a recovery.
         document.onWillWrite = { [weak self] previous in
             self?.recordHistory(for: url, previous: previous)
+        }
+        // Anything watching content — the semantic index, today — is told
+        // after the write lands, with the text that landed.
+        document.onDidWrite = { [weak self] written in
+            self?.onNoteSaved?(url, written)
         }
         documents[url] = document
         return document

@@ -49,6 +49,10 @@ struct AssistantSettingsPane: View {
                     }
                 }
 
+                Section("Semantic search") {
+                    SemanticSearchRow()
+                }
+
                 Section("Skills") {
                     SkillFolderRow()
                 }
@@ -276,5 +280,58 @@ private struct SkillFolderRow: View {
             library.adopt(url)
         }
         #endif
+    }
+}
+
+/// Turning semantic recall on, and watching it build.
+///
+/// Off by default and visibly a choice: it is minutes of CPU on a machine
+/// someone is writing on. Search works without it — this only widens what the
+/// assistant can reach, to notes whose words do not match the question.
+private struct SemanticSearchRow: View {
+    @Environment(SemanticSearchService.self) private var semantic
+    @Environment(Workspace.self) private var workspace
+
+    var body: some View {
+        @Bindable var service = semantic
+
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Find notes by meaning, not just keywords", isOn: $service.isEnabled)
+
+            if semantic.isEnabled {
+                HStack(spacing: 8) {
+                    if let fraction = semantic.progressFraction {
+                        ProgressView(value: fraction)
+                            .frame(maxWidth: 160)
+                    }
+                    Text(semantic.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(semantic.progressFraction == nil
+                           ? String(localized: "Build index")
+                           : String(localized: "Building…")) {
+                        semantic.build(notes: allNotes())
+                    }
+                    .disabled(semantic.progressFraction != nil || workspace.root == nil)
+                }
+            }
+
+            Text("Runs entirely on this Mac using the model macOS already ships — nothing is uploaded and the app gains no size. The first build of a large vault takes several minutes; it saves as it goes and picks up where it left off.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear { semantic.open(vault: workspace.root) }
+        .onChange(of: workspace.root) { semantic.open(vault: workspace.root) }
+    }
+
+    /// Every note, read for indexing.
+    private func allNotes() -> [(path: String, text: String)] {
+        guard let root = workspace.root else { return [] }
+        return workspace.index.orderedNotes.compactMap { url in
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+            return (MentionIndex.relativePath(url, vaultRoot: root), text)
+        }
     }
 }

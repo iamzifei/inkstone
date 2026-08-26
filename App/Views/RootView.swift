@@ -61,6 +61,20 @@ struct RootView: View {
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
         }
+        #if os(macOS)
+        .sheet(isPresented: $workspace.isQuickRewritePresented) {
+            // Guarded on both: the menu item is disabled without a selection,
+            // but a shortcut can still fire between the selection changing and
+            // the menu updating.
+            if let selection = workspace.editorSelection, !selection.isEmpty,
+               let replace = workspace.replaceEditorSelection {
+                QuickRewriteView(original: selection, onReplace: replace)
+            } else {
+                ContentUnavailableView("Select some text first", systemImage: "text.cursor")
+                    .frame(width: 380, height: 200)
+            }
+        }
+        #endif
     }
 
     @ViewBuilder

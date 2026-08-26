@@ -73,6 +73,8 @@ struct NoteEditorPane: View {
                         },
                         openAttachment: { openURL($0) },
                         openVaultFile: { file in workspace.openFile(at: file) },
+                        selectionChanged: { workspace.editorSelection = $0.isEmpty ? nil : $0 },
+                        provideReplacer: { workspace.replaceEditorSelection = $0 },
                         resolveVaultPath: { path in workspace.resolveVaultPath(path, from: url) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import InkstoneCore
 
 /// The assistant, living in the inspector beside the outline and backlinks.
@@ -28,6 +29,7 @@ struct AssistantPane: View {
     @State private var editDraft = ""
     @State private var showingHistory = false
     @Environment(SkillLibrary.self) private var library
+    @Environment(SemanticSearchService.self) private var semantic
     /// The skill chosen for the next message, if any.
     @State private var pendingSkill: SkillManifest?
     @State private var reviewing = false
@@ -36,6 +38,10 @@ struct AssistantPane: View {
     /// turn survive into the next.
     @State private var editStore = PendingEditStore()
     @State private var saveFailure: String?
+    /// Attached by hand, for the next message.
+    @State private var attachments: [ChatAttachment] = []
+    @State private var isDropTarget = false
+    @State private var attachmentProblem: String?
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
 
@@ -53,6 +59,13 @@ struct AssistantPane: View {
         .onAppear {
             attachCurrentNote()
             if let profile { catalogue.load(profile) }
+            semantic.open(vault: workspace.root)
+            // Keeps the index from drifting away from the vault between full
+            // builds. One note is a fraction of a second.
+            workspace.onNoteSaved = { url, text in
+                guard let root = workspace.root else { return }
+                semantic.update(path: MentionIndex.relativePath(url, vaultRoot: root), text: text)
+            }
             // Wire the transcript to the store, then load whatever was open.
             conversation.onChange = { store.update(messages: $0) }
             if let stored = store.active { conversation.load(stored.messages) }
@@ -334,6 +347,14 @@ struct AssistantPane: View {
         VStack(alignment: .leading, spacing: 6) {
             if !conversation.pendingEdits.isEmpty { changesBar }
             if !slashMatches.isEmpty { slashMenu }
+            if !mentionMatches.isEmpty { mentionMenu }
+            if !attachments.isEmpty { attachmentStrip }
+            if let problem = attachmentProblem {
+                Text(problem)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            }
             if let skill = pendingSkill { skillChip(skill) }
             if settings.data.assistant.includesCurrentNote,
                let note = conversation.attachedNote {
@@ -357,7 +378,8 @@ struct AssistantPane: View {
                 // which is the kind of question this panel is for.
                 .onSubmit(send)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
+                attachButton
                 modelPicker
                 Spacer(minLength: 4)
                 sendButton
@@ -380,6 +402,12 @@ struct AssistantPane: View {
         .padding(.bottom, 12)
         .padding(.top, 4)
         .animation(.easeOut(duration: 0.12), value: inputFocused)
+        // Files from anywhere: Finder, the sidebar tree, another app. What
+        // happens to one depends on where it came from — see `accept`.
+        .dropDestination(for: URL.self) { urls, _ in
+            accept(urls)
+            return true
+        } isTargeted: { isDropTarget = $0 }
     }
 
     /// Channel, model, and thinking effort, in one menu.
@@ -606,6 +634,201 @@ struct AssistantPane: View {
         }
     }
 
+    // MARK: - Attachments
+
+    private var attachButton: some View {
+        Menu {
+            Button {
+                pickFiles()
+            } label: {
+                Label(String(localized: "Attach files…"), systemImage: "paperclip")
+            }
+            Button {
+                attachCurrentSelection()
+            } label: {
+                Label(String(localized: "Attach editor selection"), systemImage: "text.quote")
+            }
+            .disabled(workspace.activeTab?.url == nil)
+            Divider()
+            Text("Or type @ to mention a note, or drag files here")
+        } label: {
+            Image(systemName: "plus")
+                .font(.caption)
+                .foregroundStyle(style.secondaryText)
+                .frame(width: 18, height: 18)
+                .contentShape(.rect)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(String(localized: "Attach a file, a note, or the current selection"))
+    }
+
+    private var attachmentStrip: some View {
+        // Wrapping, because four attachments in a 280pt column cannot be a row.
+        FlowLayout(spacing: 4) {
+            ForEach(attachments) { attachment in
+                HStack(spacing: 3) {
+                    Image(systemName: attachment.symbol).font(.caption2)
+                    Text(attachment.label)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button {
+                        attachments.removeAll { $0.id == attachment.id }
+                    } label: {
+                        Image(systemName: "xmark").font(.system(size: 7))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(style.secondaryText)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(style.background, in: .capsule)
+                .overlay { Capsule().strokeBorder(style.divider, lineWidth: 1) }
+            }
+        }
+    }
+
+    /// The `@` query, if the draft ends in one.
+    ///
+    /// Unlike `/`, this may appear anywhere: "compare @a with @b" is the normal
+    /// way to use it. So the trigger is the last `@` with no space after it.
+    private var mentionQuery: String? {
+        guard let at = draft.lastIndex(of: "@") else { return nil }
+        let rest = draft[draft.index(after: at)...]
+        guard !rest.contains(" "), !rest.contains("\n") else { return nil }
+        // An `@` in an email address is not a mention.
+        if at > draft.startIndex {
+            let before = draft[draft.index(before: at)]
+            if !before.isWhitespace { return nil }
+        }
+        return String(rest)
+    }
+
+    private var mentionMatches: [ChatAttachment] {
+        guard let query = mentionQuery, let root = workspace.root else { return [] }
+        return MentionIndex.matching(query, in: workspace.index, vaultRoot: root)
+    }
+
+    private var mentionMenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(mentionMatches) { candidate in
+                Button {
+                    attach(candidate)
+                    if let at = draft.lastIndex(of: "@") {
+                        draft = String(draft[draft.startIndex..<at])
+                    }
+                    inputFocused = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: candidate.symbol)
+                            .font(.caption2)
+                            .foregroundStyle(style.faintText)
+                        Text(candidate.label)
+                            .font(.caption)
+                            .foregroundStyle(style.text)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+            }
+        }
+        .background(style.background, in: .rect(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(style.divider, lineWidth: 1)
+        }
+    }
+
+    private func attach(_ attachment: ChatAttachment) {
+        // Attaching the same note twice sends it twice and says nothing new.
+        guard !attachments.contains(where: { $0.kind == attachment.kind }) else { return }
+        attachments.append(attachment)
+        attachmentProblem = nil
+    }
+
+    /// Decides what a dropped file means.
+    ///
+    /// A file inside the vault is context — it is already the user's, and the
+    /// assistant can read it by path. A file from outside is an attachment, and
+    /// has to be carried in the message because nothing else can reach it. That
+    /// distinction is the whole reason drop is handled rather than delegated.
+    private func accept(_ urls: [URL]) {
+        attachmentProblem = nil
+        var problems: [String] = []
+
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+
+            if let root = workspace.root,
+               url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path) {
+                let relative = MentionIndex.relativePath(url, vaultRoot: root)
+                attach(ChatAttachment(kind: isDirectory.boolValue
+                                      ? .folder(path: relative)
+                                      : .note(path: relative)))
+                continue
+            }
+
+            guard !isDirectory.boolValue else {
+                problems.append(String(localized: "\(url.lastPathComponent) is a folder outside the vault."))
+                continue
+            }
+
+            if let type = UTType(filenameExtension: url.pathExtension),
+               type.conforms(to: .image), let data = try? Data(contentsOf: url) {
+                guard data.count <= 8_000_000 else {
+                    problems.append(String(localized: "\(url.lastPathComponent) is too large to send."))
+                    continue
+                }
+                attach(ChatAttachment(kind: .image(
+                    mimeType: mimeType(for: type), data: data)))
+                continue
+            }
+
+            if let text = try? String(contentsOf: url, encoding: .utf8) {
+                attach(ChatAttachment(kind: .file(name: url.lastPathComponent, text: text)))
+                continue
+            }
+            problems.append(String(localized: "\(url.lastPathComponent) is not text or an image."))
+        }
+        if !problems.isEmpty { attachmentProblem = problems.joined(separator: " ") }
+    }
+
+    private func mimeType(for type: UTType) -> String {
+        type.preferredMIMEType ?? "image/png"
+    }
+
+    private func pickFiles() {
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = String(localized: "Attach")
+        if panel.runModal() == .OK { accept(panel.urls) }
+        #endif
+    }
+
+    private func attachCurrentSelection() {
+        guard let url = workspace.activeTab?.url,
+              let selection = workspace.editorSelection, !selection.isEmpty else {
+            attachmentProblem = String(localized: "Nothing is selected in the editor.")
+            return
+        }
+        attach(ChatAttachment(kind: .selection(
+            from: url.deletingPathExtension().lastPathComponent, text: selection)))
+    }
+
     /// The one thing standing between a proposal and the vault.
     ///
     /// Deliberately prominent, and deliberately not automatic: nothing is
@@ -669,7 +892,8 @@ struct AssistantPane: View {
         }
         conversation.editStore = editStore
         conversation.toolbox = NoteToolbox(
-            snapshot: workspace.index, store: store, vaultRoot: root, edits: editStore)
+            snapshot: workspace.index, store: store, vaultRoot: root,
+            edits: editStore, semantic: semantic.index)
     }
 
     /// Writes the accepted hunks, and nothing else.
@@ -724,8 +948,21 @@ struct AssistantPane: View {
         // question, and leaving it in place would silently colour every answer
         // after it.
         conversation.skillInstructions = pendingSkill.flatMap { library.instructions(for: $0) }
+        conversation.attachments = attachments
+        conversation.readAttachedNote = { path in
+            guard let root = workspace.root else { return nil }
+            return try? String(contentsOf: root.appending(path: path), encoding: .utf8)
+        }
+        conversation.listAttachedFolder = { path in
+            guard let root = workspace.root else { return [] }
+            let prefix = path.hasSuffix("/") ? path : path + "/"
+            return workspace.index.orderedNotes
+                .map { MentionIndex.relativePath($0, vaultRoot: root) }
+                .filter { $0.hasPrefix(prefix) }
+        }
         conversation.send(text, using: profile)
         pendingSkill = nil
+        attachments = []
     }
 
     /// Attaches the open note, so "summarise this" has something to mean.

@@ -61,6 +61,10 @@ public struct NoteToolbox: Sendable {
     /// Where writes go. Nil makes the toolbox read-only, and the writing tools
     /// are then not offered at all rather than offered and refused.
     private let edits: PendingEditStore?
+    /// Semantic recall, when it has been built. Nil falls back to keywords
+    /// alone rather than failing — an index that is still building should slow
+    /// nothing down.
+    private let semantic: SemanticIndex?
 
     /// How much of a note to return.
     ///
@@ -73,11 +77,12 @@ public struct NoteToolbox: Sendable {
     public static let searchResultLimit = 20
 
     public init(snapshot: IndexSnapshot, store: NoteStore, vaultRoot: URL,
-                edits: PendingEditStore? = nil) {
+                edits: PendingEditStore? = nil, semantic: SemanticIndex? = nil) {
         self.snapshot = snapshot
         self.store = store
         self.vaultRoot = vaultRoot
         self.edits = edits
+        self.semantic = semantic
     }
 
     public var canWrite: Bool { edits != nil }
@@ -110,10 +115,11 @@ public struct NoteToolbox: Sendable {
                     heading and "water 92C" three lines below — search "oolong", \
                     then read the note.
 
-                    Matching is literal, not by meaning, so if a word returns \
-                    nothing try a synonym rather than concluding the subject is \
-                    absent. Prefix a term with `tag:` to match a tag. Returns \
-                    the path, title and matching line of each hit.
+                    Matching is literal. When keyword hits are few, notes that \
+                    read as though they are about the same thing are added under \
+                    "Related by meaning" — those do not contain the word, so \
+                    read one before relying on it. Prefix a term with `tag:` to \
+                    match a tag.
                     """,
                 inputSchema: .object([
                     "type": .string("object"),
@@ -285,7 +291,15 @@ public struct NoteToolbox: Sendable {
         let hits = await SearchEngine.fullTextConcurrently(
             query: query, in: snapshot, store: store, limit: limit)
 
-        guard !hits.isEmpty else {
+        // Semantic recall fills in what keywords miss, and only what they miss.
+        // Keywords first because they are exact and fast — 115 ms across 8,865
+        // notes — and because a literal match is what someone means most of the
+        // time. Meaning-based recall is the second pass, for the case keywords
+        // cannot serve: a question whose words appear nowhere in the note that
+        // answers it.
+        let semanticHits = hits.count >= limit ? [] : await semanticRecall(query, limit: limit - hits.count, excluding: Set(hits.map { relativePath($0.url) }))
+
+        guard !hits.isEmpty || !semanticHits.isEmpty else {
             // Not an error: nothing found is a real answer. Flagging it as one
             // invites the model to apologise instead of trying another word.
             // The advice names the most likely cause. Measured: a model given
@@ -310,16 +324,42 @@ public struct NoteToolbox: Sendable {
             return ToolOutcome(content: advice)
         }
 
-        var lines = ["\(hits.count) note\(hits.count == 1 ? "" : "s") matched \"\(query)\":", ""]
-        for hit in hits {
-            let path = relativePath(hit.url)
-            let line = hit.line.trimmingCharacters(in: .whitespaces)
-            lines.append("- \(path) — \(hit.title)")
-            if !line.isEmpty {
-                lines.append("  line \(hit.lineNumber): \(line.prefix(200))")
+        var lines: [String] = []
+        if !hits.isEmpty {
+            lines.append("\(hits.count) note\(hits.count == 1 ? "" : "s") matched \"\(query)\":")
+            lines.append("")
+            for hit in hits {
+                let path = relativePath(hit.url)
+                let line = hit.line.trimmingCharacters(in: .whitespaces)
+                lines.append("- \(path) — \(hit.title)")
+                if !line.isEmpty {
+                    lines.append("  line \(hit.lineNumber): \(line.prefix(200))")
+                }
+            }
+        }
+        if !semanticHits.isEmpty {
+            // Labelled, because the two kinds of hit warrant different trust. A
+            // keyword hit contains the word; a related one merely reads as
+            // though it is about the same thing, and the model should check.
+            if !lines.isEmpty { lines.append("") }
+            lines.append("Related by meaning (these do not contain \"\(query)\"):")
+            lines.append("")
+            for hit in semanticHits {
+                lines.append("- \(hit.path)")
+                lines.append("  \(hit.text.replacingOccurrences(of: "\n", with: " ").prefix(160))")
             }
         }
         return ToolOutcome(content: lines.joined(separator: "\n"))
+    }
+
+    /// Notes that read as though they are about the same thing.
+    private func semanticRecall(_ query: String, limit: Int, excluding: Set<String>)
+        async -> [SemanticHit] {
+        guard let semantic, await semantic.isReady else { return [] }
+        // Asked for more than needed, since some will be notes keywords already
+        // found and would otherwise be listed twice.
+        let hits = await semantic.search(query, limit: limit + excluding.count)
+        return Array(hits.filter { !excluding.contains($0.path) }.prefix(limit))
     }
 
     // MARK: - read_note

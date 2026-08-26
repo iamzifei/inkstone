@@ -28,6 +28,12 @@ struct EditorActions {
     var openAttachment: (URL) -> Void = { _ in }
     /// Opens a file in the vault named by a plain-text path in the note.
     var openVaultFile: (URL) -> Void = { _ in }
+    /// Reports the selected text as it changes, so anything outside the editor
+    /// can act on what the reader has picked out.
+    var selectionChanged: (String) -> Void = { _ in }
+    /// Handed a closure that replaces the current selection, once the editor is
+    /// on screen. Whoever wants to rewrite a passage calls it.
+    var provideReplacer: ((@escaping (String) -> Void) -> Void) = { _ in }
     /// Resolves such a path to a file that exists, or nil.
     var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
@@ -943,6 +949,19 @@ private struct TextViewRepresentable: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.textView = textView
 
+        // Hand out the replacer now that there is a text view to replace in.
+        actions.provideReplacer { [weak textView] replacement in
+            guard let textView else { return }
+            let range = textView.selectedRange()
+            guard range.length > 0 else { return }
+            // Through `insertText` rather than the storage, so it is one undo
+            // step and the delegate sees it like any other edit.
+            if textView.shouldChangeText(in: range, replacementString: replacement) {
+                textView.insertText(replacement, replacementRange: range)
+                textView.didChangeText()
+            }
+        }
+
         // The readable-measure inset depends on the scroll view's width, so it
         // has to be recomputed whenever that width changes. Without this it was
         // only ever calculated on the first layout — when the width is often
@@ -1183,6 +1202,12 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard !isApplyingAttributes, let textView, let storage = textView.textStorage else { return }
+            // Reported before the rehighlight guard below, which returns early
+            // on most selection changes — including every one that does not
+            // move to a new line, which is most of the ones that select text.
+            let selected = textView.selectedRange()
+            actions.selectionChanged(selected.length > 0
+                ? (storage.string as NSString).substring(with: selected) : "")
             // Live preview needs a re-run whenever the caret moves to a new line —
             // and only then. Typing fires this *as well as* `textDidChange`, so
             // without the guard every keystroke ran the pass twice.
@@ -1660,6 +1685,11 @@ private struct TextViewRepresentable: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
+            if let storage = textView.textStorage as NSTextStorage? {
+                let selected = textView.selectedRange
+                actions.selectionChanged(selected.length > 0
+                    ? (storage.string as NSString).substring(with: selected) : "")
+            }
             guard !isApplyingAttributes else { return }
             // Same guard as AppKit: only a change of caret *line* can change what
             // live preview shows. UIKit fires this while scrolling a selection

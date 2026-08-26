@@ -21,6 +21,8 @@ struct InkstoneApp: App {
 
     /// Shared, so the settings pane and the assistant see the same library.
     @State private var skillLibrary = SkillLibrary()
+    /// Semantic recall, shared by the assistant and the settings pane.
+    @State private var semantic = SemanticSearchService()
 
     #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
@@ -536,6 +538,7 @@ struct InkstoneApp: App {
             StyledRoot { RootView() }
                 .environment(workspace)
                 .environment(skillLibrary)
+                .environment(semantic)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
                 #if os(iOS)
@@ -582,6 +585,7 @@ struct InkstoneApp: App {
             StyledRoot { SettingsView() }
                 .environment(workspace)
                 .environment(skillLibrary)
+                .environment(semantic)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
         }
@@ -815,6 +819,12 @@ struct InkstoneApp: App {
             Divider()
             Button("Quick Switcher…") { workspace.isQuickSwitcherPresented = true }
                 .keyboardShortcut("o")
+            // The on-device model's home. Disabled without a selection, since
+            // there is nothing for it to work on — and it works on selections
+            // only, because 4,000 tokens does not stretch further.
+            Button("Rewrite Selection…") { workspace.isQuickRewritePresented = true }
+                .keyboardShortcut("k", modifiers: [.command, .option])
+                .disabled(workspace.editorSelection?.isEmpty != false)
             Button("Save") { workspace.saveAll() }
                 .keyboardShortcut("s")
             Divider()

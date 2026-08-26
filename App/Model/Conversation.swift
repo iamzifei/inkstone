@@ -75,6 +75,13 @@ final class Conversation {
     /// nothing on screen saying why.
     var skillInstructions: String?
 
+    /// Attached by hand, for the next message only.
+    var attachments: [ChatAttachment] = []
+    /// Reads an attached note at send time, so a note edited between attaching
+    /// and sending goes as it is now.
+    var readAttachedNote: (String) -> String? = { _ in nil }
+    var listAttachedFolder: (String) -> [String] = { _ in [] }
+
     /// The vault, as tools. Nil until a vault is open, in which case the model
     /// is given no tools rather than tools that fail.
     var toolbox: NoteToolbox?
@@ -110,10 +117,23 @@ final class Conversation {
         guard !trimmed.isEmpty, !isRunning else { return }
 
         failure = nil
-        messages.append(ChatMessage(role: .user, text: trimmed))
+
+        // Attachments become part of the message rather than of the system
+        // prompt: they belong to this question, and a later question about
+        // something else should not still be carrying them.
+        var blocks: [ContentBlock] = []
+        if let text = AttachmentRenderer.textBlock(
+            for: attachments, readNote: readAttachedNote, listFolder: listAttachedFolder) {
+            blocks.append(.text(text))
+        }
+        blocks += AttachmentRenderer.imageBlocks(for: attachments)
+        blocks.append(.text(trimmed))
+
+        messages.append(ChatMessage(role: .user, blocks: blocks))
         publish()
         run(using: profile)
         skillInstructions = nil
+        attachments = []
     }
 
     /// Re-runs the last turn after a failure, without duplicating the question.

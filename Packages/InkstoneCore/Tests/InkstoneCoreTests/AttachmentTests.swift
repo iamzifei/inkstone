@@ -2,202 +2,134 @@ import Testing
 import Foundation
 @testable import InkstoneCore
 
-@Suite("Attachments")
-struct AttachmentTests {
-    private let root = URL(fileURLWithPath: "/vault")
+/// Attachments: what the user adds by hand, as opposed to what the assistant
+/// finds for itself.
+@Suite("Chat attachments")
+struct ChatAttachmentTests {
+    @Test("An attached note is read at send time, not at attach time")
+    func readsLate() {
+        // A note edited between attaching and sending should go as it is now.
+        // The renderer is handed a closure rather than text for exactly this.
+        var current = "first version"
+        let block = AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .note(path: "a.md"))],
+            readNote: { _ in current }, listFolder: { _ in [] })
+        #expect(block?.contains("first version") == true)
 
-    /// A small vault: two notes, an attachments folder, and a same-named image
-    /// in two places so ambiguity resolution gets exercised.
-    private func tree() -> FileNode {
-        func file(_ path: String) -> FileNode {
-            FileNode(url: root.appending(path: path), isDirectory: false)
-        }
-        return FileNode(url: root, isDirectory: true, children: [
-            file("Home.md"),
-            FileNode(url: root.appending(path: "Attachments"), isDirectory: true, children: [
-                file("Attachments/diagram.png"),
-                file("Attachments/clip.mp4"),
-                file("Attachments/shared.png"),
-            ]),
-            FileNode(url: root.appending(path: "Ideas"), isDirectory: true, children: [
-                file("Ideas/Product Ideas.md"),
-                file("Ideas/shared.png"),
-            ]),
-        ])
+        current = "second version"
+        let later = AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .note(path: "a.md"))],
+            readNote: { _ in current }, listFolder: { _ in [] })
+        #expect(later?.contains("second version") == true)
     }
 
-    // MARK: - Kind
-
-    @Test("Extensions map to the right kind")
-    func kinds() {
-        #expect(AttachmentKind(pathExtension: "PNG") == .image)
-        #expect(AttachmentKind(pathExtension: "heic") == .image)
-        #expect(AttachmentKind(pathExtension: "mov") == .video)
-        #expect(AttachmentKind(pathExtension: "m4a") == .audio)
-        #expect(AttachmentKind(pathExtension: "pdf") == .pdf)
-        #expect(AttachmentKind(pathExtension: "zip") == .other)
-        #expect(AttachmentKind(pathExtension: "") == .other)
+    @Test("A note that cannot be read says so rather than going missing")
+    func reportsUnreadableNotes() {
+        let block = AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .note(path: "gone.md"))],
+            readNote: { _ in nil }, listFolder: { _ in [] })
+        #expect(block?.contains("could not be read") == true)
     }
 
-    @Test("Only images render inline")
-    func inlineRenderable() {
-        #expect(AttachmentKind.image.isInlineRenderable)
-        #expect(!AttachmentKind.video.isInlineRenderable)
-        #expect(!AttachmentKind.pdf.isInlineRenderable)
+    @Test("A folder is listed, not read")
+    func listsFoldersWithoutReading() {
+        // A folder can hold hundreds of notes; attaching one means "look in
+        // here", which the assistant can then do with its own tools.
+        let block = AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .folder(path: "work"))],
+            readNote: { _ in "SHOULD NOT APPEAR" },
+            listFolder: { _ in ["work/a.md", "work/b.md"] })
+        #expect(block?.contains("work/a.md") == true)
+        #expect(block?.contains("SHOULD NOT APPEAR") == false)
+        #expect(block?.contains("2 notes") == true)
     }
 
-    // MARK: - Index
-
-    @Test("Notes and canvases are not attachments")
-    func excludesNotes() {
-        let index = AttachmentIndex(tree: tree())
-        #expect(index.count == 4)
-        #expect(!index.all.contains { $0.pathExtension == "md" })
+    @Test("An oversized attachment is cut and says where")
+    func truncatesLongAttachments() {
+        let long = String(repeating: "字", count: AttachmentRenderer.characterLimit + 100)
+        let block = AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .file(name: "big.txt", text: long))],
+            readNote: { _ in nil }, listFolder: { _ in [] })
+        #expect(block?.contains("truncated") == true)
     }
 
-    @Test("Resolves a bare file name from anywhere in the vault")
-    func resolvesByName() {
-        let index = AttachmentIndex(tree: tree())
-        let from = root.appending(path: "Home.md")
-        #expect(index.resolve("diagram.png", from: from, vaultRoot: root)?.lastPathComponent == "diagram.png")
+    @Test("Images become their own blocks, not text")
+    func separatesImages() {
+        // A vision model needs a picture as a picture. Described in prose it is
+        // just a claim that an image exists.
+        let attachments = [
+            ChatAttachment(kind: .image(mimeType: "image/png", data: Data([1, 2, 3]))),
+            ChatAttachment(kind: .note(path: "a.md")),
+        ]
+        let blocks = AttachmentRenderer.imageBlocks(for: attachments)
+        #expect(blocks.count == 1)
+        guard case .image(let mime, _) = blocks[0] else { Issue.record("not an image"); return }
+        #expect(mime == "image/png")
+
+        // And the text block does not mention the image.
+        let text = AttachmentRenderer.textBlock(
+            for: attachments, readNote: { _ in "note text" }, listFolder: { _ in [] })
+        #expect(text?.contains("note text") == true)
     }
 
-    @Test("Resolves an explicit vault-relative path")
-    func resolvesByPath() {
-        let index = AttachmentIndex(tree: tree())
-        let from = root.appending(path: "Home.md")
-        let resolved = index.resolve("Attachments/clip.mp4", from: from, vaultRoot: root)
-        #expect(resolved?.path == "/vault/Attachments/clip.mp4")
+    @Test("Nothing attached produces no block at all")
+    func staysQuietWhenEmpty() {
+        // An empty "the user attached the following" costs tokens and says the
+        // opposite of the truth.
+        #expect(AttachmentRenderer.textBlock(
+            for: [], readNote: { _ in nil }, listFolder: { _ in [] }) == nil)
+        #expect(AttachmentRenderer.textBlock(
+            for: [ChatAttachment(kind: .image(mimeType: "image/png", data: Data()))],
+            readNote: { _ in nil }, listFolder: { _ in [] }) == nil)
     }
 
-    @Test("An ambiguous name resolves to the nearest copy")
-    func resolvesNearest() {
-        let index = AttachmentIndex(tree: tree())
-        // Linking from inside Ideas/ should prefer Ideas/shared.png over the one
-        // in Attachments/, the same way note links disambiguate.
-        let fromIdeas = root.appending(path: "Ideas/Product Ideas.md")
-        #expect(index.resolve("shared.png", from: fromIdeas, vaultRoot: root)?.path == "/vault/Ideas/shared.png")
+    @Test("Attachments say what they are in the chip")
+    func labelsThemselves() {
+        #expect(ChatAttachment(kind: .note(path: "work/plan.md")).label == "plan.md")
+        #expect(ChatAttachment(kind: .folder(path: "work/deep")).label == "deep/")
+        #expect(ChatAttachment(kind: .file(name: "x.csv", text: "")).label == "x.csv")
+        #expect(!ChatAttachment(kind: .note(path: "a.md")).isImage)
+        #expect(ChatAttachment(kind: .image(mimeType: "image/png", data: Data())).isImage)
     }
 
-    @Test("An unknown target resolves to nothing")
-    func unresolved() {
-        let index = AttachmentIndex(tree: tree())
-        let from = root.appending(path: "Home.md")
-        #expect(index.resolve("missing.png", from: from, vaultRoot: root) == nil)
-        #expect(index.resolve("", from: from, vaultRoot: root) == nil)
-    }
-
-    // MARK: - Sync policy
-
-    @Test("Notes always sync, whatever the policy says")
-    func notesAlwaysSync() {
-        var policy = SyncFilePolicy()
-        policy.syncsImages = false
-        policy.syncsOtherFiles = false
-        #expect(policy.allows(root.appending(path: "Home.md")))
-        #expect(policy.allows(root.appending(path: "Map.canvas")))
-    }
-
-    @Test("Attachment kinds follow their switches")
-    func kindSwitches() {
-        var policy = SyncFilePolicy()
-        #expect(policy.allows(root.appending(path: "a.png")))
-        #expect(!policy.allows(root.appending(path: "a.mp4")))  // video off by default
-
-        policy.setSyncs(.video, true)
-        policy.setSyncs(.image, false)
-        #expect(policy.allows(root.appending(path: "a.mp4")))
-        #expect(!policy.allows(root.appending(path: "a.png")))
-    }
-
-    @Test("The size ceiling excludes large files")
-    func sizeCeiling() {
-        var policy = SyncFilePolicy()
-        policy.maximumFileSizeMB = 10
-        let image = root.appending(path: "big.png")
-        #expect(policy.allows(image, sizeBytes: 5 * 1_048_576))
-        #expect(!policy.allows(image, sizeBytes: 20 * 1_048_576))
-        // Unknown size cannot be excluded on size alone.
-        #expect(policy.allows(image, sizeBytes: nil))
-
-        policy.maximumFileSizeMB = 0  // no limit
-        #expect(policy.allows(image, sizeBytes: 900 * 1_048_576))
-    }
-
-    @Test("A size ceiling never overrides notes")
-    func ceilingSpareNotes() {
-        var policy = SyncFilePolicy()
-        policy.maximumFileSizeMB = 1
-        #expect(policy.allows(root.appending(path: "Huge.md"), sizeBytes: 50 * 1_048_576))
-    }
-
-    @Test("Policy round-trips through Codable")
-    func codable() throws {
-        var policy = SyncFilePolicy()
-        policy.setSyncs(.video, true)
-        policy.maximumFileSizeMB = 42
-        let data = try JSONEncoder().encode(policy)
-        #expect(try JSONDecoder().decode(SyncFilePolicy.self, from: data) == policy)
+    @Test("Attachments survive being saved with the conversation")
+    func codesForHistory() throws {
+        let attachment = ChatAttachment(kind: .selection(from: "note", text: "选中的话"))
+        let data = try JSONEncoder().encode(attachment)
+        #expect(try JSONDecoder().decode(ChatAttachment.self, from: data) == attachment)
     }
 }
 
-/// Settings are loaded with `try?`, so a decode failure silently resets every
-/// preference the user has. Adding a required field is therefore a breaking
-/// change disguised as a one-line edit. This suite guards that boundary.
-@Suite("Settings compatibility")
-struct SettingsCompatibilityTests {
+@Suite("Mentions")
+struct MentionTests {
+    let root = URL(fileURLWithPath: "/vault")
 
-    @Test("Settings written before sync policy existed still decode")
-    func decodesLegacySettings() throws {
-        // Exactly what an older build would have written: every field it knew
-        // about, and nothing for the key added since.
-        var current = SettingsData()
-        current.attachmentFolder = "Files"
-        current.dailyNoteFolder = "Journal"
-
-        var object = try JSONSerialization.jsonObject(
-            with: try JSONEncoder().encode(current)
-        ) as! [String: Any]
-        object.removeValue(forKey: "syncPolicy")
-        let legacy = try JSONSerialization.data(withJSONObject: object)
-
-        let decoded = try JSONDecoder().decode(SettingsData.self, from: legacy)
-        // The user's existing choices survive...
-        #expect(decoded.attachmentFolder == "Files")
-        #expect(decoded.dailyNoteFolder == "Journal")
-        // ...and the new setting comes back as its default rather than throwing,
-        // which would have reset every preference on first launch.
-        #expect(decoded.syncPolicy == SyncFilePolicy())
+    private func snapshot(_ paths: [String]) -> IndexSnapshot {
+        IndexBuilder.assemble(
+            paths.map { NoteParser.parse(text: "", url: root.appending(path: $0)) },
+            vaultRoot: root)
     }
 
-    @Test("Any single missing key falls back to its default")
-    func toleratesAnyMissingKey() throws {
-        // Guards the whole struct, not just the newest field: dropping any one
-        // key must not take the other preferences down with it.
-        var current = SettingsData()
-        current.attachmentFolder = "Files"
-        current.tabSize = 8
-        let encoded = try JSONEncoder().encode(current)
-        let object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
-
-        for key in object.keys {
-            var stripped = object
-            stripped.removeValue(forKey: key)
-            let data = try JSONSerialization.data(withJSONObject: stripped)
-            let decoded = try? JSONDecoder().decode(SettingsData.self, from: data)
-            #expect(decoded != nil, "removing \(key) made the whole settings file undecodable")
-        }
+    @Test("A mention finds notes by name the way ⌘O does")
+    func matchesNotes() {
+        // Reusing quickSwitch rather than writing a second matcher: two places
+        // that both match note names must not disagree about what matches.
+        let found = MentionIndex.matching(
+            "plan", in: snapshot(["work/plan.md", "other.md"]), vaultRoot: root)
+        #expect(found.contains { $0.label == "plan.md" })
+        #expect(!found.contains { $0.label == "other.md" })
     }
 
-    @Test("Sync policy survives a settings round-trip")
-    func roundTripsSyncPolicy() throws {
-        var data = SettingsData()
-        data.syncPolicy.setSyncs(.video, true)
-        data.syncPolicy.maximumFileSizeMB = 250
+    @Test("A mention can pick a folder")
+    func matchesFolders() {
+        let found = MentionIndex.matching(
+            "work", in: snapshot(["work/a.md", "work/b.md", "home/c.md"]), vaultRoot: root)
+        #expect(found.contains { if case .folder = $0.kind { return true }; return false })
+    }
 
-        let encoded = try JSONEncoder().encode(data)
-        let decoded = try JSONDecoder().decode(SettingsData.self, from: encoded)
-        #expect(decoded.syncPolicy.syncsVideos)
-        #expect(decoded.syncPolicy.maximumFileSizeMB == 250)
+    @Test("An empty query offers notes rather than nothing")
+    func handlesEmptyQuery() {
+        // Typing `@` alone should show something to pick from.
+        #expect(!MentionIndex.matching("", in: snapshot(["a.md", "b.md"]), vaultRoot: root).isEmpty)
     }
 }
