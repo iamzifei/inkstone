@@ -29,9 +29,7 @@ struct AssistantPane: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             transcript
-            Divider()
             composer
         }
         .background(style.background)
@@ -42,58 +40,37 @@ struct AssistantPane: View {
 
     // MARK: - Header
 
+    /// A thin strip, not a title bar.
+    ///
+    /// The model picker used to live here, which is where neither ChatGPT nor
+    /// Claude puts it: the choice belongs beside the message it applies to, so
+    /// it has moved into the composer. What is left is the one action that has
+    /// nowhere else to go, and it appears only once there is a conversation to
+    /// leave behind.
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 6) {
-            Menu {
-                Picker(String(localized: "Model"), selection: profileBinding) {
-                    ForEach(settings.data.assistant.profiles) { candidate in
-                        Text(candidate.name).tag(candidate.id as UUID?)
-                    }
+        if !conversation.isEmpty {
+            HStack(spacing: 6) {
+                if let usage = conversation.lastUsage, usage.total > 0 {
+                    Text("\(usage.total) tokens")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(style.faintText)
                 }
-                .pickerStyle(.inline)
-                Divider()
-                Picker(String(localized: "Thinking"), selection: thinkingBinding) {
-                    ForEach(ThinkingEffort.allCases, id: \.self) { effort in
-                        Text(Self.thinkingLabel(effort)).tag(effort)
-                    }
+                Spacer(minLength: 0)
+                Button {
+                    conversation.clear()
+                    inputFocused = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .foregroundStyle(style.secondaryText)
                 }
-                .pickerStyle(.inline)
-            } label: {
-                HStack(spacing: 3) {
-                    Text(profile?.name ?? String(localized: "No model"))
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down").imageScale(.small)
-                }
-                .font(.callout)
+                .buttonStyle(.plain)
+                .help(String(localized: "New conversation"))
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .disabled(settings.data.assistant.profiles.isEmpty)
-
-            Spacer(minLength: 4)
-
-            if let usage = conversation.lastUsage, usage.total > 0 {
-                Text("\(usage.total) tokens")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-                    // The number is only useful next to what produced it, and
-                    // the panel is narrow — so it yields to the buttons.
-                    .lineLimit(1)
-                    .layoutPriority(-1)
-            }
-
-            Button {
-                conversation.clear()
-                inputFocused = true
-            } label: {
-                Image(systemName: "square.and.pencil")
-            }
-            .buttonStyle(.borderless)
-            .disabled(conversation.isEmpty)
-            .help(String(localized: "Start a new conversation"))
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
     }
 
     private var profileBinding: Binding<UUID?> {
@@ -111,6 +88,16 @@ struct AssistantPane: View {
                         .firstIndex(where: { $0.id == id }) else { return }
                 settings.data.assistant.profiles[index].thinking = effort
             })
+    }
+
+    /// A word, for the composer, where the full phrase would not fit.
+    static func thinkingShortLabel(_ effort: ThinkingEffort) -> String {
+        switch effort {
+        case .off: return ""
+        case .low: return String(localized: "Low")
+        case .medium: return String(localized: "Medium")
+        case .high: return String(localized: "High")
+        }
     }
 
     static func thinkingLabel(_ effort: ThinkingEffort) -> String {
@@ -145,8 +132,13 @@ struct AssistantPane: View {
                     // way up it, and the text then streams off the bottom.
                     Color.clear.frame(height: 1).id(Self.bottomAnchor)
                 }
-                .padding(12)
+                // Matching the composer card's outer inset, so the column of
+                // text has one left edge rather than two.
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .onChange(of: conversation.streaming?.blocks.count) { follow(proxy) }
             .onChange(of: conversation.messages.count) { follow(proxy) }
         }
@@ -160,76 +152,195 @@ struct AssistantPane: View {
         proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
     }
 
+    /// What the panel says before it has been asked anything.
+    ///
+    /// Centred and quiet. The previous version was a line of prose in the top
+    /// left, which in an otherwise empty column reads like a rendering error
+    /// rather than an invitation.
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 10) {
             if let profile, profile.kind == .appleOnDevice,
                let unavailable = AppleOnDeviceProvider.availabilityMessage {
-                Label {
-                    Text(unavailable)
-                } icon: {
-                    Image(systemName: "exclamationmark.triangle")
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title2)
+                    .foregroundStyle(style.faintText)
+                Text(unavailable)
+                    .font(.callout)
+                    .foregroundStyle(style.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if needsKey {
+                Image(systemName: "key")
+                    .font(.title2)
+                    .foregroundStyle(style.faintText)
+                Text("Add an API key in Settings › Assistant to start.")
+                    .font(.callout)
+                    .foregroundStyle(style.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                #if os(macOS)
+                // `SettingsLink` and `.link` are both macOS-only; on iOS the
+                // Settings sheet is reached from the sidebar, so pointing at it
+                // in words is the honest option rather than a button that
+                // cannot open anything.
+                SettingsLink {
+                    Text("Open Settings")
                 }
+                .buttonStyle(.borderless)
                 .font(.callout)
-                .foregroundStyle(.secondary)
-            } else if settings.data.assistant.profiles.isEmpty {
-                Text("Add a model in Settings › Assistant to begin.")
-                    .foregroundStyle(.secondary)
+                #endif
             } else {
-                Text("Ask about this note, or about anything in the vault.")
-                    .foregroundStyle(.secondary)
-                if let note = conversation.attachedNote {
-                    Label(note.title, systemImage: "doc.text")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.title2)
+                    .foregroundStyle(style.faintText)
+                Text("Ask about this note, or anything in the vault.")
+                    .font(.callout)
+                    .foregroundStyle(style.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .font(.callout)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.top, 40)
+    }
+
+    /// Whether the chosen profile still wants a credential.
+    ///
+    /// Asked of the Keychain rather than of the settings, because that is where
+    /// the answer is; a profile looks fully configured either way.
+    private var needsKey: Bool {
+        guard let profile, profile.kind.needsAPIKey else { return false }
+        return AssistantCredentials.key(for: profile.credentialAccount) == nil
     }
 
     // MARK: - Composer
 
+    /// The composer: one rounded card holding the field, the model, and send.
+    ///
+    /// Shaped after what ChatGPT and Claude both settled on, for the same
+    /// reasons. The field was a bare `TextField` pinned to the bottom edge,
+    /// which read as a search box rather than a place to write, and sat close
+    /// enough to the window's rounded corner that the corner clipped it. A card
+    /// with its own inset keeps clear of the corner radius, and gives the model
+    /// picker somewhere to live that is next to the message it governs.
     private var composer: some View {
-        VStack(spacing: 6) {
-            HStack(alignment: .bottom, spacing: 6) {
-                TextField(String(localized: "Ask about your notes…"),
-                          text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(1...8)
-                    .focused($inputFocused)
-                    .onSubmit(send)
-                    .disabled(conversation.isRunning)
-
-                if conversation.isRunning {
-                    Button(action: conversation.stop) {
-                        Image(systemName: "stop.circle.fill")
-                            .imageScale(.large)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: "Stop"))
-                } else {
-                    Button(action: send) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .imageScale(.large)
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              || profile == nil)
-                    .help(String(localized: "Send"))
-                }
-            }
+        VStack(alignment: .leading, spacing: 6) {
             if settings.data.assistant.includesCurrentNote,
-               let note = conversation.attachedNote, !conversation.isEmpty {
+               let note = conversation.attachedNote {
                 Label(note.title, systemImage: "paperclip")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(style.faintText)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .truncationMode(.middle)
+            }
+
+            TextField(String(localized: "Ask about your notes…"),
+                      text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(style.uiFont)
+                .foregroundStyle(style.text)
+                .lineLimit(1...10)
+                .focused($inputFocused)
+                .disabled(conversation.isRunning)
+                // ⌘↩ sends; Return alone makes a new line. A single-line Return
+                // would make a multi-paragraph question impossible to type,
+                // which is the kind of question this panel is for.
+                .onSubmit(send)
+
+            HStack(spacing: 4) {
+                modelPicker
+                Spacer(minLength: 4)
+                sendButton
             }
         }
-        .padding(10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(style.secondaryBackground)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(inputFocused ? style.accent.opacity(0.5) : style.divider,
+                                      lineWidth: 1)
+                }
+        }
+        // Clear of the window's rounded corner on every side. Pinned flush, the
+        // corner radius cut the card's own corner and the send button with it.
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, 4)
+        .animation(.easeOut(duration: 0.12), value: inputFocused)
+    }
+
+    /// Model and thinking effort, as one unobtrusive menu.
+    ///
+    /// Reads as a label until pointed at, the way the model name does in both
+    /// ChatGPT and Claude — it is a setting people change rarely and read often,
+    /// so it should be legible without drawing the eye.
+    private var modelPicker: some View {
+        Menu {
+            Picker(String(localized: "Model"), selection: profileBinding) {
+                ForEach(settings.data.assistant.profiles) { candidate in
+                    Text(candidate.name).tag(candidate.id as UUID?)
+                }
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Picker(String(localized: "Thinking"), selection: thinkingBinding) {
+                ForEach(ThinkingEffort.allCases, id: \.self) { effort in
+                    Text(Self.thinkingLabel(effort)).tag(effort)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 3) {
+                Text(profile?.name ?? String(localized: "No model"))
+                    .foregroundStyle(style.secondaryText)
+                if let profile, profile.thinking != .off {
+                    Text(Self.thinkingShortLabel(profile.thinking))
+                        .foregroundStyle(style.faintText)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(style.faintText)
+            }
+            .font(.caption)
+            .lineLimit(1)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(settings.data.assistant.profiles.isEmpty)
+    }
+
+    @ViewBuilder
+    private var sendButton: some View {
+        if conversation.isRunning {
+            Button(action: conversation.stop) {
+                Image(systemName: "stop.fill")
+                    .font(.caption)
+                    .foregroundStyle(style.background)
+                    .frame(width: 22, height: 22)
+                    .background(style.text, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .help(String(localized: "Stop"))
+        } else {
+            let ready = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && profile != nil
+            Button(action: send) {
+                Image(systemName: "arrow.up")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ready ? style.background : style.faintText)
+                    .frame(width: 22, height: 22)
+                    .background(ready ? style.accent : style.divider.opacity(0.5), in: .circle)
+            }
+            .buttonStyle(.plain)
+            .disabled(!ready)
+            .keyboardShortcut(.return, modifiers: .command)
+            .help(String(localized: "Send (⌘↩)"))
+        }
     }
 
     private func send() {
@@ -268,13 +379,20 @@ private struct MessageRow: View {
         VStack(alignment: .leading, spacing: 6) {
             switch message.role {
             case .user:
+                // A bubble, inset from the trailing edge so it does not run into
+                // the panel's own border. Capped short of full width, because a
+                // bubble that spans the column is indistinguishable from the
+                // reply below it.
                 Text(message.text)
+                    .font(style.uiFont)
+                    .foregroundStyle(style.text)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(style.selection.opacity(0.5),
-                                in: .rect(cornerRadius: 10))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
+                    .background(style.secondaryBackground,
+                                in: .rect(cornerRadius: 12, style: .continuous))
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.leading, 24)
 
             case .assistant:
                 ForEach(Array(message.blocks.enumerated()), id: \.offset) { _, block in
@@ -301,7 +419,9 @@ private struct BlockView: View {
         case .text(let markdown):
             // The same renderer as reading mode. Tables, code, formulas and
             // Mermaid diagrams all work without another line of code here.
-            ReadingView(markdown: markdown)
+            // The note renderer, without the page margins it uses when a note
+            // fills the window.
+            ReadingView(markdown: markdown, isCompact: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
 

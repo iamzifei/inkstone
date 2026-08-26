@@ -41,6 +41,13 @@ struct ReadingView: View {
     /// Paths are linked only when this answers, since a link going nowhere is
     /// worse than no link.
     var resolveVaultPath: (String) -> URL? = { _ in nil }
+    /// Drops the page margins and the readable-measure centring.
+    ///
+    /// Those exist for a note filling a window: a column of text capped at a
+    /// comfortable reading width with air around it. Inside a 280pt inspector
+    /// they work against the same goal — the text ends up indented twice and
+    /// each reply starts a third of an inch from where the question did.
+    var isCompact = false
     @Environment(\.style) private var style
     /// Bumped when a Mermaid diagram finishes rendering.
     ///
@@ -62,6 +69,7 @@ struct ReadingView: View {
             resolveAttachment: resolveAttachment,
             resolveVaultPath: resolveVaultPath,
             actions: actions,
+            isCompact: isCompact,
             generation: mermaidGeneration
         )
         .background(style.background)
@@ -446,6 +454,7 @@ private struct ReadingTextView: NSViewRepresentable {
     let resolveAttachment: (String) -> URL?
     let resolveVaultPath: (String) -> URL?
     let actions: EditorActions
+    let isCompact: Bool
     /// Changes when a Mermaid diagram finishes, so SwiftUI runs `updateNSView`.
     let generation: Int
 
@@ -479,10 +488,16 @@ private struct ReadingTextView: NSViewRepresentable {
         // Centred and capped, the same measure the editor uses — the readable
         // line width is a typography setting, not an editor one.
         let available = scroll.contentSize.width
-        let measure = style.typography.isReadableLineWidthEnabled
-            ? min(available - 48, style.typography.readableLineWidth)
-            : available - 48
-        textView.textContainerInset = NSSize(width: max(24, (available - measure) / 2), height: 32)
+        let measure: CGFloat
+        if isCompact {
+            measure = max(80, available)
+            textView.textContainerInset = NSSize(width: 0, height: 0)
+        } else {
+            measure = style.typography.isReadableLineWidthEnabled
+                ? min(available - 48, style.typography.readableLineWidth)
+                : available - 48
+            textView.textContainerInset = NSSize(width: max(24, (available - measure) / 2), height: 32)
+        }
 
         // Typeset here rather than in `body`, because the measure a picture is
         // scaled to is only known once the view has a width.
@@ -502,6 +517,7 @@ private struct ReadingTextView: UIViewRepresentable {
     let resolveAttachment: (String) -> URL?
     let resolveVaultPath: (String) -> URL?
     let actions: EditorActions
+    let isCompact: Bool
     let generation: Int
 
     func makeUIView(context: Context) -> UITextView {
@@ -520,7 +536,10 @@ private struct ReadingTextView: UIViewRepresentable {
 
     func updateUIView(_ textView: UITextView, context: Context) {
         (textView as? ReadingUITextView)?.actions = actions
-        let measure = max(120, textView.bounds.width - 32)
+        if isCompact { textView.textContainerInset = .zero }
+        let measure = isCompact
+            ? max(80, textView.bounds.width)
+            : max(120, textView.bounds.width - 32)
         textView.attributedText = ReadingTypesetter.attributed(
             document, style: style,
             resolveAttachment: resolveAttachment,
