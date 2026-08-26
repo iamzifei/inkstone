@@ -78,7 +78,7 @@ struct SettingsView: View {
     /// Both platforms use these: the Mac tags its tabs with them, iOS pushes
     /// them onto a navigation path.
     enum Pane: String, CaseIterable, Identifiable, Hashable {
-        case appearance, typography, editor, files, sync
+        case appearance, typography, editor, files, assistant, sync
 
         var id: String { rawValue }
 
@@ -88,6 +88,7 @@ struct SettingsView: View {
             case .typography: return "Typography"
             case .editor: return "Editor"
             case .files: return "Files & Links"
+            case .assistant: return "Assistant"
             case .sync: return "Sync"
             }
         }
@@ -98,6 +99,7 @@ struct SettingsView: View {
             case .typography: return "textformat"
             case .editor: return "square.and.pencil"
             case .files: return "folder"
+            case .assistant: return "sparkles"
             case .sync: return "arrow.triangle.2.circlepath"
             }
         }
@@ -108,6 +110,7 @@ struct SettingsView: View {
             case .typography: TypographySettings()
             case .editor: EditorSettings()
             case .files: FilesSettings()
+            case .assistant: AssistantSettingsPane()
             case .sync: SyncSettings()
             }
         }

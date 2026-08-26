@@ -213,7 +213,47 @@ struct InspectorView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
 
+    /// See the note in `AssistantPane`: only the workspace is in the
+    /// environment, and asking for anything else traps at launch.
+    private var settings: AppSettings { workspace.settings }
+
+    /// Which half of the inspector is showing.
+    ///
+    /// A segmented switch rather than another `Section` in the list: the
+    /// assistant needs the full height and a text field pinned to the bottom,
+    /// neither of which a row inside a scrolling `List` can have.
+    private enum Tab: Hashable { case inspector, assistant }
+    @State private var tab: Tab = .inspector
+
     var body: some View {
+        // The switch appears only once the assistant is turned on, so the
+        // inspector is unchanged for anyone not using it.
+        if settings.data.assistant.isEnabled {
+            VStack(spacing: 0) {
+                Picker("", selection: $tab) {
+                    Text("Note").tag(Tab.inspector)
+                    Text("Assistant").tag(Tab.assistant)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+                Divider()
+
+                switch tab {
+                case .inspector: inspectorContent
+                case .assistant: AssistantPane()
+                }
+            }
+        } else {
+            inspectorContent
+        }
+    }
+
+    @ViewBuilder
+    private var inspectorContent: some View {
         if let url = workspace.activeTab?.url, let note = workspace.index.metadata(for: url) {
             List {
                 if !note.frontmatter.properties.isEmpty {

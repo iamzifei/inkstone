@@ -144,6 +144,13 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// How often to sync while the app is open. 0 syncs only when a vault opens.
     public var gitHubSyncIntervalMinutes = 15
 
+    /// The assistant panel: profiles, the active one, and whether it is on.
+    ///
+    /// API keys are **not** here, for the same reason the GitHub token is not:
+    /// this struct is a plain JSON blob in UserDefaults. Each profile names a
+    /// Keychain account instead.
+    public var assistant = AssistantSettings()
+
     /// Which file types take part in sync.
     public var syncPolicy = SyncFilePolicy()
     /// "owner/repository" for GitHub sync. The token lives in the Keychain, not

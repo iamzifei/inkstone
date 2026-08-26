@@ -476,3 +476,122 @@ struct SSELineTests {
         #expect(try await split("").isEmpty)
     }
 }
+
+/// Turning a stream of events into one message.
+@Suite("Turn accumulator")
+struct TurnAccumulatorTests {
+    private func accumulate(_ events: [StreamEvent]) -> TurnAccumulator {
+        var accumulator = TurnAccumulator()
+        for event in events { accumulator.consume(event) }
+        return accumulator
+    }
+
+    @Test("Text deltas coalesce into one block, not one block each")
+    func coalescesText() {
+        // A thousand single-character blocks would be correct and unusable.
+        let message = accumulate([
+            .textDelta("Hel"), .textDelta("lo "), .textDelta("world"),
+        ]).message
+        #expect(message.blocks.count == 1)
+        #expect(message.text == "Hello world")
+    }
+
+    @Test("A tool call keeps its place when text follows it")
+    func keepsToolCallOrder() {
+        // The transcript must not show the answer before the step that produced
+        // it. A placeholder reserves the slot when the call starts.
+        let message = accumulate([
+            .textDelta("Let me look. "),
+            .toolUseStarted(id: "t1", name: "search_notes"),
+            .toolInputDelta(id: "t1", json: #"{"query":"tea"}"#),
+            .toolUseEnded(id: "t1"),
+            .textDelta("Found it."),
+        ]).message
+        #expect(message.blocks.count == 3)
+        guard case .toolUse(_, let name, let input) = message.blocks[1] else {
+            Issue.record("tool call is not in the middle"); return
+        }
+        #expect(name == "search_notes")
+        #expect(input["query"]?.stringValue == "tea")
+    }
+
+    @Test("Interleaved tool calls keep their own arguments")
+    func separatesInterleavedCalls() {
+        let message = accumulate([
+            .toolUseStarted(id: "a", name: "read_note"),
+            .toolUseStarted(id: "b", name: "read_note"),
+            .toolInputDelta(id: "b", json: #"{"path":"B"}"#),
+            .toolInputDelta(id: "a", json: #"{"path":"A"}"#),
+            .toolUseEnded(id: "a"),
+            .toolUseEnded(id: "b"),
+        ]).message
+        let paths = message.toolUses.map { $0.input["path"]?.stringValue }
+        #expect(paths == ["A", "B"])
+    }
+
+    @Test("A turn stopped mid-argument still shows the call")
+    func survivesTruncation() {
+        // Pressing stop while a tool call is streaming should show what the
+        // model was about to do, not silently drop it.
+        let message = accumulate([
+            .toolUseStarted(id: "t1", name: "edit_note"),
+            .toolInputDelta(id: "t1", json: #"{"path":"a.md","#),
+        ]).message
+        #expect(message.toolUses.count == 1)
+        #expect(message.toolUses[0].name == "edit_note")
+        // Arguments that never became valid JSON degrade to empty rather than
+        // to junk the tool would then have to defend against.
+        #expect(message.toolUses[0].input == .object([:]))
+    }
+
+    @Test("Thinking and prose are separate blocks in the order they arrived")
+    func separatesThinkingFromProse() {
+        let message = accumulate([
+            .thinkingDelta("weighing"), .thinkingDelta(" it up"),
+            .textDelta("The answer is 4."),
+        ]).message
+        #expect(message.blocks.count == 2)
+        guard case .thinking(let thought) = message.blocks[0] else {
+            Issue.record("first block is not thinking"); return
+        }
+        #expect(thought == "weighing it up")
+        #expect(message.text == "The answer is 4.")
+    }
+
+    @Test("Thinking after prose starts a new block")
+    func reopensThinkingSeparately() {
+        // Extended-thinking models alternate. Reopening the earlier block would
+        // splice two separate thoughts into one.
+        let message = accumulate([
+            .thinkingDelta("first"), .textDelta("a"), .thinkingDelta("second"),
+        ]).message
+        #expect(message.blocks.count == 3)
+    }
+
+    @Test("A tool_use stop is reported as needing results, not as finished")
+    func recognisesToolStop() {
+        // The condition the whole agent loop turns on.
+        let done = accumulate([
+            .toolUseStarted(id: "t1", name: "search_notes"),
+            .toolInputDelta(id: "t1", json: "{}"),
+            .toolUseEnded(id: "t1"),
+            .finished(stopReason: .toolUse, usage: TokenUsage(outputTokens: 9)),
+        ])
+        #expect(done.needsToolResults)
+        #expect(done.usage.outputTokens == 9)
+
+        let ended = accumulate([
+            .textDelta("done"),
+            .finished(stopReason: .endTurn, usage: TokenUsage()),
+        ])
+        #expect(!ended.needsToolResults)
+    }
+
+    @Test("A turn that produced nothing is recognisable as empty")
+    func detectsEmptyTurns() {
+        #expect(accumulate([.finished(stopReason: .endTurn, usage: TokenUsage())]).isEmpty)
+        #expect(!accumulate([.textDelta("x")]).isEmpty)
+        // A turn that only called a tool is not empty — it did something.
+        #expect(!accumulate([.toolUseStarted(id: "t", name: "read_note")]).isEmpty)
+    }
+}
