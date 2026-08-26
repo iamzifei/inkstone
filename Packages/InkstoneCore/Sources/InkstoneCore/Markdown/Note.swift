@@ -143,7 +143,7 @@ public enum NoteParser {
             if isCJK(scalar) {
                 count += 1
                 inLatinRun = false
-            } else if CharacterSet.alphanumerics.contains(scalar) {
+            } else if isAlphanumeric(scalar) {
                 if !inLatinRun { count += 1 }
                 inLatinRun = true
             } else {
@@ -151,6 +151,24 @@ public enum NoteParser {
             }
         }
         return count
+    }
+
+    /// Alphanumeric, with a fast path for ASCII.
+    ///
+    /// `CharacterSet.alphanumerics.contains` walks a bitmap for every scalar,
+    /// and over 32 million characters that was 778 ms of the vault's parse —
+    /// the second largest item after syntax scanning. Latin text is almost
+    /// entirely ASCII, where four comparisons settle it; everything else falls
+    /// through to the general answer, which is still correct for Greek,
+    /// Cyrillic, accented Latin and the rest.
+    private static func isAlphanumeric(_ scalar: Unicode.Scalar) -> Bool {
+        let value = scalar.value
+        if value < 128 {
+            return (value >= 48 && value <= 57)      // 0-9
+                || (value >= 65 && value <= 90)      // A-Z
+                || (value >= 97 && value <= 122)     // a-z
+        }
+        return CharacterSet.alphanumerics.contains(scalar)
     }
 
     private static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
