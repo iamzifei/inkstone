@@ -255,10 +255,18 @@ struct InspectorView: View {
 
                 Divider()
 
-                switch tab {
-                case .inspector: inspectorContent
-                case .assistant: AssistantPane()
+                // The content fills what is left, which is what pins the switch
+                // to the top. Without it the switch took its own height, the
+                // stack took the height of both, and the whole thing floated to
+                // the middle of the column whenever the pane below was short —
+                // so the switch moved depending on whether a note was open.
+                Group {
+                    switch tab {
+                    case .inspector: inspectorContent
+                    case .assistant: AssistantPane()
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else {
             inspectorContent
