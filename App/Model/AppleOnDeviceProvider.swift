@@ -63,10 +63,48 @@ struct AppleOnDeviceProvider: ModelProvider {
         }
     }
 
+    /// The context window, in characters, with room left to answer.
+    ///
+    /// Measured on this machine: the window is **4,096 tokens**, and the model
+    /// refuses outright past it —
+    /// `exceededContextWindowSize … Provided 11,156 tokens, but the maximum
+    /// allowed is 4,096`. Mixed Chinese and English ran about 1.8 characters per
+    /// token, so 4,096 tokens is roughly 7,300 characters. Half of that is the
+    /// budget for everything sent, leaving the rest for the reply.
+    ///
+    /// This is the number that makes the on-device model a different kind of
+    /// tool rather than a cheaper one: a cloud model takes a 40,000-character
+    /// note without noticing, and this one cannot take a tenth of it.
+    static let characterBudget = 3_600
+
+    /// Whether a request fits, and can therefore be attempted.
+    ///
+    /// Checked before sending rather than after failing, because the failure is
+    /// a rejected request rather than a truncated answer, and "nothing happened"
+    /// is what that looks like from the panel.
+    static func isTooLong(_ request: CompletionRequest) -> Bool {
+        let system = request.system?.count ?? 0
+        let conversation = request.messages.reduce(0) { total, message in
+            total + message.blocks.reduce(0) { $0 + $1.plainText.count }
+        }
+        return system + conversation > characterBudget
+    }
+
     func stream(_ request: CompletionRequest) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
+                    if !request.tools.isEmpty {
+                        // Tools are declined rather than ignored. One
+                        // search_notes result runs to a thousand characters and
+                        // one read_note to twelve thousand, against a budget of
+                        // 3,600 — a loop here would fail on its first result,
+                        // after spending the round. The panel says so instead.
+                        throw ProviderError.onDeviceCannotUseTools
+                    }
+                    if Self.isTooLong(request) {
+                        throw ProviderError.contextTooLong
+                    }
                     let instructions = request.system ?? ""
                     let session = instructions.isEmpty
                         ? LanguageModelSession()

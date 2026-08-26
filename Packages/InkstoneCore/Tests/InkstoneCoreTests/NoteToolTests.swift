@@ -240,3 +240,48 @@ struct NoteToolTests {
         }
     }
 }
+
+/// The on-device model's limits, which are what make it a different kind of
+/// tool rather than a cheaper one.
+@Suite("On-device budget")
+struct OnDeviceBudgetTests {
+    /// Mirrors `AppleOnDeviceProvider.isTooLong`, which lives in the app target
+    /// because it imports FoundationModels. The arithmetic is what matters and
+    /// it is worth pinning: the window is 4,096 tokens, measured, and the model
+    /// refuses the request outright rather than truncating it.
+    private func size(_ request: CompletionRequest) -> Int {
+        let system = request.system?.count ?? 0
+        return system + request.messages.reduce(0) { total, message in
+            total + message.blocks.reduce(0) { $0 + $1.plainText.count }
+        }
+    }
+
+    @Test("A note-sized attachment is over budget")
+    func measuresRequests() {
+        // A real note from the vault this was built against runs to tens of
+        // thousands of characters. The budget is 3,600.
+        let note = String(repeating: "笔", count: 8_000)
+        let request = CompletionRequest(
+            model: "apple-on-device",
+            system: "You are an assistant.\n\(note)",
+            messages: [.init(role: .user, text: "summarise")])
+        #expect(size(request) > 3_600)
+    }
+
+    @Test("A short exchange fits")
+    func allowsShortRequests() {
+        let request = CompletionRequest(
+            model: "apple-on-device",
+            system: "You are an assistant.",
+            messages: [.init(role: .user, text: "rewrite this sentence")])
+        #expect(size(request) < 3_600)
+    }
+
+    @Test("Tool results alone would exceed the whole window")
+    func showsWhyToolsAreDeclined() {
+        // The reason tools are refused rather than offered and left to fail:
+        // one read_note result is more than three times the entire budget, so
+        // the first round of any loop would be the last.
+        #expect(NoteToolbox.noteCharacterLimit > 3_600 * 3)
+    }
+}

@@ -285,6 +285,11 @@ public enum ProviderError: Error, Sendable, Equatable {
     /// `gpt-4.1-mini`, which answers `Unrecognized request argument supplied:
     /// reasoning_effort` rather than ignoring it.
     case unsupportedThinking
+    /// The on-device model was offered tools it cannot run.
+    ///
+    /// Not a failure of the request so much as of the pairing: the window is
+    /// 4,096 tokens and one note excerpt is larger than that.
+    case onDeviceCannotUseTools
     case serverError(status: Int, body: String)
     case network(String)
     case decoding(String)

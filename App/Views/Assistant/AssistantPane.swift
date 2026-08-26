@@ -265,6 +265,19 @@ struct AssistantPane: View {
                 .buttonStyle(.borderless)
                 .font(.callout)
                 #endif
+            } else if profile?.kind == .appleOnDevice {
+                // Said before the first question, not after it fails. This
+                // model cannot search the vault at all — its window is smaller
+                // than one note — and that is the opposite of what the panel
+                // otherwise promises.
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.title2)
+                    .foregroundStyle(style.faintText)
+                Text("Runs on this Mac, free and offline. It cannot search your vault — ask it to rewrite, summarise or name the note in front of you.")
+                    .font(.callout)
+                    .foregroundStyle(style.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Image(systemName: "bubble.left.and.text.bubble.right")
                     .font(.title2)
@@ -686,6 +699,13 @@ private struct MessageRow: View {
             }
             if !isEditing { actions }
         }
+        // The whole row is hit-testable, which is what makes the buttons
+        // reachable. `.opacity(0)` does not receive hit tests, and a VStack with
+        // no background only responds where its children draw — so moving off
+        // the text set `hovering` to false, which set the buttons' opacity to
+        // zero before the pointer arrived. They could be seen and never
+        // clicked.
+        .contentShape(.rect)
         .onHover { hovering = $0 }
     }
 

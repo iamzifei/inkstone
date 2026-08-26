@@ -132,7 +132,7 @@ final class Conversation {
 
         let request = CompletionRequest(
             model: profile.model,
-            system: systemPrompt(),
+            system: systemPrompt(for: profile),
             messages: messages,
             tools: toolbox == nil ? [] : NoteToolbox.definitions,
             maxTokens: 8_192,
@@ -325,7 +325,7 @@ final class Conversation {
 
     // MARK: - Prompt
 
-    private func systemPrompt() -> String {
+    private func systemPrompt(for profile: AssistantProfile) -> String {
         var prompt = """
             You are an assistant inside Inkstone, a Markdown notes app. You are \
             helping with the user's own notes.
@@ -351,7 +351,19 @@ final class Conversation {
                 --- END SKILL ---
                 """
         }
-        if let note = attachedNote {
+        if var note = attachedNote {
+            // The on-device model holds about 4,000 tokens, so a note of any
+            // size has to be cut to fit. Cut rather than refused: someone who
+            // asks about the note in front of them should get an answer about
+            // its opening, with a line saying what was left out, instead of an
+            // error telling them to change model.
+            if profile.kind == .appleOnDevice {
+                let budget = AppleOnDeviceProvider.characterBudget - 600
+                if note.text.count > budget {
+                    note.text = String(note.text.prefix(budget))
+                        + "\n\n[Cut here — this model can only hold the first part of the note.]"
+                }
+            }
             prompt += """
 
 
@@ -386,6 +398,13 @@ final class Conversation {
             return String(localized: "Rate limited by the provider. Try again shortly.")
         case .contextTooLong:
             return String(localized: "This conversation is too long for the model. Start a new one.")
+        case .onDeviceCannotUseTools:
+            return String(localized: """
+                The on-device model cannot search your notes. It holds about \
+                4,000 tokens and one note is usually larger than that. Use a \
+                cloud model for questions about the vault, or ask this one to \
+                rewrite or summarise the text in front of you.
+                """)
         case .unsupportedThinking:
             // Reached only if the retry without thinking also failed, since the
             // first one is handled rather than reported.
