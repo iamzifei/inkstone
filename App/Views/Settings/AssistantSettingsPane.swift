@@ -49,6 +49,10 @@ struct AssistantSettingsPane: View {
                     }
                 }
 
+                Section("Skills") {
+                    SkillFolderRow()
+                }
+
                 Section("Context") {
                     Toggle("Attach the open note to each conversation",
                            isOn: $settings.data.assistant.includesCurrentNote)
@@ -212,5 +216,65 @@ private struct ProfileRow: View {
                 checkState = .failed(error.localizedDescription)
             }
         }
+    }
+}
+
+/// Choosing the folder of skills.
+///
+/// A folder rather than a path field, because a sandboxed app cannot read
+/// `~/.claude/skills` from a string — permission comes from the user handing the
+/// folder over through an open panel, and a security-scoped bookmark is what
+/// keeps it across launches. The same mechanism the vault uses.
+private struct SkillFolderRow: View {
+    @Environment(SkillLibrary.self) private var library
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                if let name = library.folderName {
+                    Label(name, systemImage: "folder")
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(library.skills.count) skills")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button(String(localized: "Change…")) { choose() }
+                    Button(String(localized: "Remove")) { library.forget() }
+                } else {
+                    Text("No skills folder")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(String(localized: "Choose…")) { choose() }
+                }
+            }
+            if let problem = library.problem {
+                Label(problem, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Type / in the assistant to use one. Claude Code's format — point this at ~/.claude/skills. Skills that run scripts contribute their instructions only, since a sandboxed app cannot launch other programs.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func choose() {
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Use Folder")
+        panel.message = String(localized: "Choose the folder holding your skills")
+        // Start where they usually live, since it is a hidden folder and typing
+        // the path into an open panel means knowing to press ⇧⌘G first.
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".claude/skills")
+        if panel.runModal() == .OK, let url = panel.url {
+            library.adopt(url)
+        }
+        #endif
     }
 }

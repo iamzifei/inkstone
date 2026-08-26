@@ -19,6 +19,9 @@ struct InkstoneApp: App {
         return Workspace()
     }()
 
+    /// Shared, so the settings pane and the assistant see the same library.
+    @State private var skillLibrary = SkillLibrary()
+
     #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
     #endif
@@ -532,6 +535,7 @@ struct InkstoneApp: App {
         WindowGroup {
             StyledRoot { RootView() }
                 .environment(workspace)
+                .environment(skillLibrary)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
                 #if os(iOS)
@@ -577,6 +581,7 @@ struct InkstoneApp: App {
         Settings {
             StyledRoot { SettingsView() }
                 .environment(workspace)
+                .environment(skillLibrary)
                 .preferredColorScheme(preferredColorScheme)
                 .environment(\.locale, locale)
         }

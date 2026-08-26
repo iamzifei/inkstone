@@ -67,7 +67,13 @@ public enum JSONValue: Sendable, Hashable, Codable {
 /// turn can hold text, images, and the results of tools the assistant asked for.
 /// Both providers model this as a list of typed blocks, so this does too rather
 /// than flattening to a string and re-parsing later.
-public enum ContentBlock: Sendable, Hashable {
+/// Codable so a conversation survives quitting the app.
+///
+/// Swift synthesises this for an enum with associated values, including the
+/// `Data` in `.image` — which is base64 in JSON and therefore large. Images are
+/// left in rather than stripped: a conversation that silently loses the picture
+/// it was about is worse than a big file, and the store caps its own size.
+public enum ContentBlock: Sendable, Hashable, Codable {
     case text(String)
     /// The model's reasoning, when the provider returns it separately from the
     /// answer. Displayed collapsed, and never sent back as ordinary text.
@@ -90,7 +96,7 @@ public enum ContentBlock: Sendable, Hashable {
 }
 
 /// One turn in a conversation.
-public struct ChatMessage: Sendable, Hashable, Identifiable {
+public struct ChatMessage: Sendable, Hashable, Identifiable, Codable {
     public enum Role: String, Sendable, Codable, Hashable {
         case user
         case assistant

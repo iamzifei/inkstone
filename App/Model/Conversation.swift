@@ -54,6 +54,8 @@ enum ProviderFactory {
 final class Conversation {
     /// Finished turns, oldest first.
     private(set) var messages: [ChatMessage] = []
+    /// Called whenever the transcript changes, so the store can persist it.
+    var onChange: ([ChatMessage]) -> Void = { _ in }
     /// The assistant turn currently streaming, if any. Kept apart from
     /// `messages` so the view can animate it without diffing the whole list.
     private(set) var streaming: ChatMessage?
@@ -66,6 +68,12 @@ final class Conversation {
     /// is on. Held rather than folded into the first message so that switching
     /// notes changes what the next question sees.
     var attachedNote: (title: String, text: String)?
+    /// A skill's instructions, for the next message only.
+    ///
+    /// Cleared once sent. A skill is a way of answering one question; leaving it
+    /// in place would silently colour every answer after it, and there would be
+    /// nothing on screen saying why.
+    var skillInstructions: String?
 
     private var task: Task<Void, Never>?
 
@@ -84,7 +92,9 @@ final class Conversation {
 
         failure = nil
         messages.append(ChatMessage(role: .user, text: trimmed))
+        publish()
         run(using: profile)
+        skillInstructions = nil
     }
 
     /// Re-runs the last turn after a failure, without duplicating the question.
@@ -161,6 +171,7 @@ final class Conversation {
         streaming = nil
         isRunning = false
         task = nil
+        publish()
     }
 
     /// Re-runs the turn with thinking off, and remembers not to ask again.
@@ -177,6 +188,53 @@ final class Conversation {
     /// Models that answered a thinking request with a 400, this session.
     private(set) var modelsRefusingThinking: Set<String> = []
 
+    /// Replaces an earlier question and re-runs from there.
+    ///
+    /// Everything after it is dropped, because it was an answer to a question
+    /// that no longer exists. Keeping the later turns would leave a transcript
+    /// that reads as a conversation nobody had.
+    func edit(_ id: UUID, to text: String, using profile: AssistantProfile) {
+        guard !isRunning,
+              let index = messages.firstIndex(where: { $0.id == id }),
+              messages[index].role == .user else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        messages[index] = ChatMessage(id: id, role: .user, text: trimmed)
+        messages.removeSubrange((index + 1)...)
+        failure = nil
+        publish()
+        run(using: profile)
+    }
+
+    /// Asks the same question again, discarding the answer given.
+    ///
+    /// The previous answer is removed rather than kept alongside: two answers to
+    /// one question in a linear transcript is a branch drawn as a list, and the
+    /// clients that offer this all replace rather than append.
+    func regenerate(using profile: AssistantProfile) {
+        guard !isRunning, messages.last?.role == .assistant else { return }
+        messages.removeLast()
+        failure = nil
+        publish()
+        run(using: profile)
+    }
+
+    /// Whether the last turn can be asked again.
+    var canRegenerate: Bool { !isRunning && messages.last?.role == .assistant }
+
+    /// Loads a stored transcript, abandoning anything in flight.
+    func load(_ stored: [ChatMessage]) {
+        stop()
+        messages = stored
+        streaming = nil
+        failure = nil
+        lastUsage = nil
+        isRunning = false
+    }
+
+    private func publish() { onChange(messages) }
+
     func stop() {
         task?.cancel()
         task = nil
@@ -188,6 +246,7 @@ final class Conversation {
         streaming = nil
         failure = nil
         lastUsage = nil
+        publish()
     }
 
     // MARK: - Prompt
@@ -204,6 +263,20 @@ final class Conversation {
             Be concise. Prefer showing the relevant passage over summarising it \
             at length.
             """
+        if let skill = skillInstructions, !skill.isEmpty {
+            prompt += """
+
+
+                The user invoked a skill. Follow these instructions for this \
+                request. Anything in them about running scripts or shell \
+                commands cannot be done here — do that part yourself, with the \
+                information you have.
+
+                --- BEGIN SKILL ---
+                \(skill)
+                --- END SKILL ---
+                """
+        }
         if let note = attachedNote {
             prompt += """
 
