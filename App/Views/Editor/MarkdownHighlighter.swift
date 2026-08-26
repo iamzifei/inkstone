@@ -47,6 +47,73 @@ final class ScanCache {
         #endif
         return scanner.tokens(for: text)
     }
+
+    /// Facts about the whole document that styling a viewport still needs.
+    ///
+    /// Three of them, and each is derived from every token in the file rather
+    /// than from the visible ones:
+    ///
+    /// - **Table extents**, because a bold run inside a cell has to keep the
+    ///   cell's metrics or the column stops lining up. The visible run may be
+    ///   inside a table whose start is far above the viewport.
+    /// - **Headings**, because a `[TOC]` lists headings that come after it.
+    /// - **Paired HTML spans**, because `<b>` and its `</b>` are separate tokens
+    ///   and either may be off screen.
+    ///
+    /// Measured on the note that prompted this — 63k characters, 1,825 tokens,
+    /// 587 table rows — rebuilding these on every pass cost **147 ms**, which is
+    /// eight dropped frames each time the viewport moved past what was already
+    /// styled. They depend only on the text, so they are cached with it.
+    struct DocumentFacts {
+        /// Table extents as ranges, for the column-alignment pass, which walks
+        /// them and needs the boundaries rather than membership.
+        var tableRanges: [NSRange] = []
+        /// The same extents as a set of indices, for the "is this run inside a
+        /// table?" question, which is asked once per token.
+        var tableIndices = IndexSet()
+        var headings: [(level: Int, title: String)] = []
+        var html: (spans: [MarkdownHighlighter.HTMLSpan], tags: [NSRange]) = ([], [])
+    }
+
+    private var factsText: String?
+    private var facts = DocumentFacts()
+    /// How many times the facts were rebuilt, for the benchmark hooks.
+    private(set) var factsBuildCount = 0
+
+    func documentFacts(for text: String, tokens: [SyntaxToken]) -> DocumentFacts {
+        // Compared by content, matching how `CachingScanner` decides. Two
+        // documents with the same text have the same facts whatever else
+        // differs about them.
+        if factsText == text { return facts }
+
+        var built = DocumentFacts()
+        // As an IndexSet, not an array of ranges. The "is this run inside a
+        // table?" question is asked once per token, and scanning every table
+        // range each time made the pass quadratic — on a note with 200 tables
+        // that alone was the largest cost in highlighting.
+        for token in tokens {
+            switch token.kind {
+            case .table:
+                if token.range.length > 0 {
+                    built.tableRanges.append(token.range)
+                    built.tableIndices.insert(
+                        integersIn: token.range.location..<(token.range.location + token.range.length))
+                }
+            case .heading(let level):
+                let title = (text as NSString).substring(with: token.contentRange)
+                    .trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty { built.headings.append((level, title)) }
+            default:
+                break
+            }
+        }
+        built.html = MarkdownHighlighter.htmlSpans(in: tokens)
+
+        factsText = text
+        facts = built
+        factsBuildCount += 1
+        return built
+    }
 }
 
 /// Turns scanner tokens into text attributes for the editor.
@@ -105,42 +172,56 @@ struct MarkdownHighlighter {
         let scope = visibleRange.map { NSIntersectionRange($0, full) } ?? full
         guard scope.length > 0 else { return }
 
+        #if DEBUG
+        let phaseLog = ProcessInfo.processInfo.environment["INKSTONE_HIGHLIGHT_PHASES"] != nil
+        var mark = DispatchTime.now().uptimeNanoseconds
+        var phases: [(String, Double)] = []
+        func phase(_ name: String) {
+            guard phaseLog else { return }
+            let now = DispatchTime.now().uptimeNanoseconds
+            phases.append((name, Double(now - mark) / 1_000_000))
+            mark = now
+        }
+        defer {
+            if phaseLog, !phases.isEmpty {
+                let line = "[phases] " + phases.map {
+                    "\($0.0)=\(String(format: "%.1f", $0.1))" }.joined(separator: " ")
+                let t = MarkdownHighlighter.tableTotals
+                let detail = t.tables > 0
+                    ? String(format: "  [tables n=%d cells=%d parse=%.1f pipes=%.1f measure=%.1f]",
+                             t.tables, t.cells, t.parse, t.pipes, t.measure)
+                    : ""
+                MarkdownHighlighter.tableTotals = (0, 0, 0, 0, 0, 0)
+                FileHandle.standardError.write(Data((line + detail + "\n").utf8))
+            }
+        }
+        #else
+        func phase(_ name: String) {}
+        #endif
+
         storage.beginEditing()
         defer { storage.endEditing() }
 
         applyBaseAttributes(to: storage, range: scope)
+        phase("base")
 
         let tokens = ScanCache.shared.tokens(for: text)
-        // Table cells are laid out with a monospaced font so columns line up.
-        // Inline runs inside a cell have to use the same metrics or a single bold
-        // word would knock the whole column out of alignment, so the ranges are
-        // collected up front and consulted when styling those runs.
-        let tableRanges = tokens.compactMap { token -> NSRange? in
-            if case .table = token.kind { return token.range }
-            return nil
-        }
-        // As an IndexSet, not an array. The "is this run inside a table?" check
-        // runs once per token, and scanning every table range each time made the
-        // pass quadratic — on a note with 200 tables that was the single largest
-        // cost in highlighting.
-        var tableIndices = IndexSet()
-        for range in tableRanges where range.length > 0 {
-            tableIndices.insert(integersIn: range.location..<(range.location + range.length))
-        }
-
-        // Headings are collected up front: a [TOC] anywhere in the document has
-        // to list all of them, including ones that appear after it.
-        let headings: [(level: Int, title: String)] = tokens.compactMap { token in
-            guard case .heading(let level) = token.kind else { return nil }
-            let title = (text as NSString).substring(with: token.contentRange)
-                .trimmingCharacters(in: .whitespaces)
-            return title.isEmpty ? nil : (level, title)
-        }
-
-        // Inline HTML spans, paired before the loop because a tag on its own
-        // says nothing: it is `<b>` *and* its `</b>` that mean bold, and the two
-        // are separate tokens.
-        let html = Self.htmlSpans(in: tokens)
+        phase("scan")
+        // Whole-document facts that styling a viewport still needs: table
+        // extents (a cell's metrics apply to runs inside it, and the cell may
+        // start above the viewport), headings (a [TOC] lists ones that follow
+        // it), and paired HTML spans (`<b>` and `</b>` are separate tokens,
+        // either of which may be off screen).
+        //
+        // Cached with the text rather than rebuilt per pass. Measured on a 63k
+        // note with 587 table rows, rebuilding them cost 147 ms — eight dropped
+        // frames every time the viewport moved past what was already styled.
+        let facts = ScanCache.shared.documentFacts(for: text, tokens: tokens)
+        phase("facts")
+        let tableRanges = facts.tableRanges
+        let tableIndices = facts.tableIndices
+        let headings = facts.headings
+        let html = facts.html
 
         // The body lines of every folded callout, collected before the loop and
         // collapsed after it. Doing it while the callout's own token was being
@@ -150,6 +231,11 @@ struct MarkdownHighlighter {
         // height, leaving a quote rule down an empty column.
         let foldedBodies: [NSRange] = tokens.compactMap { token in
             guard case .callout(_, true, _) = token.kind else { return nil }
+            // Scoped, because `calloutBody` walks forward through the text to
+            // find where the quote ends. Every folded callout in the document
+            // was being walked on every pass, including the ones nowhere near
+            // the viewport — and only the ones inside it are collapsed below.
+            guard NSIntersectionRange(token.range, scope).length > 0 else { return nil }
             if let caretLineRange,
                NSIntersectionRange(caretLineRange, token.range).length > 0 { return nil }
             return calloutBody(after: token.range, in: text as NSString)
@@ -209,6 +295,7 @@ struct MarkdownHighlighter {
         // Last, because column alignment and CJK spacing both write `.kern` and
         // the alignment values have to be the ones that survive — otherwise a
         // cell ending on a Han/Latin boundary silently loses its padding.
+        phase("tokens")
         if mode != .source {
             for range in tableRanges
             where NSIntersectionRange(range, scope).length > 0 {
@@ -217,6 +304,7 @@ struct MarkdownHighlighter {
                 )
             }
         }
+        phase("tables")
     }
 
     // MARK: - Base
@@ -1666,6 +1754,33 @@ struct MarkdownHighlighter {
     /// Bounded so a pathological document cannot grow it without limit.
     private nonisolated(unsafe) static var cellWidthCache: [String: CGFloat] = [:]
 
+    /// Measured cell widths, per table.
+    ///
+    /// `cellWidthCache` keys on a cell's plain text, which only helps the cells
+    /// that carry no inline formatting. On the note that prompted this — 60
+    /// tables, 1,582 cells, 1,033 bold runs and 342 code spans — most cells are
+    /// *not* plain, so most fell through to `attributedSubstring(_:).size()`,
+    /// and measuring cost **30 ms of a 47 ms table pass**.
+    ///
+    /// A whole table's measurements are determined by three things: its text,
+    /// the body font, and whether the caret is inside it (which un-conceals the
+    /// syntax and changes every width in it). All three are in the key, so a
+    /// table already measured under the same conditions is not measured again —
+    /// which is every table on screen, every time the viewport moves.
+    private nonisolated(unsafe) static var tableMeasurementCache: [String: [[CGFloat]]] = [:]
+
+    /// Bounded, because a vault of long documents would otherwise accumulate
+    /// every table ever scrolled past. Cleared wholesale rather than evicted one
+    /// by one: the next pass refills what is on screen, and an LRU here would be
+    /// more bookkeeping than the thing it manages.
+    private static let tableMeasurementCacheLimit = 512
+
+    #if DEBUG
+    /// Accumulated across the tables of one pass, printed by the phase logger.
+    nonisolated(unsafe) static var tableTotals =
+        (parse: 0.0, pipes: 0.0, measure: 0.0, kern: 0.0, cells: 0, tables: 0)
+    #endif
+
     /// Space between a table's cell text and its border, and between columns.
     static let tableCellPadding: CGFloat = 12
 
@@ -1797,6 +1912,26 @@ struct MarkdownHighlighter {
         /// cell that is one run of the body face takes the old cached path and
         /// only the ones that actually differ pay for the accurate measurement.
         let bodyFont = style.typography.editorFont.platformFont(size: style.typography.editorFontSize)
+        #if DEBUG
+        var tMeasure = 0.0, tParse = 0.0, tPipes = 0.0, tKern = 0.0
+        var cells = 0
+        var stamp = DispatchTime.now().uptimeNanoseconds
+        func lap() -> Double {
+            let now = DispatchTime.now().uptimeNanoseconds
+            defer { stamp = now }
+            return Double(now - stamp) / 1_000_000
+        }
+        defer {
+            if ProcessInfo.processInfo.environment["INKSTONE_TABLE_PHASES"] != nil {
+                Self.tableTotals.parse += tParse
+                Self.tableTotals.pipes += tPipes
+                Self.tableTotals.measure += tMeasure
+                Self.tableTotals.kern += tKern
+                Self.tableTotals.cells += cells
+                Self.tableTotals.tables += 1
+            }
+        }
+        #endif
 
         func width(of range: NSRange) -> CGFloat {
             guard range.length > 0, NSMaxRange(range) <= storage.length else { return 0 }
@@ -1874,6 +2009,9 @@ struct MarkdownHighlighter {
             if !cells.isEmpty { rows.append(cells) }
         }
 
+        #if DEBUG
+        tParse += lap()
+        #endif
         // The delimiter row's pipes are collected separately: that line is
         // concealed whole, so it never reaches the loop above.
         do {
@@ -1898,9 +2036,22 @@ struct MarkdownHighlighter {
         // whose columns cannot be aligned then has no cell boundaries at all, and
         // its header reads as a run of words rather than as four column names.
         let tiny = PlatformFont.systemFont(ofSize: Self.concealedFontSize)
-        for pipe in pipePositions {
-            let line = text.paragraphRange(for: NSRange(location: pipe, length: 0))
-            if let caretLineRange, NSIntersectionRange(caretLineRange, line).length > 0 { continue }
+        // The caret test is per *line*, not per pipe, and a row of a wide table
+        // holds a dozen pipes. Asking `paragraphRange` for each one walked the
+        // line again every time — on the note that prompted this, 587 table rows
+        // meant thousands of those walks in a pass that has 16 ms to spare.
+        //
+        // Sorted so the running line range only ever moves forward.
+        var lastLine = NSRange(location: NSNotFound, length: 0)
+        var lineIsCaret = false
+        for pipe in pipePositions.sorted() {
+            if pipe < lastLine.location || pipe >= NSMaxRange(lastLine) {
+                lastLine = text.paragraphRange(for: NSRange(location: pipe, length: 0))
+                lineIsCaret = caretLineRange.map {
+                    NSIntersectionRange($0, lastLine).length > 0
+                } ?? false
+            }
+            if lineIsCaret { continue }
             let range = NSRange(location: pipe, length: 1)
             storage.addAttribute(.font, value: tiny, range: range)
             storage.addAttribute(.foregroundColor, value: PlatformColor.clear, range: range)
@@ -1909,13 +2060,40 @@ struct MarkdownHighlighter {
             }
         }
 
+        #if DEBUG
+        tPipes += lap()
+        #endif
         guard rows.count > 1 else { return }
 
         let alignments = columnAlignments(in: tableRange, text: text)
         let columnCount = rows.map(\.count).max() ?? 0
         var widths = [CGFloat](repeating: 0, count: columnCount)
         // Measure once and keep it; the second pass used to re-measure every cell.
-        var measured: [[CGFloat]] = rows.map { row in row.map { width(of: $0) } }
+        // Keyed on everything the widths depend on. `caretInside` matters
+        // because the caret un-conceals syntax in its row, which changes the
+        // width of every cell in the table.
+        let caretInside = caretLineRange.map {
+            NSIntersectionRange($0, tableRange).length > 0
+        } ?? false
+        let cacheKey = "\(style.typography.editorFontSize)|\(caretInside)|"
+            + text.substring(with: tableRange)
+
+        var measured: [[CGFloat]]
+        if let cached = Self.tableMeasurementCache[cacheKey],
+           cached.count == rows.count,
+           zip(cached, rows).allSatisfy({ $0.count == $1.count }) {
+            measured = cached
+        } else {
+            measured = rows.map { row in row.map { width(of: $0) } }
+            if Self.tableMeasurementCache.count >= Self.tableMeasurementCacheLimit {
+                Self.tableMeasurementCache.removeAll(keepingCapacity: true)
+            }
+            Self.tableMeasurementCache[cacheKey] = measured
+        }
+        #if DEBUG
+        cells += rows.reduce(0) { $0 + $1.count }
+        tMeasure += lap()
+        #endif
         for (rowIndex, row) in rows.enumerated() {
             for column in row.indices {
                 widths[column] = max(widths[column], measured[rowIndex][column])

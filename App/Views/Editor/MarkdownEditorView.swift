@@ -949,6 +949,8 @@ private struct TextViewRepresentable: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.textView = textView
 
+
+
         // Hand out the replacer now that there is a text view to replace in.
         actions.provideReplacer { [weak textView] replacement in
             guard let textView else { return }
@@ -999,6 +1001,17 @@ private struct TextViewRepresentable: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        // The scroll benchmark runs once, on the first document large enough to
+        // be worth measuring. In `updateNSView` rather than `makeNSView`
+        // because the editor view is made before any note is open.
+        if MacCoordinator.isBenchmarkingScroll,
+           !context.coordinator.didRunScrollBenchmark,
+           (scrollView.documentView as? NSTextView)?.textStorage?.length ?? 0 > 20_000 {
+            context.coordinator.didRunScrollBenchmark = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak coordinator = context.coordinator] in
+                coordinator?.runScrollBenchmark()
+            }
+        }
         let coordinator = context.coordinator
         coordinator.text = $text
         coordinator.actions = actions
@@ -1128,6 +1141,31 @@ private struct TextViewRepresentable: NSViewRepresentable {
         /// between styled and unstyled text.
         static let viewportThreshold = 40_000
 
+        /// Environment-driven switches, read once at launch.
+        ///
+        /// `ProcessInfo.environment` constructs the whole dictionary on every
+        /// access. Both of these sit in paths that run on every scroll, which
+        /// is exactly where a stray allocation shows up as the thing it was
+        /// meant to be measuring.
+        static let isLoggingHighlights =
+            ProcessInfo.processInfo.environment["INKSTONE_LOG_HIGHLIGHTS"] != nil
+        static let isBenchmarkingScroll =
+            ProcessInfo.processInfo.environment["INKSTONE_SCROLL_BENCH"] != nil
+        /// How far beyond the viewport to style, as a multiple of its height.
+        ///
+        /// Two. Measured across 66 viewports of a 63k note with 587 table rows,
+        /// with incremental styling in place:
+        ///
+        /// | padding | restyles | median | over 16 ms |
+        /// | ------- | -------- | ------ | ---------- |
+        /// | 1x      | 31       | 8.4 ms | 9 of 31    |
+        /// | **2x**  | **21**   | **8.9 ms** | **2 of 21** |
+        ///
+        /// Past 2x the passes grow faster than they become rarer.
+        static let scopePaddingMultiplier =
+            ProcessInfo.processInfo.environment["INKSTONE_SCOPE_PADDING"]
+                .flatMap(Double.init) ?? 2.0
+
         /// Character range last styled, so scrolling only re-runs when the reader
         /// approaches the edge of it.
         var styledRange: NSRange?
@@ -1144,8 +1182,25 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let glyphRange = layoutManager.glyphRange(forBoundingRect: textView.visibleRect, in: container)
             let visible = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
             guard visible.length > 0 else { return nil }
+            _ = storage
 
-            let padding = max(visible.length, 2_000)
+            // Half a screen either side, not a whole one.
+            //
+            // The padding decides both how much work a pass does and how often
+            // one happens, and the two trade against each other. A full screen
+            // each way made the styled range three times the viewport: on the
+            // note that prompted this, that pulled all sixty of its tables into
+            // every pass and cost 47 ms — three dropped frames, felt as a stall.
+            //
+            // Half a screen makes the range twice the viewport. Passes happen
+            // sooner but each is shorter, and shorter is what smooth means: at
+            // 60 Hz a frame is 16 ms, so four passes of 12 ms read as nothing
+            // while one of 47 ms reads as a jolt.
+            // Tunable for the benchmark, so the trade between how often a
+            // pass happens and how much each one does can be measured rather
+            // than guessed. See `runScrollBenchmark`.
+            let multiplier = Self.scopePaddingMultiplier
+            let padding = max(Int(Double(visible.length) * multiplier), 1_500)
             let start = max(0, visible.location - padding)
             let end = min(storage.length, visible.location + visible.length + padding)
             return NSRange(location: start, length: end - start)
@@ -1154,24 +1209,208 @@ private struct TextViewRepresentable: NSViewRepresentable {
         /// Re-styles after scrolling, but only once the viewport nears the edge of
         /// what is already styled — otherwise every scroll event would re-run the
         /// whole pass.
-        func rehighlightForScrollIfNeeded() {
-            guard let scope = viewportScope() else { return }
-            if let styled = styledRange,
-               scope.location >= styled.location,
-               scope.location + scope.length <= styled.location + styled.length {
+        /// Scrolls the whole document a screen at a time, timing each pass.
+        ///
+        /// Exists because driving a real scroll from a script proved
+        /// unreliable — synthetic events reached the app for keys and text but
+        /// not for the scroll wheel, and the window's coordinates did not
+        /// survive a second display. This measures the same code path a real
+        /// scroll takes: move the viewport, ask whether the styled range still
+        /// covers it, restyle when it does not.
+        ///
+        ///     INKSTONE_SCROLL_BENCH=1 Inkstone.app/Contents/MacOS/Inkstone
+        ///
+        /// Prints per-pass timings and quits.
+        var didRunScrollBenchmark = false
+
+        func runScrollBenchmark() {
+            guard let textView, let scrollView = textView.enclosingScrollView,
+                  let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer else { return }
+
+            // Layout has to be finished, or the first "viewport" is the whole
+            // document and every measurement is of the opening pass instead.
+            layoutManager.ensureLayout(for: container)
+            let total = layoutManager.usedRect(for: container).height
+            let page = scrollView.contentSize.height
+            guard page > 0, total > page else {
+                FileHandle.standardError.write(Data("[bench] document fits; nothing to scroll\n".utf8))
                 return
             }
-            rehighlight()
+
+            var timings: [Double] = []
+            var offset: CGFloat = 0
+            // Capped: a 2.4 MB note is eight hundred viewports, and a hundred
+            // is already more than enough to see the distribution.
+            while offset < total - page, timings.count < 100 {
+                offset += page * 0.85
+                scrollView.contentView.scroll(to: NSPoint(x: 0, y: offset))
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+
+                let started = DispatchTime.now().uptimeNanoseconds
+                rehighlightForScrollIfNeeded()
+                let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+                timings.append(ms)
+            }
+
+            let styled = timings.filter { $0 > 0.5 }
+            let sorted = styled.sorted()
+            func percentile(_ p: Double) -> Double {
+                guard !sorted.isEmpty else { return 0 }
+                return sorted[min(sorted.count - 1, Int(Double(sorted.count) * p))]
+            }
+            // Incremental styling is only worth having if it produces the same
+            // attributes as doing the whole range. Checked here rather than
+            // trusted: the failure mode is a table measured from half its rows,
+            // or a code fence styled at its opening and not its body, and
+            // neither shows up as an error — only as a page that looks wrong.
+            let checkRange = visibleCharacterRange() ?? NSRange(location: 0, length: 0)
+            let incrementalAttributes = Self.attributeFingerprint(
+                of: textView.textStorage, in: checkRange)
+            styledRange = nil                       // force a full pass
+            rehighlight(incremental: false)
+            let fullAttributes = Self.attributeFingerprint(
+                of: textView.textStorage, in: checkRange)
+            let mismatches = zip(incrementalAttributes, fullAttributes)
+                .filter { $0 != $1 }.count
+
+            let report = """
+                [bench] incremental vs full: \(mismatches) mismatched of \(fullAttributes.count)
+                [bench] \(timings.count) viewports, \(styled.count) triggered a restyle
+                [bench] restyle ms: median \(String(format: "%.1f", percentile(0.5))) \
+                p90 \(String(format: "%.1f", percentile(0.9))) \
+                max \(String(format: "%.1f", sorted.last ?? 0))
+                [bench] over 16ms: \(styled.filter { $0 > 16 }.count) of \(styled.count)
+
+                """
+            FileHandle.standardError.write(Data(report.utf8))
         }
 
-        func rehighlight() {
+        func rehighlightForScrollIfNeeded() {
+            guard let visible = visibleCharacterRange() else {
+                // Below the viewport threshold the whole document is styled at
+                // once, and scrolling changes nothing.
+                return
+            }
+            // Compared against what is *on screen*, not against the padded
+            // range that would be styled next.
+            //
+            // The padded range moves with the viewport, so comparing it to the
+            // last styled range meant the far edge had always advanced by
+            // however far the user scrolled — and a restyle fired on every
+            // single viewport, whatever the padding was set to. Measured across
+            // 66 viewports of the note that prompted this: 66 restyles at
+            // padding 0.5x, 66 at 1x, and still 63 at 2x, each one slower than
+            // the last. The padding was paying for itself and then cancelling
+            // itself out.
+            //
+            // Asking whether the visible text is still inside what was styled is
+            // the question the padding exists to answer.
+            if let styled = styledRange,
+               visible.location >= styled.location,
+               NSMaxRange(visible) <= NSMaxRange(styled) {
+                return
+            }
+            rehighlight(incremental: true)
+        }
+
+        /// A per-character summary of the attributes that decide how text looks.
+        ///
+        /// Font, colour and kerning: the three an incremental pass could get
+        /// wrong by styling a structure from only part of itself.
+        static func attributeFingerprint(of storage: NSTextStorage?, in range: NSRange) -> [Int] {
+            guard let storage, range.length > 0,
+                  NSMaxRange(range) <= storage.length else { return [] }
+            var result: [Int] = []
+            result.reserveCapacity(range.length)
+            storage.enumerateAttributes(in: range) { attributes, subrange, _ in
+                var hasher = Hasher()
+                if let font = attributes[.font] as? PlatformFont {
+                    hasher.combine(font.fontName)
+                    hasher.combine(font.pointSize)
+                }
+                if let colour = attributes[.foregroundColor] as? PlatformColor {
+                    hasher.combine(colour.description)
+                }
+                if let kern = attributes[.kern] as? CGFloat { hasher.combine(kern) }
+                let value = hasher.finalize()
+                result += Array(repeating: value, count: subrange.length)
+            }
+            return result
+        }
+
+        /// The part of `scope` that `styled` does not already cover.
+        ///
+        /// Returns nil when the two do not overlap, or when the new range is
+        /// covered on both sides — the first means there is nothing to reuse and
+        /// the second that there is nothing to do.
+        ///
+        /// The strip is widened to paragraph boundaries. Styling half a
+        /// paragraph is how a table gets its columns measured from the rows that
+        /// happen to be in range, and a fence gets code styling applied to its
+        /// opening and not its body.
+        static func newStrip(scope: NSRange, styled: NSRange, in storage: NSTextStorage)
+            -> NSRange? {
+            guard NSIntersectionRange(scope, styled).length > 0 else { return nil }
+            let text = storage.string as NSString
+
+            let below = NSMaxRange(scope) > NSMaxRange(styled)
+            let above = scope.location < styled.location
+            // Both directions at once means the viewport grew — a window
+            // resize, not a scroll. Cheaper to do the whole thing than to
+            // stitch two strips together.
+            guard below != above else { return nil }
+
+            let raw: NSRange = below
+                ? NSRange(location: NSMaxRange(styled),
+                          length: NSMaxRange(scope) - NSMaxRange(styled))
+                : NSRange(location: scope.location, length: styled.location - scope.location)
+            guard raw.length > 0 else { return nil }
+
+            // Out to whole paragraphs on both sides.
+            let start = text.paragraphRange(for: NSRange(location: raw.location, length: 0)).location
+            let endAnchor = min(NSMaxRange(raw), text.length > 0 ? text.length - 1 : 0)
+            let end = NSMaxRange(text.paragraphRange(for: NSRange(location: endAnchor, length: 0)))
+            return NSRange(location: start, length: min(end, text.length) - start)
+        }
+
+        /// The characters on screen, or nil when the document is styled whole.
+        func visibleCharacterRange() -> NSRange? {
+            guard let textView, let storage = textView.textStorage,
+                  storage.length > Self.viewportThreshold,
+                  let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer
+            else { return nil }
+            let glyphs = layoutManager.glyphRange(forBoundingRect: textView.visibleRect, in: container)
+            let visible = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+            return visible.length > 0 ? visible : nil
+        }
+
+        /// Styles the viewport, doing only the part that is new when it can.
+        ///
+        /// Scrolling moves the viewport by less than its own height, so most of
+        /// what the next pass would style is already styled. Restyling the whole
+        /// padded range each time was measured at 33.6 ms on the note that
+        /// prompted this — two dropped frames, on a range mostly identical to
+        /// the one before it.
+        ///
+        /// Incremental passes handle only the strip that came into range, which
+        /// is the part that actually changed. Anything that alters how existing
+        /// text is drawn — an edit, or the caret moving to a different line,
+        /// which un-conceals that line's syntax — restyles in full instead.
+        func rehighlight(incremental: Bool = false) {
             guard let textView, let storage = textView.textStorage else { return }
-            #if DEBUG
+            // Not `#if DEBUG`. A debug build's timings are several times the
+            // real ones, so a number measured there says nothing about what a
+            // reader feels — and this is the only instrument for the thing
+            // being tuned. Off unless the variable is set; one environment
+            // lookup per pass when it is.
             let started = DispatchTime.now().uptimeNanoseconds
             defer {
                 let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
-                let logAll = ProcessInfo.processInfo.environment["INKSTONE_LOG_HIGHLIGHTS"] != nil
-                if ms > 8 || logAll {
+                // Read once, not per pass: an instrument that changes what it
+                // measures is worse than none.
+                if Self.isLoggingHighlights {
                     FileHandle.standardError.write(Data(
                         "[inkstone] highlight \(storage.length) chars in \(String(format: "%.1f", ms)) ms\n".utf8
                     ))
@@ -1184,14 +1423,27 @@ private struct TextViewRepresentable: NSViewRepresentable {
                     } else { try? Data(line.utf8).write(to: url) }
                 }
             }
-            #endif
             isApplyingAttributes = true
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange())
             let scope = viewportScope()
-            styledRange = scope
+
+            var target = scope
+            if incremental, let scope, let styled = styledRange,
+               let strip = Self.newStrip(scope: scope, styled: styled, in: storage) {
+                target = strip
+                // The styled range grows to cover both, so the next pass knows
+                // what is already done. Capped: without a ceiling it would
+                // eventually claim the whole document, and an edit anywhere
+                // would then be believed to have been restyled.
+                let union = NSUnionRange(scope, styled)
+                styledRange = union.length <= scope.length * 4 ? union : scope
+            } else {
+                styledRange = scope
+            }
+
             caretTracker.record(caretLine: caretRange)
-            highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: scope)
+            highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: target)
         }
 
         func textDidChange(_ notification: Notification) {
