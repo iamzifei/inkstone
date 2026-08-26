@@ -251,6 +251,98 @@ func checkAgent(_ provider: any ModelProvider, named label: String, model: Strin
     return true
 }
 
+/// Asks a real model to edit real notes, and checks that nothing was written.
+///
+/// The premise of the whole review step is that a tool call proposes rather
+/// than acts. That is asserted in unit tests against the toolbox; this asserts
+/// it against a model that was told it could edit files and may well believe it
+/// did.
+func checkWrites(_ provider: any ModelProvider, named label: String, model: String) async -> Bool {
+    print("\n── \(label) · proposing edits ──")
+
+    let root = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appending(path: "write-check-\(UUID().uuidString)")
+    let original = "# 会议纪要\n\n- 讨论了预算\n- 下次会议待定\n"
+    var notes: [NoteMetadata] = []
+    do {
+        let url = root.appending(path: "meeting.md")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try original.write(to: url, atomically: true, encoding: .utf8)
+        notes.append(NoteParser.parse(text: original, url: url))
+    } catch {
+        print("  ✘ setup failed: \(error)"); return false
+    }
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let edits = PendingEditStore()
+    let snapshot = IndexBuilder.assemble(notes, vaultRoot: root)
+    let toolbox = NoteToolbox(snapshot: snapshot, store: NoteStore(root: root),
+                              vaultRoot: root, edits: edits)
+
+    var messages: [ChatMessage] = [
+        .init(role: .user, text: "把 meeting.md 里「下次会议待定」改成「下次会议：周五 10:00」。")
+    ]
+    var used: [String] = []
+    var rounds = 0
+
+    while rounds < 6 {
+        rounds += 1
+        let request = CompletionRequest(
+            model: model,
+            system: "You help with the user's notes. Use the tools.",
+            messages: messages,
+            tools: NoteToolbox.definitions(canWrite: true),
+            maxTokens: 2_048)
+
+        var accumulator = TurnAccumulator()
+        do {
+            for try await event in provider.stream(request) { accumulator.consume(event) }
+        } catch {
+            print("  ✘ \(error)"); return false
+        }
+        let turn = accumulator.message
+        messages.append(turn)
+        guard accumulator.needsToolResults else { break }
+
+        var results: [ContentBlock] = []
+        for call in turn.toolUses {
+            let outcome = await toolbox.run(call.name, input: call.input)
+            used.append(call.name)
+            results.append(.toolResult(id: call.id, content: outcome.content,
+                                       isError: outcome.isError))
+        }
+        messages.append(ChatMessage(role: .user, blocks: results))
+    }
+
+    for name in used { print("  · \(name)") }
+    let queue = await edits.snapshot()
+    let onDisk = (try? String(contentsOf: root.appending(path: "meeting.md"), encoding: .utf8)) ?? ""
+
+    print("  queued   \(queue.count) file(s), \(queue.edits.first?.hunks.count ?? 0) hunk(s)")
+    print("  on disk  unchanged: \(onDisk == original)")
+
+    guard used.contains("edit_note") else { print("  ✘ did not use edit_note"); return false }
+    guard queue.count == 1 else { print("  ✘ nothing queued"); return false }
+    // The assertion the review step rests on.
+    guard onDisk == original else { print("  ✘ THE FILE WAS WRITTEN"); return false }
+    guard queue.edits[0].after.contains("周五") else { print("  ✘ wrong edit"); return false }
+
+    // And the two properties, on a real diff rather than a constructed one.
+    var accepted = queue.edits[0]
+    accepted.setAll(true)
+    guard accepted.resolved == queue.edits[0].after else {
+        print("  ✘ accepting all diverged from the proposal"); return false
+    }
+    var rejected = queue.edits[0]
+    rejected.setAll(false)
+    guard rejected.resolved == original else {
+        print("  ✘ rejecting all changed the file"); return false
+    }
+    print("  accept all → proposal · reject all → original")
+    print("  ✔ ok")
+    return true
+}
+
 // MARK: - Run
 
 let environment = environmentIncludingDotEnv()
@@ -264,6 +356,7 @@ if let key = environment["CLAUDE_API_KEY"], !key.isEmpty {
     results.append(("anthropic/text", await check(provider, named: "Anthropic", model: model)))
     results.append(("anthropic/tools", await checkTools(provider, named: "Anthropic", model: model)))
     results.append(("anthropic/agent", await checkAgent(provider, named: "Anthropic", model: model)))
+    results.append(("anthropic/writes", await checkWrites(provider, named: "Anthropic", model: model)))
 } else {
     print("Anthropic: no CLAUDE_API_KEY, skipped")
 }
@@ -276,6 +369,7 @@ if let key = environment["OPENAI_API_KEY"], !key.isEmpty {
     results.append(("openai/text", await check(provider, named: "OpenAI", model: model)))
     results.append(("openai/tools", await checkTools(provider, named: "OpenAI", model: model)))
     results.append(("openai/agent", await checkAgent(provider, named: "OpenAI", model: model)))
+    results.append(("openai/writes", await checkWrites(provider, named: "OpenAI", model: model)))
 } else {
     print("OpenAI: no OPENAI_API_KEY, skipped")
 }

@@ -30,6 +30,12 @@ struct AssistantPane: View {
     @Environment(SkillLibrary.self) private var library
     /// The skill chosen for the next message, if any.
     @State private var pendingSkill: SkillManifest?
+    @State private var reviewing = false
+    @State private var reviewQueue = EditQueue()
+    /// The edit store lives as long as the panel, so changes proposed in one
+    /// turn survive into the next.
+    @State private var editStore = PendingEditStore()
+    @State private var saveFailure: String?
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
 
@@ -55,6 +61,17 @@ struct AssistantPane: View {
         // The snapshot is a value, so a toolbox built once would keep answering
         // from the vault as it was when the panel opened — including for notes
         // the assistant itself had just been told about.
+        .sheet(isPresented: $reviewing) {
+            ReviewChangesView(
+                queue: $reviewQueue,
+                onApply: { applyEdits($0) },
+                onDiscard: { Task { await conversation.discardPendingEdits() } })
+        }
+        .onChange(of: reviewing) { _, showing in
+            // Carry the reviewer's decisions back even when the sheet is
+            // dismissed without saving, so a later question sees the same state.
+            if !showing { Task { await conversation.syncPendingEdits(reviewQueue) } }
+        }
         .onChange(of: workspace.index.notes.count) { refreshToolbox() }
         .onChange(of: workspace.root) { refreshToolbox() }
         .onChange(of: profile?.id) { if let profile { catalogue.load(profile) } }
@@ -315,6 +332,7 @@ struct AssistantPane: View {
     /// picker somewhere to live that is next to the message it governs.
     private var composer: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if !conversation.pendingEdits.isEmpty { changesBar }
             if !slashMatches.isEmpty { slashMenu }
             if let skill = pendingSkill { skillChip(skill) }
             if settings.data.assistant.includesCurrentNote,
@@ -588,6 +606,41 @@ struct AssistantPane: View {
         }
     }
 
+    /// The one thing standing between a proposal and the vault.
+    ///
+    /// Deliberately prominent, and deliberately not automatic: nothing is
+    /// written until this is opened and something is accepted.
+    private var changesBar: some View {
+        Button {
+            reviewQueue = conversation.pendingEdits
+            reviewing = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.badge.ellipsis")
+                Text(changesSummary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Text("Review")
+                    .foregroundStyle(style.accent)
+            }
+            .font(.caption)
+            .foregroundStyle(style.secondaryText)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(style.accent.opacity(0.08), in: .rect(cornerRadius: 8, style: .continuous))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var changesSummary: String {
+        let paths = conversation.pendingEdits.affectedPaths
+        if paths.count == 1 {
+            return String(localized: "1 unsaved change to \(paths[0])")
+        }
+        return String(localized: "\(paths.count) files with unsaved changes")
+    }
+
     private func skillChip(_ skill: SkillManifest) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "wand.and.stars").font(.caption2)
@@ -614,8 +667,40 @@ struct AssistantPane: View {
             conversation.toolbox = nil
             return
         }
+        conversation.editStore = editStore
         conversation.toolbox = NoteToolbox(
-            snapshot: workspace.index, store: store, vaultRoot: root)
+            snapshot: workspace.index, store: store, vaultRoot: root, edits: editStore)
+    }
+
+    /// Writes the accepted hunks, and nothing else.
+    ///
+    /// Through `NoteStore`, the same path the editor saves by, so a note written
+    /// here is indexed, versioned and synced like any other. Writing the file
+    /// directly would leave the index describing a note that no longer says
+    /// what it says.
+    private func applyEdits(_ edits: [PendingEdit]) {
+        guard let root = workspace.root else { return }
+        var failures: [String] = []
+
+        for edit in edits {
+            let text = edit.resolved
+            let url = root.appending(path: edit.path)
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try text.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                failures.append("\(edit.path): \(error.localizedDescription)")
+            }
+        }
+
+        Task {
+            await conversation.discardPendingEdits()
+            workspace.reindex()
+        }
+        if !failures.isEmpty {
+            saveFailure = failures.joined(separator: "\n")
+        }
     }
 
     private func beginEditing(_ message: ChatMessage) {

@@ -78,6 +78,11 @@ final class Conversation {
     /// The vault, as tools. Nil until a vault is open, in which case the model
     /// is given no tools rather than tools that fail.
     var toolbox: NoteToolbox?
+    /// Where the assistant's proposed changes accumulate.
+    var editStore: PendingEditStore?
+    /// Mirrors the store for the view. Kept here rather than read on demand
+    /// because SwiftUI cannot await an actor while building a body.
+    private(set) var pendingEdits = EditQueue()
 
     /// How many times one question may go round the loop.
     ///
@@ -198,6 +203,7 @@ final class Conversation {
         // A cancelled turn does not run its tools: stop means stop, and a
         // half-streamed call is the least likely one to have been meant.
         guard error == nil, accumulator.needsToolResults, let toolbox else {
+            if let editStore { pendingEdits = await editStore.snapshot() }
             isRunning = false
             task = nil
             round = 0
@@ -236,6 +242,8 @@ final class Conversation {
             publish()
             return
         }
+
+        if let editStore { pendingEdits = await editStore.snapshot() }
 
         // Results go back as a user turn, which is what both APIs expect: the
         // model's turn asked, and the reply to it is ours to give.
@@ -305,6 +313,28 @@ final class Conversation {
     }
 
     private func publish() { onChange(messages) }
+
+    // MARK: - Pending changes
+
+    func refreshPendingEdits() async {
+        guard let editStore else { return }
+        pendingEdits = await editStore.snapshot()
+    }
+
+    /// Pushes the reviewer's decisions back into the store.
+    ///
+    /// Needed because the sheet edits a copy: without this, unchecking a hunk
+    /// and then asking a follow-up question would show the assistant a file it
+    /// had been told was accepted.
+    func syncPendingEdits(_ queue: EditQueue) async {
+        pendingEdits = queue
+        await editStore?.replace(with: queue)
+    }
+
+    func discardPendingEdits() async {
+        pendingEdits = EditQueue()
+        await editStore?.clear()
+    }
 
     func stop() {
         task?.cancel()

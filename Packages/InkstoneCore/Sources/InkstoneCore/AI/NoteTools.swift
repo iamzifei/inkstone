@@ -1,5 +1,30 @@
 import Foundation
 
+/// Where proposed changes accumulate.
+///
+/// An actor because the tools run off the main actor and a turn may propose
+/// several changes concurrently, while the review UI reads the same queue.
+public actor PendingEditStore {
+    private var queue = EditQueue()
+
+    public init() {}
+
+    public func propose(_ edit: PendingEdit) {
+        queue.add(edit)
+    }
+
+    /// What a file says including changes not yet saved.
+    public func currentText(of path: String) -> String? {
+        queue.currentText(of: path)
+    }
+
+    public func snapshot() -> EditQueue { queue }
+
+    public func replace(with queue: EditQueue) { self.queue = queue }
+
+    public func clear() { queue.removeAll() }
+}
+
 /// What a tool call produced.
 public struct ToolOutcome: Sendable, Hashable {
     public let content: String
@@ -33,6 +58,9 @@ public struct NoteToolbox: Sendable {
     private let snapshot: IndexSnapshot
     private let store: NoteStore
     private let vaultRoot: URL
+    /// Where writes go. Nil makes the toolbox read-only, and the writing tools
+    /// are then not offered at all rather than offered and refused.
+    private let edits: PendingEditStore?
 
     /// How much of a note to return.
     ///
@@ -44,11 +72,15 @@ public struct NoteToolbox: Sendable {
     /// How many hits to describe.
     public static let searchResultLimit = 20
 
-    public init(snapshot: IndexSnapshot, store: NoteStore, vaultRoot: URL) {
+    public init(snapshot: IndexSnapshot, store: NoteStore, vaultRoot: URL,
+                edits: PendingEditStore? = nil) {
         self.snapshot = snapshot
         self.store = store
         self.vaultRoot = vaultRoot
+        self.edits = edits
     }
+
+    public var canWrite: Bool { edits != nil }
 
     // MARK: - Definitions
 
@@ -66,7 +98,7 @@ public struct NoteToolbox: Sendable {
     /// nothing each time, and reported the subject absent from a vault that
     /// contained it. With the rule stated instead, the same model recovered on
     /// its second try and answered correctly.
-    public static var definitions: [ToolDefinition] {
+    public static var readOnlyDefinitions: [ToolDefinition] {
         [
             ToolDefinition(
                 name: "search_notes",
@@ -156,16 +188,88 @@ public struct NoteToolbox: Sendable {
         ]
     }
 
-    public static let names: Set<String> = Set(definitions.map(\.name))
+    /// The tools that change files.
+    ///
+    /// Described as proposals, not actions, because that is what they are — the
+    /// model needs to know a person will see this before it happens, or it will
+    /// report the work as done.
+    public static var writeDefinitions: [ToolDefinition] {
+        [
+            ToolDefinition(
+                name: "create_note",
+                description: """
+                    Propose a new note. It is shown to the user for review and \
+                    saved only if they accept it, so say what you have written \
+                    rather than claiming it exists.
+                    """,
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "path": .object([
+                            "type": .string("string"),
+                            "description": .string("Vault-relative path ending in .md, e.g. `notes/summary.md`."),
+                        ]),
+                        "content": .object([
+                            "type": .string("string"),
+                            "description": .string("The note's full Markdown text."),
+                        ]),
+                    ]),
+                    "required": .array([.string("path"), .string("content")]),
+                ])),
+
+            ToolDefinition(
+                name: "edit_note",
+                description: """
+                    Propose a change to an existing note by replacing one exact \
+                    passage with another. Read the note first: `old_text` must \
+                    match the file character for character, including \
+                    indentation, and must appear exactly once. To replace a \
+                    whole note, use `create_note` with its path instead.
+
+                    Changes are shown to the user for review and saved only if \
+                    accepted.
+                    """,
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "path": .object([
+                            "type": .string("string"),
+                            "description": .string("Vault-relative path of the note."),
+                        ]),
+                        "old_text": .object([
+                            "type": .string("string"),
+                            "description": .string("The exact text to replace. Include enough surrounding lines to make it unique."),
+                        ]),
+                        "new_text": .object([
+                            "type": .string("string"),
+                            "description": .string("What to put in its place. Empty to delete the passage."),
+                        ]),
+                    ]),
+                    "required": .array([.string("path"), .string("old_text"), .string("new_text")]),
+                ])),
+        ]
+    }
+
+    /// What to offer, given whether writing is allowed.
+    public static func definitions(canWrite: Bool) -> [ToolDefinition] {
+        canWrite ? readOnlyDefinitions + writeDefinitions : readOnlyDefinitions
+    }
+
+    public static var definitions: [ToolDefinition] { readOnlyDefinitions }
+
+    public static let names: Set<String> = Set(
+        (readOnlyDefinitions + writeDefinitions).map(\.name))
 
     // MARK: - Running
 
     public func run(_ name: String, input: JSONValue) async -> ToolOutcome {
         switch name {
         case "search_notes": return await search(input)
-        case "read_note": return read(input)
+        case "read_note": return await read(input)
         case "list_links": return links(input)
         case "list_notes": return list(input)
+        case "create_note": return await create(input)
+        case "edit_note": return await edit(input)
         default:
             return .failure("There is no tool called \(name).")
         }
@@ -220,7 +324,7 @@ public struct NoteToolbox: Sendable {
 
     // MARK: - read_note
 
-    private func read(_ input: JSONValue) -> ToolOutcome {
+    private func read(_ input: JSONValue) async -> ToolOutcome {
         guard let path = input["path"]?.stringValue, !path.isEmpty else {
             return .failure("read_note needs a `path`.")
         }
@@ -230,7 +334,12 @@ public struct NoteToolbox: Sendable {
                 to see what is in that folder.
                 """)
         }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        // Pending changes first. Reading from disk would show the assistant
+        // that its own edit had not happened, and it would make it again —
+        // costing a round and producing a second change to review.
+        let relative = relativePath(url)
+        let pending = await edits?.currentText(of: relative)
+        guard let text = pending ?? (try? String(contentsOf: url, encoding: .utf8)) else {
             return .failure("\(path) could not be read.")
         }
 
@@ -335,6 +444,106 @@ public struct NoteToolbox: Sendable {
             }
         }
         return ToolOutcome(content: lines.joined(separator: "\n"))
+    }
+
+    // MARK: - create_note
+
+    private func create(_ input: JSONValue) async -> ToolOutcome {
+        guard let edits else {
+            return .failure("This assistant cannot change files.")
+        }
+        guard let path = input["path"]?.stringValue, !path.isEmpty else {
+            return .failure("create_note needs a `path`.")
+        }
+        guard let content = input["content"]?.stringValue else {
+            return .failure("create_note needs `content`.")
+        }
+        guard let relative = VaultPathDetector.vaultRelative(path, vaultRoot: vaultRoot),
+              !relative.hasPrefix("..") else {
+            return .failure("\(path) is outside the vault.")
+        }
+        let target = relative.hasSuffix(".md") ? relative : relative + ".md"
+        let url = vaultRoot.appending(path: target)
+
+        // An existing note is never silently overwritten. The model has a tool
+        // for changing one, and using create_note on it is a mistake worth
+        // reporting rather than a request worth honouring.
+        let onDisk = try? String(contentsOf: url, encoding: .utf8)
+        if onDisk != nil {
+            return .failure("""
+                \(target) already exists. Use edit_note to change it, or choose \
+                another path.
+                """)
+        }
+
+        await edits.propose(PendingEdit(
+            path: target, before: nil, after: content,
+            summary: String(localized: "Create \(target)")))
+
+        return ToolOutcome(content: """
+            Proposed a new note at \(target) (\(content.count) characters). \
+            It is waiting for the user to review; it has not been saved yet.
+            """)
+    }
+
+    // MARK: - edit_note
+
+    private func edit(_ input: JSONValue) async -> ToolOutcome {
+        guard let edits else {
+            return .failure("This assistant cannot change files.")
+        }
+        guard let path = input["path"]?.stringValue, !path.isEmpty else {
+            return .failure("edit_note needs a `path`.")
+        }
+        guard let oldText = input["old_text"]?.stringValue, !oldText.isEmpty else {
+            return .failure("edit_note needs `old_text`. To create a note, use create_note.")
+        }
+        guard let newText = input["new_text"]?.stringValue else {
+            return .failure("edit_note needs `new_text`. Pass an empty string to delete the passage.")
+        }
+        guard let url = resolve(path) else {
+            return .failure("No note at \(path). Use search_notes to find it.")
+        }
+
+        let relative = relativePath(url)
+        let onDisk = try? String(contentsOf: url, encoding: .utf8)
+        let pending = await edits.currentText(of: relative)
+        guard let current = pending ?? onDisk else {
+            return .failure("\(relative) could not be read.")
+        }
+
+        // Must match exactly, and exactly once. A near-match applied anyway is
+        // how an edit lands in the wrong paragraph, and the file it lands in is
+        // the user's own writing.
+        let occurrences = current.components(separatedBy: oldText).count - 1
+        guard occurrences > 0 else {
+            return .failure("""
+                That exact text is not in \(relative). Read the note again — it \
+                must match character for character, including indentation.
+                """)
+        }
+        guard occurrences == 1 else {
+            return .failure("""
+                That text appears \(occurrences) times in \(relative). Include \
+                more surrounding lines so it matches only the passage you mean.
+                """)
+        }
+
+        let updated = current.replacingOccurrences(of: oldText, with: newText)
+        await edits.propose(PendingEdit(
+            path: relative,
+            // Against what is on disk, so the review shows the change a person
+            // would actually be saving rather than a step in the middle.
+            before: onDisk ?? "",
+            after: updated,
+            summary: newText.isEmpty
+                ? String(localized: "Delete a passage from \(relative)")
+                : String(localized: "Edit \(relative)")))
+
+        return ToolOutcome(content: """
+            Proposed a change to \(relative). It is waiting for the user to \
+            review; it has not been saved yet.
+            """)
     }
 
     // MARK: - Paths
