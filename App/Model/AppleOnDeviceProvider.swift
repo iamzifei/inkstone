@@ -147,6 +147,16 @@ struct AppleOnDeviceProvider: ModelProvider {
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish(throwing: ProviderError.cancelled)
+                } catch let error as ProviderError {
+                    // Passed through, not re-wrapped. Without this the errors
+                    // thrown a few lines above — the tool refusal and the
+                    // context check — were caught by the clause below and
+                    // wrapped in `.network(error.localizedDescription)`, which
+                    // for an enum with no `LocalizedError` conformance reads
+                    // "The operation couldn't be completed (error 8)". The two
+                    // most likely failures of this provider were the two that
+                    // said nothing.
+                    continuation.finish(throwing: error)
                 } catch {
                     continuation.finish(
                         throwing: ProviderError.network(error.localizedDescription))

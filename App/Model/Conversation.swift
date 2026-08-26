@@ -408,11 +408,44 @@ final class Conversation {
             // its opening, with a line saying what was left out, instead of an
             // error telling them to change model.
             if profile.kind == .appleOnDevice {
-                let budget = AppleOnDeviceProvider.characterBudget - 600
-                if note.text.count > budget {
-                    note.text = String(note.text.prefix(budget))
-                        + "\n\n[Cut here — this model can only hold the first part of the note.]"
+                // Measured against what is *already* in the prompt, not against
+                // a guess at it.
+                //
+                // Subtracting a flat 600 from the budget was wrong twice over:
+                // the instructions above run to several hundred characters of
+                // their own, and the conversation so far counts too. A note cut
+                // to 3,000 characters then joined a prompt that was already
+                // 500, and the request was refused for being over 3,600 with
+                // barely room for the question — so attaching any real note to
+                // the on-device model failed every time.
+                let alreadyUsed = prompt.count
+                    + messages.reduce(0) { total, message in
+                        total + message.blocks.reduce(0) { $0 + $1.plainText.count }
+                    }
+                // Room for the answer's prompt overhead and the question being
+                // typed, which is not in `messages` yet.
+                let budget = ContextBudget.allowance(
+                    window: AppleOnDeviceProvider.characterBudget,
+                    used: alreadyUsed,
+                    reserve: 400)
+
+                if budget < ContextBudget.minimumUsefulAllowance {
+                    // Nothing worth attaching would fit. Saying so beats
+                    // attaching two sentences of a note and answering about
+                    // those as though they were the note.
+                    prompt += """
+
+
+                        The note "\(note.title)" is open, but this conversation \
+                        already fills the model's context, so its text is not \
+                        included. Say so if the question needs it.
+                        """
+                    return prompt
                 }
+                note.text = ContextBudget.fit(
+                    note.text, into: budget,
+                    marker: "\n\n[Cut here — this model holds only the first part of the note.]")
+                    ?? note.text
             }
             prompt += """
 

@@ -273,7 +273,7 @@ public struct ModelInfo: Sendable, Hashable, Identifiable, Comparable {
 /// Deliberately not a passthrough of the provider's message: "401" tells a
 /// person nothing, while "the key was rejected" tells them which of the four
 /// things in front of them to change.
-public enum ProviderError: Error, Sendable, Equatable {
+public enum ProviderError: LocalizedError, Sendable, Equatable {
     case missingKey
     case unauthorized
     case rateLimited(retryAfter: TimeInterval?)
@@ -296,6 +296,42 @@ public enum ProviderError: Error, Sendable, Equatable {
     /// The user pressed stop. Distinct from a failure so the transcript keeps
     /// what had already streamed instead of showing an error over it.
     case cancelled
+
+    /// A readable sentence, so being wrapped by something else still says
+    /// something.
+    ///
+    /// `Conversation.describe` produces the fuller, more actionable version for
+    /// the panel. This is the fallback for every other path — and one of those
+    /// paths was live: an error thrown inside a provider and caught by its own
+    /// catch-all arrived as "The operation couldn't be completed (error 8)",
+    /// which names nothing a person can act on.
+    public var errorDescription: String? {
+        switch self {
+        case .missingKey:
+            return String(localized: "No API key is configured.")
+        case .unauthorized:
+            return String(localized: "The API key was rejected.")
+        case .rateLimited(let after):
+            return after.map { String(localized: "Rate limited; retry in \(Int($0))s.") }
+                ?? String(localized: "Rate limited by the provider.")
+        case .contextTooLong:
+            return String(localized: "Too much text for this model's context window.")
+        case .unsupportedThinking:
+            return String(localized: "This model does not support extended thinking.")
+        case .onDeviceCannotUseTools:
+            return String(localized: "The on-device model cannot use tools.")
+        case .serverError(let status, let body):
+            return body.isEmpty
+                ? String(localized: "The provider returned \(status).")
+                : String(localized: "The provider returned \(status): \(String(body.prefix(200)))")
+        case .network(let detail):
+            return String(localized: "Could not reach the provider: \(detail)")
+        case .decoding(let detail):
+            return String(localized: "Unexpected response: \(detail)")
+        case .cancelled:
+            return String(localized: "Stopped.")
+        }
+    }
 
     public var isRetryable: Bool {
         switch self {

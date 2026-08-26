@@ -233,3 +233,44 @@ struct WordCountTests {
         #expect(NoteParser.wordCount(of: "Привет мир") == 2)
     }
 }
+
+/// Fitting an attachment into what is left of a context window.
+@Suite("Context budget")
+struct ContextBudgetTests {
+    @Test("The allowance is what remains, not the window less a guess")
+    func measuresWhatIsLeft() {
+        // The bug this replaced subtracted a flat 600 from a 3,600 window and
+        // called the result the allowance — ignoring the several hundred
+        // characters of instructions already in the prompt and everything said
+        // so far. A note cut to 3,000 then joined a prompt of 500, and the
+        // request was refused every time.
+        #expect(ContextBudget.allowance(window: 3_600, used: 374, reserve: 400) == 2_826)
+        #expect(ContextBudget.allowance(window: 3_600, used: 3_000, reserve: 400) == 200)
+    }
+
+    @Test("A full window yields nothing, not a negative")
+    func clampsAtZero() {
+        #expect(ContextBudget.allowance(window: 3_600, used: 4_000, reserve: 400) == 0)
+    }
+
+    @Test("Text that fits is returned whole")
+    func keepsShortText() {
+        #expect(ContextBudget.fit("short", into: 1_000, marker: "[cut]") == "short")
+    }
+
+    @Test("Long text is cut to the allowance and says so")
+    func cutsLongText() {
+        let text = String(repeating: "字", count: 5_000)
+        let fitted = ContextBudget.fit(text, into: 1_000, marker: "[cut]")
+        #expect(fitted?.hasSuffix("[cut]") == true)
+        #expect(fitted?.count == 1_005)
+    }
+
+    @Test("Too small an allowance yields nothing at all")
+    func refusesFragments() {
+        // Two sentences of a note, answered about as though they were the note,
+        // is worse than saying the note did not fit.
+        #expect(ContextBudget.fit("some text", into: 50, marker: "[cut]") == nil)
+        #expect(ContextBudget.fit("some text", into: 0, marker: "[cut]") == nil)
+    }
+}
