@@ -105,6 +105,9 @@ siblings:
   audioswitch: 在菜单栏里切换音频设备
   candela: 控制外接显示器的亮度
   clipstack: 不碍事的剪贴板历史
+  veil: "正在用的窗口保持清晰，后面的一切柔和地模糊掉。免费，MIT 开源。"
+  tapper: "把鼠标指针变成长杆上的卡通手套，演示和录屏时一眼看清你指哪儿。免费，MIT 开源。"
+  tapper_name: 敲黑板 Tapper
 footer:
   tagline: 一个不动你文件的笔记应用。
   guides: "指南"

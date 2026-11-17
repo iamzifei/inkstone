@@ -105,6 +105,8 @@ siblings:
   audioswitch: Changer de périphérique audio depuis la barre des menus
   candela: Régler la luminosité des écrans externes
   clipstack: Un historique du presse-papiers qui ne gêne pas
+  veil: "Garde nette la fenêtre sur laquelle vous travaillez et floute doucement tout le reste. Gratuit, MIT."
+  tapper: "Transforme votre pointeur en gant de dessin animé au bout d'un long bâton, pour les démos et les enregistrements d'écran. Gratuit, MIT."
 footer:
   tagline: Une application de notes qui laisse vos fichiers tranquilles.
   guides: "Guides"

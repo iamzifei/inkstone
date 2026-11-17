@@ -105,6 +105,8 @@ siblings:
   audioswitch: Audiogeräte aus der Menüleiste umschalten
   candela: Die Helligkeit externer Displays steuern
   clipstack: Zwischenablage-Verlauf, der nicht im Weg steht
+  veil: "Hält das Fenster, in dem du arbeitest, scharf und zeichnet alles dahinter weich. Kostenlos, MIT."
+  tapper: "Macht deinen Mauszeiger zu einem Comic-Handschuh an einem langen Stab – für Demos und Bildschirmaufnahmen. Kostenlos, MIT."
 footer:
   tagline: Eine Notizapp, die Ihre Dateien in Ruhe lässt.
   guides: "Anleitungen"

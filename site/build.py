@@ -50,13 +50,15 @@ KOFI = "https://ko-fi.com/james_ai/tip"
 HAS_RELEASE = True
 DOWNLOAD = f"{REPO}/releases/latest/download/Inkstone.dmg"
 
-# The other three macOS apps. Someone who liked one is the likeliest person to
+# The other macOS apps. Someone who liked one is the likeliest person to
 # want another, which is why each site links to the rest rather than to a
 # portfolio page nobody visits.
 SIBLINGS = [
     ("AudioSwitch", "https://audioswitch.dev"),
     ("Candela", "https://getcandela.app"),
     ("ClipStack", "https://getclipstack.app"),
+    ("Veil", "https://jamesai.dev/veil/"),
+    ("Tapper", "https://jamesai.dev/tapper/"),
 ]
 
 # BCP 47, because that is what hreflang takes. The default language lives at the
@@ -273,11 +275,19 @@ def nav(page: Page, by_slug: dict) -> str:
 
 def footer(page: Page, by_slug: dict) -> str:
     d = page.data
+    def sib_label(name: str) -> str:
+        # A language may give a sibling its own display name (Tapper is
+        # "敲黑板 Tapper" in Chinese); otherwise the product name is used as is.
+        try:
+            return get(d, f"siblings.{name.lower()}_name")
+        except KeyError:
+            return name
+
     sibs = "".join(
         f'<li><a href="{url}" rel="noopener">'
         f'<img src="{page.up}assets/{name.lower()}.png" alt="" width="28" height="28" '
         f'loading="lazy" decoding="async">'
-        f'<span class="sib-text"><span class="sib-name">{name}</span>'
+        f'<span class="sib-text"><span class="sib-name">{e(sib_label(name))}</span>'
         f'<span class="sib-note">{e(get(d, f"siblings.{name.lower()}"))}</span></span></a></li>'
         for name, url in SIBLINGS
     )

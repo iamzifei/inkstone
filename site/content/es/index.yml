@@ -105,6 +105,8 @@ siblings:
   audioswitch: Cambiar de dispositivo de audio desde la barra de menús
   candela: Controlar el brillo de las pantallas externas
   clipstack: Un historial del portapapeles que no estorba
+  veil: "Mantiene nítida la ventana en la que trabajas y difumina suavemente todo lo demás. Gratis, MIT."
+  tapper: "Convierte tu puntero en un guante de dibujos animados en un palo largo, para demos y grabaciones de pantalla. Gratis, MIT."
 footer:
   tagline: Una app de notas que deja tus archivos en paz.
   guides: "Guías"

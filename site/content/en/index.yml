@@ -105,6 +105,8 @@ siblings:
   audioswitch: Switch audio devices from the menu bar
   candela: Control external display brightness
   clipstack: Clipboard history that stays out of the way
+  veil: "Keeps the window you're working in sharp and softly blurs everything behind it. Free, MIT."
+  tapper: "Turns your pointer into a cartoon glove on a long stick, for demos and screen recordings. Free, MIT."
 footer:
   tagline: A notes app that leaves your files alone.
   guides: "Guides"
