@@ -30,26 +30,30 @@ public enum SyncError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .firstSyncNeedsDirection(let differing, let localFiles, let remoteFiles):
-            return """
-                This vault has never synced with GitHub. It has \(localFiles) files \
-                and the repository has \(remoteFiles); \(differing) of them differ. \
+            // Counts go in as `String`, not `Int`: an `Int` interpolated into a
+            // localised string is formatted for the locale ("8,882"), and the
+            // message is also read by people grepping a log for the number.
+            return String(localized: """
+                This vault has never synced with GitHub. It has \(String(localFiles)) files \
+                and the repository has \(String(remoteFiles)); \(String(differing)) of them differ. \
                 There is no earlier sync to compare against, so neither side is \
                 known to be newer — choose which one to keep.
-                """
+                """)
         case .tooManyDeletions(let deleting, let total, let side):
-            let place = side == .remote ? "from GitHub" : "from this device"
-            return """
-                Stopped: this sync would delete \(deleting) of \(total) synced files \
+            let place = side == .remote
+                ? String(localized: "from GitHub") : String(localized: "from this device")
+            return String(localized: """
+                Stopped: this sync would delete \(String(deleting)) of \(String(total)) synced files \
                 \(place). That is usually a sign the wrong folder or branch is \
                 configured rather than a deletion anyone asked for. Check them, or \
                 confirm if it is what you meant.
-                """
+                """)
         case .remoteUnexpectedlyEmpty(let recorded):
-            return """
-                Stopped: GitHub reported no files, but \(recorded) were synced there \
+            return String(localized: """
+                Stopped: GitHub reported no files, but \(String(recorded)) were synced there \
                 before. Syncing now would delete them from this device. Check the \
                 repository and branch, then sync again.
-                """
+                """)
         }
     }
 }
@@ -225,14 +229,14 @@ public struct SyncEngine: Sendable {
         confirmingLargeDeletion: Bool = false,
         progress: (@Sendable (SyncProgress) -> Void)? = nil
     ) async throws -> SyncReport {
-        progress?(SyncProgress(phase: .verifying, message: "Checking repository…"))
+        progress?(SyncProgress(phase: .verifying, message: String(localized: "Checking repository…")))
         _ = try await client.verify()
 
-        progress?(SyncProgress(phase: .listing, message: "Listing remote files…"))
+        progress?(SyncProgress(phase: .listing, message: String(localized: "Listing remote files…")))
         let remote = try await client.listFiles()
         let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
 
-        progress?(SyncProgress(phase: .scanning, message: "Scanning vault…"))
+        progress?(SyncProgress(phase: .scanning, message: String(localized: "Scanning vault…")))
         let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
 
@@ -260,7 +264,7 @@ public struct SyncEngine: Sendable {
             )
         }
 
-        progress?(SyncProgress(phase: .planning, message: "Working out what changed…"))
+        progress?(SyncProgress(phase: .planning, message: String(localized: "Working out what changed…")))
         var report = SyncReport()
         var actions = SyncPlanner.plan(
             entries: entries, policy: policy, excludedLocally: excludedLocally
@@ -365,7 +369,7 @@ public struct SyncEngine: Sendable {
 
                 case .upload(let path):
                     progress?(SyncProgress(
-                        message: "Uploading \(path)…", completed: index, total: actions.count
+                        message: String(localized: "Uploading \(path)…"), completed: index, total: actions.count
                     ))
                     let data = try Data(contentsOf: fileURL(path))
                     let sha = try await client.upload(
@@ -379,7 +383,7 @@ public struct SyncEngine: Sendable {
 
                 case .download(let path):
                     progress?(SyncProgress(
-                        message: "Downloading \(path)…", completed: index, total: actions.count
+                        message: String(localized: "Downloading \(path)…"), completed: index, total: actions.count
                     ))
                     guard let file = remoteByPath[path] else { break }
                     let data = try await client.download(sha: file.sha, path: path)
@@ -389,7 +393,7 @@ public struct SyncEngine: Sendable {
 
                 case .deleteRemote(let path):
                     progress?(SyncProgress(
-                        message: "Removing \(path) from GitHub…", completed: index, total: actions.count
+                        message: String(localized: "Removing \(path) from GitHub…"), completed: index, total: actions.count
                     ))
                     guard let file = remoteByPath[path] else { break }
                     try await client.delete(path: path, sha: file.sha, message: "Delete \(path) from Inkstone")
@@ -398,7 +402,7 @@ public struct SyncEngine: Sendable {
 
                 case .deleteLocal(let path):
                     progress?(SyncProgress(
-                        message: "Removing \(path)…", completed: index, total: actions.count
+                        message: String(localized: "Removing \(path)…"), completed: index, total: actions.count
                     ))
                     try? FileManager.default.removeItem(at: fileURL(path))
                     state.blobs.removeValue(forKey: path)
@@ -409,7 +413,7 @@ public struct SyncEngine: Sendable {
                     // one and the user decides which to keep; losing a note to an
                     // automatic merge is far worse than having two of them.
                     progress?(SyncProgress(
-                        message: "Conflict on \(path)…", completed: index, total: actions.count
+                        message: String(localized: "Conflict on \(path)…"), completed: index, total: actions.count
                     ))
                     guard let file = remoteByPath[path] else {
                         report.conflicted.append(path)

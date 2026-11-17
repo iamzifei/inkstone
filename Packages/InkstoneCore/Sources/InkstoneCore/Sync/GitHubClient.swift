@@ -59,40 +59,39 @@ public enum GitHubError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "Set a repository and a personal access token in Settings › Sync first."
+            return String(localized: "Set a repository and a personal access token in Settings › Sync first.")
         case .badRepository(let value):
-            return "\"\(value)\" is not an owner/repository pair."
+            return String(localized: "\"\(value)\" is not an owner/repository pair.")
         case .unauthorised:
-            return "GitHub rejected the token. Check that it has not expired and grants Contents: read and write."
+            return String(localized: "GitHub rejected the token. Check that it has not expired and grants Contents: read and write.")
         case .notFound(let path):
-            return "GitHub could not find \(path). Check the repository name and branch."
+            return String(localized: "GitHub could not find \(path). Check the repository name and branch.")
         case .rateLimited(let resetAt):
-            guard let resetAt else { return "GitHub rate limit reached. Try again shortly." }
+            guard let resetAt else { return String(localized: "GitHub rate limit reached. Try again shortly.") }
             let formatter = DateFormatter()
             formatter.timeStyle = .short
-            return "GitHub rate limit reached. It resets at \(formatter.string(from: resetAt))."
+            return String(localized: "GitHub rate limit reached. It resets at \(formatter.string(from: resetAt)).")
         case .conflict(let path):
-            return "\(path) changed on GitHub while syncing. Run sync again."
+            return String(localized: "\(path) changed on GitHub while syncing. Run sync again.")
         case .forbidden(let path, let message):
             let detail = message.isEmpty ? "" : " \(message)"
-            return "GitHub would not let Inkstone write \(path).\(detail)"
+            return String(localized: "GitHub would not let Inkstone write \(path).\(detail)")
         case .branchNotFound(let branch, let repository, let available):
             let known = available.isEmpty
                 ? ""
-                : " It has: " + available.prefix(6).joined(separator: ", ") + "."
-            return "\(repository) has no branch called \"\(branch)\".\(known)"
+                : String(localized: " It has: \(available.prefix(6).joined(separator: ", ")).")
+            return String(localized: "\(repository) has no branch called \"\(branch)\".\(known)")
         case .tooLarge(let path, let size):
             // Actionable, because there is something to do: exclude the type, or
             // commit the file with git, which has no such limit.
-            let measured = "GitHub's file API refuses files this large — its limit is around 40 MB."
-            let advice = "Turn its file type off under Sync, or add it with git instead."
+            let measured = String(localized: "GitHub's file API refuses files this large — its limit is around 40 MB.")
+            let advice = String(localized: "Turn its file type off under Sync, or add it with git instead.")
             guard size >= 0 else { return "\(path): \(measured) \(advice)" }
-            return String(
-                format: "%@ is %.1f MB. %@ %@", path, Double(size) / 1_048_576, measured, advice
-            )
+            let megabytes = String(format: "%.1f", Double(size) / 1_048_576)
+            return String(localized: "\(path) is \(megabytes) MB. \(measured) \(advice)")
         case .http(let status, let message, let path):
             let detail = message.isEmpty ? "" : " \(message)"
-            return "GitHub returned \(status) for \(path).\(detail)"
+            return String(localized: "GitHub returned \(status) for \(path).\(detail)")
         }
     }
 }

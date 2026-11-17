@@ -7,6 +7,28 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.2.0 — 2026-11-18
+
+### A welcome guide, and the interface in three languages
+
+- **First-run welcome guide (macOS).** Six pages, each with a screenshot of the
+  app: choosing the notes folder, `[[wikilinks]]` and backlinks, the quick
+  switcher (⌘O), the graph, the canvas, and sync / settings. It opens once, and
+  people updating from 0.1.x see it once too — the "seen" flag is a version
+  number (`onboardingSeenVersion`), so a later guide with new pages can be shown
+  again by bumping one constant. Reopen it any time from **Help › Show Welcome
+  Guide**; Esc closes it, ← → turn the pages.
+- **The guide is English, 简体中文 and 繁體中文**, and follows the language chosen
+  in Settings rather than only the system language.
+- **Every interface string now has all three languages.** About 270 strings —
+  most of Settings › Sync, the assistant, version history, bookmarks and the
+  sidebar menus, and the iCloud messages — had no Chinese at all and showed in
+  English. GitHub and sync errors, sync progress, and the assistant's provider
+  errors are translated too; they used to be plain English strings that could not
+  be.
+- A sync error that names a count ("would delete 8882 of …") still prints the
+  bare number rather than "8,882".
+
 ## 0.1.5 — 2026-08-26
 
 - **Tables in reading mode are drawn with rules.** A real `NSTextTable` on macOS;

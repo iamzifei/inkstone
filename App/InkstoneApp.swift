@@ -29,6 +29,8 @@ struct InkstoneApp: App {
     #endif
 
     #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+
     /// Held here rather than created in the commands block, because Sparkle's
     /// scheduled-check timer lives as long as this object does. Rebuilding it on
     /// a view update would restart the cycle on every redraw.
@@ -59,6 +61,7 @@ struct InkstoneApp: App {
         #if DEBUG && os(macOS)
         Self.runHighlightBenchmarkIfRequested()
         SmokeTest.runIfRequested()
+        OnboardingView.dumpIfRequested()
         #endif
     }
 
@@ -562,6 +565,12 @@ struct InkstoneApp: App {
                 }
                 #endif
                 .onAppear {
+                    #if os(macOS)
+                    // Once per guide version; see OnboardingLauncher.
+                    if OnboardingLauncher.consumeFirstShow() {
+                        openWindow(id: OnboardingView.windowID)
+                    }
+                    #endif
                     openLastVault()
                     seedDemoSyncBinding()
                     // A token saved before it could travel; move it onto iCloud
@@ -577,10 +586,21 @@ struct InkstoneApp: App {
             commands
             #if os(macOS)
             CheckForUpdatesCommand(updater: updater)
+            WelcomeGuideCommand()
             #endif
         }
 
         #if os(macOS)
+        // Opened by `openWindow`, never automatically at launch by SwiftUI.
+        Window("Welcome to Inkstone", id: OnboardingView.windowID) {
+            StyledRoot { OnboardingView() }
+                .environment(workspace)
+                .preferredColorScheme(preferredColorScheme)
+                .environment(\.locale, locale)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Settings {
             StyledRoot { SettingsView() }
                 .environment(workspace)
