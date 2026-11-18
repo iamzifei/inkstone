@@ -1930,9 +1930,18 @@ private struct TextViewRepresentable: UIViewRepresentable {
             let layoutManager = textView.layoutManager
             let inset = textView.textContainerInset
             let height = textView.bounds.height
+            // Not laid out yet: style the top of the note rather than all of it.
+            guard height > 0 else {
+                return (storage.string as NSString).paragraphRange(
+                    for: NSRange(location: 0, length: min(storage.length, Self.viewportThreshold / 4)))
+            }
+            // Clamped, so a rubber-band overscroll past either end still finds text
+            // instead of an empty glyph range (which would style everything).
+            let maxOffset = max(0, textView.contentSize.height - height)
+            let offset = min(max(textView.contentOffset.y, 0), maxOffset)
             let visibleRect = CGRect(
                 x: 0,
-                y: textView.contentOffset.y - inset.top - height * 0.5,
+                y: offset - inset.top - height * 0.5,
                 width: textView.bounds.width,
                 height: height * 2
             )

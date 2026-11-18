@@ -84,6 +84,10 @@ Target (acceptance): autosave round-trip on 10k vault < 50 ms main-thread work; 
 | `assemble` | 292 ms | 142–146 ms | same test |
 | Per-keystroke styling, 88 KB note | 73 ms (iOS styled whole note) | 20 ms (viewport + ½ screen each side) | `INKSTONE_BENCH` + `INKSTONE_BENCH_WINDOW=6000`, -O build without sandbox (see note) |
 | Sync local scan, 10k notes | 477 ms (read + hash every file) | 231 ms (size+mtime+ctime stamps; rest is enumeration + .gitignore) | same test, `SCALE syncScan` (page-cached files; cold disk gains more — unmeasured) |
+| Embed image decode, 48 MP JPEG → 700 pt (macOS) | 123–159 ms, peak 75 MB | 119–131 ms, peak 67 MB — no real gain on Mac (NSImage already decoded at scale) | `imgbench.swift` (scratch), -O, 2 runs each |
+| Embed image decode (iOS) | UIImage full decode + redraw | ImageIO downsample at 3x; byte budget 96 MB | **unmeasured** — gain is inferred, verify in Instruments on device |
+| Canvas file cards | each card read from disk in `body` (every pan/zoom frame) | read once per file, off main | — |
+| Mermaid cache | already bounded (64) | unchanged | — |
 | Word count | whole note recounted in `body` every keystroke | stored, refreshed 300 ms after typing pauses | — |
 
 Note: the `INKSTONE_BENCH` hook is DEBUG-only and the app is sandboxed, so the benchmark build is Debug with `SWIFT_OPTIMIZATION_LEVEL=-O`, no entitlements, ad-hoc signed (`codesign --force --deep -s -`).
@@ -93,4 +97,6 @@ Behaviour fix found by the equivalence test: on a vault whose path contains a sp
 ## Progress log
 - 2026-11-18: plan written after code survey + SDK verification; James approved (all phases, runtime download OK, merge after green + independent review).
 - 2026-11-18: P1.1 incremental index + string resolve + background tree refresh; P1.2 iOS viewport styling + debounced word count. 582 core tests green; macOS + iOS builds green. CI caught a reuse-window bug (margin measured from now, not from previous build) → fixed + mutation-verified. `scripts/test-all.sh` green. Draft PR #1.
+- 2026-11-18: independent review of PR #1 (report only): 1 medium (late background tree scan could overwrite a newer synchronous refresh → generation counter), low: no periodic full index (→ full rebuild if last > 10 min), iOS overscroll/first-layout styled whole note (→ clamp), Package.resolved churn (→ reverted), reindex could publish after vault close (pre-existing → guarded + cancelled).
+- 2026-11-18: P1.3/P1.4 ImageIO embeds + byte budget, async canvas file cards.
 - 2026-11-18: P1.5 sync hash stamps (586 tests). Duo simulator (iOS 27.2) boots; Device Hub drives Closed / Partially Open / Open; screenshots per display work (`simctl io … screenshot --display=<uuid>`; inner AA1D87E1…, outer 21E0C8A9… on this machine).

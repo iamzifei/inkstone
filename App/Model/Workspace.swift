@@ -239,6 +239,13 @@ final class Workspace {
     private let indexBuilder = IndexBuilder()
     private var reindexTask: Task<Void, Never>?
     private var treeTask: Task<Void, Never>?
+    /// Bumped by every synchronous `refreshTree()`, so a background scan that
+    /// started earlier can tell its result is out of date.
+    private var treeGeneration = 0
+    /// When the last full (non-incremental) index build started. Incremental
+    /// builds trust modification dates; a full rebuild every few minutes
+    /// catches the rare edit that keeps its date (`rsync -t`, restored backups).
+    private var lastFullIndex = Date.distantPast
 
     init(registry: VaultRegistry = VaultRegistry(), settings: AppSettings = AppSettings()) {
         self.registry = registry
@@ -355,6 +362,8 @@ final class Workspace {
         saveAll()
         autoSyncTask?.cancel()
         autoSyncTask = nil
+        reindexTask?.cancel()
+        treeTask?.cancel()
         watcher?.stop()
         watcher = nil
         if let vault { registry.endAccess(to: vault) }
@@ -406,11 +415,16 @@ final class Workspace {
     private func refreshTreeInBackground() {
         guard let root else { return }
         treeTask?.cancel()
+        let generation = treeGeneration
         treeTask = Task.detached(priority: .userInitiated) { [weak self] in
             let scanned = VaultScanner().scan(root)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                guard let self, self.root == root, !Task.isCancelled else { return }
+                // A synchronous `refreshTree()` since this scan began published
+                // a newer listing (a note just created, renamed or deleted);
+                // this one is older and must not overwrite it.
+                guard let self, self.root == root, !Task.isCancelled,
+                      self.treeGeneration == generation else { return }
                 guard scanned != self.tree else { return }
                 self.tree = scanned
                 self.attachments = AttachmentIndex(tree: scanned)
@@ -422,6 +436,8 @@ final class Workspace {
 
     func refreshTree() {
         guard let root else { return }
+        treeTask?.cancel()
+        treeGeneration &+= 1
         let scanned = VaultScanner().scan(root)
         tree = scanned
         attachments = AttachmentIndex(tree: scanned)
@@ -928,11 +944,15 @@ final class Workspace {
         guard let root else { return }
         reindexTask?.cancel()
         isIndexing = true
+        let full = full || Date.now.timeIntervalSince(lastFullIndex) > 600
+        if full { lastFullIndex = .now }
         let previous: IndexSnapshot? = full ? nil : index
         reindexTask = Task { [indexBuilder] in
             let snapshot = await indexBuilder.build(vaultRoot: root, reusing: previous)
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                // The vault may have been closed or switched while building.
+                guard self.root == root, !Task.isCancelled else { return }
                 self.index = snapshot
                 self.indexGeneration += 1
                 self.isIndexing = false

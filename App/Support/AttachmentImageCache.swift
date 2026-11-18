@@ -1,6 +1,7 @@
 import Foundation
 import InkstoneCore
 import PDFKit
+import ImageIO
 
 #if os(macOS)
 import AppKit
@@ -30,6 +31,11 @@ final class AttachmentImageCache {
     private var failures: Set<Key> = []
     private var order: [Key] = []
     private let limit = 64
+    /// Decoded bytes kept in memory. Count alone did not bound memory: 64
+    /// full-width photos at 3x are hundreds of megabytes on a phone.
+    private var costs: [Key: Int] = [:]
+    private var totalCost = 0
+    private let costLimit = 96 * 1024 * 1024
 
     private init() {}
 
@@ -63,9 +69,13 @@ final class AttachmentImageCache {
 
         images[key] = decoded
         order.append(key)
-        if order.count > limit {
+        let cost = Self.byteCost(of: decoded)
+        costs[key] = cost
+        totalCost += cost
+        while order.count > 1, order.count > limit || totalCost > costLimit {
             let evicted = order.removeFirst()
             images.removeValue(forKey: evicted)
+            totalCost -= costs.removeValue(forKey: evicted) ?? 0
         }
         return decoded
     }
@@ -114,10 +124,83 @@ final class AttachmentImageCache {
         images.removeAll()
         failures.removeAll()
         order.removeAll()
+        costs.removeAll()
+        totalCost = 0
     }
 
+    private static func byteCost(of image: PlatformImage) -> Int {
+        #if os(macOS)
+        let pixels = image.representations.map { $0.pixelsWide * $0.pixelsHigh }.max() ?? 0
+        return max(pixels, Int(image.size.width * image.size.height)) * 4
+        #else
+        return Int(image.size.width * image.scale * image.size.height * image.scale) * 4
+        #endif
+    }
+
+    /// Pixels per point the picture will be drawn at. Not `UIScreen.main`
+    /// (deprecated, and wrong on a device with two screens such as iPhone Duo);
+    /// 3 is the densest iPhone screen and costs little over 2 at embed sizes.
+    private static var displayScale: CGFloat {
+        #if os(macOS)
+        NSScreen.screens.map(\.backingScaleFactor).max() ?? 2
+        #else
+        3
+        #endif
+    }
+
+    /// Decodes `url` straight to the size it will be shown at.
+    ///
+    /// The previous path decoded the full image and then redrew it smaller: a
+    /// 48 MP photo meant ~190 MB of pixels on the main thread for a picture a
+    /// few hundred points wide. ImageIO's thumbnail decoder downsamples while
+    /// decoding, and applies the EXIF orientation as the old loaders did.
+    ///
+    /// The returned image keeps the old *point* size — the original's natural
+    /// size, or `maxWidth` wide if that is smaller — so layout is unchanged;
+    /// only the pixels behind it are fewer (or, on Retina, sharper).
+    private func downsampled(_ url: URL, maxWidth: CGFloat) -> (CGImage, CGSize)? {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, options),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              var pixelWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              var pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
+              pixelWidth > 0, pixelHeight > 0
+        else { return nil }
+        // Orientations 5–8 are rotated a quarter turn: width and height swap.
+        if let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue, orientation >= 5 {
+            swap(&pixelWidth, &pixelHeight)
+        }
+        #if os(macOS)
+        // NSImage sized pictures by their DPI (a 144-dpi screenshot is half its
+        // pixel width in points); kept so embeds lay out as before.
+        let dpi = (properties[kCGImagePropertyDPIWidth] as? NSNumber)?.doubleValue ?? 72
+        let pointsPerPixel = dpi > 0 ? 72 / dpi : 1
+        #else
+        let pointsPerPixel = 1.0
+        #endif
+        let naturalWidth = pixelWidth * pointsPerPixel
+        let pointWidth = min(naturalWidth, Double(maxWidth))
+        let pointSize = CGSize(width: pointWidth, height: pixelHeight * pointsPerPixel * pointWidth / naturalWidth)
+        let targetWidth = min(pixelWidth, pointWidth * Double(Self.displayScale))
+        let maxPixel = max(1, Int((max(pixelWidth, pixelHeight) * targetWidth / pixelWidth).rounded(.up)))
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ] as CFDictionary
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else { return nil }
+        return (image, pointSize)
+    }
+
+    // ImageIO first; the original whole-image path only for what ImageIO
+    // cannot decode (SVG — which NSImage renders on macOS — and anything else
+    // it rejects), so no format that used to show stops showing.
     #if os(macOS)
     private func load(_ url: URL, maxWidth: CGFloat) -> NSImage? {
+        if let (image, size) = downsampled(url, maxWidth: maxWidth) {
+            return NSImage(cgImage: image, size: size)
+        }
         guard let image = NSImage(contentsOf: url) else { return nil }
         let size = image.size
         guard size.width > 0, size.height > 0 else { return nil }
@@ -132,6 +215,9 @@ final class AttachmentImageCache {
     }
     #else
     private func load(_ url: URL, maxWidth: CGFloat) -> UIImage? {
+        if let (image, size) = downsampled(url, maxWidth: maxWidth) {
+            return UIImage(cgImage: image, scale: CGFloat(image.width) / max(size.width, 1), orientation: .up)
+        }
         guard let image = UIImage(contentsOfFile: url.path) else { return nil }
         let size = image.size
         guard size.width > 0, size.height > 0, size.width > maxWidth else { return image }

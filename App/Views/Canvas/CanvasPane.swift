@@ -115,12 +115,9 @@ struct CanvasPane: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Label(node.file.map { ($0 as NSString).lastPathComponent } ?? "", systemImage: "doc.text")
                         .font(style.uiFont.weight(.medium))
-                    if let file = node.file, let root = workspace.root,
-                       let text = try? workspace.store?.read(root.appending(path: file)) {
-                        Text(text.prefix(400))
-                            .font(.caption)
-                            .foregroundStyle(style.secondaryText)
-                            .lineLimit(12)
+                    if let file = node.file, let root = workspace.root, let store = workspace.store {
+                        FileCardPreview(url: root.appending(path: file), store: store,
+                                        color: style.secondaryText)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -344,5 +341,34 @@ extension Color {
     init(hex: String) {
         let components = ThemeColor(hex).components
         self = Color(.sRGB, red: components.red, green: components.green, blue: components.blue, opacity: components.alpha)
+    }
+}
+
+/// The first few hundred characters of a file shown on a canvas card.
+///
+/// Read once, off the main thread, and again only when the card points at a
+/// different file. It used to be read inside `body`, so every redraw of the
+/// canvas — each frame of a pan or zoom — read every file card from disk.
+private struct FileCardPreview: View {
+    let url: URL
+    let store: NoteStore
+    let color: Color
+    @State private var text: String?
+
+    var body: some View {
+        Group {
+            if let text {
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(color)
+                    .lineLimit(12)
+            }
+        }
+        .task(id: url) {
+            let url = url, store = store
+            text = await Task.detached(priority: .userInitiated) {
+                (try? store.read(url)).map { String($0.prefix(400)) }
+            }.value
+        }
     }
 }
