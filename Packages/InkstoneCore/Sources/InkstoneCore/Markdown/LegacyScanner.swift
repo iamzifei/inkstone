@@ -303,7 +303,7 @@ private enum LegacyPatterns {
     static let inlineCode = make(#"`([^`\n]+)`"#)
 
     static let mathBlock = make(#"\$\$([\s\S]*?)\$\$"#)
-    static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?!\$)"#)
+    static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?![\$\d])"#)
 
     static let comment = make(#"%%[\s\S]*?%%"#)
 
