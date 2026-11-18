@@ -36,9 +36,14 @@ actor SpotlightIndexer {
     // so a request still waiting when a newer one arrives is dropped, not queued.
     private var pending: (root: URL?, notes: [URL: Date], enabled: Bool)?
     private var running = false
+    /// Requests are numbered on the main actor; separate tasks can reach this
+    /// actor out of order, and an older one must not replace a newer one.
+    private var newest = 0
 
     /// Brings the index up to date with `notes` (nil root: no vault open).
-    func submit(root: URL?, notes: [URL: Date], enabled: Bool) async {
+    func submit(sequence: Int, root: URL?, notes: [URL: Date], enabled: Bool) async {
+        guard sequence > newest else { return }
+        newest = sequence
         pending = (root, notes, enabled)
         guard !running else { return }
         running = true
@@ -107,7 +112,7 @@ actor SpotlightIndexer {
         // download it (or block until it is) — the whole vault, for an index.
         let keys: Set<URLResourceKey> = [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
         if let values = try? url.resourceValues(forKeys: keys), values.isUbiquitousItem == true,
-           values.ubiquitousItemDownloadingStatus != .current {
+           values.ubiquitousItemDownloadingStatus == .notDownloaded {
             return nil
         }
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }

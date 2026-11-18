@@ -1134,12 +1134,15 @@ final class Workspace {
     /// Brings Spotlight up to date with the index. Runs after the previous
     /// update finishes, never alongside it (the indexer's record of what it
     /// pushed would interleave).
+    @ObservationIgnored private var spotlightSequence = 0
     func updateSpotlight() {
         let root = root
         let notes = root == nil ? [:] : index.notes.mapValues(\.modified)
         let enabled = settings.data.indexInSpotlight
+        spotlightSequence += 1
+        let sequence = spotlightSequence
         Task.detached(priority: .utility) {
-            await SpotlightIndexer.shared.submit(root: root, notes: notes, enabled: enabled)
+            await SpotlightIndexer.shared.submit(sequence: sequence, root: root, notes: notes, enabled: enabled)
         }
     }
 
