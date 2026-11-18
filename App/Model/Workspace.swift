@@ -404,6 +404,7 @@ final class Workspace {
             refreshTreeInBackground()
             reindex(full: true, seedFromDisk: true)
             startWatching(url)
+            deliverSharedItems()
 
             if startingBackgroundWork {
                 if settings.data.gitHubAutoSync {
@@ -1800,6 +1801,44 @@ final class Workspace {
         refreshTree()
         reindex()
         return url
+    }
+
+    /// Moves what was shared from other apps (the share extension leaves it in
+    /// the app group's inbox) into the vault's Inbox note, oldest first.
+    func deliverSharedItems() {
+        #if os(iOS)
+        guard let store, let root else { return }
+        SharedInbox.appHasVault = true
+        let inbox = root.appending(path: "Inbox.md")
+        // In iCloud but not downloaded (only a ".Inbox.md.icloud" placeholder):
+        // creating a fresh Inbox.md would make a duplicate. Wait for it.
+        if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)),
+           FileManager.default.fileExists(atPath: root.appending(path: ".Inbox.md.icloud").path(percentEncoded: false)) {
+            try? FileManager.default.startDownloadingUbiquitousItem(at: inbox)
+            return
+        }
+        var delivered = false
+        SharedInbox.drain { item in
+            if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)) {
+                guard (try? store.write("# Inbox\n", to: inbox)) != nil else { return false }
+            }
+            let entry = SharedInbox.entry(for: item)
+            let core = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Already in the open note from an earlier try whose save failed:
+            // don't add it a second time, just get it onto disk.
+            if let document = documents[inbox], document.text.contains(core) {
+                document.save()
+            } else {
+                guard (try? append(entry, to: inbox)) != nil else { return false }
+            }
+            // Delivered only once it is on disk: an open Inbox note saves
+            // through its editor document, whose save can fail quietly.
+            guard let written = try? store.read(inbox), written.contains(core) else { return false }
+            delivered = true
+            return true
+        }
+        if delivered { refreshTree() }
+        #endif
     }
 
     /// Appends `text` to today's daily note (created if needed).

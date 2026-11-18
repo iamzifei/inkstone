@@ -8,6 +8,8 @@
 
   Required-reason APIs, each with what the code actually does:
   - UserDefaults (CA92.1): the app's own settings and vault list.
+    (1C8F.1): the app group's defaults, shared with the share extension only
+    (whether a vault has been opened yet).
   - File timestamps (3B52.1, C617.1): modification dates of notes in the vault
     the user chose (incremental indexing, sync change detection, conflict
     detection) and of files in the app's own container (scratch / iCloud).
@@ -28,7 +30,7 @@
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
-			<array><string>CA92.1</string></array>
+			<array><string>CA92.1</string><string>1C8F.1</string></array>
 		</dict>
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
