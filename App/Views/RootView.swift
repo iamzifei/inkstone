@@ -249,6 +249,17 @@ struct RootView: View {
                 .help(syncHelp)
             }
 
+            #if os(iOS)
+            // Touch has no ⌘F; this is the way into the note's find bar there.
+            if workspace.presentEditorFind != nil {
+                Button {
+                    workspace.presentEditorFind?(false)
+                } label: {
+                    Label("Find in Note", systemImage: "doc.text.magnifyingglass")
+                }
+            }
+            #endif
+
             Button {
                 workspace.isInspectorPresented.toggle()
             } label: {

@@ -81,6 +81,9 @@ final class Workspace {
     /// that wants to replace a selection — a rewrite sheet — has no business
     /// holding a text view.
     var replaceEditorSelection: ((String) -> Void)?
+    /// Opens the active editor's find bar (`true` = with replace). Set by the
+    /// editor; nil when no note is open.
+    var presentEditorFind: ((Bool) -> Void)?
     /// Set when ⌥⌘K should open the rewrite sheet.
     var isQuickRewritePresented = false
 

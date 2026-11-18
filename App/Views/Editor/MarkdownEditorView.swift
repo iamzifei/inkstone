@@ -34,6 +34,9 @@ struct EditorActions {
     /// Handed a closure that replaces the current selection, once the editor is
     /// on screen. Whoever wants to rewrite a passage calls it.
     var provideReplacer: ((@escaping (String) -> Void) -> Void) = { _ in }
+    /// Hands out "show the find bar" for this editor (`true` = with replace),
+    /// so the menu and toolbar can open it.
+    var provideFinder: ((@escaping (Bool) -> Void) -> Void) = { _ in }
     /// Resolves such a path to a file that exists, or nil.
     var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
@@ -951,6 +954,19 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
 
 
+        // Find and replace in the note. Off by default on NSTextView, and it
+        // was never switched on: the Edit menu had no Find at all.
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
+        actions.provideFinder { [weak textView] showReplace in
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            let sender = NSMenuItem()
+            sender.tag = (showReplace ? NSTextFinder.Action.showReplaceInterface
+                                      : NSTextFinder.Action.showFindInterface).rawValue
+            textView.performTextFinderAction(sender)
+        }
+
         // Hand out the replacer now that there is a text view to replace in.
         actions.provideReplacer { [weak textView] replacement in
             guard let textView else { return }
@@ -1768,6 +1784,13 @@ private struct TextViewRepresentable: UIViewRepresentable {
         textView.smartQuotesType = .no
         textView.smartDashesType = .no
         textView.keyboardDismissMode = .interactive
+        // The system find bar, with replace: ⌘F on a hardware keyboard, and
+        // the toolbar's "Find in Note" on a touch screen.
+        textView.isFindInteractionEnabled = true
+        actions.provideFinder { [weak textView] showReplace in
+            guard let textView else { return }
+            textView.findInteraction?.presentFindNavigator(showingReplace: showReplace)
+        }
         textView.text = text
 
         let tap = UITapGestureRecognizer(

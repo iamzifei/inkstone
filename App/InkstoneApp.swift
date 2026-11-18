@@ -918,6 +918,27 @@ struct InkstoneApp: App {
             .disabled(!workspace.canSync)
         }
 
+        CommandGroup(after: .textEditing) {
+            Divider()
+            Button(localized("Find…")) { workspace.presentEditorFind?(false) }
+                .keyboardShortcut("f")
+                .disabled(workspace.presentEditorFind == nil)
+            Button(localized("Find and Replace…")) { workspace.presentEditorFind?(true) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(workspace.presentEditorFind == nil)
+            #if os(macOS)
+            // ⌘G only: ⇧⌘G (the usual Find Previous) is already the graph,
+            // and the find bar has its own previous / next buttons.
+            Button(localized("Find Next")) {
+                let sender = NSMenuItem()
+                sender.tag = NSTextFinder.Action.nextMatch.rawValue
+                NSApp.sendAction(#selector(NSResponder.performTextFinderAction(_:)), to: nil, from: sender)
+            }
+            .keyboardShortcut("g")
+            .disabled(workspace.presentEditorFind == nil)
+            #endif
+        }
+
         // Merged into the system View menu rather than declared as
         // `CommandMenu("View")`, which produced a *second* menu also called
         // "View" sitting next to the built-in one in the menu bar.
