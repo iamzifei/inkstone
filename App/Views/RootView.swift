@@ -75,7 +75,15 @@ struct RootView: View {
             TemplatePickerView()
         }
         #if os(iOS)
-        .sheet(item: $workspace.exportedFile) { file in
+        .sheet(item: $workspace.exportedFile, onDismiss: {
+            // Share sheet closed: whatever it was going to do with the file is done.
+            let folder = FileManager.default.temporaryDirectory
+            if let leftovers = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+                for dir in leftovers where dir.lastPathComponent.hasPrefix("Export-") {
+                    try? FileManager.default.removeItem(at: dir)
+                }
+            }
+        }) { file in
             ShareSheet(items: [file.url]).ignoresSafeArea()
         }
         #endif

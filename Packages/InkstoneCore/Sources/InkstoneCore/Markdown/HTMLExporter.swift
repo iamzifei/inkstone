@@ -14,12 +14,13 @@ public enum HTMLExporter {
         let source = body as NSString
         var edits: [(range: NSRange, text: String)] = []
 
+        var inlined: [String: String] = [:]   // each image read and encoded once
         for token in SyntaxScanner().scan(body) {
             switch token.kind {
             case .wikiLink(let link):
                 edits.append((token.range, #"<span class="wikilink">"# + escape(link.displayText) + "</span>"))
             case .embed(let link):
-                edits.append((token.range, embedHTML(link, resolveAttachment: resolveAttachment)))
+                edits.append((token.range, embedHTML(link, resolveAttachment: resolveAttachment, cache: &inlined)))
             case .tag:
                 edits.append((token.range, #"<span class="tag">"# + escape(source.substring(with: token.range)) + "</span>"))
             case .comment:
@@ -36,11 +37,18 @@ public enum HTMLExporter {
             }
         }
 
-        // Apply back to front; an edit inside one already applied (a link in a
-        // comment) is dropped.
+        // An edit inside another (a link inside a comment) is dropped — the
+        // outer one replaces it anyway. Then apply back to front, so earlier
+        // ranges stay valid.
+        let outer = edits.filter { edit in
+            !edits.contains { other in
+                other.range != edit.range && other.range.length > edit.range.length
+                    && NSIntersectionRange(other.range, edit.range) == edit.range
+            }
+        }
         let rewritten = NSMutableString(string: body)
         var floor = Int.max
-        for edit in edits.sorted(by: { $0.range.location > $1.range.location }) {
+        for edit in outer.sorted(by: { $0.range.location > $1.range.location }) {
             guard NSMaxRange(edit.range) <= floor else { continue }
             rewritten.replaceCharacters(in: edit.range, with: edit.text)
             floor = edit.range.location
@@ -55,6 +63,7 @@ public enum HTMLExporter {
         <html>
         <head>
         <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>\(escape(title))</title>
         <style>\(stylesheet)</style>
@@ -74,19 +83,37 @@ public enum HTMLExporter {
         "webp": "image/webp", "svg": "image/svg+xml", "heic": "image/heic", "bmp": "image/bmp",
     ]
 
-    private static func embedHTML(_ link: WikiLink, resolveAttachment: (String) -> URL?) -> String {
+    /// Images larger than this are named, not inlined: a photo straight off a
+    /// phone, base64-encoded and copied through the pipeline, costs several
+    /// times its size in memory.
+    public static let maxInlineImageBytes = 15_000_000
+
+    private static func embedHTML(_ link: WikiLink, resolveAttachment: (String) -> URL?,
+                                  cache: inout [String: String]) -> String {
         let ext = (link.target as NSString).pathExtension.lowercased()
-        if let type = imageTypes[ext], let url = resolveAttachment(link.target),
-           let data = try? Data(contentsOf: url) {
-            var size = ""
-            if let s = link.embedSize {
-                size = #" width="\#(Int(s.width))""#
-                if let h = s.height { size += #" height="\#(Int(h))""# }
+        if let type = imageTypes[ext] {
+            if let cached = cache[link.target] { return cached }
+            if let url = resolveAttachment(link.target),
+               let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+               bytes <= maxInlineImageBytes,
+               let data = try? Data(contentsOf: url) {
+                // Markdown image syntax, not an <img> tag: a tag alone on a
+                // line opens a CommonMark HTML block, and the lines after it
+                // would come out as raw text. Embed sizes are left to the
+                // stylesheet (max-width: 100%).
+                let image = "![\(markdownEscape(link.target))](data:\(type);base64,\(data.base64EncodedString()))"
+                cache[link.target] = image
+                return image
             }
-            return #"<img src="data:\#(type);base64,\#(data.base64EncodedString())" alt="\#(escape(link.target))"\#(size)>"#
         }
-        // A note or file we do not inline: say what was embedded.
+        // A note, or a file we do not inline: say what was embedded.
         return #"<span class="embed">"# + escape(link.displayText) + "</span>"
+    }
+
+    private static func markdownEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "[", with: "\\[")
+            .replacingOccurrences(of: "]", with: "\\]")
     }
 
     static func escape(_ s: String) -> String {

@@ -57,6 +57,53 @@ struct HTMLExporterTests {
         #expect(html.contains(#"<img src="data:image/png;base64,"#))
     }
 
+    // Review 2026-11-18.
+    @Test func hugeOrInfiniteEmbedSizesDoNotCrash() throws {
+        let png = try onePixelPNG()
+        for size in ["1e30", "inf", "99999999999999999999x5"] {
+            let html = body("![[pic.png|\(size)]]\n", resolve: { _ in png })
+            #expect(html.contains("data:image/png;base64,"))
+        }
+    }
+
+    @Test func anImageAloneOnALineDoesNotSwallowTheNextLines() throws {
+        let png = try onePixelPNG()
+        let html = body("![[pic.png]]\nThe **caption** follows.\n", resolve: { _ in png })
+        #expect(html.contains("<strong>caption</strong>"))
+    }
+
+    @Test func aLinkInsideACommentStaysHidden() {
+        let html = body("Visible %%secret [[Hidden]] note%% text\n")
+        #expect(!html.contains("Hidden"))
+        #expect(!html.contains("%%"))
+        #expect(html.contains("Visible"))
+    }
+
+    @Test func theDocumentBlocksScriptsAndNetwork() {
+        let doc = HTMLExporter.document("<script>alert(1)</script>\n<img src=\"https://example.com/x.png\">\n", title: "t", resolveAttachment: { _ in nil })
+        #expect(doc.contains(#"http-equiv="Content-Security-Policy""#))
+        #expect(doc.contains("default-src 'none'"))
+    }
+
+    @Test func oversizedImagesAreNotInlined() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "inkstone-export-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let big = dir.appending(path: "big.png")
+        try Data(count: HTMLExporter.maxInlineImageBytes + 1).write(to: big)
+        let html = body("![[big.png]]\n", resolve: { _ in big })
+        #expect(!html.contains("base64"))
+        #expect(html.contains("big.png"))
+    }
+
+    func onePixelPNG() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "inkstone-export-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let png = dir.appending(path: "pic.png")
+        try Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")!.write(to: png)
+        return png
+    }
+
     @Test func aWholeDocumentIsSelfContained() {
         let doc = HTMLExporter.document("# Hi\n", title: "Hi & bye", resolveAttachment: { _ in nil })
         #expect(doc.hasPrefix("<!doctype html>"))

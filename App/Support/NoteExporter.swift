@@ -31,6 +31,11 @@ enum NoteExporter {
         try await PDFPrinter().print(html, to: url)
     }
 
+    /// Removes an export's temporary folder (it holds the whole note).
+    static func discard(_ file: URL) {
+        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+    }
+
     /// Writes the export to a temporary file named after the note.
     static func export(_ url: URL, as format: Format, in workspace: Workspace) async throws -> URL {
         guard let html = html(for: url, in: workspace) else { throw CocoaError(.fileReadUnknown) }
@@ -55,8 +60,18 @@ private final class PDFPrinter: NSObject, WKNavigationDelegate {
 
     func print(_ html: String, to url: URL) async throws {
         let config = WKWebViewConfiguration()
+        // Notes can hold raw HTML (and arrive by sync from elsewhere): no
+        // scripts. The document's CSP also blocks every network load.
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
         let webView = WKWebView(frame: CGRect(origin: .zero, size: paper), configuration: config)
         webView.navigationDelegate = self
+        // A load that never finishes (a stalled subresource) must not hang the
+        // export forever.
+        let timeout = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            self?.finishLoad(.failure(CocoaError(.fileReadUnknown)))
+        }
+        defer { timeout.cancel() }
         try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
             loaded = c
             webView.loadHTMLString(html, baseURL: nil)
@@ -96,6 +111,8 @@ private final class PDFPrinter: NSObject, WKNavigationDelegate {
         let page = CGRect(origin: .zero, size: paper)
         renderer.setValue(page, forKey: "paperRect")
         renderer.setValue(page.insetBy(dx: margin, dy: margin), forKey: "printableRect")
+        // A blank PDF reported as success is worse than an error.
+        guard renderer.numberOfPages > 0 else { throw CocoaError(.fileWriteUnknown) }
         let data = NSMutableData()
         UIGraphicsBeginPDFContextToData(data, page, nil)
         renderer.prepare(forDrawingPages: NSRange(location: 0, length: renderer.numberOfPages))
@@ -108,14 +125,30 @@ private final class PDFPrinter: NSObject, WKNavigationDelegate {
         #endif
     }
 
+    /// Resumes the load wait once, whichever of finish / fail / crash /
+    /// timeout comes first.
+    private func finishLoad(_ result: Result<Void, Error>) {
+        guard let c = loaded else { return }
+        loaded = nil
+        c.resume(with: result)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        loaded?.resume(); loaded = nil
+        finishLoad(.success(()))
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        loaded?.resume(throwing: error); loaded = nil
+        finishLoad(.failure(error))
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        loaded?.resume(throwing: error); loaded = nil
+        finishLoad(.failure(error))
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        finishLoad(.failure(CocoaError(.fileReadUnknown)))
+    }
+    /// Only the note itself loads; a link or meta refresh in it does not
+    /// navigate the print view to another page.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        action.request.url?.absoluteString == "about:blank" ? .allow : .cancel
     }
 }
 

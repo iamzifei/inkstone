@@ -117,23 +117,32 @@ final class Workspace {
     struct ExportedFile: Identifiable { let url: URL; var id: URL { url } }
     var exportedFile: ExportedFile?
     var exportFailure: String?
+    private(set) var isExporting = false
 
     /// Exports the open note. On Mac asks where to save it; on iOS hands the
     /// file to the share sheet (Save to Files, Mail, Print, …).
     func exportActiveNote(as format: NoteExporter.Format) {
-        guard let note = activeTab?.url else { return }
+        // Notes only (a canvas or an image tab has a URL too), one at a time.
+        guard !isExporting, let note = activeTab?.url, note.pathExtension.lowercased() == "md" else { return }
+        isExporting = true
         Task { @MainActor in
+            defer { isExporting = false }
             do {
                 let file = try await NoteExporter.export(note, as: format, in: self)
                 #if os(macOS)
+                defer { NoteExporter.discard(file) }
                 let panel = NSSavePanel()
                 panel.nameFieldStringValue = file.lastPathComponent
                 panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
                 guard panel.runModal() == .OK, let destination = panel.url else { return }
-                try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.copyItem(at: file, to: destination)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    // Atomic: the old file is only gone once the new one is in place.
+                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: file)
+                } else {
+                    try FileManager.default.copyItem(at: file, to: destination)
+                }
                 #else
-                exportedFile = ExportedFile(url: file)
+                exportedFile = ExportedFile(url: file)   // discarded when the share sheet closes
                 #endif
             } catch {
                 exportFailure = error.localizedDescription
