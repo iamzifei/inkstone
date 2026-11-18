@@ -7,8 +7,9 @@ fastlane picks a screenshot's slot from its pixel size and does not know the
 iPhone Duo's inner screen, so these go up through the App Store Connect API
 directly: for each language in assets/store-shots/<lang>/duo, the version's
 localization gets an APP_IPHONE_DUO screenshot set whose images are replaced
-by these, in file-name order. Run it after fastlane has created the
-localizations (zh-Hans, zh-Hant).
+by these, in file-name order. Run it after fastlane — which creates the
+zh-Hans / zh-Hant localizations, and whose overwrite_screenshots would delete
+this set if it ran afterwards. Needs PyJWT and cryptography (pip).
 
 Uses the same API key as the rest of the release tooling. Without --confirm it
 only prints what it would do.
@@ -103,17 +104,22 @@ def main() -> int:
         print(f"{locale}: {len(files)} Duo screenshots" + (" (replacing the current set)" if existing else ""))
         if not confirm:
             continue
+        old_ids: list[str] = []
         if existing:
             set_id = existing["id"]
-            for old in call("GET", f"/v1/appScreenshotSets/{set_id}/appScreenshots")["data"]:
-                call("DELETE", f"/v1/appScreenshots/{old['id']}")
+            old_ids = [old["id"] for old in
+                       call("GET", f"/v1/appScreenshotSets/{set_id}/appScreenshots?limit=200")["data"]]
         else:
             set_id = call("POST", "/v1/appScreenshotSets", {"data": {
                 "type": "appScreenshotSets", "attributes": {"screenshotDisplayType": SLOT},
                 "relationships": {"appStoreVersionLocalization": {
                     "data": {"type": "appStoreVersionLocalizations", "id": loc_id}}}}})["data"]["id"]
+        # New ones first, old ones removed only once the new ones are in: a
+        # failure part-way leaves the old set, not an empty one.
         ids = [upload(set_id, f) for f in files]
         wait_until_processed(ids)
+        for old in old_ids:
+            call("DELETE", f"/v1/appScreenshots/{old}")
         print(f"  uploaded and processed: {', '.join(f.name for f in files)}")
     if not confirm:
         print("dry run — pass --confirm to upload")
