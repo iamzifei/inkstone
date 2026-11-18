@@ -101,6 +101,13 @@ enum DemoDirector {
                     log.error("demo export failed \(error.localizedDescription, privacy: .public)")
                 }
             }
+        case "mode":
+            // mode live|source|reading — the editor mode, as the toolbar sets it.
+            switch arg {
+            case "reading": workspace.settings.data.editorMode = .reading
+            case "source": workspace.settings.data.editorMode = .source
+            default: workspace.settings.data.editorMode = .livePreview
+            }
         case "palette":
             workspace.isCommandPalettePresented = arg != "off"
         case "palette-pick":

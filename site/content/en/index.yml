@@ -66,7 +66,7 @@ features:
     sync:
       kicker: Two machines
       title: iCloud or GitHub, and you choose what travels
-      body: Sync through iCloud, or push the vault to a GitHub repository with conflicts settled once rather than left as two copies. Per-type filters decide whether attachments and media go with it, and the vault's own .gitignore is respected.
+      body: 'Sync through iCloud, or push the vault to a GitHub repository. A conflict never overwrites anything: when both sides changed a note, the other version is kept beside yours as a conflict copy. Per-type filters decide whether attachments and media go with it, and the vault''s own .gitignore is respected.'
       alt: 'The GitHub sync settings: repository and branch pickers, and per-file-type switches deciding what is synchronised.'
 duo:
   title: "iPhone Duo: one note, four shapes"
@@ -105,6 +105,8 @@ specs:
     v: GitHub Flavored Markdown, plus wikilinks, embeds, block references, callouts, footnotes, maths and Mermaid
   - k: Sync
     v: iCloud or a GitHub repository, with per-file-type filters
+  - k: Workflow
+    v: "Templates with Obsidian's placeholders, export to PDF or HTML, a command palette, notes in Spotlight, Shortcuts actions"
   - k: Interface languages
     v: English, 简体中文, 繁體中文
   - k: Source

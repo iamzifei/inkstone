@@ -107,15 +107,22 @@ First release.
 
 ## Screenshots
 
-Captured 2026-08-20 from the current build, at exactly the sizes Apple requires,
-so none of them need resizing or padding.
+Captured 2026-11-19 for 0.4.0, in three languages (en / zh-Hans / zh-Hant),
+each with the app's UI and demo vault in that language, at exactly the sizes
+App Store Connect takes — nothing is resized or padded.
 
-| Set | Size | Files |
-| --- | --- | --- |
-| iPhone 6.9" | 1320 × 2868 | `assets/ios-shots/01-library.png` … `06-search.png` |
-| iPad 13" | 2064 × 2752 | `assets/ios-shots/ipad/01-live-preview.png` … `03-measure.png` |
+| Set | Size | Slot | Raw → composed |
+| --- | --- | --- | --- |
+| iPhone 6.9" | 1320 × 2868 | APP_IPHONE_67 | `assets/ios-shots/<lang>/iphone` → `assets/store-shots/<lang>/iphone` (7) |
+| iPad 13" | 2064 × 2752 | APP_IPAD_PRO_3GEN_129 | `…/ipad` (6) |
+| iPhone Duo inner screen, unfolded | 2853 × 2007 | APP_IPHONE_DUO | `…/duo` (3) |
 
-Reproduce with `scripts/capture-ios-shots.sh`.
+1. `scripts/capture-store-shots.sh <lang>` — raw captures on the iPhone 17 Pro
+   Max, iPad Pro 13" and "Inkstone Duo" simulators (Device Hub drives the hinge).
+2. `scripts/make-store-shots.py` — captions per language; also copies the
+   iPhone and iPad sets into `fastlane/screenshots/<locale>`.
+3. fastlane uploads those; the Duo set goes up through the API
+   (`Tools/upload-duo-shots.py`), since fastlane does not know the Duo size.
 
 ## App Privacy answers
 

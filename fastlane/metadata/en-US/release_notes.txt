@@ -1,10 +1,9 @@
-What's new in 0.3
+What's new in 0.4
 
-• Find and replace inside a note, from the toolbar or ⌘F on a keyboard.
-• iPhone Duo: half-open, the note sits on one side of the crease and its backlinks, outline and properties on the other.
-• iPhone: larger rows, swipe to bookmark, rename or move to trash, a bottom bar to jump to or create a note, and the inspector as a sheet.
-• GitHub sync is safer. Fixed cases that could delete or bring back notes: renaming a note by changing only its capitalisation, hidden files in the repository, files that could not be read or were still in iCloud, and very large repositories. Typing during a sync is never overwritten.
-• Sync health in Settings: last successful sync, failed files, conflict copies, and a preview of the next sync.
-• Markdown reads the way Obsidian reads it: prices such as A$220 are no longer taken for maths, bare web addresses are links, and tags follow Obsidian's rules.
-• Large vaults open without a pause, and long notes stay quick to type in.
-• Rebuild Index in Settings, for when files were changed elsewhere with their dates preserved.
+• Templates: keep them in a folder (Templates, as in Obsidian) and insert one into the open note, with {{title}}, {{date}} and {{time}} filled in.
+• Export a note as a PDF (A4 pages) or a self-contained HTML file, from the More menu.
+• Command palette: every command, found by typing a few letters. In the More menu, or ⇧⌘P on a keyboard.
+• Notes in system search: titles and text are added to this device's search index, and a result opens the note. Can be turned off in Settings.
+• Shortcuts actions: New Note and Add to Today's Note, for Siri, the Action button and home-screen shortcuts.
+• iPhone Duo: the caret and scroll position stay put when you fold or unfold.
+• Background sync carries on where it stopped when iOS ends a long first sync early.

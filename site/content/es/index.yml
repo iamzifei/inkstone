@@ -66,7 +66,7 @@ features:
     sync:
       kicker: Dos máquinas
       title: iCloud o GitHub, y tú decides qué viaja
-      body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub: los conflictos se resuelven una vez, en lugar de quedarse como dos copias. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
+      body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub. Un conflicto nunca sobrescribe nada: si ambos lados cambiaron una nota, la otra versión se guarda junto a la tuya como copia en conflicto. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
       alt: 'Los ajustes de sincronización con GitHub: selectores de repositorio y rama, e interruptores por tipo de archivo.'
 duo:
   title: "iPhone Duo: una nota, cuatro formas"
@@ -105,6 +105,8 @@ specs:
     v: GitHub Flavored Markdown, más wikienlaces, incrustaciones, referencias de bloque, avisos, notas al pie, matemáticas y Mermaid
   - k: Sincronización
     v: iCloud o un repositorio de GitHub, con filtros por tipo de archivo
+  - k: Flujo de trabajo
+    v: "Plantillas con los marcadores de Obsidian, exportar a PDF o HTML, paleta de comandos, notas en Spotlight, acciones de Atajos"
   - k: Idiomas de la interfaz
     v: English, 简体中文, 繁體中文
   - k: Código
