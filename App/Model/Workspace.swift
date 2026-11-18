@@ -84,6 +84,10 @@ final class Workspace {
     /// Opens the active editor's find bar (`true` = with replace). Set by the
     /// editor; nil when no note is open.
     var presentEditorFind: ((Bool) -> Void)?
+    /// Puts the active editor's caret at a location (DemoDirector `caret`).
+    @ObservationIgnored var setEditorCaret: ((NSRange) -> Void)?
+    /// The active editor's caret, read live (DemoDirector `report`).
+    @ObservationIgnored var editorCaret: (() -> NSRange)?
     /// Set when ⌥⌘K should open the rewrite sheet.
     var isQuickRewritePresented = false
 

@@ -37,6 +37,16 @@ struct EditorActions {
     /// Hands out "show the find bar" for this editor (`true` = with replace),
     /// so the menu and toolbar can open it.
     var provideFinder: ((@escaping (Bool) -> Void) -> Void) = { _ in }
+    /// Where the caret and the scroll position were the last time this note
+    /// was in an editor, and where to report them as they change. A new editor
+    /// view — iPhone Duo folding or unfolding rebuilds the layout, and so does
+    /// switching tabs — restores them instead of starting at the top.
+    var savedPosition: () -> EditorPosition? = { nil }
+    var positionChanged: (EditorPosition) -> Void = { _ in }
+    /// Hands out "put the caret here" for this editor (scripted checks).
+    var provideCaretSetter: ((@escaping (NSRange) -> Void) -> Void) = { _ in }
+    /// Hands out "where is the caret now" for this editor (scripted checks).
+    var provideCaretGetter: ((@escaping () -> NSRange) -> Void) = { _ in }
     /// Resolves such a path to a file that exists, or nil.
     var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
@@ -73,6 +83,12 @@ struct EditingBehaviour: Equatable {
 /// need attributed-run access, caret position, click targets on links, and
 /// TextKit-level control over paragraph metrics — none of which `TextEditor`
 /// exposes.
+/// Caret and scroll position of a note in an editor; see `EditorActions.savedPosition`.
+struct EditorPosition: Equatable {
+    var selection: NSRange
+    var scrollOffset: CGFloat
+}
+
 struct MarkdownEditorView: View {
     @Binding var text: String
     let style: Style
@@ -102,6 +118,10 @@ struct MarkdownEditorView: View {
 /// Platform-agnostic editing logic, shared by the AppKit and UIKit wrappers.
 @MainActor
 class EditorCoordinator: NSObject {
+    /// True from building an editor until its saved caret and scroll are back:
+    /// the selection and scroll events in between are the editor's own set-up,
+    /// not the reader moving, and must not overwrite the saved position.
+    var restoringPosition = false
     var text: Binding<String>
     var style: Style
     var mode: EditorMode
@@ -918,6 +938,9 @@ private struct TextViewRepresentable: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
+        // See makeUIView: read before the text goes in.
+        let saved = actions.savedPosition()
+        context.coordinator.restoringPosition = saved != nil
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
@@ -1013,6 +1036,25 @@ private struct TextViewRepresentable: NSViewRepresentable {
 
         context.coordinator.applyStyle()
         context.coordinator.rehighlight()
+        actions.provideCaretGetter { [weak textView] in textView?.selectedRange() ?? NSRange(location: -1, length: 0) }
+        actions.provideCaretSetter { [weak textView] range in
+            guard let textView else { return }
+            let length = (textView.string as NSString).length
+            textView.setSelectedRange(NSRange(location: min(range.location, length), length: 0))
+        }
+        if let saved {
+            let length = (textView.string as NSString).length
+            let selection = NSRange(location: min(saved.selection.location, length),
+                                    length: min(saved.selection.length, max(0, length - min(saved.selection.location, length))))
+            // After layout, or the scroll lands on a document that has no height yet.
+            DispatchQueue.main.async { [weak textView, weak scrollView, weak coordinator = context.coordinator] in
+                guard let textView, let scrollView else { return }
+                textView.setSelectedRange(selection)
+                scrollView.contentView.scroll(to: NSPoint(x: 0, y: saved.scrollOffset))
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+                coordinator?.restoringPosition = false
+            }
+        }
         return scrollView
     }
 
@@ -1476,6 +1518,11 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let selected = textView.selectedRange()
             actions.selectionChanged(selected.length > 0
                 ? (storage.string as NSString).substring(with: selected) : "")
+            if !restoringPosition {
+                actions.positionChanged(EditorPosition(
+                    selection: selected,
+                    scrollOffset: textView.enclosingScrollView?.contentView.bounds.origin.y ?? 0))
+            }
             // Live preview needs a re-run whenever the caret moves to a new line —
             // and only then. Typing fires this *as well as* `textDidChange`, so
             // without the guard every keystroke ran the pass twice.
@@ -1764,6 +1811,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
+        // Read before the text goes in: setting it moves the caret to the end
+        // and reports that, which overwrote the position being restored.
+        let saved = actions.savedPosition()
+        context.coordinator.restoringPosition = saved != nil
         // TextKit 1 deliberately: we need `layoutManager.characterIndex(for:)`
         // to hit-test link taps, which has no direct TextKit 2 equivalent that
         // works as cleanly inside a `UITextView`.
@@ -1838,6 +1889,24 @@ private struct TextViewRepresentable: UIViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.applyStyle()
         context.coordinator.rehighlight()
+        actions.provideCaretGetter { [weak textView] in textView?.selectedRange ?? NSRange(location: -1, length: 0) }
+        actions.provideCaretSetter { [weak textView] range in
+            guard let textView else { return }
+            textView.selectedRange = NSRange(location: min(range.location, textView.textStorage.length), length: 0)
+        }
+        if let saved {
+            let length = textView.textStorage.length
+            let location = min(saved.selection.location, length)
+            let selection = NSRange(location: location, length: min(saved.selection.length, length - location))
+            // After the first layout, or the offset is clamped to an empty view.
+            DispatchQueue.main.async { [weak textView, weak coordinator = context.coordinator] in
+                guard let textView else { return }
+                textView.selectedRange = selection
+                let maxOffset = max(0, textView.contentSize.height - textView.bounds.height)
+                textView.contentOffset = CGPoint(x: 0, y: min(saved.scrollOffset, maxOffset))
+                coordinator?.restoringPosition = false
+            }
+        }
         return textView
     }
 
@@ -1995,6 +2064,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            if let textView, !restoringPosition {
+                actions.positionChanged(EditorPosition(selection: textView.selectedRange,
+                                                       scrollOffset: scrollView.contentOffset.y))
+            }
             guard !isApplyingAttributes, let visible = visibleCharacters() else { return }
             if let styled = styledRange,
                visible.location >= styled.location,
@@ -2036,6 +2109,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
                 let selected = textView.selectedRange
                 actions.selectionChanged(selected.length > 0
                     ? (storage.string as NSString).substring(with: selected) : "")
+                if !restoringPosition {
+                    actions.positionChanged(EditorPosition(selection: selected, scrollOffset: textView.contentOffset.y))
+                }
             }
             guard !isApplyingAttributes else { return }
             // Same guard as AppKit: only a change of caret *line* can change what

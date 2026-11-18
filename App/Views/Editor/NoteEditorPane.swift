@@ -76,6 +76,10 @@ struct NoteEditorPane: View {
                         selectionChanged: { workspace.editorSelection = $0.isEmpty ? nil : $0 },
                         provideReplacer: { workspace.replaceEditorSelection = $0 },
                         provideFinder: { workspace.presentEditorFind = $0 },
+                        savedPosition: { document.editorPosition },
+                        positionChanged: { document.editorPosition = $0 },
+                        provideCaretSetter: { workspace.setEditorCaret = $0 },
+                        provideCaretGetter: { workspace.editorCaret = $0 },
                         resolveVaultPath: { path in workspace.resolveVaultPath(path, from: url) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,

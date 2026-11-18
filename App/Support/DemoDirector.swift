@@ -76,6 +76,12 @@ enum DemoDirector {
             workspace.isQuickSwitcherPresented = arg != "off"
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
+        case "caret":
+            if let location = Int(arg) { workspace.setEditorCaret?(NSRange(location: location, length: 0)) }
+        case "report":
+            let position = workspace.activeTab?.url.flatMap { workspace.document(for: $0) }?.editorPosition
+            Logger(subsystem: "com.orris.inkstone", category: "Demo")
+                .info("demo report editor caret \(workspace.editorCaret?().location ?? -1) saved \(position?.selection.location ?? -1)")
         case "back":
             workspace.goBack()
         case "close":
