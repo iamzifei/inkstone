@@ -201,7 +201,7 @@ enum ObsidianSyntax {
         /// `https://…`, `http://…` or `www.…` not glued to a preceding word.
         /// Stops at whitespace, angle brackets and full-width (CJK)
         /// punctuation, so `https://a.com，然后` links only the URL.
-        static let bareURL = make(#"(?<![\w/@.:\-])(?:https?://|www\.)[^\s<>\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]+"#)
+        static let bareURL = make(#"(?<![\p{L}\p{N}/@.:\-])(?:https?://|www\.)[^\s<>\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]+"#)
         static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?![\$\d])"#)
 
         static let comment = make(#"%%[\s\S]*?%%"#)
@@ -225,9 +225,11 @@ enum ObsidianSyntax {
         private static let tagStop = ##"\s!"#$%&'()*+,.:;<=>?@\[\\\]^`{|}~"##
         private static let tagBody = "[^\(tagStop)]*[^\\d\(tagStop)][^\(tagStop)]*"
         static let tag = make("#(" + tagBody + ")")
-        /// One or more tags back to back, starting at line start or after
-        /// whitespace.
-        static let tagRun = make("(?<!\\S)(?:#" + tagBody + ")+")
+        /// One or more tags back to back, starting at line start, after
+        /// whitespace, or right after `* _ = ~ [ |` — measured in Obsidian:
+        /// `**#a**`, `==#a==`, `~~#a~~` and `[#a]` are tags there, `(#a)`,
+        /// `"#a"` and `中文#a` are not.
+        static let tagRun = make("(?<![^\\s*_=~\\[|])(?:#" + tagBody + ")+")
 
         /// Block identifier anchored at end of line: `Some text ^my-block`.
         static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)

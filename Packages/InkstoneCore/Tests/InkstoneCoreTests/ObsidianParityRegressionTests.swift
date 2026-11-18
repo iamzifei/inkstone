@@ -79,6 +79,25 @@ struct ObsidianParityRegressionTests {
         #expect(tagNames("#nested/tag-name_x") == ["nested/tag-name_x"])
     }
 
+    /// Rendered in Obsidian itself (2026-11-18): a tag may also start right
+    /// after emphasis / highlight / strikethrough markers or `[`, but not
+    /// after `(` or a quote.
+    @Test func tagsAfterInlineMarkupMatchObsidian() {
+        #expect(tagNames("**#bold** text") == ["bold"])
+        #expect(tagNames("==#mark== text") == ["mark"])
+        #expect(tagNames("~~#del~~ text") == ["del"])
+        #expect(tagNames("[#bracket] text") == ["bracket"])
+        #expect(tagNames("(#paren) text").isEmpty)
+        #expect(tagNames("\"#quote\" text").isEmpty)
+        #expect(tagNames("| a | b |\n|---|---|\n| #cell | x |") == ["cell"])
+        #expect(tagNames("中文#标签 x").isEmpty)
+    }
+
+    @Test func aURLInsideEmphasisIsALink() {
+        #expect(links("_https://u.com_") == ["https://u.com"])
+        #expect(links("**https://v.com**") == ["https://v.com"])
+    }
+
     @Test func aBareURLHasNothingToConceal() throws {
         let token = try #require(tokens("x https://a.com y").first { if case .markdownLink = $0.kind { return true } else { return false } })
         #expect(token.range == token.contentRange)
