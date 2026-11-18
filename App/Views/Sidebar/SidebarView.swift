@@ -117,7 +117,7 @@ private struct VaultSwitcher: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: workspace.vault?.isCloudBacked == true ? "icloud" : "folder")
-                Text(workspace.vault?.name ?? String(localized: "No Vault"))
+                Text(workspace.vault?.name ?? localized("No Vault"))
                     .lineLimit(1)
                 Spacer()
                 if workspace.isIndexing {
@@ -187,12 +187,12 @@ private struct SectionPicker: View {
 
     private func label(for section: SidebarSection) -> String {
         switch section {
-        case .files: return String(localized: "Files")
-        case .search: return String(localized: "Search")
-        case .bookmarks: return String(localized: "Bookmarks")
-        case .tags: return String(localized: "Tags")
-        case .links: return String(localized: "Unresolved Links")
-        case .outline: return String(localized: "Outline")
+        case .files: return localized("Files")
+        case .search: return localized("Search")
+        case .bookmarks: return localized("Bookmarks")
+        case .tags: return localized("Tags")
+        case .links: return localized("Unresolved Links")
+        case .outline: return localized("Outline")
         }
     }
 }
@@ -577,7 +577,7 @@ struct SearchPane: View {
         @Bindable var workspace = workspace
 
         VStack(spacing: 0) {
-            TextField(String(localized: "Search notes… (try tag:idea)"), text: $workspace.searchQuery)
+            TextField(localized("Search notes… (try tag:idea)"), text: $workspace.searchQuery)
                 .textFieldStyle(.roundedBorder)
                 .font(style.uiFont)
                 .padding(8)
@@ -669,7 +669,7 @@ struct TagListView: View {
             }
 
             if let selectedTag {
-                Section(String(localized: "Notes tagged #\(selectedTag)")) {
+                Section(localized("Notes tagged #\(selectedTag)")) {
                     ForEach(workspace.index.notes(taggedWith: selectedTag)) { note in
                         Text(note.title)
                             .font(style.uiFont)
@@ -691,7 +691,7 @@ struct UnresolvedLinksView: View {
 
     var body: some View {
         List {
-            Section(String(localized: "Unresolved links")) {
+            Section(localized("Unresolved links")) {
                 ForEach(workspace.index.unresolved.sorted(by: { $0.value > $1.value }), id: \.key) { target, count in
                     HStack {
                         Text(target).font(style.uiFont)

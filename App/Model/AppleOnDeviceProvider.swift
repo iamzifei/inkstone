@@ -27,7 +27,7 @@ struct AppleOnDeviceProvider: ModelProvider {
             throw ProviderFactory.Unusable.onDeviceUnavailable(reason: describe(reason))
         @unknown default:
             throw ProviderFactory.Unusable.onDeviceUnavailable(
-                reason: String(localized: "The on-device model is unavailable."))
+                reason: localized("The on-device model is unavailable."))
         }
     }
 
@@ -35,22 +35,22 @@ struct AppleOnDeviceProvider: ModelProvider {
     static func describe(_ reason: SystemLanguageModel.Availability.UnavailableReason) -> String {
         switch reason {
         case .appleIntelligenceNotEnabled:
-            return String(localized: """
+            return localized("""
                 Apple Intelligence is off. Turn it on in System Settings › \
                 Apple Intelligence & Siri, then try again.
                 """)
         case .modelNotReady:
-            return String(localized: """
+            return localized("""
                 The on-device model is still downloading. This finishes in the \
                 background; try again in a few minutes.
                 """)
         case .deviceNotEligible:
-            return String(localized: """
+            return localized("""
                 This Mac does not support Apple Intelligence. Use a cloud model \
                 instead.
                 """)
         @unknown default:
-            return String(localized: "The on-device model is unavailable.")
+            return localized("The on-device model is unavailable.")
         }
     }
 
@@ -59,7 +59,7 @@ struct AppleOnDeviceProvider: ModelProvider {
         switch SystemLanguageModel.default.availability {
         case .available: return nil
         case .unavailable(let reason): return describe(reason)
-        @unknown default: return String(localized: "The on-device model is unavailable.")
+        @unknown default: return localized("The on-device model is unavailable.")
         }
     }
 
@@ -182,6 +182,6 @@ struct AppleOnDeviceProvider: ModelProvider {
 
     /// One entry, because the on-device model is not a choice of models.
     func models() async throws -> [ModelInfo] {
-        [ModelInfo(id: "apple-on-device", displayName: String(localized: "Apple on-device"))]
+        [ModelInfo(id: "apple-on-device", displayName: localized("Apple on-device"))]
     }
 }

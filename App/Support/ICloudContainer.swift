@@ -100,21 +100,21 @@ extension ICloudAvailability {
     var explanation: String {
         switch self {
         case .available:
-            return String(localized: "iCloud Drive is ready.")
+            return localized("iCloud Drive is ready.")
         case .notEntitled:
             // Not the user's fault and not fixable by them: this build simply
             // cannot use iCloud. Say so rather than sending them to Settings.
-            return String(localized: """
+            return localized("""
                 This build of Inkstone was not signed for iCloud, so it can't create \
                 a vault there. Open any folder as a vault instead.
                 """)
         case .notSignedIn:
-            return String(localized: """
+            return localized("""
                 Sign in to iCloud and turn on iCloud Drive, then try again. You can \
                 also open any folder as a vault.
                 """)
         case .unreachable:
-            return String(localized: """
+            return localized("""
                 iCloud Drive is signed in, but Inkstone's storage isn't responding \
                 yet. It often sorts itself out in a minute or two — or open any \
                 folder as a vault.
@@ -125,10 +125,10 @@ extension ICloudAvailability {
     /// A short title for the same, so an alert does not open with a sentence.
     var title: String {
         switch self {
-        case .available: return String(localized: "iCloud Drive is ready")
-        case .notEntitled: return String(localized: "This build can't use iCloud")
-        case .notSignedIn: return String(localized: "iCloud Drive isn't switched on")
-        case .unreachable: return String(localized: "iCloud Drive isn't responding")
+        case .available: return localized("iCloud Drive is ready")
+        case .notEntitled: return localized("This build can't use iCloud")
+        case .notSignedIn: return localized("iCloud Drive isn't switched on")
+        case .unreachable: return localized("iCloud Drive isn't responding")
         }
     }
 }

@@ -22,7 +22,7 @@ struct StoredConversation: Codable, Identifiable, Hashable {
     var title: String {
         guard let first = messages.first(where: { $0.role == .user })?.text,
               !first.isEmpty else {
-            return String(localized: "New conversation")
+            return localized("New conversation")
         }
         let line = first.split(separator: "\n").first.map(String.init) ?? first
         return line.count > 60 ? String(line.prefix(60)) + "…" : line

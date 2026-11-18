@@ -119,7 +119,7 @@ struct AssistantPane: View {
             }
             .buttonStyle(.plain)
             .disabled(conversation.isEmpty)
-            .help(String(localized: "New conversation"))
+            .help(localized("New conversation"))
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -147,7 +147,7 @@ struct AssistantPane: View {
                     }
                 }
                 Divider()
-                Button(String(localized: "Delete this conversation"), role: .destructive) {
+                Button(localized("Delete this conversation"), role: .destructive) {
                     if let id = store.activeID {
                         store.delete(id)
                         conversation.load(store.active?.messages ?? [])
@@ -164,7 +164,7 @@ struct AssistantPane: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(String(localized: "Past conversations"))
+        .help(localized("Past conversations"))
     }
 
     private var profileBinding: Binding<UUID?> {
@@ -188,18 +188,18 @@ struct AssistantPane: View {
     static func thinkingShortLabel(_ effort: ThinkingEffort) -> String {
         switch effort {
         case .off: return ""
-        case .low: return String(localized: "Low")
-        case .medium: return String(localized: "Medium")
-        case .high: return String(localized: "High")
+        case .low: return localized("Low")
+        case .medium: return localized("Medium")
+        case .high: return localized("High")
         }
     }
 
     static func thinkingLabel(_ effort: ThinkingEffort) -> String {
         switch effort {
-        case .off: return String(localized: "No extra thinking")
-        case .low: return String(localized: "Think briefly")
-        case .medium: return String(localized: "Think")
-        case .high: return String(localized: "Think hard")
+        case .off: return localized("No extra thinking")
+        case .low: return localized("Think briefly")
+        case .medium: return localized("Think")
+        case .high: return localized("Think hard")
         }
     }
 
@@ -365,7 +365,7 @@ struct AssistantPane: View {
                     .truncationMode(.middle)
             }
 
-            TextField(String(localized: "Ask about your notes…"),
+            TextField(localized("Ask about your notes…"),
                       text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(style.uiFont)
@@ -424,7 +424,7 @@ struct AssistantPane: View {
     private var modelPicker: some View {
         Menu {
             if settings.data.assistant.profiles.count > 1 {
-                Picker(String(localized: "Channel"), selection: profileBinding) {
+                Picker(localized("Channel"), selection: profileBinding) {
                     ForEach(settings.data.assistant.profiles) { candidate in
                         Text(candidate.name).tag(candidate.id as UUID?)
                     }
@@ -468,13 +468,13 @@ struct AssistantPane: View {
                 // cannot list its models usually has a bad key, and this is
                 // where someone will look first.
                 Text(message)
-                Button(String(localized: "Try again")) { catalogue.load(profile, force: true) }
+                Button(localized("Try again")) { catalogue.load(profile, force: true) }
             case .idle, .loaded:
                 let models = catalogue.models(for: profile)
                 if models.isEmpty {
                     Text("No models")
                 } else {
-                    Picker(String(localized: "Model"), selection: modelBinding) {
+                    Picker(localized("Model"), selection: modelBinding) {
                         ForEach(models) { model in
                             Text(model.displayName).tag(model.id)
                         }
@@ -495,7 +495,7 @@ struct AssistantPane: View {
     @ViewBuilder
     private var thinkingSection: some View {
         if thinkingIsAvailable {
-            Picker(String(localized: "Thinking"), selection: thinkingBinding) {
+            Picker(localized("Thinking"), selection: thinkingBinding) {
                 ForEach(ThinkingEffort.allCases, id: \.self) { effort in
                     Text(Self.thinkingLabel(effort)).tag(effort)
                 }
@@ -516,9 +516,9 @@ struct AssistantPane: View {
     /// choosing. The channel appears only when there is more than one, because
     /// with a single channel its name is noise.
     private var modelLabel: String {
-        guard let profile else { return String(localized: "No model") }
+        guard let profile else { return localized("No model") }
         let model = profile.model.isEmpty
-            ? String(localized: "Choose a model")
+            ? localized("Choose a model")
             : ModelCapabilities.displayName(for: profile.model)
         return settings.data.assistant.profiles.count > 1
             ? "\(profile.name) · \(model)"
@@ -552,7 +552,7 @@ struct AssistantPane: View {
                     .background(style.text, in: .circle)
             }
             .buttonStyle(.plain)
-            .help(String(localized: "Stop"))
+            .help(localized("Stop"))
         } else {
             let ready = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && profile != nil
@@ -566,7 +566,7 @@ struct AssistantPane: View {
             .buttonStyle(.plain)
             .disabled(!ready)
             .keyboardShortcut(.return, modifiers: .command)
-            .help(String(localized: "Send (⌘↩)"))
+            .help(localized("Send (⌘↩)"))
         }
     }
 
@@ -641,12 +641,12 @@ struct AssistantPane: View {
             Button {
                 pickFiles()
             } label: {
-                Label(String(localized: "Attach files…"), systemImage: "paperclip")
+                Label(localized("Attach files…"), systemImage: "paperclip")
             }
             Button {
                 attachCurrentSelection()
             } label: {
-                Label(String(localized: "Attach editor selection"), systemImage: "text.quote")
+                Label(localized("Attach editor selection"), systemImage: "text.quote")
             }
             .disabled(workspace.activeTab?.url == nil)
             Divider()
@@ -661,7 +661,7 @@ struct AssistantPane: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(String(localized: "Attach a file, a note, or the current selection"))
+        .help(localized("Attach a file, a note, or the current selection"))
     }
 
     private var attachmentStrip: some View {
@@ -780,14 +780,14 @@ struct AssistantPane: View {
             }
 
             guard !isDirectory.boolValue else {
-                problems.append(String(localized: "\(url.lastPathComponent) is a folder outside the vault."))
+                problems.append(localized("\(url.lastPathComponent) is a folder outside the vault."))
                 continue
             }
 
             if let type = UTType(filenameExtension: url.pathExtension),
                type.conforms(to: .image), let data = try? Data(contentsOf: url) {
                 guard data.count <= 8_000_000 else {
-                    problems.append(String(localized: "\(url.lastPathComponent) is too large to send."))
+                    problems.append(localized("\(url.lastPathComponent) is too large to send."))
                     continue
                 }
                 attach(ChatAttachment(kind: .image(
@@ -799,7 +799,7 @@ struct AssistantPane: View {
                 attach(ChatAttachment(kind: .file(name: url.lastPathComponent, text: text)))
                 continue
             }
-            problems.append(String(localized: "\(url.lastPathComponent) is not text or an image."))
+            problems.append(localized("\(url.lastPathComponent) is not text or an image."))
         }
         if !problems.isEmpty { attachmentProblem = problems.joined(separator: " ") }
     }
@@ -814,7 +814,7 @@ struct AssistantPane: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
-        panel.prompt = String(localized: "Attach")
+        panel.prompt = localized("Attach")
         if panel.runModal() == .OK { accept(panel.urls) }
         #endif
     }
@@ -822,7 +822,7 @@ struct AssistantPane: View {
     private func attachCurrentSelection() {
         guard let url = workspace.activeTab?.url,
               let selection = workspace.editorSelection, !selection.isEmpty else {
-            attachmentProblem = String(localized: "Nothing is selected in the editor.")
+            attachmentProblem = localized("Nothing is selected in the editor.")
             return
         }
         attach(ChatAttachment(kind: .selection(
@@ -859,9 +859,9 @@ struct AssistantPane: View {
     private var changesSummary: String {
         let paths = conversation.pendingEdits.affectedPaths
         if paths.count == 1 {
-            return String(localized: "1 unsaved change to \(paths[0])")
+            return localized("1 unsaved change to \(paths[0])")
         }
-        return String(localized: "\(paths.count) files with unsaved changes")
+        return localized("\(paths.count) files with unsaved changes")
     }
 
     private func skillChip(_ skill: SkillManifest) -> some View {
@@ -1060,10 +1060,10 @@ private struct MessageRow: View {
                         .strokeBorder(style.accent.opacity(0.5), lineWidth: 1)
                 }
             HStack(spacing: 8) {
-                Button(String(localized: "Cancel"), action: onCancelEdit)
+                Button(localized("Cancel"), action: onCancelEdit)
                     .buttonStyle(.plain)
                     .foregroundStyle(style.secondaryText)
-                Button(String(localized: "Send"), action: onCommitEdit)
+                Button(localized("Send"), action: onCommitEdit)
                     .buttonStyle(.plain)
                     .foregroundStyle(style.accent)
             }
@@ -1079,25 +1079,25 @@ private struct MessageRow: View {
                 Button {
                     copy(message.blocks.map(\.plainText).joined(separator: "\n\n"))
                 } label: {
-                    Label(copied ? String(localized: "Copied") : String(localized: "Copy"),
+                    Label(copied ? localized("Copied") : localized("Copy"),
                           systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 if canRegenerate {
                     Button {
                         onRegenerate()
                     } label: {
-                        Label(String(localized: "Regenerate"), systemImage: "arrow.clockwise")
+                        Label(localized("Regenerate"), systemImage: "arrow.clockwise")
                     }
                 }
             } else {
                 Button {
                     copy(message.text)
                 } label: {
-                    Label(copied ? String(localized: "Copied") : String(localized: "Copy"),
+                    Label(copied ? localized("Copied") : localized("Copy"),
                           systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 Button(action: onEdit) {
-                    Label(String(localized: "Edit"), systemImage: "pencil")
+                    Label(localized("Edit"), systemImage: "pencil")
                 }
             }
         }
@@ -1151,7 +1151,7 @@ private struct BlockView: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
-                Label(String(localized: "Thinking"), systemImage: "brain")
+                Label(localized("Thinking"), systemImage: "brain")
                     .font(.caption)
                     .foregroundStyle(style.faintText)
             }
@@ -1172,7 +1172,7 @@ private struct BlockView: View {
                          isError: isError)
 
         case .image:
-            Label(String(localized: "Image"), systemImage: "photo")
+            Label(localized("Image"), systemImage: "photo")
                 .font(.caption)
                 .foregroundStyle(style.faintText)
         }
@@ -1192,16 +1192,16 @@ private struct BlockView: View {
         switch name {
         case "search_notes":
             let query = input["query"]?.stringValue ?? ""
-            return String(localized: "Searching for \(query)")
+            return localized("Searching for \(query)")
         case "read_note":
-            return String(localized: "Reading \(input["path"]?.stringValue ?? "")")
+            return localized("Reading \(input["path"]?.stringValue ?? "")")
         case "list_links":
-            return String(localized: "Links of \(input["path"]?.stringValue ?? "")")
+            return localized("Links of \(input["path"]?.stringValue ?? "")")
         case "list_notes":
             let folder = input["folder"]?.stringValue ?? ""
             return folder.isEmpty
-                ? String(localized: "Listing the vault")
-                : String(localized: "Listing \(folder)")
+                ? localized("Listing the vault")
+                : localized("Listing \(folder)")
         default:
             return name
         }
@@ -1277,7 +1277,7 @@ private struct FailureRow: View {
                 .font(.callout)
                 .foregroundStyle(.orange)
             if canRetry {
-                Button(String(localized: "Retry"), action: retry)
+                Button(localized("Retry"), action: retry)
                     // `.link` is macOS-only, and this panel builds for both.
                     .buttonStyle(.borderless)
                     .font(.callout)

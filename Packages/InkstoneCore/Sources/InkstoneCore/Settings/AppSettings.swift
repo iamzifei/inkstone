@@ -331,7 +331,11 @@ public struct SettingsData: Codable, Hashable, Sendable {
 @Observable
 public final class AppSettings {
     public var data: SettingsData {
-        didSet { persist() }
+        didSet {
+            persist()
+            // Strings built outside SwiftUI follow the picker too; see Localization.
+            Localization.use(data.language)
+        }
     }
 
     /// User-installed themes loaded from the vault's `.inkstone/themes` folder,
@@ -353,6 +357,7 @@ public final class AppSettings {
         // Settings saved before the assistant existed decode with an empty
         // profile list, which would leave the panel offering nothing to pick.
         data.assistant.seedIfEmpty()
+        Localization.use(data.language)
     }
 
     public var theme: Theme {

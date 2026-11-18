@@ -225,8 +225,8 @@ struct CanvasPane: View {
             }
             .disabled(selection.count != 2)
             .help(selection.count == 2
-                  ? String(localized: "Draw an arrow between the two selected cards")
-                  : String(localized: "Select two cards to connect them"))
+                  ? localized("Draw an arrow between the two selected cards")
+                  : localized("Select two cards to connect them"))
 
             Divider().frame(height: 16)
 
@@ -247,8 +247,8 @@ struct CanvasPane: View {
             }
             .disabled(selection.isEmpty)
             .help(selection.isEmpty
-                  ? String(localized: "Select a card to delete it")
-                  : String(localized: "Delete the selected cards"))
+                  ? localized("Select a card to delete it")
+                  : localized("Delete the selected cards"))
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
@@ -269,7 +269,7 @@ struct CanvasPane: View {
             width: type == .group ? 400 : 260,
             height: type == .group ? 300 : 140,
             text: type == .text ? "" : nil,
-            label: type == .group ? String(localized: "Group") : nil
+            label: type == .group ? localized("Group") : nil
         )
         document.nodes.append(node)
         selection = [node.id]

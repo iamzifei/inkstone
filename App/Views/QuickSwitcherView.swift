@@ -18,7 +18,7 @@ struct QuickSwitcherView: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(style.faintText)
-                TextField(String(localized: "Find or create a note…"), text: $query)
+                TextField(localized("Find or create a note…"), text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .focused($isFieldFocused)

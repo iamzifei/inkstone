@@ -106,7 +106,7 @@ struct NoteEditorPane: View {
                 Circle()
                     .fill(style.accent.opacity(0.6))
                     .frame(width: 6, height: 6)
-                    .help(String(localized: "Unsaved changes"))
+                    .help(localized("Unsaved changes"))
             }
 
             Spacer()
@@ -280,7 +280,7 @@ struct InspectorView: View {
         if let url = workspace.activeTab?.url, let note = workspace.index.metadata(for: url) {
             List {
                 if !note.frontmatter.properties.isEmpty {
-                    Section(String(localized: "Properties")) {
+                    Section(localized("Properties")) {
                         ForEach(note.frontmatter.properties.keys.sorted(), id: \.self) { key in
                             HStack(alignment: .top) {
                                 Text(key)
@@ -297,7 +297,7 @@ struct InspectorView: View {
                 }
 
                 if !note.tags.isEmpty {
-                    Section(String(localized: "Tags")) {
+                    Section(localized("Tags")) {
                         FlowLayout(spacing: 6) {
                             ForEach(note.tags, id: \.self) { tag in
                                 Text("#" + tag)
@@ -312,7 +312,7 @@ struct InspectorView: View {
                 }
 
                 if !note.headings.isEmpty {
-                    Section(String(localized: "Outline")) {
+                    Section(localized("Outline")) {
                         // Also reachable from the sidebar's outline tab. It lives
                         // here too because this is the panel that answers
                         // "what is in the note I am looking at", and that is
@@ -335,7 +335,7 @@ struct InspectorView: View {
                     }
                 }
 
-                Section(String(localized: "Backlinks")) {
+                Section(localized("Backlinks")) {
                     let backlinks = workspace.index.incoming(to: url)
                     if backlinks.isEmpty {
                         Text("No backlinks yet")
@@ -350,7 +350,7 @@ struct InspectorView: View {
                     }
                 }
 
-                Section(String(localized: "Outgoing links")) {
+                Section(localized("Outgoing links")) {
                     ForEach(Array(workspace.index.outgoing(from: url).enumerated()), id: \.offset) { _, edge in
                         HStack {
                             Image(systemName: edge.destination == nil ? "link.badge.plus" : "link")
@@ -367,7 +367,7 @@ struct InspectorView: View {
                     }
                 }
 
-                Section(String(localized: "Local graph")) {
+                Section(localized("Local graph")) {
                     LocalGraphThumbnail(url: url)
                         .frame(height: 200)
                 }

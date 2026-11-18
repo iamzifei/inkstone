@@ -586,13 +586,13 @@ struct InkstoneApp: App {
             commands
             #if os(macOS)
             CheckForUpdatesCommand(updater: updater)
-            WelcomeGuideCommand()
+            WelcomeGuideCommand(title: localized("Show Welcome Guide"))
             #endif
         }
 
         #if os(macOS)
         // Opened by `openWindow`, never automatically at launch by SwiftUI.
-        Window("Welcome to Inkstone", id: OnboardingView.windowID) {
+        Window(localized("Welcome to Inkstone"), id: OnboardingView.windowID) {
             StyledRoot { OnboardingView() }
                 .environment(workspace)
                 .preferredColorScheme(preferredColorScheme)
@@ -827,28 +827,28 @@ struct InkstoneApp: App {
     @CommandsBuilder
     private var commands: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Note") { workspace.createNote() }
+            Button(localized("New Note")) { workspace.createNote() }
                 .keyboardShortcut("n")
-            Button("New Canvas") { workspace.createCanvas() }
+            Button(localized("New Canvas")) { workspace.createCanvas() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("Today's Daily Note") { workspace.openDailyNote() }
+            Button(localized("Today's Daily Note")) { workspace.openDailyNote() }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
         }
 
         CommandGroup(after: .newItem) {
             Divider()
-            Button("Quick Switcher…") { workspace.isQuickSwitcherPresented = true }
+            Button(localized("Quick Switcher…")) { workspace.isQuickSwitcherPresented = true }
                 .keyboardShortcut("o")
             // The on-device model's home. Disabled without a selection, since
             // there is nothing for it to work on — and it works on selections
             // only, because 4,000 tokens does not stretch further.
-            Button("Rewrite Selection…") { workspace.isQuickRewritePresented = true }
+            Button(localized("Rewrite Selection…")) { workspace.isQuickRewritePresented = true }
                 .keyboardShortcut("k", modifiers: [.command, .option])
                 .disabled(workspace.editorSelection?.isEmpty != false)
-            Button("Save") { workspace.saveAll() }
+            Button(localized("Save")) { workspace.saveAll() }
                 .keyboardShortcut("s")
             Divider()
-            Button(workspace.isSyncing ? "Syncing…" : "Sync with GitHub") {
+            Button(workspace.isSyncing ? localized("Syncing…") : localized("Sync with GitHub")) {
                 Task { await workspace.sync() }
             }
             .keyboardShortcut("y", modifiers: [.command, .shift])
@@ -860,26 +860,26 @@ struct InkstoneApp: App {
         // "View" sitting next to the built-in one in the menu bar.
         CommandGroup(after: .toolbar) {
             Divider()
-            Button("Graph View") { workspace.open(.graph(focus: workspace.activeTab?.url)) }
+            Button(localized("Graph View")) { workspace.open(.graph(focus: workspace.activeTab?.url)) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
-            Button("Whole Vault Graph") { workspace.open(.graph(focus: nil)) }
+            Button(localized("Whole Vault Graph")) { workspace.open(.graph(focus: nil)) }
                 .keyboardShortcut("g", modifiers: [.command, .option])
-            Button("Reveal in Sidebar") {
+            Button(localized("Reveal in Sidebar")) {
                 if let url = workspace.activeTab?.url { workspace.revealInTree(url) }
             }
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(workspace.activeTab?.url == nil)
-            Button("Calendar") { workspace.open(.calendar) }
+            Button(localized("Calendar")) { workspace.open(.calendar) }
             Divider()
-            Button("Live Preview") { workspace.settings.data.editorMode = .livePreview }
+            Button(localized("Live Preview")) { workspace.settings.data.editorMode = .livePreview }
                 .keyboardShortcut("e", modifiers: [.command])
-            Button("Source Mode") { workspace.settings.data.editorMode = .source }
-            Button("Reading Mode") { workspace.settings.data.editorMode = .reading }
+            Button(localized("Source Mode")) { workspace.settings.data.editorMode = .source }
+            Button(localized("Reading Mode")) { workspace.settings.data.editorMode = .reading }
             Divider()
-            Button("Back") { workspace.goBack() }
+            Button(localized("Back")) { workspace.goBack() }
                 .keyboardShortcut("[", modifiers: [.command])
                 .disabled(!workspace.canGoBack)
-            Button("Forward") { workspace.goForward() }
+            Button(localized("Forward")) { workspace.goForward() }
                 .keyboardShortcut("]", modifiers: [.command])
                 .disabled(!workspace.canGoForward)
         }

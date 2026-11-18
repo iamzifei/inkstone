@@ -86,8 +86,8 @@ struct GraphSettingsPanel: View {
                         .labelsHidden()
                         .disabled(currentNote == nil)
                         .help(currentNote == nil
-                              ? String(localized: "Open a note to centre the graph on it")
-                              : String(localized: "Centre the graph on the note you have open"))
+                              ? localized("Open a note to centre the graph on it")
+                              : localized("Centre the graph on the note you have open"))
                     }
                 }
 

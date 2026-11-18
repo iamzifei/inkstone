@@ -35,14 +35,30 @@ Also: `GitHubError`, `SyncError` and the sync progress messages were plain
 Counts inside `SyncError` stay `String`-interpolated so they print as "8882",
 which `SyncBranchSafetyTests` pins.
 
+## 0.2.1 follow-up
+
+- **Opening in front.** `FrontmostWindow` (an `NSViewRepresentable` in the guide)
+  activates the app and orders its window front, immediately and again after 0.5s.
+  Guide version bumped to 2 so 0.2.0 users see it again.
+- **Checked against a real process**, not just unit tests: an ad-hoc-signed,
+  unsandboxed copy of the Debug build (its defaults live in
+  `~/Library/Preferences`, separate from the real app's sandbox container), driven
+  only through System Events window and menu names. Fresh: guide window first and
+  app frontmost. Second launch: no guide. Seen version 1: guide shown, flag becomes 2.
+  System `zh-Hant-TW`: window title 歡迎使用 Inkstone. System English with in-app
+  zh-Hans: title, Help item and the app's own File/View items in Simplified Chinese.
+- **Picker.** `AppLanguage.resolving(preferred:)` picks the pre-selection;
+  `Localization` / `localized(_:)` resolve non-SwiftUI strings against the chosen
+  `.lproj`. `AppSettings` keeps `Localization` in step with the setting.
+- `ImageRenderer` draws the segmented picker as a yellow "prohibited" box, so the
+  debug dump renders through `NSHostingView` instead.
+
 ## Known limits
 
-- `String(localized:)` follows the *system* language; only SwiftUI `Text` follows
-  the in-app language picker. Errors and status lines therefore ignore the picker.
-  That was already true of the assistant's errors.
-- The Help-menu item and the window title are localised by the system language for
-  the same reason.
+- Items macOS supplies (File, Edit, About, Close, the system menus) follow the
+  system language; only the app's own items follow the picker.
+- A live language change updating already-open menus is the same mechanism as the
+  initial one (App.body re-evaluates) but was only checked at launch, not by clicking.
 - Plain-`String` text that never passes through a localisation call is invisible to
-  the compiler's extraction; the grep for `errorDescription` / `LocalizedError`
-  found only the three enums above.
-- iOS shares the string catalog and benefits, but gets no guide.
+  the compiler's extraction.
+- iOS shares the string catalog but gets no guide.

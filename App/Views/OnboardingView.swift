@@ -22,11 +22,14 @@ private struct GuidePage {
 /// Text is `LocalizedStringKey`, so it follows the app's own language setting
 /// (the locale injected by `InkstoneApp`) and not only the system language.
 struct OnboardingView: View {
+    static let size = CGSize(width: 640, height: 590)
+
     /// Scene identifier used by `openWindow` / `dismissWindow`.
     static let windowID = "welcome-guide"
 
     @Environment(\.style) private var style
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(Workspace.self) private var workspace
     @State private var page: Int
 
     init(page: Int = 0) { _page = State(initialValue: page) }
@@ -64,6 +67,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 18) {
+                if page == 0 { languagePicker }
                 Image(content.image)
                     .resizable()
                     .aspectRatio(1.6, contentMode: .fit)
@@ -96,8 +100,9 @@ struct OnboardingView: View {
 
             footer
         }
-        .frame(width: 640, height: 590)
+        .frame(width: Self.size.width, height: Self.size.height)
         .background(style.background)
+        .background(FrontmostWindow())
         .animation(.easeInOut(duration: 0.18), value: page)
         .background {
             // Esc closes, like any other window that is asking for nothing.
@@ -106,6 +111,38 @@ struct OnboardingView: View {
                 .opacity(0)
                 .accessibilityHidden(true)
         }
+    }
+
+    /// The language the picker shows: the saved choice, or — while the setting is
+    /// still on "System" — the language the system's preferences resolve to, so
+    /// the control never claims a language the guide is not in.
+    private var selectedLanguage: Binding<AppLanguage> {
+        Binding(
+            get: {
+                let saved = workspace.settings.data.language
+                return saved == .system ? AppLanguage.resolving() : saved
+            },
+            // The app's own language setting, so the whole app follows — the
+            // same value Settings > Language edits.
+            set: { workspace.settings.data.language = $0 }
+        )
+    }
+
+    private var languagePicker: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "globe").foregroundStyle(style.secondaryText)
+            Picker("Language", selection: selectedLanguage) {
+                // Endonyms, so each is readable whatever language is showing.
+                ForEach(AppLanguage.allCases.filter { $0 != .system }) { language in
+                    Text(verbatim: language.endonym).tag(language)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 300)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Language"))
     }
 
     private var footer: some View {
@@ -166,13 +203,23 @@ extension OnboardingView {
         try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
         for language in ["en", "zh-Hans", "zh-Hant"] {
             for page in 0..<Onboarding.pageCount {
+                let suite = UserDefaults(suiteName: "guide-dump-\(language)")!
+                suite.removePersistentDomain(forName: "guide-dump-\(language)")
+                let workspace = Workspace(registry: VaultRegistry(defaults: suite),
+                                          settings: AppSettings(defaults: suite))
+                workspace.settings.data.language = AppLanguage(rawValue: language) ?? .system
                 let view = OnboardingView(page: page)
+                    .environment(workspace)
                     .environment(\.locale, Locale(identifier: language))
                     .environment(\.style, .fallback)
-                let renderer = ImageRenderer(content: view)
-                renderer.scale = 2
-                guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
-                      let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+                // NSHostingView, not ImageRenderer: the language picker is an
+                // AppKit segmented control, which ImageRenderer draws as a
+                // yellow "prohibited" placeholder.
+                let host = NSHostingView(rootView: view)
+                host.frame = NSRect(origin: .zero, size: Self.size)
+                host.layoutSubtreeIfNeeded()
+                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds),
+                      let png = { host.cacheDisplay(in: host.bounds, to: rep); return rep.representation(using: .png, properties: [:]) }()
                 else {
                     FileHandle.standardError.write(Data("render failed: \(language) \(page)\n".utf8))
                     continue
@@ -191,9 +238,6 @@ extension OnboardingView {
 
 /// Decides, once per launch, whether the guide should open by itself.
 enum OnboardingLauncher {
-    /// True when this install has not yet seen the current guide version. The
-    /// flag is written on the spot: closing the window early is a clear "not
-    /// now", and Help > Show Welcome Guide is one click away.
     @MainActor
     static func consumeFirstShow() -> Bool {
         #if DEBUG
@@ -201,21 +245,44 @@ enum OnboardingLauncher {
         // of the shot would ruin it.
         if ProcessInfo.processInfo.environment["INKSTONE_DEMO_DEFAULTS"] != nil { return false }
         #endif
-        let defaults = UserDefaults.standard
-        let seen = defaults.integer(forKey: Onboarding.seenVersionKey)
-        guard Onboarding.shouldShow(seenVersion: seen) else { return false }
-        defaults.set(Onboarding.currentVersion, forKey: Onboarding.seenVersionKey)
-        return true
+        return Onboarding.consumeFirstShow(in: .standard)
     }
 }
 
+/// Brings the window this sits in to the front and makes it key.
+///
+/// `openWindow` from the main window's `onAppear` can lose the race with the main
+/// window finishing its own appearance, leaving the guide behind it — which for a
+/// first launch is the whole point missed. So it is brought forward explicitly,
+/// once straight away and once after the main window has settled.
+private struct FrontmostWindow: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        for delay in [0.0, 0.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak view] in
+                guard let window = view?.window else { return }
+                window.collectionBehavior.insert(.moveToActiveSpace)
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
 /// Help > Show Welcome Guide.
+///
+/// The title is passed in, already localised: menus do not receive the app's
+/// `\.locale`, so a `LocalizedStringKey` here would answer in the system language.
 struct WelcomeGuideCommand: Commands {
+    let title: String
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandGroup(after: .help) {
-            Button("Show Welcome Guide") { openWindow(id: OnboardingView.windowID) }
+            Button(title) { openWindow(id: OnboardingView.windowID) }
         }
     }
 }

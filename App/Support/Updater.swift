@@ -1,5 +1,6 @@
 #if os(macOS)
 import Combine
+import InkstoneCore
 import Sparkle
 import SwiftUI
 
@@ -66,7 +67,7 @@ struct CheckForUpdatesCommand: Commands {
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { updater.checkForUpdates() }
+            Button(localized("Check for Updates…")) { updater.checkForUpdates() }
                 .disabled(!updater.canCheck)
         }
     }

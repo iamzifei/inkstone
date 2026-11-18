@@ -34,9 +34,9 @@ public struct ChatAttachment: Sendable, Hashable, Identifiable, Codable {
         switch kind {
         case .note(let path): return (path as NSString).lastPathComponent
         case .folder(let path): return (path as NSString).lastPathComponent + "/"
-        case .image: return String(localized: "Image")
+        case .image: return localized("Image")
         case .file(let name, _): return name
-        case .selection(let from, _): return String(localized: "Selection from \(from)")
+        case .selection(let from, _): return localized("Selection from \(from)")
         }
     }
 

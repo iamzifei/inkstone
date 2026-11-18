@@ -118,16 +118,16 @@ struct RootView: View {
 
     private var syncHelp: String {
         switch workspace.syncStatus {
-        case .idle: String(localized: "Sync with GitHub")
+        case .idle: localized("Sync with GitHub")
         case .running(let message): message
         case .failed(let message): message
         case .finished(let report):
             report.changeCount == 0
-                ? String(localized: "Up to date")
-                : String(localized: "\(report.changeCount) change(s) synced")
+                ? localized("Up to date")
+                : localized("\(report.changeCount) change(s) synced")
         // Says what actually happened. "Failed" would be wrong — the run was cut
         // short by the system, what it moved is kept, and the next one resumes.
-        case .interrupted: String(localized: "Sync ran out of time — carrying on")
+        case .interrupted: localized("Sync ran out of time — carrying on")
         }
     }
 
@@ -209,8 +209,8 @@ struct RootView: View {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
             .help(isInspectorPresented
-                  ? String(localized: "Hide the inspector")
-                  : String(localized: "Show the inspector — properties, backlinks, local graph"))
+                  ? localized("Hide the inspector")
+                  : localized("Show the inspector — properties, backlinks, local graph"))
         }
     }
 }
@@ -357,8 +357,8 @@ private struct TabStrip: View {
         // no help in telling them apart.
         case .graph(let focus):
             return focus.map { $0.deletingPathExtension().lastPathComponent }
-                ?? String(localized: "Graph")
-        case .calendar: return String(localized: "Calendar")
+                ?? localized("Graph")
+        case .calendar: return localized("Calendar")
         }
     }
 

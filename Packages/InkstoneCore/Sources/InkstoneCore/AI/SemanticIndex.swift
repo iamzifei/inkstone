@@ -361,19 +361,17 @@ public actor SemanticIndex {
         // identifier is the same for all four languages it supports.
         guard let candidate = NLContextualEmbedding(language: .simplifiedChinese)
                 ?? NLContextualEmbedding(language: .english) else {
-            state = .unavailable(String(localized: "This Mac has no embedding model."))
+            state = .unavailable(localized("This Mac has no embedding model."))
             return nil
         }
         if !candidate.hasAvailableAssets {
             do { try await candidate.requestAssets() } catch {
-                state = .unavailable(String(localized:
-                    "The embedding model could not be downloaded: \(error.localizedDescription)"))
+                state = .unavailable(localized("The embedding model could not be downloaded: \(error.localizedDescription)"))
                 return nil
             }
         }
         do { try candidate.load() } catch {
-            state = .unavailable(String(localized:
-                "The embedding model could not be loaded: \(error.localizedDescription)"))
+            state = .unavailable(localized("The embedding model could not be loaded: \(error.localizedDescription)"))
             return nil
         }
         model = candidate

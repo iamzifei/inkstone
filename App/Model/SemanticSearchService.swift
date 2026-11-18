@@ -136,13 +136,13 @@ final class SemanticSearchService {
     var summary: String {
         switch status {
         case .off:
-            return String(localized: "Off")
+            return localized("Off")
         case .idle:
-            return String(localized: "Not built yet")
+            return localized("Not built yet")
         case .building(let done, let total):
-            return String(localized: "Indexing \(done) of \(total) notes…")
+            return localized("Indexing \(done) of \(total) notes…")
         case .ready(_, let chunks):
-            return String(localized: "\(chunks) passages indexed")
+            return localized("\(chunks) passages indexed")
         case .failed(let reason):
             return reason
         }

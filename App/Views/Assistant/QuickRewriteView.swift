@@ -38,13 +38,13 @@ struct QuickRewriteView: View {
 
         var label: String {
             switch self {
-            case .polish: return String(localized: "Polish")
-            case .shorten: return String(localized: "Make shorter")
-            case .expand: return String(localized: "Expand")
-            case .bullets: return String(localized: "As bullet points")
-            case .translate: return String(localized: "Translate")
-            case .title: return String(localized: "Suggest a title")
-            case .custom: return String(localized: "Custom…")
+            case .polish: return localized("Polish")
+            case .shorten: return localized("Make shorter")
+            case .expand: return localized("Expand")
+            case .bullets: return localized("As bullet points")
+            case .translate: return localized("Translate")
+            case .title: return localized("Suggest a title")
+            case .custom: return localized("Custom…")
             }
         }
 
@@ -98,7 +98,7 @@ struct QuickRewriteView: View {
             .onChange(of: action) { run() }
 
             if action == .custom {
-                TextField(String(localized: "What should it do?"), text: $custom)
+                TextField(localized("What should it do?"), text: $custom)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { run() }
             }
@@ -150,12 +150,12 @@ struct QuickRewriteView: View {
 
     private var footer: some View {
         HStack {
-            Button(String(localized: "Try again"), action: run)
+            Button(localized("Try again"), action: run)
                 .disabled(isRunning)
             Spacer()
-            Button(String(localized: "Cancel")) { dismiss() }
+            Button(localized("Cancel")) { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button(String(localized: "Replace selection")) {
+            Button(localized("Replace selection")) {
                 onReplace(result)
                 dismiss()
             }
@@ -175,7 +175,7 @@ struct QuickRewriteView: View {
         // the instruction and the answer both come out of it.
         let budget = AppleOnDeviceProvider.characterBudget - 800
         guard original.count <= budget else {
-            failure = String(localized: """
+            failure = localized("""
                 That selection is too long for the on-device model — it holds \
                 about \(budget) characters and this is \(original.count). Select \
                 less, or use a cloud model in the assistant panel.

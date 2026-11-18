@@ -7,6 +7,26 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.2.1 — 2026-11-18
+
+- **The welcome guide now opens in front on first launch.** It was being opened
+  from the main window's first appearance and could end up behind it. It is now
+  brought forward and made key explicitly. Everyone sees it once more with this
+  version (guide version 2), including people who dismissed or missed 0.2.0's.
+  Verified for a brand-new install (no preferences, no vault — the guide comes
+  first, then the folder chooser behind it), a second launch (not shown again) and
+  an upgrade from guide version 1.
+- **A language picker on the guide's first page.** English / 简体中文 / 繁體中文,
+  pre-selected from the system's preferred languages (`zh-Hant`, `zh-TW`, `zh-HK`
+  and `zh-MO` give 繁體中文, any other Chinese gives 简体中文, anything else
+  English). Choosing one re-renders the guide at once and sets the app's own
+  language setting, the same one as Settings › Language, so the whole app follows.
+- **Errors, status lines and the app's own menu titles follow that setting too.**
+  They used to answer in the system language whatever the picker said, because
+  `String(localized:)` asks the main bundle. They now look the string up in the
+  chosen language (`localized(_:)`). Menus and items that macOS supplies itself
+  (File, Edit, About, Close…) still follow the system language.
+
 ## 0.2.0 — 2026-11-18
 
 ### A welcome guide, and the interface in three languages

@@ -44,7 +44,7 @@ struct AssistantSettingsPane: View {
 
                     Button("Add a model…") {
                         let profile = AssistantProfile(
-                            name: String(localized: "New model"), kind: .openAICompatible)
+                            name: localized("New model"), kind: .openAICompatible)
                         settings.data.assistant.profiles.append(profile)
                     }
                 }
@@ -186,13 +186,13 @@ private struct ProfileRow: View {
                         .foregroundStyle(isActive ? Color.accentColor : .secondary)
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Use this model"))
+                .help(localized("Use this model"))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(profile.name)
                     Text(profile.kind == .appleOnDevice
-                         ? String(localized: "On this Mac")
-                         : profile.model.isEmpty ? String(localized: "No model chosen") : profile.model)
+                         ? localized("On this Mac")
+                         : profile.model.isEmpty ? localized("No model chosen") : profile.model)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -242,13 +242,13 @@ private struct SkillFolderRow: View {
                     Text("\(library.skills.count) skills")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button(String(localized: "Change…")) { choose() }
-                    Button(String(localized: "Remove")) { library.forget() }
+                    Button(localized("Change…")) { choose() }
+                    Button(localized("Remove")) { library.forget() }
                 } else {
                     Text("No skills folder")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button(String(localized: "Choose…")) { choose() }
+                    Button(localized("Choose…")) { choose() }
                 }
             }
             if let problem = library.problem {
@@ -270,8 +270,8 @@ private struct SkillFolderRow: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = String(localized: "Use Folder")
-        panel.message = String(localized: "Choose the folder holding your skills")
+        panel.prompt = localized("Use Folder")
+        panel.message = localized("Choose the folder holding your skills")
         // Start where they usually live, since it is a hidden folder and typing
         // the path into an open panel means knowing to press ⇧⌘G first.
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
@@ -309,8 +309,8 @@ private struct SemanticSearchRow: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button(semantic.progressFraction == nil
-                           ? String(localized: "Build index")
-                           : String(localized: "Building…")) {
+                           ? localized("Build index")
+                           : localized("Building…")) {
                         semantic.build(notes: allNotes())
                     }
                     .disabled(semantic.progressFraction != nil || workspace.root == nil)

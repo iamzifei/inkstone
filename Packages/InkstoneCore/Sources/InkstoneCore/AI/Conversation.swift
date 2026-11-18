@@ -308,28 +308,28 @@ public enum ProviderError: LocalizedError, Sendable, Equatable {
     public var errorDescription: String? {
         switch self {
         case .missingKey:
-            return String(localized: "No API key is configured.")
+            return localized("No API key is configured.")
         case .unauthorized:
-            return String(localized: "The API key was rejected.")
+            return localized("The API key was rejected.")
         case .rateLimited(let after):
-            return after.map { String(localized: "Rate limited; retry in \(Int($0))s.") }
-                ?? String(localized: "Rate limited by the provider.")
+            return after.map { localized("Rate limited; retry in \(Int($0))s.") }
+                ?? localized("Rate limited by the provider.")
         case .contextTooLong:
-            return String(localized: "Too much text for this model's context window.")
+            return localized("Too much text for this model's context window.")
         case .unsupportedThinking:
-            return String(localized: "This model does not support extended thinking.")
+            return localized("This model does not support extended thinking.")
         case .onDeviceCannotUseTools:
-            return String(localized: "The on-device model cannot use tools.")
+            return localized("The on-device model cannot use tools.")
         case .serverError(let status, let body):
             return body.isEmpty
-                ? String(localized: "The provider returned \(status).")
-                : String(localized: "The provider returned \(status): \(String(body.prefix(200)))")
+                ? localized("The provider returned \(status).")
+                : localized("The provider returned \(status): \(String(body.prefix(200)))")
         case .network(let detail):
-            return String(localized: "Could not reach the provider: \(detail)")
+            return localized("Could not reach the provider: \(detail)")
         case .decoding(let detail):
-            return String(localized: "Unexpected response: \(detail)")
+            return localized("Unexpected response: \(detail)")
         case .cancelled:
-            return String(localized: "Stopped.")
+            return localized("Stopped.")
         }
     }
 

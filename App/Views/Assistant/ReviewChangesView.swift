@@ -53,8 +53,8 @@ struct ReviewChangesView: View {
                     .foregroundStyle(style.secondaryText)
             }
             Spacer()
-            Button(String(localized: "Accept all")) { queue.setAll(true) }
-            Button(String(localized: "Reject all")) { queue.setAll(false) }
+            Button(localized("Accept all")) { queue.setAll(true) }
+            Button(localized("Reject all")) { queue.setAll(false) }
         }
         .padding(14)
     }
@@ -63,19 +63,19 @@ struct ReviewChangesView: View {
         let files = queue.count
         let hunks = queue.edits.reduce(0) { $0 + $1.hunks.count }
         let accepted = queue.edits.reduce(0) { $0 + $1.acceptedCount }
-        return String(localized: "\(files) file\(files == 1 ? "" : "s"), \(accepted) of \(hunks) changes selected")
+        return localized("\(files) file\(files == 1 ? "" : "s"), \(accepted) of \(hunks) changes selected")
     }
 
     private var footer: some View {
         HStack {
-            Button(String(localized: "Discard all"), role: .destructive) {
+            Button(localized("Discard all"), role: .destructive) {
                 onDiscard()
                 dismiss()
             }
             Spacer()
-            Button(String(localized: "Cancel")) { dismiss() }
+            Button(localized("Cancel")) { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button(String(localized: "Save selected")) {
+            Button(localized("Save selected")) {
                 onApply(queue.edits.filter(\.hasAcceptedChanges))
                 dismiss()
             }

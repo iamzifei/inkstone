@@ -12,9 +12,9 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var displayName: String {
         switch self {
-        case .anthropic: return String(localized: "Anthropic")
-        case .openAICompatible: return String(localized: "OpenAI-compatible")
-        case .appleOnDevice: return String(localized: "On this Mac")
+        case .anthropic: return localized("Anthropic")
+        case .openAICompatible: return localized("OpenAI-compatible")
+        case .appleOnDevice: return localized("On this Mac")
         }
     }
 
@@ -133,11 +133,11 @@ public struct AssistantSettings: Codable, Hashable, Sendable {
     /// an option at all.
     public static func seeded() -> AssistantSettings {
         AssistantSettings(profiles: [
-            AssistantProfile(name: String(localized: "Claude"), kind: .anthropic,
+            AssistantProfile(name: localized("Claude"), kind: .anthropic,
                              model: "claude-sonnet-5"),
-            AssistantProfile(name: String(localized: "OpenAI"), kind: .openAICompatible,
+            AssistantProfile(name: localized("OpenAI"), kind: .openAICompatible,
                              model: "gpt-5"),
-            AssistantProfile(name: String(localized: "On this Mac"), kind: .appleOnDevice),
+            AssistantProfile(name: localized("On this Mac"), kind: .appleOnDevice),
         ])
     }
 }

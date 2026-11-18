@@ -52,7 +52,7 @@ final class ModelCatalogue {
         guard profile.kind != .appleOnDevice else {
             states[profile.id] = .loaded([
                 ModelInfo(id: "apple-on-device",
-                          displayName: String(localized: "Apple on-device")),
+                          displayName: localized("Apple on-device")),
             ])
             return
         }

@@ -167,12 +167,12 @@ private struct TypographySettings: View {
             // was simply never exposed.
             Section {
                 FontPicker(
-                    title: String(localized: "Font"),
+                    title: localized("Font"),
                     selection: $settings.data.typography.interfaceFont,
                     suggestions: Typography.recommendedCJKFonts
                 )
                 LabeledStepper(
-                    title: String(localized: "Size"),
+                    title: localized("Size"),
                     value: $settings.data.typography.interfaceFontSize,
                     range: 10...24,
                     step: 0.5,
@@ -186,26 +186,26 @@ private struct TypographySettings: View {
 
             Section("Body text") {
                 FontPicker(
-                    title: String(localized: "Font"),
+                    title: localized("Font"),
                     selection: $settings.data.typography.editorFont,
                     suggestions: Typography.recommendedCJKFonts
                 )
                 LabeledStepper(
-                    title: String(localized: "Size"),
+                    title: localized("Size"),
                     value: $settings.data.typography.editorFontSize,
                     range: 11...32,
                     step: 0.5,
                     format: "%.1f pt"
                 )
                 LabeledStepper(
-                    title: String(localized: "Line height"),
+                    title: localized("Line height"),
                     value: $settings.data.typography.lineHeightMultiple,
                     range: 1.0...2.6,
                     step: 0.05,
                     format: "%.2f×"
                 )
                 LabeledStepper(
-                    title: String(localized: "Letter spacing"),
+                    title: localized("Letter spacing"),
                     value: $settings.data.typography.letterSpacing,
                     range: -1...4,
                     step: 0.1,
@@ -215,19 +215,19 @@ private struct TypographySettings: View {
 
             Section("Code") {
                 FontPicker(
-                    title: String(localized: "Font"),
+                    title: localized("Font"),
                     selection: $settings.data.typography.codeFont,
                     suggestions: Typography.recommendedCodeFonts
                 )
                 LabeledStepper(
-                    title: String(localized: "Size"),
+                    title: localized("Size"),
                     value: $settings.data.typography.codeFontSize,
                     range: 9...24,
                     step: 0.5,
                     format: "%.1f pt"
                 )
                 LabeledStepper(
-                    title: String(localized: "Line height"),
+                    title: localized("Line height"),
                     value: $settings.data.typography.codeLineHeightMultiple,
                     range: 1.0...2.2,
                     step: 0.05,
@@ -238,7 +238,7 @@ private struct TypographySettings: View {
             Section("Layout") {
                 Toggle("Limit line width", isOn: $settings.data.typography.isReadableLineWidthEnabled)
                 LabeledStepper(
-                    title: String(localized: "Max line width"),
+                    title: localized("Max line width"),
                     value: $settings.data.typography.readableLineWidth,
                     range: 400...1200,
                     step: 20,
@@ -246,7 +246,7 @@ private struct TypographySettings: View {
                 )
                 .disabled(!settings.data.typography.isReadableLineWidthEnabled)
                 LabeledStepper(
-                    title: String(localized: "Heading scale"),
+                    title: localized("Heading scale"),
                     value: $settings.data.typography.headingScale,
                     range: 1.05...1.5,
                     step: 0.01,
@@ -409,7 +409,7 @@ private struct SyncSettings: View {
     /// of the first sync.
     private func verify() async {
         guard let client = workspace.gitHubClient() else {
-            verification = String(localized: "No token saved.")
+            verification = localized("No token saved.")
             return
         }
         isVerifying = true
@@ -417,7 +417,7 @@ private struct SyncSettings: View {
         do {
             let name = try await client.verify()
             let files = try await client.listFiles()
-            verification = String(localized: "Verified \(name) · \(files.count) files")
+            verification = localized("Verified \(name) · \(files.count) files")
         } catch {
             verification = error.localizedDescription
         }
@@ -568,7 +568,7 @@ private struct SyncSettings: View {
 
     private func label(for name: String) -> String {
         guard let repository = repositories.first(where: { $0.fullName == name }) else { return name }
-        return repository.canPush ? name : name + String(localized: " (read-only)")
+        return repository.canPush ? name : name + localized(" (read-only)")
     }
 
     @ViewBuilder

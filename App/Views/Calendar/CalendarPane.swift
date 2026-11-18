@@ -152,7 +152,7 @@ struct CalendarPane: View {
                 }
             }
 
-            Section(String(localized: "Open tasks")) {
+            Section(localized("Open tasks")) {
                 let tasks = openTasks()
                 if tasks.isEmpty {
                     Text("No open tasks in this vault.")

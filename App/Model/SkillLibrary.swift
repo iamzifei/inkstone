@@ -51,7 +51,7 @@ final class SkillLibrary {
             UserDefaults.standard.set(bookmark, forKey: defaultsKey)
             open(url)
         } catch {
-            problem = String(localized: "Could not keep access to that folder: \(error.localizedDescription)")
+            problem = localized("Could not keep access to that folder: \(error.localizedDescription)")
         }
     }
 
@@ -77,7 +77,7 @@ final class SkillLibrary {
                                 bookmarkDataIsStale: &stale)
         #endif
         guard let url = resolved else {
-            problem = String(localized: "The skills folder could not be found. Choose it again in Settings.")
+            problem = localized("The skills folder could not be found. Choose it again in Settings.")
             return
         }
         open(url)
@@ -91,7 +91,7 @@ final class SkillLibrary {
     private func open(_ url: URL) {
         stopAccessing()
         guard url.startAccessingSecurityScopedResource() else {
-            problem = String(localized: "Permission to read the skills folder was refused.")
+            problem = localized("Permission to read the skills folder was refused.")
             return
         }
         accessing = url
@@ -112,7 +112,7 @@ final class SkillLibrary {
         let manager = FileManager.default
         guard let entries = try? manager.contentsOfDirectory(
             at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
-            problem = String(localized: "The skills folder could not be read.")
+            problem = localized("The skills folder could not be read.")
             return
         }
 

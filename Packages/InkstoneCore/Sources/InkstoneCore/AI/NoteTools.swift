@@ -518,7 +518,7 @@ public struct NoteToolbox: Sendable {
 
         await edits.propose(PendingEdit(
             path: target, before: nil, after: content,
-            summary: String(localized: "Create \(target)")))
+            summary: localized("Create \(target)")))
 
         return ToolOutcome(content: """
             Proposed a new note at \(target) (\(content.count) characters). \
@@ -577,8 +577,8 @@ public struct NoteToolbox: Sendable {
             before: onDisk ?? "",
             after: updated,
             summary: newText.isEmpty
-                ? String(localized: "Delete a passage from \(relative)")
-                : String(localized: "Edit \(relative)")))
+                ? localized("Delete a passage from \(relative)")
+                : localized("Edit \(relative)")))
 
         return ToolOutcome(content: """
             Proposed a change to \(relative). It is waiting for the user to \

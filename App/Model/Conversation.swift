@@ -237,7 +237,7 @@ final class Conversation {
             // like the model simply stopped.
             messages.append(ChatMessage(
                 role: .assistant, blocks: [],
-                failure: String(localized: "Stopped after \(maximumRounds) rounds of tool use without an answer.")))
+                failure: localized("Stopped after \(maximumRounds) rounds of tool use without an answer.")))
             isRunning = false
             task = nil
             round = 0
@@ -471,18 +471,18 @@ final class Conversation {
     static func describe(_ error: ProviderError) -> String {
         switch error {
         case .missingKey:
-            return String(localized: "No API key. Add one in Settings › Assistant.")
+            return localized("No API key. Add one in Settings › Assistant.")
         case .unauthorized:
-            return String(localized: "The API key was rejected. Check it in Settings › Assistant.")
+            return localized("The API key was rejected. Check it in Settings › Assistant.")
         case .rateLimited(let after):
             if let after {
-                return String(localized: "Rate limited. Try again in \(Int(after)) seconds.")
+                return localized("Rate limited. Try again in \(Int(after)) seconds.")
             }
-            return String(localized: "Rate limited by the provider. Try again shortly.")
+            return localized("Rate limited by the provider. Try again shortly.")
         case .contextTooLong:
-            return String(localized: "This conversation is too long for the model. Start a new one.")
+            return localized("This conversation is too long for the model. Start a new one.")
         case .onDeviceCannotUseTools:
-            return String(localized: """
+            return localized("""
                 The on-device model cannot search your notes. It holds about \
                 4,000 tokens and one note is usually larger than that. Use a \
                 cloud model for questions about the vault, or ask this one to \
@@ -491,18 +491,18 @@ final class Conversation {
         case .unsupportedThinking:
             // Reached only if the retry without thinking also failed, since the
             // first one is handled rather than reported.
-            return String(localized: "This model does not support extended thinking. Turn it off in the model menu.")
+            return localized("This model does not support extended thinking. Turn it off in the model menu.")
         case .serverError(let status, let body):
             let detail = body.prefix(200)
             return detail.isEmpty
-                ? String(localized: "The provider returned an error (\(status)).")
-                : String(localized: "The provider returned an error (\(status)): \(String(detail))")
+                ? localized("The provider returned an error (\(status)).")
+                : localized("The provider returned an error (\(status)): \(String(detail))")
         case .network(let detail):
-            return String(localized: "Could not reach the provider: \(detail)")
+            return localized("Could not reach the provider: \(detail)")
         case .decoding(let detail):
-            return String(localized: "Unexpected response from the provider: \(detail)")
+            return localized("Unexpected response from the provider: \(detail)")
         case .cancelled:
-            return String(localized: "Stopped.")
+            return localized("Stopped.")
         }
     }
 
