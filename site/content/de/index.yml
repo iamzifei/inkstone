@@ -1,5 +1,5 @@
-title: Inkstone — eine Markdown-Notizapp für macOS und iOS
-description: Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.
+title: "Inkstone — kostenlose Markdown-Notizen-App für Mac und iOS"
+description: "Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert."
 nav:
   label: Abschnitte
   skip: Zum Inhalt springen
@@ -11,11 +11,16 @@ cta:
   source: Quelltext lesen
   tour: Ansehen, was sie kann
   kofi: Auf Ko-fi unterstützen
+brew:
+  label: "Oder mit Homebrew installieren"
+  copy: "Kopieren"
+  copied: "Kopiert"
+  copy_aria: "Homebrew-Befehl kopieren"
 hero:
   eyebrow: macOS 26 · iOS 26 · Natives SwiftUI
   title: Ihre Notizen sind Dateien. Das sollen sie bleiben.
   lede: Inkstone arbeitet direkt mit reinem Markdown in einem Ordner Ihrer Wahl. Es liest den Tresor, den Sie schon haben, schreibt nichts, was sich nicht in jedem anderen Editor öffnen ließe, und legt seinen eigenen Zustand in einem versteckten Ordner ab, den Sie jederzeit löschen dürfen.
-  note: Kostenlos · Apple Silicon · English · 简体中文 · 繁體中文
+  note: "Kostenlos · Apple Silicon und Intel · English · 简体中文 · 繁體中文"
   video_alt: 'Eine Bildschirmaufnahme von Inkstone unter macOS: ein Tresor wird geöffnet, eine Zeile aus chinesischer und lateinischer Schrift getippt, einem Wikilink gefolgt und der Graph geöffnet.'
   video_caption: Aufgenommen unter macOS 26. Ungeschnitten, bis auf die Blenden zwischen den Abschnitten.
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: Was zu wissen sich lohnt, bevor Sie irgendetwas herunterladen.
   rows:
   - k: Plattformen
-    v: macOS 26 und iOS 26, eine SwiftUI-Codebasis, Apple Silicon
+    v: "macOS 26 und iOS 26, eine SwiftUI-Codebasis. Die Mac-App ist universell: Apple Silicon und Intel"
   - k: Speicherung
     v: Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import
   - k: Kompatibilität

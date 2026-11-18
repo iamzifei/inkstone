@@ -1,17 +1,157 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://inkslab.app/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/de/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/es/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/fr/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/ja/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/ko/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/obsidian-alternative.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/obsidian-sync-free.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/privacy.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/sync.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/zh-Hant/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/zh-Hant/sync.html</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/zh/</loc><changefreq>monthly</changefreq></url>
-  <url><loc>https://inkslab.app/zh/sync.html</loc><changefreq>monthly</changefreq></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://inkslab.app/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/de/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/es/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/fr/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/ja/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/ko/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/obsidian-alternative.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://inkslab.app/obsidian-sync-free.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://inkslab.app/privacy.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://inkslab.app/sync.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/sync.html"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/zh-Hant/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/zh-Hant/sync.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/sync.html"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/zh/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="de" href="https://inkslab.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://inkslab.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/"/>
+  </url>
+  <url>
+    <loc>https://inkslab.app/zh/sync.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inkslab.app/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/sync.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inkslab.app/sync.html"/>
+  </url>
 </urlset>

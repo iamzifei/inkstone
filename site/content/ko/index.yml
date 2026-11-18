@@ -1,5 +1,5 @@
-title: Inkstone 墨硯 — 노트를 파일 그대로 두는 macOS / iOS 앱
-description: 직접 고른 폴더에 놓인 순수 Markdown 파일. 위키링크, 백링크, 그래프, 캔버스, 데일리 노트를 macOS 26과 iOS 26을 위한 네이티브 SwiftUI로. 데이터베이스도, Electron도, 계정도 없습니다.
+title: "Inkstone 墨硯 — 무료 Mac용 Markdown 노트 앱"
+description: "무료 Mac용 Markdown 노트 앱. 노트는 직접 고른 폴더의 순수 Markdown 파일입니다. 위키링크, 백링크, 그래프, 캔버스를 지원하고 Obsidian 보관함을 그대로 엽니다. 계정 불필요."
 nav:
   label: 섹션
   skip: 본문으로 건너뛰기
@@ -11,11 +11,16 @@ cta:
   source: 소스 보기
   tour: 무엇을 하는지 보기
   kofi: Ko-fi에서 후원
+brew:
+  label: "또는 Homebrew로 설치"
+  copy: "복사"
+  copied: "복사됨"
+  copy_aria: "Homebrew 명령 복사"
 hero:
   eyebrow: macOS 26 · iOS 26 · 네이티브 SwiftUI
   title: 노트는 원래 파일입니다. 계속 파일이어야 합니다.
   lede: Inkstone은 당신이 지정한 폴더의 Markdown을 그대로 읽고 씁니다. 이미 가지고 있는 보관함을 그대로 열고, 다른 편집기로 열 수 없는 것은 아무것도 쓰지 않습니다. 앱 자신의 상태는 숨김 폴더에 있고, 언제든 지워도 됩니다.
-  note: 무료 · Apple 실리콘 · English · 简体中文 · 繁體中文
+  note: "무료 · Apple 실리콘과 Intel · English · 简体中文 · 繁體中文"
   video_alt: 'macOS에서 Inkstone을 녹화한 화면: 보관함을 열고, 한자와 라틴 문자가 섞인 한 줄을 입력하고, 위키링크를 따라가고, 그래프를 여는 과정.'
   video_caption: macOS 26에서 녹화. 구간 사이의 디졸브 외에는 편집하지 않았습니다.
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: 무엇이든 내려받기 전에 알아 둘 만한 것들.
   rows:
   - k: 플랫폼
-    v: macOS 26과 iOS 26, 하나의 SwiftUI 코드베이스, Apple 실리콘
+    v: "macOS 26과 iOS 26, 하나의 SwiftUI 코드베이스. Mac 앱은 유니버설이라 Apple 실리콘과 Intel 모두 지원"
   - k: 저장
     v: 직접 고른 폴더의 순수 Markdown 파일. 데이터베이스도 가져오기도 없음
   - k: 호환성

@@ -1,5 +1,5 @@
-title: Inkstone墨砚 —— 一个把笔记留成文件的macOS / iOS应用
-description: 纯Markdown文件，存在你自己选的文件夹里。双链、反向链接、关系图谱、白板和日记， 原生SwiftUI，为macOS 26与iOS 26而写。没有数据库，没有Electron，不需要注册。
+title: "Inkstone墨砚 —— 免费的Mac Markdown笔记软件，兼容Obsidian"
+description: "免费的Mac Markdown笔记软件：笔记就是你自己文件夹里的纯Markdown文件，支持双链、反向链接、关系图谱和白板，Obsidian的库直接打开。不需要注册。"
 nav:
   label: 章节
   skip: 跳到正文
@@ -11,11 +11,16 @@ cta:
   source: 看源码
   tour: 看它能做什么
   kofi: 请我喝杯咖啡
+brew:
+  label: "或者用Homebrew安装"
+  copy: "复制"
+  copied: "已复制"
+  copy_aria: "复制Homebrew安装命令"
 hero:
   eyebrow: macOS 26 · iOS 26 · 原生SwiftUI
   title: 笔记本来就是文件，它就该一直是文件。
   lede: Inkstone直接读写你指定文件夹里的Markdown。它能打开你现有的库， 不会写下任何别的编辑器打不开的东西，自己的状态则放在一个隐藏文件夹里， 你随时可以删掉。
-  note: 免费 · Apple芯片 · English · 简体中文 · 繁體中文
+  note: "免费 · Apple芯片与Intel · English · 简体中文 · 繁體中文"
   video_alt: Inkstone在macOS上的屏幕录制：打开一个库、输入一行中英混排的文字、 点开一个双链、再打开关系图谱。
   video_caption: 录于macOS 26。除了段落之间的淡入淡出，没有别的剪辑。
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: 在你下载任何东西之前，值得先知道的部分。
   rows:
   - k: 平台
-    v: macOS 26与iOS 26，一套SwiftUI代码，Apple芯片
+    v: "macOS 26与iOS 26，一套SwiftUI代码。Mac版是通用应用，Apple芯片与Intel都能用"
   - k: 存储
     v: 你自己选的文件夹里的纯Markdown文件。没有数据库，不需要导入
   - k: 兼容性

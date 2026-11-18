@@ -1,5 +1,5 @@
-title: Inkstone — une application de notes Markdown pour macOS et iOS
-description: De simples fichiers Markdown sur votre propre disque. Wikiliens, rétroliens, graphe, canevas et notes du jour, dans une application native pour macOS 26 et iOS 26. Sans base de données, sans Electron, sans compte.
+title: "Inkstone — app de notes Markdown gratuite pour Mac et iOS"
+description: "App de notes Markdown gratuite pour Mac : des fichiers dans votre dossier, wikiliens, rétroliens, graphe, canevas. Ouvre vos coffres Obsidian tels quels."
 nav:
   label: Sections
   skip: Aller au contenu
@@ -11,11 +11,16 @@ cta:
   source: Lire le code source
   tour: Voir ce qu’elle fait
   kofi: Soutenir sur Ko-fi
+brew:
+  label: "Ou installez-la avec Homebrew"
+  copy: "Copier"
+  copied: "Copié"
+  copy_aria: "Copier la commande Homebrew"
 hero:
   eyebrow: macOS 26 · iOS 26 · SwiftUI natif
   title: Vos notes sont des fichiers. Elles devraient le rester.
   lede: Inkstone travaille directement sur du Markdown ordinaire, dans un dossier que vous choisissez. Elle ouvre le coffre que vous avez déjà, n’écrit rien qu’un autre éditeur ne saurait ouvrir, et range son propre état dans un dossier caché que vous êtes libre de supprimer.
-  note: Gratuit · Apple silicon · English · 简体中文 · 繁體中文
+  note: "Gratuit · Apple silicon et Intel · English · 简体中文 · 繁體中文"
   video_alt: 'Une capture vidéo d’Inkstone sous macOS : ouverture d’un coffre, saisie d’une ligne mêlant chinois et alphabet latin, suivi d’un wikilien, puis ouverture du graphe.'
   video_caption: Enregistré sous macOS 26. Sans montage, hormis les fondus entre les sections.
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: Ce qu’il vaut la peine de savoir avant de télécharger quoi que ce soit.
   rows:
   - k: Plateformes
-    v: macOS 26 et iOS 26, une seule base de code SwiftUI, Apple silicon
+    v: "macOS 26 et iOS 26, une seule base de code SwiftUI. L’app Mac est universelle : Apple silicon et Intel"
   - k: Stockage
     v: Des fichiers Markdown ordinaires dans un dossier que vous choisissez. Ni base de données ni importation
   - k: Compatibilité

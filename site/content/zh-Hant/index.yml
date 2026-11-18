@@ -1,5 +1,5 @@
-title: Inkstone墨硯 —— 一個把筆記留成檔案的macOS / iOS應用程式
-description: 純Markdown檔案，放在你自己選的資料夾裡。雙向連結、反向連結、關聯圖譜、白板與日記， 原生SwiftUI，為macOS 26與iOS 26而寫。沒有資料庫，沒有Electron，不必註冊。
+title: "Inkstone墨硯 —— 免費的Mac Markdown筆記軟體，相容Obsidian"
+description: "免費的Mac Markdown筆記軟體：筆記就是你自己資料夾裡的純Markdown檔案，支援雙向連結、反向連結、關聯圖譜與白板，Obsidian的儲存庫直接打開。不必註冊。"
 nav:
   label: 章節
   skip: 跳到內文
@@ -11,11 +11,16 @@ cta:
   source: 看原始碼
   tour: 看它能做什麼
   kofi: 請我喝杯咖啡
+brew:
+  label: "或者用Homebrew安裝"
+  copy: "複製"
+  copied: "已複製"
+  copy_aria: "複製Homebrew安裝指令"
 hero:
   eyebrow: macOS 26 · iOS 26 · 原生SwiftUI
   title: 筆記本來就是檔案，它就該一直是檔案。
   lede: Inkstone直接讀寫你指定資料夾裡的Markdown。它能打開你現有的儲存庫， 不會寫下任何別的編輯器打不開的東西，自己的狀態則放在一個隱藏資料夾裡， 你隨時可以刪掉。
-  note: 免費 · Apple晶片 · English · 简体中文 · 繁體中文
+  note: "免費 · Apple晶片與Intel · English · 简体中文 · 繁體中文"
   video_alt: Inkstone在macOS上的螢幕錄影：打開一個儲存庫、輸入一行中英混排的文字、 點開一個雙向連結、再打開關聯圖譜。
   video_caption: 錄於macOS 26。除了段落之間的淡入淡出，沒有別的剪接。
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: 在你下載任何東西之前，值得先知道的部分。
   rows:
   - k: 平台
-    v: macOS 26與iOS 26，一套SwiftUI程式碼，Apple晶片
+    v: "macOS 26與iOS 26，一套SwiftUI程式碼。Mac版是通用應用程式，Apple晶片與Intel都能用"
   - k: 儲存
     v: 你自己選的資料夾裡的純Markdown檔案。沒有資料庫，不必匯入
   - k: 相容性

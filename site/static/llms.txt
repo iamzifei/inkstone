@@ -4,9 +4,19 @@
 > folder you choose — no database, no proprietary format, no account, no
 > Electron. Reads and writes the same vaults Obsidian does.
 
-Inkstone is free. Its source is public at https://github.com/iamzifei/inkstone
+Inkstone is free (no price, no subscription, no account) and is made by James
+(GitHub: iamzifei). Its source is public at https://github.com/iamzifei/inkstone
 but carries no open-source licence, so the accurate description is
 source-available rather than open source.
+
+Install on a Mac with Homebrew:
+
+    brew install --cask iamzifei/tap/inkstone
+
+or download the signed, notarised DMG from
+https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg.
+The Mac app is a universal binary (Apple silicon and Intel), needs macOS 26 or
+later, and updates itself through Sparkle.
 
 Three decisions the rest follows from:
 
@@ -49,9 +59,13 @@ Three decisions the rest follows from:
 - macOS and iOS only. No Windows, Linux or Android build.
 - No published-site feature equivalent to Obsidian Publish.
 
-## Pages
+## Links
 
 - [Home](https://inkslab.app/): what the app is, with a screen recording.
+- [Download (DMG)](https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg)
+- Homebrew: `brew install --cask iamzifei/tap/inkstone`
+- [Releases and changelog](https://github.com/iamzifei/inkstone/releases/latest)
+- [Source on GitHub](https://github.com/iamzifei/inkstone)
 - [Obsidian alternative](https://inkslab.app/obsidian-alternative.html): an
   honest comparison, including what Inkstone does not have.
 - [Syncing a vault for free](https://inkslab.app/obsidian-sync-free.html): what
@@ -60,9 +74,12 @@ Three decisions the rest follows from:
   devices.
 - [Privacy](https://inkslab.app/privacy.html): nothing is collected. No account,
   no analytics, no server of ours.
-- [Source](https://github.com/iamzifei/inkstone)
-- [Releases](https://github.com/iamzifei/inkstone/releases/latest)
+- The home page in other languages: [简体中文](https://inkslab.app/zh/),
+  [繁體中文](https://inkslab.app/zh-Hant/), [日本語](https://inkslab.app/ja/),
+  [한국어](https://inkslab.app/ko/), [Deutsch](https://inkslab.app/de/),
+  [Français](https://inkslab.app/fr/), [Español](https://inkslab.app/es/).
 
 ## Requirements
 
-macOS 26 or iOS 26, Apple silicon. Interface in English, 简体中文 and 繁體中文.
+macOS 26 or later (universal: Apple silicon and Intel), or iOS 26. Interface in
+English, 简体中文 and 繁體中文. Price: free.

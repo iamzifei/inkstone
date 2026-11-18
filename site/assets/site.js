@@ -1,6 +1,6 @@
 /* Inkstone — inkslab.app
  *
- * Four small jobs, none of which the page needs in order to be readable. Every
+ * Five small jobs, none of which the page needs in order to be readable. Every
  * one of them starts from the finished page and adds to it, rather than hiding
  * the page and revealing it later: with this file blocked the visitor still gets
  * all the text, all the pictures and the video's poster frame.
@@ -104,7 +104,42 @@
     }
   }
 
-  /* 4. Remember a deliberate language choice.
+  /* 4. Copy the Homebrew command.
+   *    The labels come from the button's data attributes, which the build fills
+   *    in per language, so this file stays language-free. If the clipboard is
+   *    refused (an insecure context, or a browser that says no) the command is
+   *    selected instead, so a Cmd-C still works. */
+  Array.prototype.forEach.call(document.querySelectorAll(".brew-copy"), function (btn) {
+    var timer = null;
+    var done = function () {
+      btn.textContent = btn.getAttribute("data-done");
+      btn.setAttribute("data-copied", "");
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        btn.textContent = btn.getAttribute("data-label");
+        btn.removeAttribute("data-copied");
+      }, 1500);
+    };
+    var selectCommand = function () {
+      var code = btn.parentNode.querySelector(".brew-cmd");
+      if (!code || !window.getSelection) return;
+      var range = document.createRange();
+      range.selectNodeContents(code);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    };
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, selectCommand);
+      } else {
+        selectCommand();
+      }
+    });
+  });
+
+  /* 5. Remember a deliberate language choice.
    *    The redirect in <head> only runs when this key is absent, so writing it
    *    here is what stops the site bouncing someone who picked English on a
    *    Chinese-language machine straight back to Chinese. */

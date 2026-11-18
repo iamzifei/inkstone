@@ -1,5 +1,5 @@
-title: Inkstone — a Markdown notes app for macOS and iOS
-description: Plain Markdown files on your own disk. Wikilinks, backlinks, a graph, a canvas and daily notes, in a native app for macOS 26 and iOS 26. No database, no Electron, no account.
+title: "Inkstone — Free Markdown Notes App for Mac and iOS"
+description: "A free Markdown notes app for Mac: plain files in a folder you pick, wikilinks, backlinks, graph and canvas. Opens Obsidian vaults as they are. No account."
 nav:
   label: Sections
   skip: Skip to content
@@ -11,11 +11,16 @@ cta:
   source: Read the source
   tour: See what it does
   kofi: Buy me a coffee
+brew:
+  label: "Or install with Homebrew"
+  copy: "Copy"
+  copied: "Copied"
+  copy_aria: "Copy the Homebrew command"
 hero:
   eyebrow: macOS 26 · iOS 26 · Native SwiftUI
   title: Your notes are files. They should stay that way.
   lede: Inkstone is a notes app built on plain Markdown in a folder you choose. It reads the vault you already have, writes nothing you cannot open in any other editor, and keeps its own state in a hidden folder you are free to delete.
-  note: Free · Apple silicon · English · 简体中文 · 繁體中文
+  note: "Free · Apple silicon and Intel · English · 简体中文 · 繁體中文"
   video_alt: 'A screen recording of Inkstone on macOS: opening a vault, typing a line of mixed Chinese and English, following a wikilink, and opening the graph.'
   video_caption: Recorded on macOS 26. Unedited, apart from the dissolves between sections.
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: The parts worth knowing before you download anything.
   rows:
   - k: Platforms
-    v: macOS 26 and iOS 26, one SwiftUI codebase, Apple silicon
+    v: "macOS 26 and iOS 26, one SwiftUI codebase. The Mac app is universal: Apple silicon and Intel"
   - k: Storage
     v: Plain Markdown files in a folder you pick. No database, no import
   - k: Compatibility

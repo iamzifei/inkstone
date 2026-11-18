@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inkstone — eine Markdown-Notizapp für macOS und iOS</title>
-<meta name="description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<title>Inkstone — kostenlose Markdown-Notizen-App für Mac und iOS</title>
+<meta name="description" content="Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert.">
 <meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://inkslab.app/de/">
@@ -19,24 +19,24 @@
 <link rel="alternate" hreflang="x-default" href="https://inkslab.app/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Inkstone">
-<meta property="og:title" content="Inkstone — eine Markdown-Notizapp für macOS und iOS">
-<meta property="og:description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<meta property="og:title" content="Inkstone — kostenlose Markdown-Notizen-App für Mac und iOS">
+<meta property="og:description" content="Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert.">
 <meta property="og:url" content="https://inkslab.app/de/">
 <meta property="og:image" content="https://inkslab.app/assets/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="de_DE">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Inkstone — eine Markdown-Notizapp für macOS und iOS">
-<meta name="twitter:description" content="Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.">
+<meta name="twitter:title" content="Inkstone — kostenlose Markdown-Notizen-App für Mac und iOS">
+<meta name="twitter:description" content="Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert.">
 <meta name="twitter:image" content="https://inkslab.app/assets/og-card.png">
 <link rel="icon" href="../assets/icon.png">
 <link rel="apple-touch-icon" href="../assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&display=swap">
-<link rel="stylesheet" href="../assets/styles.css?v=f8db207b">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26, iOS 26","url":"https://inkslab.app/de/","description":"Reine Markdown-Dateien auf Ihrer eigenen Festplatte. Wikilinks, Backlinks, ein Graph, ein Canvas und Tagesnotizen, in einer nativen App für macOS 26 und iOS 26. Keine Datenbank, kein Electron, kein Konto.","inLanguage":"de","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James Gong","url":"https://github.com/iamzifei"},"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg"}</script>
+<link rel="stylesheet" href="../assets/styles.css?v=06eaf0c1">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.2.2","url":"https://inkslab.app/de/","image":"https://inkslab.app/assets/og-card.png","description":"Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert.","inLanguage":"de","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script>
 
 </head>
 <body>
@@ -70,7 +70,16 @@
     <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">Für macOS laden</a>
     <a class="btn btn-quiet" href="#features">Ansehen, was sie kann</a>
   </div>
-  <p class="hero-note">Kostenlos · Apple Silicon · English · 简体中文 · 繁體中文</p>
+  <div class="brew">
+      <p class="brew-label">Oder mit Homebrew installieren</p>
+      <div class="brew-box">
+        <code class="brew-cmd">brew install --cask iamzifei/tap/inkstone</code>
+        <button type="button" class="brew-copy" data-copy="brew install --cask iamzifei/tap/inkstone"
+                data-label="Kopieren" data-done="Kopiert"
+                aria-label="Homebrew-Befehl kopieren">Kopieren</button>
+      </div>
+    </div>
+  <p class="hero-note">Kostenlos · Apple Silicon und Intel · English · 简体中文 · 繁體中文</p>
   <figure class="film">
     <div class="film-mat">
       <video class="film-frame" poster="../assets/video/poster.webp" autoplay muted loop playsinline
@@ -160,11 +169,20 @@
     <h2 id="specs-h">Technische Daten</h2>
     <p class="rule-sub">Was zu wissen sich lohnt, bevor Sie irgendetwas herunterladen.</p>
   </div>
-  <table class="spec-table reveal"><tbody><tr><th scope="row">Plattformen</th><td>macOS 26 und iOS 26, eine SwiftUI-Codebasis, Apple Silicon</td></tr><tr><th scope="row">Speicherung</th><td>Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import</td></tr><tr><th scope="row">Kompatibilität</th><td>Obsidian-Tresore öffnen sich unverändert, in beide Richtungen. Canvas ist JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown, dazu Wikilinks, Einbettungen, Blockreferenzen, Callouts, Fußnoten, Formelsatz und Mermaid</td></tr><tr><th scope="row">Synchronisierung</th><td>iCloud oder ein GitHub-Repository, mit Filtern je Dateityp</td></tr><tr><th scope="row">Oberflächensprachen</th><td>English, 简体中文, 繁體中文</td></tr><tr><th scope="row">Quelltext</th><td>Öffentlich auf GitHub. Eine Lizenz ist noch nicht gewählt.</td></tr><tr><th scope="row">Datenschutz</th><td>Kein Konto, keine Telemetrie, kein Netzaufruf, um den Sie nicht gebeten haben</td></tr></tbody></table>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">Plattformen</th><td>macOS 26 und iOS 26, eine SwiftUI-Codebasis. Die Mac-App ist universell: Apple Silicon und Intel</td></tr><tr><th scope="row">Speicherung</th><td>Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import</td></tr><tr><th scope="row">Kompatibilität</th><td>Obsidian-Tresore öffnen sich unverändert, in beide Richtungen. Canvas ist JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown, dazu Wikilinks, Einbettungen, Blockreferenzen, Callouts, Fußnoten, Formelsatz und Mermaid</td></tr><tr><th scope="row">Synchronisierung</th><td>iCloud oder ein GitHub-Repository, mit Filtern je Dateityp</td></tr><tr><th scope="row">Oberflächensprachen</th><td>English, 简体中文, 繁體中文</td></tr><tr><th scope="row">Quelltext</th><td>Öffentlich auf GitHub. Eine Lizenz ist noch nicht gewählt.</td></tr><tr><th scope="row">Datenschutz</th><td>Kein Konto, keine Telemetrie, kein Netzaufruf, um den Sie nicht gebeten haben</td></tr></tbody></table>
   <div class="closer reveal">
     <p class="closer-line">Sie ist kostenlos, sie hält Ihnen nichts vor, und die Dateien, die sie schreibt, sind die Dateien, die Sie ohnehin schon hatten.</p>
     <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">Für macOS laden</a>
       <a class="btn btn-quiet" href="https://ko-fi.com/james_ai/tip" rel="noopener">Auf Ko-fi unterstützen</a></div>
+    <div class="brew">
+      <p class="brew-label">Oder mit Homebrew installieren</p>
+      <div class="brew-box">
+        <code class="brew-cmd">brew install --cask iamzifei/tap/inkstone</code>
+        <button type="button" class="brew-copy" data-copy="brew install --cask iamzifei/tap/inkstone"
+                data-label="Kopieren" data-done="Kopiert"
+                aria-label="Homebrew-Befehl kopieren">Kopieren</button>
+      </div>
+    </div>
   </div>
 </section>
 </main>
@@ -194,6 +212,6 @@
   <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><a class="lang" href="https://inkslab.app/ja/" hreflang="ja" data-lang="ja">日本語</a><a class="lang" href="https://inkslab.app/ko/" hreflang="ko" data-lang="ko">한국어</a><span class="lang-current" aria-current="true">Deutsch</span><a class="lang" href="https://inkslab.app/fr/" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/" hreflang="es" data-lang="es">Español</a></nav>
   <p class="colophon">Gesetzt in Source Serif 4 und Source Han Serif. Als statische Dateien gebaut, von GitHub Pages ausgeliefert, ohne jede Analytik.</p>
 </footer>
-<script src="../assets/site.js?v=aa4b4a1b" defer></script>
+<script src="../assets/site.js?v=5be1f684" defer></script>
 </body>
 </html>

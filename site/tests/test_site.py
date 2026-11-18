@@ -419,3 +419,83 @@ class ExternalLinks(BuiltSite):
                 self.assertTrue(target.exists(),
                                 f"{page.relative_to(self.out)} links to {href}, "
                                 "which is not in the build")
+
+
+class HomebrewLine(BuiltSite):
+    """The Homebrew install line under the download buttons, in every language."""
+
+    def test_every_home_page_offers_the_cask(self) -> None:
+        for lang, meta in build.LANGS.items():
+            with self.subTest(lang=lang):
+                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+                # Hero and closer both carry it.
+                self.assertEqual(html.count(f'<code class="brew-cmd">{build.BREW}</code>'), 2)
+                self.assertEqual(html.count(f'data-copy="{build.BREW}"'), 2)
+
+    def test_the_copy_labels_are_translated(self) -> None:
+        english = (self.out / "index.html").read_text(encoding="utf-8")
+        en_label = re.search(r'<p class="brew-label">([^<]+)</p>', english).group(1)
+        for lang, meta in build.LANGS.items():
+            if lang == build.DEFAULT_LANG:
+                continue
+            with self.subTest(lang=lang):
+                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+                self.assertNotIn(f'<p class="brew-label">{en_label}</p>', html)
+
+
+class SearchMetadata(BuiltSite):
+    """Head tags, structured data and crawler files on the home pages."""
+
+    def test_titles_and_descriptions_fit(self) -> None:
+        for lang, meta in build.LANGS.items():
+            with self.subTest(lang=lang):
+                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+                title = re.search(r"<title>([^<]+)</title>", html).group(1)
+                desc = re.search(r'<meta name="description" content="([^"]+)"', html).group(1)
+                import html as h
+                self.assertLessEqual(len(h.unescape(title)), 60, title)
+                self.assertLessEqual(len(h.unescape(desc)), 155, desc)
+
+    def test_software_application_is_honest_and_parses(self) -> None:
+        import json
+        for lang, meta in build.LANGS.items():
+            with self.subTest(lang=lang):
+                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+                blocks = re.findall(
+                    r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+                self.assertEqual(len(blocks), 1)
+                data = json.loads(blocks[0])
+                self.assertEqual(data["@type"], "SoftwareApplication")
+                self.assertEqual(data["softwareVersion"], build.app_version())
+                self.assertEqual(data["offers"]["price"], "0")
+                self.assertNotIn("aggregateRating", data)
+
+    def test_robots_names_the_ai_crawlers_and_the_sitemap(self) -> None:
+        robots = (self.out / "robots.txt").read_text(encoding="utf-8")
+        for bot in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "CCBot", "Bingbot"):
+            self.assertIn(f"User-agent: {bot}\nAllow: /", robots)
+        self.assertIn(f"Sitemap: {build.SITE}/sitemap.xml", robots)
+        self.assertNotIn("Disallow", robots)
+
+    def test_sitemap_lists_every_translation_as_an_alternate(self) -> None:
+        import xml.etree.ElementTree as ET
+        sitemap = (self.out / "sitemap.xml").read_text(encoding="utf-8")
+        root = ET.fromstring(sitemap)  # raises if malformed
+        ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9",
+              "x": "http://www.w3.org/1999/xhtml"}
+        home = next(u for u in root.findall("s:url", ns)
+                    if u.find("s:loc", ns).text == f"{build.SITE}/")
+        langs = {l.get("hreflang") for l in home.findall("x:link", ns)}
+        self.assertEqual(langs, {m["hreflang"] for m in build.LANGS.values()} | {"x-default"})
+        self.assertEqual(home.find("s:lastmod", ns).text, build.SITE_UPDATED)
+
+
+class NoLegalEntityName(BuiltSite):
+    """The published site never names the company behind it — only the person."""
+
+    def test_no_published_file_mentions_it(self) -> None:
+        needle = bytes([111, 114, 114, 105, 115])  # spelled as bytes so this file stays clean
+        for path in self.out.rglob("*"):
+            if path.is_file() and path.suffix in {".html", ".txt", ".xml", ".js", ".css"}:
+                with self.subTest(path=str(path.relative_to(self.out))):
+                    self.assertNotIn(needle, path.read_bytes().lower())

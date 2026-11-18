@@ -5,6 +5,16 @@
 An Obsidian-class notes app for macOS 26 and iOS 26. Plain Markdown files on disk,
 wikilinks, graph, canvas, daily notes — native SwiftUI, no Electron.
 
+## Install
+
+```sh
+brew install --cask iamzifei/tap/inkstone
+```
+
+Or download the signed, notarised DMG from the
+[latest release](https://github.com/iamzifei/inkstone/releases/latest). macOS 26
+or later; the Mac app is universal (Apple silicon and Intel). Free.
+
 > **Picking this up mid-stream? Read [HANDOFF.md](HANDOFF.md) first**, then the
 > most recent file in [`docs/plans/`](docs/plans) — one per piece of work, each
 > written as "what was reported / what it actually was / what is left".
@@ -159,7 +169,7 @@ pick is the grant; the security-scoped bookmark restores it on later launches.
 
 ## Open items
 
-**iCloud entitlement is deferred.** `iCloud.com.orris.inkstone` doesn't exist in
+**iCloud entitlement is deferred.** The app's iCloud container (`iCloud.` + the bundle id) doesn't exist in
 the developer portal, and enabling the entitlement before the container exists
 makes every local build fail to sign. The keys are commented in
 `App/Resources/Inkstone.entitlements` with instructions; `createICloudVault()`

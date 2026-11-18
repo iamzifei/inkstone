@@ -276,6 +276,13 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   .nav-links > a:not(.btn) { display: none; }
   .wordmark-cjk { display: none; }
 }
+/* The longest download label ("Télécharger pour macOS") pushed the French bar
+ * one pixel past a 390px screen. A little less air at phone width keeps every
+ * language inside it without changing how the bar looks anywhere else. */
+@media (max-width: 420px) {
+  .nav-links { gap: .7rem; }
+  .nav-links > .btn { padding-inline: .9rem; }
+}
 
 /* language menu */
 .lang-menu { position: relative; font-family: var(--sans); }
@@ -399,6 +406,65 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   letter-spacing: .04em;
   color: var(--ink-faint);
 }
+
+/* The Homebrew line under the download buttons. Deliberately quieter than the
+ * buttons it sits under: the same micro size and faint ink as .hero-note, with
+ * the command in a hairline code box. The box may scroll sideways on a narrow
+ * phone, so a long command never widens the page itself. */
+.brew {
+  margin: 1.1rem auto 0;
+  max-width: 30rem;
+  text-align: center;
+}
+.brew-label {
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  letter-spacing: .04em;
+  color: var(--ink-faint);
+  margin-bottom: .45rem;
+}
+.brew-box {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.brew-cmd {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: .8rem .85rem;
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  line-height: 1.3;
+  color: var(--ink);
+  text-align: left;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.brew-copy {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 .95rem;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.brew-copy:hover { background: var(--paper-2); color: var(--ink); }
+.brew-copy[data-copied] { color: var(--cinnabar); }
+.brew-copy:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: -2px; }
 
 /* The demo, mounted like a plate in a book: a paper mat, a hairline, and the
  * picture inset within it. The mat is what keeps a bright video from sitting
@@ -800,6 +866,6 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
 /* ------------------------------------------------------------------- print */
 
 @media print {
-  .nav, .hero-actions, .film, .site-footer, .skip { display: none; }
+  .nav, .hero-actions, .brew, .film, .site-footer, .skip { display: none; }
   body { background: #fff; color: #000; font-size: 11pt; }
 }

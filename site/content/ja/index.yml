@@ -1,5 +1,5 @@
-title: Inkstone 墨硯 — ノートをファイルのまま置いておく macOS / iOS アプリ
-description: 自分で選んだフォルダに置かれた素の Markdown ファイル。ウィキリンク、バックリンク、 グラフ、キャンバス、デイリーノート。macOS 26 と iOS 26 のためのネイティブ SwiftUI。 データベースなし、Electron なし、アカウント不要。
+title: "Inkstone 墨硯 — 無料の Mac 向け Markdown ノートアプリ"
+description: "無料の Mac 向け Markdown ノートアプリ。ノートは自分のフォルダにある素の Markdown ファイル。ウィキリンク、バックリンク、グラフ、キャンバス。Obsidian の保管庫もそのまま開けます。"
 nav:
   label: セクション
   skip: 本文へスキップ
@@ -11,11 +11,16 @@ cta:
   source: ソースを読む
   tour: 何ができるか見る
   kofi: Ko-fi で支援
+brew:
+  label: "Homebrew でもインストールできます"
+  copy: "コピー"
+  copied: "コピーしました"
+  copy_aria: "Homebrew のコマンドをコピー"
 hero:
   eyebrow: macOS 26 · iOS 26 · ネイティブ SwiftUI
   title: ノートはもともとファイルだ。そのままでいい。
   lede: Inkstone は、あなたが指定したフォルダの Markdown をそのまま読み書きします。 いま持っている保管庫をそのまま開き、他のエディタで開けないものは何も書きません。 アプリ自身の状態は隠しフォルダに置かれ、いつ消してもかまいません。
-  note: 無料 · Apple シリコン · English · 简体中文 · 繁體中文
+  note: "無料 · Apple シリコンと Intel · English · 简体中文 · 繁體中文"
   video_alt: macOS 上の Inkstone の画面収録：保管庫を開き、漢字とラテン文字が混ざった一行を打ち、 ウィキリンクをたどり、グラフを開くまで。
   video_caption: macOS 26 で収録。区切りのディゾルブ以外、編集はしていません。
 creed:
@@ -85,7 +90,7 @@ specs:
   sub: 何かをダウンロードする前に知っておく価値のある部分。
   rows:
   - k: 対応環境
-    v: macOS 26 と iOS 26、ひとつの SwiftUI コードベース、Apple シリコン
+    v: "macOS 26 と iOS 26、ひとつの SwiftUI コードベース。Mac 版はユニバーサルで、Apple シリコンと Intel の両方に対応"
   - k: 保存
     v: 自分で選んだフォルダの素の Markdown ファイル。データベースも取り込みもなし
   - k: 互換性

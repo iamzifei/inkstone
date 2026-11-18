@@ -50,6 +50,29 @@ KOFI = "https://ko-fi.com/james_ai/tip"
 HAS_RELEASE = True
 DOWNLOAD = f"{REPO}/releases/latest/download/Inkstone.dmg"
 
+# The Homebrew cask in James's tap. It installs the same signed DMG as the
+# download button, so it is offered beside it rather than instead of it.
+BREW = "brew install --cask iamzifei/tap/inkstone"
+
+# The date the sitemap reports as <lastmod>. A constant rather than today's
+# date: `build.py --check` in CI must produce byte-identical output on any day,
+# and a clock in the build would fail that check every morning. Bump it when the
+# pages' content changes in a way worth a re-crawl.
+SITE_UPDATED = "2026-11-18"
+
+
+def app_version() -> str:
+    """The shipping version, read from project.yml so a release needs no site edit.
+
+    MARKETING_VERSION in project.yml is what Tools/release.sh stamps into the
+    app, so the structured data can never advertise a version that was not cut.
+    """
+    for line in (ROOT / "project.yml").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("MARKETING_VERSION:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    raise SystemExit("project.yml has no MARKETING_VERSION")
+
 # The other macOS apps. Someone who liked one is the likeliest person to
 # want another, which is why each site links to the rest rather than to a
 # portfolio page nobody visits.
@@ -246,6 +269,26 @@ def cta(page: Page, primary: bool = True) -> str:
     return f'<a class="{cls}" href="{e(href)}">{e(label)}</a>'
 
 
+def brew(page: Page) -> str:
+    """The Homebrew alternative, set as a quiet line under the download buttons.
+
+    The command is real text in a <code> element so it can be selected by hand
+    when the copy button is unavailable (no JavaScript, or a browser that refuses
+    clipboard access). The button's two labels travel as data attributes so
+    site.js needs no copy of its own in eight languages.
+    """
+    d = page.data
+    return f"""<div class="brew">
+      <p class="brew-label">{e(get(d, 'brew.label'))}</p>
+      <div class="brew-box">
+        <code class="brew-cmd">{e(BREW)}</code>
+        <button type="button" class="brew-copy" data-copy="{e(BREW)}"
+                data-label="{e(get(d, 'brew.copy'))}" data-done="{e(get(d, 'brew.copied'))}"
+                aria-label="{e(get(d, 'brew.copy_aria'))}">{e(get(d, 'brew.copy'))}</button>
+      </div>
+    </div>"""
+
+
 def nav(page: Page, by_slug: dict) -> str:
     d = page.data
     up = page.up
@@ -353,6 +396,7 @@ def hero(page: Page) -> str:
     {cta(page)}
     <a class="btn btn-quiet" href="#features">{e(get(d, 'cta.tour'))}</a>
   </div>
+  {brew(page)}
   <p class="hero-note">{e(get(d, 'hero.note'))}</p>
   <figure class="film">
     <div class="film-mat">
@@ -455,6 +499,7 @@ def specs(page: Page) -> str:
     <p class="closer-line">{e(get(d, 'specs.closer'))}</p>
     <div class="hero-actions">{cta(page)}
       <a class="btn btn-quiet" href="{KOFI}" rel="noopener">{e(get(d, 'cta.kofi'))}</a></div>
+    {brew(page)}
   </div>
 </section>"""
 
@@ -469,16 +514,24 @@ def json_ld(page: Page) -> str:
         "name": "Inkstone",
         "alternateName": "墨砚",
         "applicationCategory": "ProductivityApplication",
-        "operatingSystem": "macOS 26, iOS 26",
+        # The downloadable build is the Mac one, so that is what the offer
+        # describes. The binary is universal (arm64 + x86_64, checked with lipo
+        # on the 0.2.2 release).
+        "operatingSystem": "macOS 26.0 or later",
+        "processorRequirement": "Apple silicon or Intel (universal binary)",
+        "softwareVersion": app_version(),
         "url": page.url,
+        "image": f"{SITE}/assets/{'og-card-zh.png' if page.lang in CJK_LANGS else 'og-card.png'}",
         "description": get(d, "description"),
         "inLanguage": LANGS[page.lang]["hreflang"],
         "isAccessibleForFree": True,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
-        "author": {"@type": "Person", "name": "James Gong", "url": "https://github.com/iamzifei"},
+        "author": {"@type": "Person", "name": "James", "url": "https://github.com/iamzifei"},
     }
     if HAS_RELEASE:
         app["downloadUrl"] = DOWNLOAD
+        app["installUrl"] = DOWNLOAD
+        app["releaseNotes"] = f"{REPO}/releases/latest"
     return ('<script type="application/ld+json">'
             + json.dumps(app, ensure_ascii=False, separators=(",", ":"))
             + "</script>")
@@ -624,15 +677,54 @@ def sitemap(pages: list[Page]) -> str:
     # Static pages belong here too. They were left out when the sitemap was
     # written, which was survivable for a privacy policy nobody searches for and
     # is not for a help page the app sends people to.
-    urls = sorted({p.url for p in pages} | set(static_pages())
-                  | {f"{SITE}/{d}sync.html" for d, _, _ in guide.LANGS.values()})
-    entries = "\n".join(
-        f"  <url><loc>{url}</loc><changefreq>monthly</changefreq></url>"
-        for url in urls
-    )
+    #
+    # Each translated page lists every one of its translations (itself
+    # included) as xhtml:link alternates, which is the sitemap form of the
+    # hreflang tags in <head>. Search engines accept either; giving both means a
+    # crawler that only reads the sitemap still learns the language graph.
+    groups: dict[str, dict[str, str]] = {}   # url -> {hreflang: url} of its group
+    by_slug: dict[str, dict[str, str]] = {}
+    for p in pages:
+        by_slug.setdefault(p.slug, {})[LANGS[p.lang]["hreflang"]] = p.url
+    for alts in by_slug.values():
+        for url in alts.values():
+            groups[url] = alts
+    guide_alts = {code: f"{SITE}/{d}sync.html" for d, code, _ in guide.LANGS.values()}
+    for url in guide_alts.values():
+        groups[url] = guide_alts
+
+    urls = sorted(set(groups) | set(static_pages()))
+    entries = []
+    for url in urls:
+        alts = groups.get(url, {})
+        links = "".join(
+            f'\n    <xhtml:link rel="alternate" hreflang="{code}" href="{href}"/>'
+            for code, href in sorted(alts.items())
+        )
+        if alts:
+            default = alts.get(LANGS[DEFAULT_LANG]["hreflang"])
+            if default:
+                links += f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{default}"/>'
+        entries.append(f"  <url>\n    <loc>{url}</loc>\n    <lastmod>{SITE_UPDATED}</lastmod>"
+                       f"\n    <changefreq>monthly</changefreq>{links}\n  </url>")
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-            f"{entries}\n</urlset>\n")
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+            ' xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+            + "\n".join(entries) + "\n</urlset>\n")
+
+
+# Crawlers named explicitly as well as covered by `*`. `*` already allows them;
+# naming them is for the operators who read robots.txt to decide whether a site
+# has opted out of AI search, and for any future default that treats an
+# unnamed AI crawler as disallowed.
+ROBOTS_ALLOWED = ["Googlebot", "Bingbot", "GPTBot", "OAI-SearchBot", "ChatGPT-User",
+                  "ClaudeBot", "Claude-SearchBot", "anthropic-ai", "PerplexityBot",
+                  "Google-Extended", "Applebot", "Applebot-Extended", "CCBot"]
+
+
+def robots() -> str:
+    named = "".join(f"User-agent: {bot}\nAllow: /\n\n" for bot in ROBOTS_ALLOWED)
+    return f"User-agent: *\nAllow: /\n\n{named}Sitemap: {SITE}/sitemap.xml\n"
 
 
 def build(out: Path) -> None:
@@ -711,8 +803,7 @@ def build(out: Path) -> None:
         shutil.copyfile(appcast, out / "appcast.xml")
 
     (out / "sitemap.xml").write_text(sitemap(pages), encoding="utf-8")
-    (out / "robots.txt").write_text(
-        f"User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n", encoding="utf-8")
+    (out / "robots.txt").write_text(robots(), encoding="utf-8")
     # GitHub Pages runs Jekyll by default, which drops files beginning with an
     # underscore and rewrites others unpredictably. This turns it off.
     (out / ".nojekyll").write_text("", encoding="utf-8")
