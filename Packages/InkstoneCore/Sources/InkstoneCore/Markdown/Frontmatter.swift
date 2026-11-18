@@ -5,7 +5,7 @@ import Yams
 ///
 /// Modelled as an enum rather than `Any` so the whole note model stays `Sendable`
 /// and can cross actor boundaries during indexing.
-public enum PropertyValue: Hashable, Sendable {
+public enum PropertyValue: Hashable, Sendable, Codable {
     case text(String)
     case number(Double)
     case boolean(Bool)
@@ -34,13 +34,25 @@ public enum PropertyValue: Hashable, Sendable {
 }
 
 /// Parsed YAML frontmatter plus the byte range it occupied in the source.
-public struct Frontmatter: Hashable, Sendable {
+public struct Frontmatter: Hashable, Sendable, Codable {
     public var properties: [String: PropertyValue]
     /// Character range of the whole `---` fenced block, so the editor can hide or
     /// render it as a property table without re-scanning the document.
     public var sourceRange: Range<String.Index>?
 
     public static let empty = Frontmatter(properties: [:], sourceRange: nil)
+
+    // Codable for the on-disk index cache: the properties only. The source
+    // range indexes into the text it was parsed from, which is not cached.
+    private enum CodingKeys: String, CodingKey { case properties }
+    public init(from decoder: Decoder) throws {
+        properties = try decoder.container(keyedBy: CodingKeys.self).decode([String: PropertyValue].self, forKey: .properties)
+        sourceRange = nil
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(properties, forKey: .properties)
+    }
 
     public var tags: [String] {
         // Obsidian accepts both `tag:` and `tags:`.

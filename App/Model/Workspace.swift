@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Observation
 import SwiftUI
 import InkstoneCore
@@ -400,7 +401,7 @@ final class Workspace {
             // sidebar fills in when it lands (`refreshTreeInBackground`).
             tree = nil
             refreshTreeInBackground()
-            reindex(full: true)
+            reindex(full: true, seedFromDisk: true)
             startWatching(url)
 
             if startingBackgroundWork {
@@ -1186,26 +1187,68 @@ final class Workspace {
         if FileManager.default.fileExists(atPath: path) { openNote(at: URL(filePath: path)) }
     }
 
+    /// Where a vault's parsed index is kept between launches.
+    nonisolated static func indexCacheURL(for root: URL) -> URL? {
+        guard let support = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                                         appropriateFor: nil, create: true) else { return nil }
+        let key = SHA256.hash(data: Data(root.standardizedFileURL.path(percentEncoded: false).utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return support.appending(path: "IndexCache", directoryHint: .isDirectory).appending(path: key + ".plist")
+    }
+
+    /// A cache written by another build is not trusted: parsing may differ.
+    nonisolated static let indexParserVersion: String = {
+        let info = Bundle.main.infoDictionary
+        return "\(info?["CFBundleShortVersionString"] ?? "?")-\(info?["CFBundleVersion"] ?? "?")"
+    }()
+
+    /// Saves the index a moment after it settles (the latest one wins), off
+    /// the main thread.
+    @ObservationIgnored private var indexCacheTask: Task<Void, Never>?
+    private func saveIndexCache(_ snapshot: IndexSnapshot, root: URL) {
+        indexCacheTask?.cancel()
+        guard let url = Self.indexCacheURL(for: root) else { return }
+        indexCacheTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            try? IndexCache.save(snapshot, to: url, parserVersion: Self.indexParserVersion)
+        }
+    }
+
     func rebuildIndex() {
         refreshTree()
         reindex(full: true)
     }
 
-    func reindex(full: Bool = false) {
+    /// - Parameter seedFromDisk: opening a vault — start from the parse saved
+    ///   by the last session (`IndexCache`) instead of parsing every note:
+    ///   only notes changed since are read again. A missing or stale cache
+    ///   means a normal full build.
+    func reindex(full: Bool = false, seedFromDisk: Bool = false) {
         guard let root else { return }
         reindexTask?.cancel()
         isIndexing = true
         let full = full || Date.now.timeIntervalSince(lastFullIndex) > 600
         let previous: IndexSnapshot? = full ? nil : index
+        let cacheURL = Self.indexCacheURL(for: root)
         reindexTask = Task { [indexBuilder] in
-            let snapshot = await indexBuilder.build(vaultRoot: root, reusing: previous)
+            var seed: IndexSnapshot?
+            if seedFromDisk, let cacheURL {
+                seed = await Task.detached(priority: .userInitiated) {
+                    await IndexCache.load(from: cacheURL, parserVersion: Self.indexParserVersion)
+                }.value
+            }
+            let snapshot = await indexBuilder.build(vaultRoot: root, reusing: seed ?? previous)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 // The vault may have been closed or switched while building.
                 guard self.root == root, !Task.isCancelled else { return }
                 // Only a full build that was published counts; a cancelled one
-                // must not postpone the next.
+                // must not postpone the next. One seeded from the saved parse
+                // stands in for it: the periodic full re-read comes 10 min later.
                 if full { self.lastFullIndex = .now }
+                if seed != nil { LaunchTiming.mark("index seeded from disk (\(seed?.notes.count ?? 0) notes)") }
+                self.saveIndexCache(snapshot, root: root)
                 self.index = snapshot
                 self.updateSpotlight()
                 self.openPendingSpotlightResult()
