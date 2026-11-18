@@ -137,8 +137,30 @@ struct LegacyScanner: Sendable {
             )
         }
 
-        addMatches(LegacyPatterns.tag) { match, text in
-            SyntaxToken(kind: .tag(text.substring(with: match.range(at: 1))), range: match.range)
+        // Obsidian's tag rules, shared with the parser engine (ObsidianSyntax):
+        // a run of tags starts only after whitespace / line start or emphasis
+        // markers, and splits into one token per tag (`#a#b` is two). The old
+        // pattern here disagreed on six kinds of case — `#a#b`, `(#a)`, `+#a`,
+        // `！#短`, `&#x2014;`, `#tag。` — so the editor highlighted tags the index
+        // did not have.
+        // A `#` inside a wiki link is a heading or block reference
+        // (`[[#Heading]]`, `[[note|#alias]]`), not a tag; the parser engine
+        // claims link ranges before tags for the same reason.
+        var links = IndexSet()
+        for link in LegacyPatterns.wikiLink.matches(in: text, range: full) {
+            links.insert(integersIn: Range(link.range) ?? 0..<0)
+        }
+        for run in ObsidianSyntax.Patterns.tagRun.matches(in: text, range: full) {
+            guard !maskedRegions.intersects(run.range),
+                  !links.intersects(integersIn: Range(run.range) ?? 0..<0) else { continue }
+            var location = run.range.location
+            let end = NSMaxRange(run.range)
+            while location < end,
+                  let part = ObsidianSyntax.Patterns.tag.firstMatch(
+                      in: text, options: [.anchored], range: NSRange(location: location, length: end - location)) {
+                tokens.append(SyntaxToken(kind: .tag(nsText.substring(with: part.range(at: 1))), range: part.range))
+                location = NSMaxRange(part.range)
+            }
         }
 
         addMatches(LegacyPatterns.blockIdentifier) { match, text in
@@ -317,10 +339,6 @@ private enum LegacyPatterns {
 
     static let markdownLink = make(#"!?\[([^\]\n]*)\]\(([^)\s]+)(?:[ \t]+"[^"]*")?\)"#)
 
-    /// A tag must contain at least one non-numeric character, otherwise `#1`
-    /// in "issue #1" would be indexed as a tag. Unicode letters are allowed so
-    /// `#中文标签` works.
-    static let tag = make(#"(?<![\p{L}\p{N}_/#])#([\p{L}\p{N}_/-]*[\p{L}_-][\p{L}\p{N}_/-]*)"#)
 
     /// Block identifier anchored at end of line: `Some text ^my-block`.
     static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)
