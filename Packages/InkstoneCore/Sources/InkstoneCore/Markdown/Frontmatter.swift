@@ -45,6 +45,11 @@ public struct Frontmatter: Hashable, Sendable, Codable {
     // Codable for the on-disk index cache: the properties only. The source
     // range indexes into the text it was parsed from, which is not cached.
     private enum CodingKeys: String, CodingKey { case properties }
+    // Equality and hashing by the properties only: a note read from the cache
+    // (no source range) is the same note as a fresh parse of the same file.
+    public static func == (a: Frontmatter, b: Frontmatter) -> Bool { a.properties == b.properties }
+    public func hash(into hasher: inout Hasher) { hasher.combine(properties) }
+
     public init(from decoder: Decoder) throws {
         properties = try decoder.container(keyedBy: CodingKeys.self).decode([String: PropertyValue].self, forKey: .properties)
         sourceRange = nil

@@ -31,6 +31,10 @@ public enum IndexCache {
         let notes = Array(snapshot.notes.values)
         let size = max(1, (notes.count + chunkCount - 1) / chunkCount)
         let encoder = JSONEncoder()
+        // YAML can say .nan or .inf; JSON cannot, and a throw here meant that
+        // vault never got a cache.
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(
+            positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
         let chunks = try stride(from: 0, to: notes.count, by: size).map {
             try encoder.encode(Array(notes[$0..<min($0 + size, notes.count)]))
         }
@@ -49,7 +53,12 @@ public enum IndexCache {
               stored.format == format, stored.parserVersion == parserVersion else { return nil }
         let decoded: [[NoteMetadata]?] = await withTaskGroup(of: (Int, [NoteMetadata]?).self) { group in
             for (index, chunk) in stored.chunks.enumerated() {
-                group.addTask { (index, try? JSONDecoder().decode([NoteMetadata].self, from: chunk)) }
+                group.addTask {
+                    let decoder = JSONDecoder()
+                    decoder.nonConformingFloatDecodingStrategy = .convertFromString(
+                        positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
+                    return (index, try? decoder.decode([NoteMetadata].self, from: chunk))
+                }
             }
             var parts = [[NoteMetadata]?](repeating: nil, count: stored.chunks.count)
             for await (index, notes) in group { parts[index] = notes }

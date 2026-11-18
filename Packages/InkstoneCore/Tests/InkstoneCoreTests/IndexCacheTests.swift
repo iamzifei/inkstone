@@ -10,7 +10,7 @@ struct IndexCacheTests {
     func vault() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appending(path: "index-cache-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root.appending(path: "sub"), withIntermediateDirectories: true)
-        try "---\ntags: [a, b]\naliases: [Alt]\nrating: 4.5\ndone: true\nwhen: 2026-11-18\nlist: [1, two]\n---\n# One\n\nSee [[Two#Head|t]] and ![[pic.png]] #tag ^blk\n"
+        try "---\ntags: [a, b]\naliases: [Alt]\nrating: 4.5\nweird: .nan\ndone: true\nwhen: 2026-11-18\nlist: [1, two]\n---\n# One\n\nSee [[Two#Head|t]] and ![[pic.png]] #tag ^blk\n"
             .write(to: root.appending(path: "One.md"), atomically: true, encoding: .utf8)
         try "# Two\n\n## Head\n\n[x](One.md) _drafts/x.md\n".write(to: root.appending(path: "sub/Two.md"), atomically: true, encoding: .utf8)
         return root
@@ -54,5 +54,18 @@ struct IndexCacheTests {
         #expect(comparable(reused.notes) == comparable(full.notes))
         #expect(reused.backlinks.mapValues(\.count) == full.backlinks.mapValues(\.count))
         #expect(reused.tagCounts == full.tagCounts)
+    }
+
+    @Test func cachedAndFreshNotesAreEqual() async throws {
+        let root = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        // Without the .nan property: NaN is never equal to itself.
+        let one = root.appending(path: "One.md")
+        try (try String(contentsOf: one, encoding: .utf8)).replacingOccurrences(of: "weird: .nan\n", with: "")
+            .write(to: one, atomically: true, encoding: .utf8)
+        let built = await IndexBuilder().build(vaultRoot: root)
+        let file = root.appending(path: "cache.plist")
+        try IndexCache.save(built, to: file, parserVersion: "v")
+        let loaded = try #require(await IndexCache.load(from: file, parserVersion: "v"))
+        #expect(loaded.notes == built.notes)
     }
 }

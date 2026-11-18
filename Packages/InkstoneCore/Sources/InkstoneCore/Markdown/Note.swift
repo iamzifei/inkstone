@@ -57,6 +57,11 @@ public struct NoteMetadata: Identifiable, Hashable, Sendable, Codable {
 }
 
 public enum NoteParser {
+    /// Bump whenever parsing could produce different metadata for the same
+    /// text: the on-disk index cache (IndexCache) written by another version
+    /// is then ignored instead of served.
+    public static let schemaVersion = 1
+
     private static let scanner = SyntaxScanner()
 
     /// Builds metadata from a note's raw text. Pure and `Sendable`, so indexing

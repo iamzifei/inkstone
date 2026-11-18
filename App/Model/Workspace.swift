@@ -1,4 +1,5 @@
 import Foundation
+import os
 import CryptoKit
 import Observation
 import SwiftUI
@@ -1189,7 +1190,8 @@ final class Workspace {
 
     /// Where a vault's parsed index is kept between launches.
     nonisolated static func indexCacheURL(for root: URL) -> URL? {
-        guard let support = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+        // Caches: derived data, rebuilt if lost — not something to back up.
+        guard let support = try? FileManager.default.url(for: .cachesDirectory, in: .userDomainMask,
                                                          appropriateFor: nil, create: true) else { return nil }
         let key = SHA256.hash(data: Data(root.standardizedFileURL.path(percentEncoded: false).utf8))
             .map { String(format: "%02x", $0) }.joined()
@@ -1199,19 +1201,38 @@ final class Workspace {
     /// A cache written by another build is not trusted: parsing may differ.
     nonisolated static let indexParserVersion: String = {
         let info = Bundle.main.infoDictionary
-        return "\(info?["CFBundleShortVersionString"] ?? "?")-\(info?["CFBundleVersion"] ?? "?")"
+        var version = "s\(NoteParser.schemaVersion)-\(info?["CFBundleShortVersionString"] ?? "?")-\(info?["CFBundleVersion"] ?? "?")"
+        #if DEBUG
+        // Development builds keep one version number across edits; the
+        // binary's date stands in for it.
+        if let exe = Bundle.main.executableURL,
+           let date = try? exe.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+            version += "-\(Int(date.timeIntervalSince1970))"
+        }
+        #endif
+        return version
     }()
 
     /// Saves the index a moment after it settles (the latest one wins), off
     /// the main thread.
+    /// At most once a minute after the first: the file is the whole vault's
+    /// metadata (15 MB for 10,000 notes), and an edit reindexes on every pause.
     @ObservationIgnored private var indexCacheTask: Task<Void, Never>?
+    @ObservationIgnored private var indexCacheSaved: (root: URL, at: Date)?
     private func saveIndexCache(_ snapshot: IndexSnapshot, root: URL) {
         indexCacheTask?.cancel()
         guard let url = Self.indexCacheURL(for: root) else { return }
-        indexCacheTask = Task.detached(priority: .utility) {
-            try? await Task.sleep(for: .seconds(2))
+        let delay: Duration = indexCacheSaved?.root == root ? .seconds(60) : .seconds(2)
+        indexCacheTask = Task.detached(priority: .utility) { [weak self] in
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            try? IndexCache.save(snapshot, to: url, parserVersion: Self.indexParserVersion)
+            do {
+                try IndexCache.save(snapshot, to: url, parserVersion: Self.indexParserVersion)
+                await MainActor.run { self?.indexCacheSaved = (root, .now) }
+            } catch {
+                Logger(subsystem: "com.orris.inkstone", category: "Index")
+                    .error("index cache not saved: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
