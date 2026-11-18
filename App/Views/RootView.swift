@@ -68,6 +68,7 @@ struct RootView: View {
         }
         .tint(style.accent)
         .background(style.background)
+        .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
         }

@@ -281,7 +281,9 @@ final class Workspace {
             migrateSyncBindingIfNeeded(for: vault, root: url)
             bookmarks = Bookmarks.load(from: url)
 
+            LaunchTiming.mark("vault open start")
             refreshTree()
+            LaunchTiming.mark("file tree ready")
             reindex(full: true)
             startWatching(url)
 
@@ -957,6 +959,7 @@ final class Workspace {
                 // must not postpone the next.
                 if full { self.lastFullIndex = .now }
                 self.index = snapshot
+                LaunchTiming.mark("index ready")
                 self.indexGeneration += 1
                 self.isIndexing = false
             }
