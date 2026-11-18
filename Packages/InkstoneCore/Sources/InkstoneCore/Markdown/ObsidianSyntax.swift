@@ -16,6 +16,22 @@ import Foundation
 /// never looked at.
 enum ObsidianSyntax {
 
+    /// GFM's trailing-punctuation rule: a URL does not end in `.,:;!?'"*_~`,
+    /// and a closing `)` is dropped unless the URL opened one.
+    static func trimmedURLRange(_ range: NSRange, in text: NSString) -> NSRange {
+        var url = text.substring(with: range)
+        while let last = url.last {
+            if ".,:;!?'\"*_~".contains(last) {
+                url.removeLast()
+            } else if last == ")", url.filter({ $0 == "(" }).count < url.filter({ $0 == ")" }).count {
+                url.removeLast()
+            } else {
+                break
+            }
+        }
+        return NSRange(location: range.location, length: (url as NSString).length)
+    }
+
     /// - Parameters:
     ///   - prose: regions that are ordinary text. A match is kept only if it
     ///     lies *wholly* inside one; a pattern that straddles the boundary
@@ -81,8 +97,22 @@ enum ObsidianSyntax {
             )
         }
 
-        addMatches(Patterns.tag) { match, text in
-            SyntaxToken(kind: .tag(text.substring(with: match.range(at: 1))), range: match.range)
+        // A run of tags, then one token per tag in it: Obsidian starts a tag
+        // only after whitespace / line start, or straight after another tag
+        // (`#a#b` is two tags). Compared against Obsidian's own rendering of
+        // real notes: `……！#短` and `+#tag` are not tags there, `#a#b` is two.
+        for match in Patterns.tagRun.matches(in: text, options: [], range: full) {
+            guard prose.containsAll(match.range), !claimed.intersects(match.range) else { continue }
+            var location = match.range.location
+            let end = NSMaxRange(match.range)
+            while location < end {
+                guard let part = Patterns.tag.firstMatch(
+                    in: text, options: [.anchored], range: NSRange(location: location, length: end - location))
+                else { break }
+                tokens.append(SyntaxToken(kind: .tag(nsText.substring(with: part.range(at: 1))), range: part.range))
+                claimed.insert(range: part.range)
+                location = NSMaxRange(part.range)
+            }
         }
 
         // Before superscript, which would otherwise claim `^block-id` as `^…^`
@@ -109,6 +139,22 @@ enum ObsidianSyntax {
         }
         addMatches(Patterns.mathInline) { match, _ in
             SyntaxToken(kind: .mathInline, range: match.range, contentRange: match.range(at: 1))
+        }
+
+        // Bare URLs, which Obsidian (and GFM's autolink extension, which the
+        // parser does not enable) turn into links. A plain `https://…` in a
+        // note was unclickable text in Inkstone. Emitted as a link whose range
+        // is its content, so there is no markup to conceal.
+        let existingLinks = tokens.reduce(into: IndexSet()) { set, token in
+            if case .markdownLink = token.kind { set.insert(integersIn: Range(token.range) ?? 0..<0) }
+        }
+        addMatches(Patterns.bareURL) { match, text in
+            guard !existingLinks.intersects(integersIn: Range(match.range) ?? 0..<0) else { return nil }
+            let range = trimmedURLRange(match.range, in: text)
+            guard range.length > 0 else { return nil }
+            let url = text.substring(with: range)
+            let destination = url.lowercased().hasPrefix("www.") ? "http://" + url : url
+            return SyntaxToken(kind: .markdownLink(destination: destination), range: range, contentRange: range)
         }
 
         // CommonMark rather than Obsidian, and here because of *where* the work
@@ -152,7 +198,11 @@ enum ObsidianSyntax {
     /// deleted, not moved.
     enum Patterns {
         static let mathBlock = make(#"\$\$([\s\S]*?)\$\$"#)
-        static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?!\$)"#)
+        /// `https://…`, `http://…` or `www.…` not glued to a preceding word.
+        /// Stops at whitespace, angle brackets and full-width (CJK)
+        /// punctuation, so `https://a.com，然后` links only the URL.
+        static let bareURL = make(#"(?<![\p{L}\p{N}/@.:\-])(?:https?://|www\.)[^\s<>\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]+"#)
+        static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?![\$\d])"#)
 
         static let comment = make(#"%%[\s\S]*?%%"#)
 
@@ -166,7 +216,20 @@ enum ObsidianSyntax {
         /// without it the `#x2014` was scanned as a tag — which then claimed the
         /// text and stopped the entity being recognised at all. Found by a test
         /// for entities, not by anyone noticing a stray tag.
-        static let tag = make(#"(?<![\p{L}\p{N}_/#&])#([\p{L}\p{N}_/-]*[\p{L}_-][\p{L}\p{N}_/-]*)"#)
+        /// Obsidian's tag body, measured against its own rendering: anything
+        /// up to whitespace or ASCII punctuation other than `_ - /`. Full-width
+        /// (CJK) punctuation is part of a tag there, and a tag may begin with a
+        /// digit — it only has to contain a non-digit, so `#1` stays a number.
+        /// Characters that end a tag: whitespace and ASCII punctuation other
+        /// than `_ - /`.
+        private static let tagStop = ##"\s!"#$%&'()*+,.:;<=>?@\[\\\]^`{|}~"##
+        private static let tagBody = "[^\(tagStop)]*[^\\d\(tagStop)][^\(tagStop)]*"
+        static let tag = make("#(" + tagBody + ")")
+        /// One or more tags back to back, starting at line start, after
+        /// whitespace, or right after `* _ = ~ [ |` — measured in Obsidian:
+        /// `**#a**`, `==#a==`, `~~#a~~` and `[#a]` are tags there, `(#a)`,
+        /// `"#a"` and `中文#a` are not.
+        static let tagRun = make("(?<![^\\s*_=~\\[|])(?:#" + tagBody + ")+")
 
         /// Block identifier anchored at end of line: `Some text ^my-block`.
         static let blockIdentifier = make(#"(?m)(?:^|[ \t])\^([A-Za-z0-9][A-Za-z0-9-]*)[ \t]*$"#)
