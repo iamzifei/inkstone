@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The share extension's privacy manifest. It collects nothing and tracks
+  nothing: what the user shares is written to the app group's own container,
+  on this device, for the app to put into the user's vault.
+
+  Required-reason APIs:
+  - UserDefaults (1C8F.1): the app group's defaults, shared with the app only
+    (whether a vault has been opened yet).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>1C8F.1</string></array>
+		</dict>
+	</array>
+</dict>
+</plist>

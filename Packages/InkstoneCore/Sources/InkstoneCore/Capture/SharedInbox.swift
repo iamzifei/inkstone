@@ -27,14 +27,24 @@ public enum SharedInbox {
               let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         else { return }
         for file in files.filter({ $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            guard let data = try? Data(contentsOf: file),
-                  let item = try? JSONDecoder().decode(Capture.SharedItem.self, from: data) else {
-                try? FileManager.default.removeItem(at: file)   // unreadable: never deliverable
+            // Not readable right now (file protection while locked, a read
+            // error): leave it for the next time, never delete it.
+            guard let data = try? Data(contentsOf: file) else { return }
+            guard let item = try? JSONDecoder().decode(Capture.SharedItem.self, from: data) else {
+                try? FileManager.default.removeItem(at: file)   // not an item at all: never deliverable
                 continue
             }
             guard deliver(item) else { return }
             try? FileManager.default.removeItem(at: file)
         }
+    }
+
+    /// Whether the app has opened a vault yet (written by the app, read by the
+    /// extension, so the share sheet can say where an item will go).
+    private static let vaultKey = "hasVault"
+    public static var appHasVault: Bool {
+        get { UserDefaults(suiteName: appGroup)?.bool(forKey: vaultKey) ?? false }
+        set { UserDefaults(suiteName: appGroup)?.set(newValue, forKey: vaultKey) }
     }
 
     /// The block appended to the Inbox note for one item.

@@ -10,30 +10,55 @@ import InkstoneCore
 /// security-scoped bookmark), so it drops the item into the app group's inbox
 /// folder; the app moves it into Inbox.md the next time it is active.
 final class ShareViewController: UIViewController {
+    private let model = ShareModel()
+    /// completeRequest / cancelRequest exactly once, however often Save or
+    /// Cancel is tapped.
+    private var finished = false
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        // The form shows at once (with Cancel), and fills in when the shared
+        // item has loaded — a slow provider no longer means a blank sheet.
+        let host = UIHostingController(rootView: ShareView(
+            model: model,
+            save: { [weak self] in self?.save() },
+            cancel: { [weak self] in self?.finish(cancelled: true) }))
+        addChild(host)
+        host.view.frame = view.bounds
+        host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(host.view)
+        host.didMove(toParent: self)
+
         Task { @MainActor in
             let item = await Self.collect(from: extensionContext?.inputItems as? [NSExtensionItem] ?? [])
-            let host = UIHostingController(rootView: ShareView(
-                item: item,
-                save: { [weak self] edited in self?.save(edited) },
-                cancel: { [weak self] in
-                    self?.extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
-                }))
-            addChild(host)
-            host.view.frame = view.bounds
-            host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(host.view)
-            host.didMove(toParent: self)
+            model.item = item
+            model.text = item.text ?? ""
+            model.isLoading = false
         }
     }
 
-    private func save(_ item: Capture.SharedItem) {
+    private func save() {
+        guard !finished else { return }
+        var item = model.item
+        let text = model.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        item.text = text.isEmpty ? nil : model.text
+        item.date = .now
         do {
             try SharedInbox.add(item)
-            extensionContext?.completeRequest(returningItems: nil)
+            finish(cancelled: false)
         } catch {
-            extensionContext?.cancelRequest(withError: error)
+            // Shown, not swallowed: the user would otherwise think it was saved.
+            model.error = error.localizedDescription
+        }
+    }
+
+    private func finish(cancelled: Bool) {
+        guard !finished else { return }
+        finished = true
+        if cancelled {
+            extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
+        } else {
+            extensionContext?.completeRequest(returningItems: nil)
         }
     }
 
@@ -49,9 +74,17 @@ final class ShareViewController: UIViewController {
                    let found = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL,
                    !found.isFileURL {
                     url = found
-                } else if text == nil, provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier),
-                          let found = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String {
-                    text = found
+                } else if text == nil, provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    // Mail and Notes can hand over attributed text or raw data
+                    // rather than a String.
+                    let loaded = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier)
+                    switch loaded {
+                    case let s as String: text = s
+                    case let a as NSAttributedString: text = a.string
+                    case let d as Data: text = String(data: d, encoding: .utf8)
+                    case let u as URL where u.isFileURL: text = try? String(contentsOf: u, encoding: .utf8)
+                    default: break
+                    }
                 }
             }
         }
@@ -62,27 +95,45 @@ final class ShareViewController: UIViewController {
     }
 }
 
+@MainActor
+@Observable
+final class ShareModel {
+    var item = Capture.SharedItem(text: nil, url: nil, title: nil)
+    var text = ""
+    var isLoading = true
+    var error: String?
+    let hasVault = SharedInbox.appHasVault
+}
+
 private struct ShareView: View {
-    @State var item: Capture.SharedItem
-    let save: (Capture.SharedItem) -> Void
+    @Bindable var model: ShareModel
+    let save: () -> Void
     let cancel: () -> Void
-    @State private var text: String = ""
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    TextEditor(text: $text)
-                        .frame(minHeight: 120)
-                } footer: {
-                    Text("Saved to the Inbox note of your vault the next time Inkstone opens.")
-                }
-                if let url = item.url {
-                    Section("Link") {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let title = item.title { Text(title).font(.headline) }
-                            Text(url.absoluteString).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                if model.isLoading {
+                    Section { ProgressView().frame(maxWidth: .infinity) }
+                } else {
+                    Section {
+                        TextEditor(text: $model.text)
+                            .frame(minHeight: 120)
+                    } footer: {
+                        Text(model.hasVault
+                             ? "Saved to the Inbox note of your vault the next time Inkstone opens."
+                             : "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note.")
+                    }
+                    if let url = model.item.url {
+                        Section("Link") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if let title = model.item.title { Text(title).font(.headline) }
+                                Text(url.absoluteString).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            }
                         }
+                    }
+                    if let error = model.error {
+                        Section { Text(error).foregroundStyle(.red) } header: { Text("Not saved") }
                     }
                 }
             }
@@ -91,15 +142,10 @@ private struct ShareView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: cancel) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        var edited = item
-                        edited.text = text.isEmpty ? nil : text
-                        save(edited)
-                    }
-                    .disabled(text.isEmpty && item.url == nil)
+                    Button("Save", action: save)
+                        .disabled(model.isLoading || (model.text.isEmpty && model.item.url == nil))
                 }
             }
         }
-        .onAppear { text = item.text ?? "" }
     }
 }

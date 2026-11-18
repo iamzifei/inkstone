@@ -45,6 +45,50 @@
         }
       }
     },
+    "Not saved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not saved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未保存"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未儲存"
+          }
+        }
+      }
+    },
+    "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 Inkstone 并选择一个仓库：在那之前，你分享的内容会先在这里等着，之后放进仓库的 Inbox 笔记。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開 Inkstone 並選擇一個儲存庫：在那之前，你分享的內容會先在這裡等著，之後放進儲存庫的 Inbox 筆記。"
+          }
+        }
+      }
+    },
     "Save": {
       "localizations": {
         "en": {
