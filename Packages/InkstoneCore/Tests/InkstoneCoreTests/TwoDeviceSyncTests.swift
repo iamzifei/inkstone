@@ -23,6 +23,17 @@ extension GitHubClientTests {
         private var files: [String: Data] = [:]
 
         var paths: [String] { lock.withLock { files.keys.sorted() } }
+        /// Scenario switches for the data-loss suite (2026-11-18).
+        /// `truncated`: the tree listing says GitHub cut it short.
+        /// `failWritesWith`: every upload/delete answers this status.
+        var truncated = false
+        var failWritesWith: Int?
+
+        /// Puts a file on the remote directly, as another client would.
+        func put(_ path: String, _ text: String) { lock.withLock { files[path] = Data(text.utf8) } }
+        func contents(_ path: String) -> String? {
+            lock.withLock { files[path].map { String(decoding: $0, as: UTF8.self) } }
+        }
 
         /// The request body, whichever way URLSession chose to carry it.
         ///
@@ -64,7 +75,7 @@ extension GitHubClientTests {
                         return #"{"path":"\#(escaped)","type":"blob","sha":"\#(gitBlobSHA(value))","size":\#(value.count)}"#
                     }.joined(separator: ",")
                 }
-                return reply(200, Data(#"{"tree":[\#(entries)]}"#.utf8))
+                return reply(200, Data(#"{"tree":[\#(entries)],"truncated":\#(truncated)}"#.utf8))
             }
 
             if path.contains("git/blobs") {
@@ -82,6 +93,9 @@ extension GitHubClientTests {
                 let body = (try? JSONSerialization.jsonObject(with: Self.body(of: request)))
                     as? [String: Any] ?? [:]
 
+                if let status = failWritesWith {
+                    return reply(status, Data(#"{"message":"Bad credentials"}"#.utf8))
+                }
                 if request.httpMethod == "DELETE" {
                     lock.withLock { _ = files.removeValue(forKey: filePath) }
                     return reply(200, Data(#"{"commit":{"sha":"deadbeef"}}"#.utf8))
@@ -97,7 +111,7 @@ extension GitHubClientTests {
         }
     }
 
-    private func client(_ remote: FakeRemote) -> GitHubClient {
+    static func client(_ remote: FakeRemote) -> GitHubClient {
         StubProtocol.handler = { request in remote.handle(request) }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
@@ -123,6 +137,8 @@ extension GitHubClientTests {
     private func read(_ name: String, in vault: URL) -> String? {
         try? String(contentsOf: vault.appending(path: name), encoding: .utf8)
     }
+
+    private func client(_ remote: FakeRemote) -> GitHubClient { Self.client(remote) }
 
     private func engine(_ vault: URL, _ remote: FakeRemote) -> SyncEngine {
         SyncEngine(client: client(remote), vaultRoot: vault, policy: SyncFilePolicy())

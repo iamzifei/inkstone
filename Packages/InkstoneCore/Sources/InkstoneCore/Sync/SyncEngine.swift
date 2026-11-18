@@ -234,12 +234,16 @@ public struct SyncEngine: Sendable {
 
         progress?(SyncProgress(phase: .listing, message: localized("Listing remote files…")))
         let remote = try await client.listFiles()
-        let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
+        // Not `uniqueKeysWithValues`: Swift compares strings by canonical
+        // equivalence, so a repository holding both the NFC and NFD spelling of
+        // one name (written by different operating systems) has two entries
+        // that are one key — and that initialiser traps, on every run.
+        let remoteByPath = Dictionary(remote.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
 
         progress?(SyncProgress(phase: .scanning, message: localized("Scanning vault…")))
         var state = SyncState.load(from: vaultRoot)
         let scanStarted = Date.now
-        let (local, excludedLocally, stamps) = localFiles(
+        var (local, excludedLocally, stamps) = localFiles(
             cache: state.hashes ?? [:],
             trustBefore: state.hashesRecordedAt?.addingTimeInterval(-3) ?? .distantPast
         )
@@ -256,11 +260,26 @@ public struct SyncEngine: Sendable {
         // So the whole vault's worth of notes hangs on one listing being right.
         // Stop instead, and say so. A sync that refuses to run is an annoyance; a
         // sync that empties the vault is the end of the vault.
-        if remote.isEmpty, !state.blobs.isEmpty {
+        //
+        // Confirmable like any other mass deletion: when the last file really
+        // was deleted on another device, refusing forever wedged every other one.
+        if remote.isEmpty, !state.blobs.isEmpty, !confirmingLargeDeletion {
             throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
         }
 
+        // A synced file that is missing locally because iCloud evicted it (iOS
+        // leaves a hidden `.name.icloud` stub, which the scan skips) is not a
+        // deletion. Without this the stub's absence from the scan was read as
+        // "the user deleted it" and the note was removed from GitHub.
+        for path in state.blobs.keys where local[path] == nil && isEvictedFromICloud(path) {
+            excludedLocally.insert(path)
+        }
+
+        // Hidden paths take no part in sync. The local scan skips them, but the
+        // remote listing does not: a `.github/…` file was downloaded, never seen
+        // by the next scan, and so deleted from GitHub as a local deletion.
         let paths = Set(local.keys).union(remoteByPath.keys).union(state.blobs.keys)
+            .filter(Self.isSyncablePath)
         let entries = paths.sorted().map { path in
             SyncEntry(
                 path: path,
@@ -354,8 +373,18 @@ public struct SyncEngine: Sendable {
         // because it means something different: not "these files could not be
         // synced" but "this run was cut short and the rest has not been tried".
         var interrupted = false
+        // Case-folded paths written into the vault by this run. On a
+        // case-insensitive volume, downloading `Note.md` replaces `note.md`; a
+        // later `deleteLocal note.md` in the same run would then delete the
+        // note just downloaded (a case-only rename on another device).
+        var writtenFolded: Set<String> = []
+        let localFolded = Dictionary(local.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { first, _ in first })
 
         for (index, action) in actions.enumerated() {
+            // Progress is saved as it goes, not only at the end: a run killed
+            // part-way (iOS ends background tasks abruptly) otherwise lost the
+            // record of everything it had moved.
+            if index > 0, index % 50 == 0 { try? state.save(to: vaultRoot) }
             // Cancellation used to be invisible here. The network calls throw on
             // cancellation, the `catch` below treats that like any other
             // per-file failure, and the loop carries on — so an expired
@@ -370,8 +399,20 @@ public struct SyncEngine: Sendable {
 
             do {
                 switch action {
-                case .skip(_, let reason):
+                case .skip(let path, let reason):
                     if reason == .filtered { report.skipped += 1 }
+                    // Same content on both sides: record it as the base. Never
+                    // recording it meant a file both sides already had (a second
+                    // device joining, or an upload whose reply was lost) had no
+                    // base — so deleting it later read as "never synced" and the
+                    // next run downloaded it again.
+                    if reason == .unchanged {
+                        if let l = local[path], l == remoteByPath[path]?.sha {
+                            state.blobs[path] = l
+                        } else if local[path] == nil, remoteByPath[path] == nil {
+                            state.blobs.removeValue(forKey: path)
+                        }
+                    }
 
                 case .upload(let path):
                     progress?(SyncProgress(
@@ -393,7 +434,23 @@ public struct SyncEngine: Sendable {
                     ))
                     guard let file = remoteByPath[path] else { break }
                     let data = try await client.download(sha: file.sha, path: path)
+                    // Edited since the scan (autosave during a long run)? Then
+                    // overwriting would lose the typing: keep it, and save the
+                    // remote version beside it as a conflict copy.
+                    // Compared with what the scan saw under any case: on a
+                    // case-insensitive volume `Note.md` reads the `note.md` the
+                    // scan listed.
+                    let scanned = local[path] ?? localFolded[path.lowercased()]
+                    if let current = try? Data(contentsOf: fileURL(path)), gitBlobSHA(current) != scanned {
+                        let copy = uniqueConflictPath(SyncPlanner.conflictFilename(for: path, timestamp: stamp))
+                        try write(data, to: copy)
+                        writtenFolded.insert(copy.lowercased())
+                        state.blobs[path] = file.sha
+                        report.conflicted.append(path)
+                        break
+                    }
                     try write(data, to: path)
+                    writtenFolded.insert(path.lowercased())
                     state.blobs[path] = file.sha
                     report.downloaded.append(path)
 
@@ -410,7 +467,25 @@ public struct SyncEngine: Sendable {
                     progress?(SyncProgress(
                         message: localized("Removing \(path)…"), completed: index, total: actions.count
                     ))
-                    try? FileManager.default.removeItem(at: fileURL(path))
+                    if writtenFolded.contains(path.lowercased()) {
+                        // The same file under another case, just written by this
+                        // run: only the old name's record goes.
+                        state.blobs.removeValue(forKey: path)
+                        break
+                    }
+                    // Deleted only if it is still the version that was synced.
+                    // An edit since the scan (autosave during a long run) is
+                    // kept and uploaded on the next run instead.
+                    let url = fileURL(path)
+                    if let current = try? Data(contentsOf: url), gitBlobSHA(current) != state.blobs[path] {
+                        report.conflicted.append(path)
+                        break
+                    }
+                    // `try`, not `try?`: a delete that failed and was recorded as
+                    // done made the file look new, and it was uploaded again.
+                    if FileManager.default.fileExists(atPath: url.path) {
+                        try FileManager.default.removeItem(at: url)
+                    }
                     state.blobs.removeValue(forKey: path)
                     report.deletedLocally.append(path)
 
@@ -422,11 +497,22 @@ public struct SyncEngine: Sendable {
                         message: localized("Conflict on \(path)…"), completed: index, total: actions.count
                     ))
                     guard let file = remoteByPath[path] else {
-                        report.conflicted.append(path)
+                        // Edited here, deleted there. The edit is the version
+                        // that survives: upload it. Reporting a conflict and
+                        // doing nothing repeated the same conflict every run and
+                        // the edit never reached the other devices.
+                        let data = try Data(contentsOf: fileURL(path))
+                        let sha = try await client.upload(
+                            path: path, contents: data, sha: nil,
+                            message: "Restore \(path) from Inkstone (edited after deletion)")
+                        state.blobs[path] = sha
+                        report.uploaded.append(path)
                         break
                     }
                     let data = try await client.download(sha: file.sha, path: path)
-                    try write(data, to: SyncPlanner.conflictFilename(for: path, timestamp: stamp))
+                    let copy = uniqueConflictPath(SyncPlanner.conflictFilename(for: path, timestamp: stamp))
+                    try write(data, to: copy)
+                    writtenFolded.insert(copy.lowercased())
                     report.conflicted.append(path)
 
                     // Record the remote's blob as the base, or this conflict is
@@ -447,6 +533,15 @@ public struct SyncEngine: Sendable {
                     state.blobs[path] = file.sha
                 }
             } catch {
+                // Errors that will fail every remaining request too: stop, keep
+                // what was done, and fail the run. Carrying on turned an expired
+                // token into one failure per file and a run reported as synced.
+                if let github = error as? GitHubError, github.endsRun {
+                    state.repository = client.configuration.repository
+                    state.branch = client.configuration.branch
+                    try? state.save(to: vaultRoot)
+                    throw github
+                }
                 report.failures.append((path: pathOf(action), message: error.localizedDescription))
             }
         }
@@ -462,7 +557,7 @@ public struct SyncEngine: Sendable {
         // `lastSyncedAt` is the exception. It answers "did a sync complete", and
         // stamping it after a run that was cut off two thirds of the way through
         // is how a half-synced vault reports itself as up to date.
-        if !interrupted { state.lastSyncedAt = Date() }
+        if !interrupted, report.failures.isEmpty { state.lastSyncedAt = Date() }
         try? state.save(to: vaultRoot)
 
         if interrupted { throw CancellationError() }
@@ -584,7 +679,13 @@ public struct SyncEngine: Sendable {
                 stamps[relative] = old
                 continue
             }
-            guard let data = try? Data(contentsOf: url) else { continue }
+            // Unreadable (permissions, a file another app holds, a placeholder)
+            // is "not carried this run", never "deleted": skipping it silently
+            // made it look deleted, and the deletion was sent to GitHub.
+            guard let data = try? Data(contentsOf: url) else {
+                excluded.insert(relative)
+                continue
+            }
 
             let sha = gitBlobSHA(data)
             result[relative] = sha
@@ -619,7 +720,34 @@ public struct SyncEngine: Sendable {
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        adoptCase(of: url)
         try data.write(to: url, options: .atomic)
+    }
+
+    /// On a case-insensitive volume, writing `Note.md` over an existing
+    /// `note.md` keeps the old spelling on disk. The next scan then reported
+    /// `note.md`, uploaded it and deleted `Note.md` from GitHub — undoing the
+    /// rename another device made. Rename the existing file to the exact
+    /// spelling first (through a temporary name, since a case-only rename is a
+    /// no-op on some volumes).
+    private func adoptCase(of url: URL) {
+        let folder = url.deletingLastPathComponent()
+        let name = url.lastPathComponent
+        guard let listing = try? FileManager.default.contentsOfDirectory(atPath: folder.path),
+              !listing.contains(name),
+              let variant = listing.first(where: { $0.lowercased() == name.lowercased() })
+        else { return }
+        let temporary = folder.appending(path: ".inkstone-rename-\(UUID().uuidString)")
+        do {
+            try FileManager.default.moveItem(at: folder.appending(path: variant), to: temporary)
+            try FileManager.default.moveItem(at: temporary, to: url)
+        } catch {
+            // Put it back if the second step failed; the write that follows
+            // still lands on the right content.
+            if FileManager.default.fileExists(atPath: temporary.path) {
+                try? FileManager.default.moveItem(at: temporary, to: folder.appending(path: variant))
+            }
+        }
     }
 
     private func pathOf(_ action: SyncAction) -> String {
@@ -630,9 +758,49 @@ public struct SyncEngine: Sendable {
         }
     }
 
-    private func timestamp() -> String {
+    private func timestamp() -> String { Self.conflictTimestamp(Date()) }
+
+    /// Whether a vault-relative path takes part in sync at all: no hidden
+    /// component (except the root `.gitignore`, which travels on purpose) and
+    /// none of the folders the local scan never enters.
+    static func isSyncablePath(_ path: String) -> Bool {
+        if path == SyncFilePolicy.ignoreFileName { return true }
+        return !path.split(separator: "/").contains { part in
+            part.hasPrefix(".") || excludedComponents.contains(String(part))
+        }
+    }
+
+    /// iOS replaces an evicted iCloud file with a hidden `.<name>.icloud` stub.
+    private func isEvictedFromICloud(_ path: String) -> Bool {
+        let url = fileURL(path)
+        let stub = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).icloud")
+        if FileManager.default.fileExists(atPath: stub.path) { return true }
+        let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus
+        return status != nil && status != .current
+    }
+
+    /// A conflict copy name that does not overwrite an earlier copy made in the
+    /// same second.
+    private func uniqueConflictPath(_ path: String) -> String {
+        guard FileManager.default.fileExists(atPath: fileURL(path).path) else { return path }
+        let ns = path as NSString
+        let ext = ns.pathExtension
+        let stem = ns.deletingPathExtension
+        for n in 2...99 {
+            let candidate = ext.isEmpty ? "\(stem) \(n)" : "\(stem) \(n).\(ext)"
+            if !FileManager.default.fileExists(atPath: fileURL(candidate).path) { return candidate }
+        }
+        return path
+    }
+
+    /// The date in a conflict copy's name. POSIX locale and Gregorian calendar:
+    /// without them a device set to Arabic or a Hijri calendar named copies in
+    /// other digits and another year, so two devices could not even sort them.
+    static func conflictTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HHmm"
-        return formatter.string(from: Date())
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd HHmmss"
+        return formatter.string(from: date)
     }
 }
