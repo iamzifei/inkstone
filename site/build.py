@@ -465,6 +465,28 @@ def features(page: Page) -> str:
 </section>"""
 
 
+def duo(page: Page) -> str:
+    """iPhone Duo: one recording through its four shapes (scripts/record-duo-demo.sh)."""
+    d = page.data
+    up = page.up
+    return f"""<section class="duo" id="duo" aria-labelledby="duo-h">
+  <div class="rule-head">
+    <h2 id="duo-h">{e(get(d, 'duo.title'))}</h2>
+    <p class="rule-sub">{e(get(d, 'duo.sub'))}</p>
+  </div>
+  <figure class="film film-duo">
+    <div class="film-mat">
+      <video class="film-frame film-frame-duo" poster="{up}assets/video/duo-poster.webp" autoplay muted loop playsinline
+             preload="none" aria-label="{e(get(d, 'duo.video_alt'))}">
+        <source src="{up}assets/video/duo.webm" type="video/webm">
+        <source src="{up}assets/video/duo.mp4" type="video/mp4">
+      </video>
+    </div>
+    <figcaption>{e(get(d, 'duo.caption'))}</figcaption>
+  </figure>
+</section>"""
+
+
 def typography(page: Page) -> str:
     """The specimen. Set as a book page, because the claim is about book pages.
 
@@ -623,7 +645,7 @@ LANG_REDIRECT = """<script>
 
 def render(page: Page, by_slug: dict) -> str:
     body = "\n".join([
-        hero(page), creed(page), features(page), typography(page), specs(page),
+        hero(page), creed(page), features(page), duo(page), typography(page), specs(page),
     ])
     # One pass, over the assembled body only. Running it over the whole document
     # would put spans inside <title> and the JSON-LD, where they are text rather

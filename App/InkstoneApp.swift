@@ -636,6 +636,9 @@ struct InkstoneApp: App {
                     }
                     #endif
                     openLastVault()
+                    #if DEBUG
+                    DemoDirector.startIfRequested(workspace: workspace)
+                    #endif
                     seedDemoSyncBinding()
                     // A token saved before it could travel; move it onto iCloud
                     // Keychain so the other device does not ask for it again.

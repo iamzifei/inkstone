@@ -68,6 +68,11 @@ features:
       title: iCloud ou GitHub, et c’est vous qui décidez ce qui voyage
       body: Synchronisez par iCloud, ou poussez le coffre vers un dépôt GitHub — les conflits se tranchent une fois, au lieu de rester en double. Des filtres par type de fichier décident si les pièces jointes et les médias suivent, et le .gitignore du coffre est respecté.
       alt: 'Les réglages de synchronisation GitHub : choix du dépôt et de la branche, et interrupteurs par type de fichier.'
+duo:
+  title: "iPhone Duo : une note, quatre formes"
+  sub: "Fermé, c’est l’app iPhone. Ouvert, la barre latérale et la note côte à côte. Entrouvert, la note occupe un côté du pli, ses rétroliens, son plan et ses propriétés l’autre — rien n’est dessiné à cheval sur le pli."
+  video_alt: "Un enregistrement d’Inkstone sur iPhone Duo : la liste des notes sur l’écran extérieur, fermé ; la même note, ouvert, à côté de la barre latérale ; puis entrouvert comme un livre, l’inspecteur en page de droite ; puis à la verticale, l’inspecteur sous le pli."
+  caption: "Enregistré dans le simulateur iPhone Duo, iOS 27.2. Non monté, hormis les fondus."
 typography:
   title: Composer le chinois et le latin sur une même ligne
   sub: Le cas difficile, c’est un mot latin au milieu d’une phrase en han. Presque toutes les applications s’y trompent, d’une manière qu’on ne peut plus ignorer une fois qu’on l’a vue.

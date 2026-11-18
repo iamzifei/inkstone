@@ -28,6 +28,7 @@ Package.pins
 # running scripts/record-demo.sh. Only the encoded hero (site/assets/video) is
 # committed, because that is what gets served.
 assets/footage/
+assets/footage-duo/
 .playwright-mcp/
 __pycache__/
 .sparkle-tools/
