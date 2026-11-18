@@ -1,6 +1,6 @@
 What's new in 0.4
 
-• Templates: keep them in a folder (Templates, as in Obsidian) and insert one into the open note, with {{title}}, {{date}} and {{time}} filled in.
+• Templates: keep them in a folder (Templates by default) and insert one into the open note, with {{title}}, {{date}} and {{time}} filled in.
 • Export a note as a PDF (A4 pages) or a self-contained HTML file, from the More menu.
 • Command palette: every command, found by typing a few letters. In the More menu, or ⇧⌘P on a keyboard.
 • Notes in system search: titles and text are added to this device's search index, and a result opens the note. Can be turned off in Settings.

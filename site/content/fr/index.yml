@@ -66,7 +66,7 @@ features:
     sync:
       kicker: Deux machines
       title: iCloud ou GitHub, et c’est vous qui décidez ce qui voyage
-      body: 'Synchronisez par iCloud, ou poussez le coffre vers un dépôt GitHub. Un conflit n’écrase jamais rien : si les deux côtés ont modifié une note, l’autre version est gardée à côté de la vôtre comme copie de conflit. Des filtres par type de fichier décident si les pièces jointes et les médias suivent, et le .gitignore du coffre est respecté.'
+      body: 'Synchronisez par iCloud, ou poussez le coffre vers un dépôt GitHub. Une fois le coffre synchronisé, un conflit n’écrase jamais rien : si les deux côtés ont modifié une note, l’autre version est gardée à côté de la vôtre comme copie de conflit. Des filtres par type de fichier décident si les pièces jointes et les médias suivent, et le .gitignore du coffre est respecté.'
       alt: 'Les réglages de synchronisation GitHub : choix du dépôt et de la branche, et interrupteurs par type de fichier.'
 duo:
   title: "iPhone Duo : une note, quatre formes"

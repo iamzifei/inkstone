@@ -66,7 +66,7 @@ features:
     sync:
       kicker: Two machines
       title: iCloud or GitHub, and you choose what travels
-      body: 'Sync through iCloud, or push the vault to a GitHub repository. A conflict never overwrites anything: when both sides changed a note, the other version is kept beside yours as a conflict copy. Per-type filters decide whether attachments and media go with it, and the vault''s own .gitignore is respected.'
+      body: 'Sync through iCloud, or push the vault to a GitHub repository. Once a vault is syncing, a conflict never overwrites anything: when both sides changed a note, the other version is kept beside yours as a conflict copy. Per-type filters decide whether attachments and media go with it, and the vault''s own .gitignore is respected.'
       alt: 'The GitHub sync settings: repository and branch pickers, and per-file-type switches deciding what is synchronised.'
 duo:
   title: "iPhone Duo: one note, four shapes"

@@ -66,7 +66,7 @@ features:
     sync:
       kicker: Dos máquinas
       title: iCloud o GitHub, y tú decides qué viaja
-      body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub. Un conflicto nunca sobrescribe nada: si ambos lados cambiaron una nota, la otra versión se guarda junto a la tuya como copia en conflicto. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
+      body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub. Una vez que la bóveda se sincroniza, un conflicto nunca sobrescribe nada: si ambos lados cambiaron una nota, la otra versión se guarda junto a la tuya como copia en conflicto. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
       alt: 'Los ajustes de sincronización con GitHub: selectores de repositorio y rama, e interruptores por tipo de archivo.'
 duo:
   title: "iPhone Duo: una nota, cuatro formas"
