@@ -146,3 +146,33 @@ struct IncrementalScanPerformanceTests {
         #expect(median(incremental) * 3 < median(full))
     }
 }
+
+/// Review 2026-11-18: constructs whose meaning comes from outside the window,
+/// found by targeted probes (random edits had not hit them).
+@Suite("Incremental scan, edge cases")
+struct IncrementalScanEdgeCaseTests {
+    static let padding = String(repeating: "Padding paragraph with some words in it.\n\n", count: 60)
+
+    func check(_ before: String, _ after: String) {
+        var scanner = CachingScanner()
+        _ = scanner.tokens(for: before)
+        #expect(scanner.tokens(for: after) == SyntaxScanner().scan(after), "\(after.prefix(80).debugDescription)")
+    }
+
+    @Test(arguments: ["<!--\na\n\ny\n\nz\n-->\n", "<pre>\na\n\ny\n\nz\n</pre>\n", "<script>\na\n\ny\n\nz\n</script>\n"])
+    func htmlBlockSpanningBlankLines(_ block: String) {
+        let before = Self.padding + block + Self.padding
+        check(before, before.replacingOccurrences(of: "\ny\n", with: "\n# y\n"))
+    }
+
+    @Test func referenceDefinitionOutsideTheWindow() {
+        let before = "[x]: http://a\n\n" + Self.padding + "see [x] here\n\n" + Self.padding
+        check(before, before.replacingOccurrences(of: "see [x] here", with: "see [x]! here"))
+    }
+
+    @Test(arguments: ["\u{00A0}", "\u{2028}", "\u{2029}", "\u{0085}"])
+    func unusualLineBreaksAndBlankLookalikes(_ ch: String) {
+        let before = Self.padding + "**bold\n\(ch)\nbold\n\n" + Self.padding
+        check(before, before.replacingOccurrences(of: "\nbold\n\n", with: "\nbold**\n\n"))
+    }
+}

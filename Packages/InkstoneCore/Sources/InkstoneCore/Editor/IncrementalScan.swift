@@ -20,14 +20,17 @@ enum IncrementalScan {
         let o = old as NSString, n = new as NSString
         let oldLength = o.length, newLength = n.length
         guard oldLength > 2_000 else { return nil }   // small notes: a full scan is already cheap
+        // UTF-16 units copied out once: comparing through NSString's
+        // character(at:) cost more than the scan it saves on a long note.
+        let ou = Array(old.utf16), nu = Array(new.utf16)
+        guard isEligible(ou), isEligible(nu) else { return nil }
 
         // The changed span: common prefix and suffix, in UTF-16 units.
         var prefix = 0
         let limit = min(oldLength, newLength)
-        while prefix < limit, o.character(at: prefix) == n.character(at: prefix) { prefix += 1 }
+        while prefix < limit, ou[prefix] == nu[prefix] { prefix += 1 }
         var suffix = 0
-        while suffix < limit - prefix,
-              o.character(at: oldLength - 1 - suffix) == n.character(at: newLength - 1 - suffix) { suffix += 1 }
+        while suffix < limit - prefix, ou[oldLength - 1 - suffix] == nu[newLength - 1 - suffix] { suffix += 1 }
         let delta = newLength - oldLength
 
         // Widen to whole top-level blocks, in the new text.
@@ -60,6 +63,55 @@ enum IncrementalScan {
         return before + window + after.map { shift($0, by: delta) }
     }
 
+    /// A note in which a block can reach across blank lines from outside any
+    /// window, or where NSString and cmark disagree on what a line is, is
+    /// always scanned in full:
+    /// - a line starting (after up to three spaces) with `<` — an HTML block,
+    ///   which runs on past blank lines (`<!--`, `<pre>`, `<script>` …);
+    /// - a line starting with `[label]:` — a reference definition, which gives
+    ///   meaning to `[label]` anywhere in the note;
+    /// - U+2028, U+2029 or U+0085, which NSString treats as line breaks and
+    ///   cmark does not.
+    /// One pass over the UTF-16 units, no allocation.
+    static func isEligible(_ text: [UInt16]) -> Bool {
+        let length = text.count
+        var i = 0
+        var atLineStart = true
+        var spaces = 0
+        while i < length {
+            let c = text[i]
+            switch c {
+            case 0x2028, 0x2029, 0x0085:
+                return false
+            case 0x0A, 0x0D:
+                atLineStart = true; spaces = 0
+            case 0x20 where atLineStart && spaces < 3:
+                spaces += 1
+            case 0x3C where atLineStart: // <
+                return false
+            case 0x5B where atLineStart: // [ — a definition if "]:" follows on this line
+                var j = i + 1
+                while j < length {
+                    let d = text[j]
+                    if d == 0x0A || d == 0x0D { break }
+                    if d == 0x5D, j + 1 < length, text[j + 1] == 0x3A { return false }
+                    j += 1
+                }
+                atLineStart = false
+            default:
+                atLineStart = false
+            }
+            i += 1
+        }
+        return true
+    }
+
+    /// cmark's blank line: nothing but spaces and tabs. (A no-break space is
+    /// not blank there, though `whitespacesAndNewlines` says it is.)
+    private static func isBlank(_ line: String) -> Bool {
+        line.unicodeScalars.allSatisfy { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" }
+    }
+
     /// Text whose meaning can reach outside its own blocks.
     private static let reachesOutside = ["```", "~~~", "$$", "%%", "<", "]:", "[^", "[TOC]", "[toc]"]
 
@@ -75,7 +127,7 @@ enum IncrementalScan {
         while position > 0 {
             let previousLineStart = lineStart(of: position - 1, in: text)
             let previousLine = text.substring(with: NSRange(location: previousLineStart, length: position - previousLineStart))
-            if previousLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, startsTopLevel(at: position, in: text) {
+            if isBlank(previousLine), startsTopLevel(at: position, in: text) {
                 return position
             }
             position = previousLineStart
@@ -91,7 +143,7 @@ enum IncrementalScan {
         while position < text.length {
             let end = lineEnd(of: position, in: text)
             let line = text.substring(with: NSRange(location: position, length: end - position))
-            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if isBlank(line) {
                 sawBlank = true
             } else if sawBlank, startsTopLevel(at: position, in: text) {
                 return position
