@@ -915,6 +915,12 @@ struct InkstoneApp: App {
             Button(localized("Save")) { workspace.saveAll() }
                 .keyboardShortcut("s")
             Divider()
+            Button(localized("Export as PDF…")) { workspace.exportActiveNote(as: .pdf) }
+                .keyboardShortcut("e", modifiers: [.command, .option, .shift])
+                .disabled(workspace.presentEditorFind == nil)
+            Button(localized("Export as HTML…")) { workspace.exportActiveNote(as: .html) }
+                .disabled(workspace.presentEditorFind == nil)
+            Divider()
             Button(workspace.isSyncing ? localized("Syncing…") : localized("Sync with GitHub")) {
                 Task { await workspace.sync() }
             }

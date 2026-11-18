@@ -113,6 +113,34 @@ final class Workspace {
         return found.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
+    /// A finished export waiting for the share sheet (iOS).
+    struct ExportedFile: Identifiable { let url: URL; var id: URL { url } }
+    var exportedFile: ExportedFile?
+    var exportFailure: String?
+
+    /// Exports the open note. On Mac asks where to save it; on iOS hands the
+    /// file to the share sheet (Save to Files, Mail, Print, …).
+    func exportActiveNote(as format: NoteExporter.Format) {
+        guard let note = activeTab?.url else { return }
+        Task { @MainActor in
+            do {
+                let file = try await NoteExporter.export(note, as: format, in: self)
+                #if os(macOS)
+                let panel = NSSavePanel()
+                panel.nameFieldStringValue = file.lastPathComponent
+                panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
+                guard panel.runModal() == .OK, let destination = panel.url else { return }
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.copyItem(at: file, to: destination)
+                #else
+                exportedFile = ExportedFile(url: file)
+                #endif
+            } catch {
+                exportFailure = error.localizedDescription
+            }
+        }
+    }
+
     /// Renders a template (Obsidian's {{title}} / {{date}} / {{time}}) for the
     /// open note and inserts it at the caret.
     func insertTemplate(_ url: URL) {

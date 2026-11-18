@@ -74,6 +74,18 @@ struct RootView: View {
         .sheet(isPresented: $workspace.isTemplatePickerPresented) {
             TemplatePickerView()
         }
+        #if os(iOS)
+        .sheet(item: $workspace.exportedFile) { file in
+            ShareSheet(items: [file.url]).ignoresSafeArea()
+        }
+        #endif
+        .alert("Export failed", isPresented: Binding(
+            get: { workspace.exportFailure != nil }, set: { if !$0 { workspace.exportFailure = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(workspace.exportFailure ?? "")
+        }
         #if os(macOS)
         .sheet(isPresented: $workspace.isQuickRewritePresented) {
             // Guarded on both: the menu item is disabled without a selection,
@@ -260,10 +272,18 @@ struct RootView: View {
                 } label: {
                     Label("Find in Note", systemImage: "doc.text.magnifyingglass")
                 }
-                Button {
-                    workspace.isTemplatePickerPresented = true
+                Menu {
+                    Button("Insert Template…", systemImage: "doc.on.doc") {
+                        workspace.isTemplatePickerPresented = true
+                    }
+                    Button("Export as PDF…", systemImage: "doc.richtext") {
+                        workspace.exportActiveNote(as: .pdf)
+                    }
+                    Button("Export as HTML…", systemImage: "chevron.left.forwardslash.chevron.right") {
+                        workspace.exportActiveNote(as: .html)
+                    }
                 } label: {
-                    Label("Insert Template…", systemImage: "doc.on.doc")
+                    Label("More", systemImage: "ellipsis.circle")
                 }
             }
             #endif
