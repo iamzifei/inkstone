@@ -54,6 +54,12 @@ DOWNLOAD = f"{REPO}/releases/latest/download/Inkstone.dmg"
 # download button, so it is offered beside it rather than instead of it.
 BREW = "brew install --cask iamzifei/tap/inkstone"
 
+# The iPhone/iPad app ("Inkstone Notes" on the store). Verified in App Store
+# Connect and the public lookup API on 2026-11-18: iOS 0.1.1, free, iOS 26+,
+# live in us/au/gb/jp/cn/tw. The store link without a country redirects to the
+# visitor's own storefront.
+APPSTORE = "https://apps.apple.com/app/id6803462651"
+
 # The date the sitemap reports as <lastmod>. A constant rather than today's
 # date: `build.py --check` in CI must produce byte-identical output on any day,
 # and a clock in the build would fail that check every morning. Bump it when the
@@ -269,6 +275,12 @@ def cta(page: Page, primary: bool = True) -> str:
     return f'<a class="{cls}" href="{e(href)}">{e(label)}</a>'
 
 
+def appstore(page: Page) -> str:
+    """The iPhone/iPad app, offered beside the Mac download."""
+    return (f'<a class="btn btn-quiet" href="{e(APPSTORE)}" rel="noopener">'
+            f'{e(get(page.data, "cta.appstore"))}</a>')
+
+
 def brew(page: Page) -> str:
     """The Homebrew alternative, set as a quiet line under the download buttons.
 
@@ -394,6 +406,7 @@ def hero(page: Page) -> str:
   <p class="hero-lede">{e(get(d, 'hero.lede'))}</p>
   <div class="hero-actions">
     {cta(page)}
+    {appstore(page)}
     <a class="btn btn-quiet" href="#features">{e(get(d, 'cta.tour'))}</a>
   </div>
   {brew(page)}
@@ -498,6 +511,7 @@ def specs(page: Page) -> str:
   <div class="closer reveal">
     <p class="closer-line">{e(get(d, 'specs.closer'))}</p>
     <div class="hero-actions">{cta(page)}
+      {appstore(page)}
       <a class="btn btn-quiet" href="{KOFI}" rel="noopener">{e(get(d, 'cta.kofi'))}</a></div>
     {brew(page)}
   </div>
@@ -514,10 +528,9 @@ def json_ld(page: Page) -> str:
         "name": "Inkstone",
         "alternateName": "墨砚",
         "applicationCategory": "ProductivityApplication",
-        # The downloadable build is the Mac one, so that is what the offer
-        # describes. The binary is universal (arm64 + x86_64, checked with lipo
-        # on the 0.2.2 release).
-        "operatingSystem": "macOS 26.0 or later",
+        # Mac: the DMG below, a universal binary (arm64 + x86_64, checked with
+        # lipo on the 0.2.2 release). iPhone/iPad: the App Store link in sameAs.
+        "operatingSystem": "macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later",
         "processorRequirement": "Apple silicon or Intel (universal binary)",
         "softwareVersion": app_version(),
         "url": page.url,
@@ -527,6 +540,8 @@ def json_ld(page: Page) -> str:
         "isAccessibleForFree": True,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
         "author": {"@type": "Person", "name": "James", "url": "https://github.com/iamzifei"},
+        # The same app on the App Store (iPhone and iPad) and its source.
+        "sameAs": [APPSTORE, REPO],
     }
     if HAS_RELEASE:
         app["downloadUrl"] = DOWNLOAD

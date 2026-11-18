@@ -63,6 +63,7 @@ Three decisions the rest follows from:
 
 - [Home](https://inkslab.app/): what the app is, with a screen recording.
 - [Download (DMG)](https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg)
+- [iPhone & iPad app on the App Store ("Inkstone Notes", free, iOS 26+)](https://apps.apple.com/app/id6803462651)
 - Homebrew: `brew install --cask iamzifei/tap/inkstone`
 - [Releases and changelog](https://github.com/iamzifei/inkstone/releases/latest)
 - [Source on GitHub](https://github.com/iamzifei/inkstone)

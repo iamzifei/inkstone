@@ -443,6 +443,25 @@ class HomebrewLine(BuiltSite):
                 self.assertNotIn(f'<p class="brew-label">{en_label}</p>', html)
 
 
+class AppStoreLink(BuiltSite):
+    """The iPhone/iPad app is offered beside the Mac download (added 2026-11-18:
+    the iOS app is live on the App Store, so a page claiming iOS 26 needs a way
+    to get it)."""
+
+    def test_every_home_page_links_the_app_store_twice(self) -> None:
+        for lang, meta in build.LANGS.items():
+            with self.subTest(lang=lang):
+                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+                self.assertEqual(html.count(f'href="{build.APPSTORE}"'), 2)
+
+    def test_structured_data_names_ios_and_the_store(self) -> None:
+        import json
+        html = (self.out / "index.html").read_text(encoding="utf-8")
+        ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S).group(1))
+        self.assertIn("iOS 26.0", ld["operatingSystem"])
+        self.assertIn(build.APPSTORE, ld["sameAs"])
+
+
 class SearchMetadata(BuiltSite):
     """Head tags, structured data and crawler files on the home pages."""
 
