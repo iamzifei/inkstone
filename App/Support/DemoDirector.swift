@@ -113,7 +113,7 @@ enum DemoDirector {
         case "spotlight-open":
             if let url = workspace.root?.appending(path: arg) { workspace.openSpotlightResult(SpotlightIndexer.identifier(for: url)) }
         case "intent-daily", "intent-new":
-            // Runs the real Shortcuts action, through its @Dependency.
+            // Runs the real Shortcuts action, through IntentHost.
             let log = Logger(subsystem: "com.orris.inkstone", category: "Demo")
             Task { @MainActor in
                 do {

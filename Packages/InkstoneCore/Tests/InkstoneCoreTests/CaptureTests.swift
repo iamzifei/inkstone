@@ -32,6 +32,16 @@ struct CaptureTests {
         #expect(Capture.noteName(from: String(repeating: "a", count: 300)).count == 120)
     }
 
+    // Review 2026-11-18.
+    @Test func noteNamesFitTheFileSystem() {
+        let cjk = Capture.noteName(from: String(repeating: "中", count: 150))
+        #expect(cjk.utf8.count <= 200)
+        #expect(cjk.count == 66)
+        #expect(Capture.noteName(from: ".hidden") == "hidden")
+        #expect(Capture.noteName(from: "..") == "Untitled")
+        #expect(Capture.noteName(from: "a\tb\nc") == "a-b-c")
+    }
+
     @Test func inboxEntryRoundTrips() throws {
         let item = Capture.SharedItem(text: "t", url: URL(string: "https://x.org"), title: "x")
         let data = try JSONEncoder().encode(item)

@@ -41,14 +41,23 @@ public enum Capture {
         return out
     }
 
-    /// A file name for a note titled `title`: path separators and characters
-    /// that are not allowed in file names (or break wiki links) replaced,
-    /// trimmed, at most 120 characters.
+    /// A file name for a note titled `title`: path separators, control
+    /// characters and characters not allowed in file names (or that break wiki
+    /// links) replaced; no leading dot (a hidden file); at most 120 characters
+    /// and 200 UTF-8 bytes (file names are limited to 255 bytes, and 120 CJK
+    /// characters are 360), leaving room for the extension and a " 2".
     public static func noteName(from title: String) -> String {
-        let forbidden = CharacterSet(charactersIn: "/\\:?*\"<>|#^[]")
-        let cleaned = String(title.unicodeScalars.map { forbidden.contains($0) ? "-" : Character($0) })
+        let forbidden = CharacterSet(charactersIn: "/\\:?*\"<>|#^[]").union(.controlCharacters).union(.newlines)
+        var cleaned = String(title.unicodeScalars.map { forbidden.contains($0) ? "-" : Character($0) })
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        while cleaned.hasPrefix(".") { cleaned.removeFirst() }
+        cleaned = cleaned.trimmingCharacters(in: .whitespaces)
         guard !cleaned.isEmpty else { return "Untitled" }
-        return String(cleaned.prefix(120))
+        var name = ""
+        for character in cleaned.prefix(120) {
+            guard name.utf8.count + String(character).utf8.count <= 200 else { break }
+            name.append(character)
+        }
+        return name
     }
 }
