@@ -73,7 +73,13 @@ struct DocumentScanner {
             into: &walk.tokens
         )
 
-        return walk.tokens.sorted { $0.range.location < $1.range.location }
+        // Stable: tokens at the same location keep the walk's order. An
+        // unstable sort made their order depend on the whole array, so the same
+        // block could come out differently in a full and a partial scan.
+        return walk.tokens.enumerated()
+            .sorted { $0.element.range.location != $1.element.range.location
+                ? $0.element.range.location < $1.element.range.location : $0.offset < $1.offset }
+            .map(\.element)
     }
 
     // MARK: - The walk
