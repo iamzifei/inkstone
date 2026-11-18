@@ -317,3 +317,23 @@ struct EngineDiffTests {
         }
     }
 }
+
+/// 0.4.0 plan B5: the legacy scanner (still the editor highlighter's engine)
+/// finds the same tags as the parser engine, which follows Obsidian.
+@Suite("Legacy tag parity")
+struct LegacyTagParityTests {
+    func tags(_ engine: SyntaxScanner.Engine, _ text: String) -> [String] {
+        SyntaxScanner(engine: engine).scan(text).compactMap { token in
+            if case .tag(let name) = token.kind { return "\(name)@\(token.range.location)" } else { return nil }
+        }.sorted()
+    }
+
+    @Test(arguments: [
+        "#a#b two tags", "……！#短 not a tag", "+#tag not a tag", "**#bold** tag", "==#mark== tag",
+        "~~#strike~~ tag", "[#bracket] tag", "(#paren) not", "a#b not", "#1 not", "#2024年 tag",
+        "x #a/b/c nested", "#tag。 cjk stop", "#tag, comma", "line\n#start", "&#x2014; entity",
+    ])
+    func sameTagsAsTheParser(_ text: String) {
+        #expect(tags(.legacy, text) == tags(.parser, text), "\(text)")
+    }
+}
