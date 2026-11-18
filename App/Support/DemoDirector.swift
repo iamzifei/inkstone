@@ -15,6 +15,8 @@ import InkstoneCore
 ///     heading The Measure       scroll the open note to a heading
 ///     inspector on|off          show / hide the inspector
 ///     switcher on|off           show / hide the quick switcher
+///     switcher <query>          open the quick switcher with a query typed
+///     graph                     open the graph (of the open note, or the vault)
 ///     back                      go back
 ///     close                     close the open note (back to the list on iPhone)
 ///
@@ -69,7 +71,11 @@ enum DemoDirector {
         case "inspector":
             workspace.isInspectorPresented = arg == "on"
         case "switcher":
-            workspace.isQuickSwitcherPresented = arg == "on"
+            // `switcher on|off`, or `switcher <query>` to open it with a query.
+            if arg != "on", arg != "off" { workspace.quickSwitcherSeed = arg }
+            workspace.isQuickSwitcherPresented = arg != "off"
+        case "graph":
+            workspace.open(.graph(focus: workspace.activeTab?.url))
         case "back":
             workspace.goBack()
         case "close":

@@ -80,7 +80,9 @@ trap 'rm -rf "$WORK"' EXIT
 unzip -q "$IPA" -d "$WORK"
 APP="$WORK/Payload/Inkstone.app"
 
-AUTHORITY="$(codesign -dvv "$APP" 2>&1 | awk -F= '/^Authority/ {print $2; exit}')"
+# No `exit` in awk: leaving early closes the pipe while codesign is still
+# writing, codesign dies of SIGPIPE, and pipefail turns that into exit 141.
+AUTHORITY="$(codesign -dvv "$APP" 2>&1 | awk -F= '/^Authority/ && !seen {print $2; seen=1}')"
 ENTS="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null | plutil -convert xml1 -o - -)"
 GTA="$(echo "$ENTS" | grep -A1 'get-task-allow' | tail -1 | tr -d ' \t')"
 ICLOUD_ENV="$(echo "$ENTS" | grep -A1 'icloud-container-environment' | tail -1 | sed 's/<[^>]*>//g' | tr -d ' \t')"

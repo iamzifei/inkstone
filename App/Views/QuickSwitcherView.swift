@@ -74,7 +74,15 @@ struct QuickSwitcherView: View {
         }
         .frame(minWidth: 440, minHeight: 380)
         .background(style.background)
-        .onAppear { isFieldFocused = true }
+        .onAppear {
+            isFieldFocused = true
+            #if DEBUG
+            if !workspace.quickSwitcherSeed.isEmpty {
+                query = workspace.quickSwitcherSeed
+                workspace.quickSwitcherSeed = ""
+            }
+            #endif
+        }
         // Also covers the first appearance, so the switcher opens showing the
         // whole vault rather than an empty list.
         .task(id: query) { await refresh() }

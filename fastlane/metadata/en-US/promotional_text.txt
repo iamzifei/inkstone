@@ -1,1 +1,1 @@
-Your notes stay plain Markdown files in a folder you choose — openable by any other editor, on any other device, long after this app is gone.
+New in 0.3: find and replace, iPhone Duo layouts, safer GitHub sync with a preview of what the next sync will do, and Markdown that matches Obsidian.
