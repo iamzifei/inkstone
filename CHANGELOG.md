@@ -7,6 +7,22 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.2.2 — 2026-11-18
+
+- **The welcome guide's screenshots match the guide's language.** Each of the six
+  pages now has an English, 简体中文 and 繁體中文 screenshot, and they swap as soon
+  as the language picker changes. They are not captures: `GuideShots` draws the
+  app's real views (`RootView`, the quick switcher, `SettingsView`) offscreen with
+  the in-app language forced, against a demo vault, so the sidebar, inspector,
+  graph labels and canvas cards are in that language. `scripts/make-guide-shots.sh`
+  reproduces them. About 770 KB for all 18.
+- **Chinese demo vaults** (`assets/demo-vault-zh`, `assets/demo-vault-zh-Hant`)
+  with Chinese file names, folders, tags and notes, for those renders.
+- **A canvas opened while its window was still settling no longer stays framed for
+  the wrong size.** The automatic fit is redone when the pane is resized, as long
+  as nobody has panned or zoomed. (Found while rendering the canvas page: it came
+  out tiny in a corner.)
+
 ## 0.2.1 — 2026-11-18
 
 - **The welcome guide now opens in front on first launch.** It was being opened

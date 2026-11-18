@@ -22,6 +22,11 @@ struct CanvasPane: View {
     @State private var connectingFrom: String?
     /// Viewport size, needed to centre the content; see fitToContent().
     @State private var viewportSize: CGSize = .zero
+    /// The zoom and pan the last automatic fit produced. While the view still
+    /// matches them nobody has moved it, so a change of viewport size should
+    /// re-fit rather than leave the content framed for the old size.
+    @State private var fittedZoom: CGFloat?
+    @State private var fittedPan: CGSize?
 
     var body: some View {
         GeometryReader { geometry in
@@ -34,8 +39,13 @@ struct CanvasPane: View {
                     let wasUnsized = viewportSize == .zero
                     viewportSize = size
                     // The first real size arrives after onAppear, so the initial
-                    // fit has to be redone once the viewport is actually known.
-                    if wasUnsized { fitToContent() }
+                    // fit has to be redone once the viewport is actually known —
+                    // and again if the pane is resized before anyone has panned
+                    // or zoomed, which is when the view is still the automatic
+                    // one. (A canvas opened while the window was still settling
+                    // stayed framed for a viewport a fraction of its real size.)
+                    let untouched = fittedZoom == zoom && fittedPan == pan
+                    if wasUnsized || untouched { fitToContent() }
                 }
                 .onDisappear(perform: save)
         }
@@ -313,6 +323,8 @@ struct CanvasPane: View {
             height: viewportSize.height / 2 - midY * zoom
         )
         panStart = pan
+        fittedZoom = zoom
+        fittedPan = pan
     }
 
     // MARK: - Persistence

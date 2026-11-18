@@ -4,8 +4,10 @@ import InkstoneCore
 
 /// One page of the welcome guide: a screenshot of the real app and two lines.
 private struct GuidePage {
-    /// Name of an image set in `Assets.xcassets` (cropped from the website's
-    /// demo-vault screenshots, so no personal notes are ever shown).
+    /// Base name of the screenshot. The image sets are `<base>-en`,
+    /// `<base>-zh-Hans` and `<base>-zh-Hant`, rendered from the app's real views
+    /// in each language (`scripts/make-guide-shots.sh`) against a demo vault, so
+    /// no personal notes are ever shown.
     let image: String
     let icon: String
     let title: LocalizedStringKey
@@ -36,27 +38,27 @@ struct OnboardingView: View {
 
     private static let pages: [GuidePage] = [
         GuidePage(
-            image: "GuideFolder", icon: "folder",
+            image: Onboarding.screenshots[0], icon: "folder",
             title: "Pick a folder for your notes",
             body: "A vault is just a folder of Markdown files — no database, no import. Choose one with Open Folder as Vault or create one in iCloud Drive, and switch vaults from the vault name at the top of the sidebar."),
         GuidePage(
-            image: "GuideLinks", icon: "link",
+            image: Onboarding.screenshots[1], icon: "link",
             title: "Connect notes with [[wikilinks]]",
             body: "Write [[Note name]] to link to another note. The inspector on the right lists every note that links back, along with tags, the outline and a small local graph."),
         GuidePage(
-            image: "GuideSwitcher", icon: "magnifyingglass",
+            image: Onboarding.screenshots[2], icon: "magnifyingglass",
             title: "Jump anywhere with ⌘O",
             body: "Press ⌘O and start typing to open a note by name. If nothing matches, press Return to create a note with that name."),
         GuidePage(
-            image: "GuideGraph", icon: "point.3.connected.trianglepath.dotted",
+            image: Onboarding.screenshots[3], icon: "point.3.connected.trianglepath.dotted",
             title: "See how it all connects",
             body: "Graph View (⇧⌘G) draws the notes around the one you have open and the links between them. Whole Vault Graph (⌥⌘G) shows everything at once."),
         GuidePage(
-            image: "GuideCanvas", icon: "rectangle.on.rectangle",
+            image: Onboarding.screenshots[4], icon: "rectangle.on.rectangle",
             title: "Think on a canvas",
             body: "New Canvas (⇧⌘N) opens a free-form board: drop in notes and text cards and connect them with arrows. It is saved as a standard .canvas file."),
         GuidePage(
-            image: "GuideSync", icon: "arrow.triangle.2.circlepath",
+            image: Onboarding.screenshots[5], icon: "arrow.triangle.2.circlepath",
             title: "Sync, and make it yours",
             body: "Keep a vault in iCloud Drive to sync it across your devices, or turn on GitHub sync in Settings (⌘,) › Sync. This guide is always under Help › Show Welcome Guide."),
     ]
@@ -68,7 +70,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             VStack(spacing: 18) {
                 if page == 0 { languagePicker }
-                Image(content.image)
+                Image("\(content.image)-\(effectiveLanguage.rawValue)")
                     .resizable()
                     .aspectRatio(1.6, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -116,12 +118,15 @@ struct OnboardingView: View {
     /// The language the picker shows: the saved choice, or — while the setting is
     /// still on "System" — the language the system's preferences resolve to, so
     /// the control never claims a language the guide is not in.
+    /// The language the guide is showing, which is also the screenshot set.
+    private var effectiveLanguage: AppLanguage {
+        let saved = workspace.settings.data.language
+        return saved == .system ? AppLanguage.resolving() : saved
+    }
+
     private var selectedLanguage: Binding<AppLanguage> {
         Binding(
-            get: {
-                let saved = workspace.settings.data.language
-                return saved == .system ? AppLanguage.resolving() : saved
-            },
+            get: { effectiveLanguage },
             // The app's own language setting, so the whole app follows — the
             // same value Settings > Language edits.
             set: { workspace.settings.data.language = $0 }

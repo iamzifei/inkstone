@@ -14,8 +14,14 @@ public enum Onboarding {
     /// people who had already dismissed or missed version 1 see it once more.
     public static let currentVersion = 2
 
-    /// Pages: folder, links, quick switcher, graph, canvas, sync.
-    public static let pageCount = 6
+    /// Base names of the pages' screenshots, in page order: folder, links, quick
+    /// switcher, graph, canvas, sync. Each exists as an image set per language,
+    /// `<name>-en`, `<name>-zh-Hans` and `<name>-zh-Hant`.
+    public static let screenshots = [
+        "GuideFolder", "GuideLinks", "GuideSwitcher", "GuideGraph", "GuideCanvas", "GuideSync",
+    ]
+
+    public static var pageCount: Int { screenshots.count }
 
     /// The stored value is the version last shown. It is 0 when the key is
     /// missing, which covers both a fresh install and an upgrade from 0.1.x, so

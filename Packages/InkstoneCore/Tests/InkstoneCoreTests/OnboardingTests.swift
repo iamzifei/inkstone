@@ -102,3 +102,31 @@ import Foundation
         #expect(localized("Stopped.") == "Stopped.")
     }
 }
+
+/// The guide asks the asset catalog for `<page>-<language>`; a missing image set
+/// renders as an empty box with no error, so check they are all there.
+@Suite struct OnboardingScreenshotTests {
+    private var catalog: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "App/Resources/Assets.xcassets")
+    }
+
+    @Test func everyPageHasAScreenshotInEveryLanguage() throws {
+        var total = 0
+        for language in ["en", "zh-Hans", "zh-Hant"] {
+            for name in Onboarding.screenshots {
+                let image = "\(name)-\(language)"
+                let file = catalog.appending(path: "\(image).imageset/\(image).jpg")
+                let size = try #require(
+                    try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int,
+                    "missing \(image)")
+                #expect(size > 5_000, "\(image) looks empty")
+                total += size
+            }
+        }
+        // The brief: keep the bundle growth modest.
+        #expect(total < 1_500_000, "guide screenshots are \(total) bytes")
+    }
+}

@@ -61,6 +61,7 @@ struct InkstoneApp: App {
         #if DEBUG && os(macOS)
         Self.runHighlightBenchmarkIfRequested()
         SmokeTest.runIfRequested()
+        GuideShots.runIfRequested()
         OnboardingView.dumpIfRequested()
         #endif
     }
