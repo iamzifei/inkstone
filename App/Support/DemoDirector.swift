@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import CoreGraphics
 import os
 import InkstoneCore
 
@@ -81,6 +82,23 @@ enum DemoDirector {
         case "insert-template":
             if let url = workspace.templateFiles.first(where: { $0.deletingPathExtension().lastPathComponent == arg }) {
                 workspace.insertTemplate(url)
+            }
+        case "export":
+            // export pdf|html — writes the open note's export and logs where,
+            // how big, and (PDF) how many pages.
+            guard let note = workspace.activeTab?.url else { break }
+            let format: NoteExporter.Format = arg == "html" ? .html : .pdf
+            let log = Logger(subsystem: "com.orris.inkstone", category: "Demo")
+            Task { @MainActor in
+                do {
+                    let file = try await NoteExporter.export(note, as: format, in: workspace)
+                    let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? -1
+                    var pages = -1
+                    if format == .pdf, let doc = CGPDFDocument(file as CFURL) { pages = doc.numberOfPages }
+                    log.info("demo export \(file.path, privacy: .public) bytes \(size) pages \(pages)")
+                } catch {
+                    log.error("demo export failed \(error.localizedDescription, privacy: .public)")
+                }
             }
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))

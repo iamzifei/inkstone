@@ -2,6 +2,7 @@
 import Foundation
 import AppKit
 import SwiftUI
+import PDFKit
 import InkstoneCore
 
 /// Drives the real app through a real vault, from the command line.
@@ -41,6 +42,7 @@ enum SmokeTest {
     private static func run() async {
         await checkFindBar()
         await checkTemplateInsert()
+        await checkPDFExport()
 
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "inkstone-smoke-\(UUID().uuidString)")
@@ -339,6 +341,26 @@ enum SmokeTest {
         try? await Task.sleep(for: .milliseconds(200))
         check("Insert Template puts the rendered template into the note", box.text.contains("## Smoke"))
         window.close()
+    }
+
+    /// Export as PDF on Mac goes through NSPrintOperation: a long note must
+    /// come out as several A4 pages, not one long one or an empty file.
+    private static func checkPDFExport() async {
+        let md = "# Long\n\n" + (1...15).map { "## Section \($0)\n\n" + String(repeating: "Lorem ipsum dolor sit amet. ", count: 12) }
+            .joined(separator: "\n\n")
+        let html = HTMLExporter.document(md, title: "Long", resolveAttachment: { _ in nil })
+        let url = FileManager.default.temporaryDirectory.appending(path: "inkstone-smoke-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            try await NoteExporter.printPDF(html, to: url)
+            let pdf = PDFDocument(url: url)
+            let pages = pdf?.pageCount ?? 0
+            let firstPage = pdf?.page(at: 0)?.string ?? ""
+            check("Export as PDF makes a paginated A4 PDF (\(pages) pages)", pages >= 3)
+            check("and the pages have the note's text on them", firstPage.contains("Section 1") && firstPage.contains("Lorem ipsum"))
+        } catch {
+            check("Export as PDF makes a paginated A4 PDF (\(error.localizedDescription))", false)
+        }
     }
 
     private static func waitUntil(

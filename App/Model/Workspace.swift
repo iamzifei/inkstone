@@ -113,6 +113,50 @@ final class Workspace {
         return found.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
+    /// A finished export waiting for the share sheet (iOS).
+    struct ExportedFile: Identifiable { let url: URL; var id: URL { url } }
+    var exportedFile: ExportedFile?
+    var exportFailure: String?
+    private(set) var isExporting = false
+
+    /// Exports the open note. On Mac asks where to save it; on iOS hands the
+    /// file to the share sheet (Save to Files, Mail, Print, …).
+    func exportActiveNote(as format: NoteExporter.Format) {
+        // Notes only (a canvas or an image tab has a URL too), one at a time.
+        guard !isExporting, let note = activeTab?.url, note.pathExtension.lowercased() == "md" else { return }
+        isExporting = true
+        Task { @MainActor in
+            defer { isExporting = false }
+            do {
+                let file = try await NoteExporter.export(note, as: format, in: self)
+                #if os(macOS)
+                defer { NoteExporter.discard(file) }
+                let panel = NSSavePanel()
+                panel.nameFieldStringValue = file.lastPathComponent
+                panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
+                guard panel.runModal() == .OK, let destination = panel.url else { return }
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    // Atomic: the old file is only gone once the new one is in
+                    // place. The sandbox may refuse the swap file it needs next
+                    // to the destination; then overwrite in place, which the
+                    // save panel's grant does cover.
+                    do {
+                        _ = try FileManager.default.replaceItemAt(destination, withItemAt: file)
+                    } catch {
+                        try Data(contentsOf: file).write(to: destination)
+                    }
+                } else {
+                    try FileManager.default.copyItem(at: file, to: destination)
+                }
+                #else
+                exportedFile = ExportedFile(url: file)   // discarded when the share sheet closes
+                #endif
+            } catch {
+                exportFailure = error.localizedDescription
+            }
+        }
+    }
+
     /// Renders a template (Obsidian's {{title}} / {{date}} / {{time}}) for the
     /// open note and inserts it at the caret.
     func insertTemplate(_ url: URL) {
