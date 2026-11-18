@@ -60,7 +60,10 @@ struct DevicePostureReader<Content: View>: View {
     }
 
     static func posture(in proxy: GeometryProxy, hingePartiallyOpen: Bool) -> DevicePosture {
-        #if os(iOS)
+        // `compiler(>=6.4)`: the hinge and reserved-region APIs exist only in
+        // the iOS 27.1+ SDK (Xcode 27). An older Xcode — CI's runners — builds
+        // the app without them, and the posture is simply always `.flat`.
+        #if os(iOS) && compiler(>=6.4)
         if #available(iOS 27.1, *) {
             let regions = proxy.reservedRegions(kind: .division)
             guard let crease = regions.first(where: \.isActive)?.frame, crease.width > 0 || crease.height > 0 else {
@@ -78,7 +81,7 @@ struct DevicePostureReader<Content: View>: View {
 
     #if DEBUG
     static func logRegions(_ proxy: GeometryProxy) {
-        #if os(iOS)
+        #if os(iOS) && compiler(>=6.4)
         if #available(iOS 27.1, *) {
             for kind in [ReservedRegion.Kind.division, .occlusion] {
                 for region in proxy.reservedRegions(kind: kind, options: .includeInactive) {
@@ -96,7 +99,7 @@ private struct HingeObserver: ViewModifier {
     @Binding var partiallyOpen: Bool
 
     func body(content: Content) -> some View {
-        #if os(iOS)
+        #if os(iOS) && compiler(>=6.4)
         if #available(iOS 27.1, *) {
             content.onHingeChange { _, new in
                 let isPartial = new.hinge?.status == .partiallyOpen
