@@ -52,6 +52,11 @@ final class NoteDocument {
     /// from `text` on every read, and the status line reads it in `body` — so
     /// every keystroke re-counted the whole note on the main thread.
     private(set) var wordCount = 0
+
+    /// Caret and scroll position from the last editor that showed this note.
+    /// Not observed: it changes on every caret move and scroll, and nothing
+    /// should redraw because of it — it is read only when an editor is built.
+    @ObservationIgnored var editorPosition: EditorPosition?
     private var countTask: Task<Void, Never>?
 
     private func scheduleWordCount() {
