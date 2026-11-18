@@ -81,6 +81,9 @@ final class Workspace {
     /// that wants to replace a selection — a rewrite sheet — has no business
     /// holding a text view.
     var replaceEditorSelection: ((String) -> Void)?
+    /// Opens the active editor's find bar (`true` = with replace). Set by the
+    /// editor; nil when no note is open.
+    var presentEditorFind: ((Bool) -> Void)?
     /// Set when ⌥⌘K should open the rewrite sheet.
     var isQuickRewritePresented = false
 
@@ -294,6 +297,7 @@ final class Workspace {
             bookmarks = Bookmarks.load(from: url)
 
             LaunchTiming.mark("vault open start")
+            loadLastSuccessfulSync()
             // Off the main thread: on a 9,894-note vault the scan held the
             // first window frozen for ~375 ms right after it appeared. The
             // sidebar fills in when it lands (`refreshTreeInBackground`).
@@ -759,6 +763,55 @@ final class Workspace {
     /// button as anything else: saying yes here is the irreversible one.
     var pendingLargeDeletion: SyncError?
 
+    /// Result of "Preview Next Sync": what a run would do, nothing done.
+    var syncPreview: SyncPreview?
+    var isPreviewingSync = false
+    var syncPreviewError: String?
+
+    func previewSync() async {
+        guard !isPreviewingSync, !isSyncing else { return }
+        guard let root, syncBinding.isConfigured, let client = gitHubClient() else {
+            syncPreviewError = GitHubError.notConfigured.localizedDescription
+            return
+        }
+        saveAll()
+        isPreviewingSync = true
+        defer { isPreviewingSync = false }
+        syncPreviewError = nil
+        do {
+            syncPreview = try await SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy).preview()
+        } catch {
+            syncPreview = nil
+            syncPreviewError = error.localizedDescription
+        }
+    }
+
+    /// When the last complete sync finished, from the vault's own sync record —
+    /// so it survives relaunches, unlike the in-memory status line. Stored, not
+    /// computed: sync.json holds thousands of hash stamps, and decoding it on
+    /// every redraw of Settings was real main-thread work.
+    private(set) var lastSuccessfulSync: Date?
+
+    private func loadLastSuccessfulSync() {
+        guard let root else { lastSuccessfulSync = nil; return }
+        let url = root.appending(path: ".inkstone/sync.json")
+        struct Stamp: Decodable { let lastSyncedAt: Date? }
+        lastSuccessfulSync = (try? Data(contentsOf: url))
+            .flatMap { try? JSONDecoder().decode(Stamp.self, from: $0) }?.lastSyncedAt
+    }
+
+    /// Conflict copies sync left in the vault (`… (conflict 2026-…).md`), each
+    /// waiting for the user to keep one version.
+    var conflictCopies: [URL] {
+        var found: [URL] = []
+        func walk(_ node: FileNode) {
+            if !node.isDirectory, node.name.contains(" (conflict ") { found.append(node.url) }
+            node.children?.forEach(walk)
+        }
+        tree.map(walk)
+        return found.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
     func sync(
         firstSyncDirection: FirstSyncDirection? = nil,
         confirmingLargeDeletion: Bool = false
@@ -782,6 +835,8 @@ final class Workspace {
 
         syncStatus = .running("Starting…")
         syncProgress = SyncProgress(message: "Starting…")
+        // A preview describes the state before this run; after it, it is stale.
+        syncPreview = nil
         pendingFirstSync = nil
         pendingLargeDeletion = nil
         do {
@@ -796,6 +851,7 @@ final class Workspace {
             }
             syncProgress = nil
             syncStatus = .finished(report)
+            loadLastSuccessfulSync()
             // Files may have arrived or vanished underneath us.
             refreshTree()
             reindex()
@@ -962,6 +1018,15 @@ final class Workspace {
     /// is unchanged since the current snapshot are reused (see
     /// `IndexBuilder.build(vaultRoot:reusing:)`). `full` re-parses everything —
     /// used when a vault is opened, as the consistency backstop.
+    /// Everything from scratch: the file tree and a full re-parse of every
+    /// note. The incremental index trusts modification dates, so a change that
+    /// kept its date (a restored backup, `rsync -t`) is only picked up by the
+    /// periodic full rebuild; this is the button for not waiting.
+    func rebuildIndex() {
+        refreshTree()
+        reindex(full: true)
+    }
+
     func reindex(full: Bool = false) {
         guard let root else { return }
         reindexTask?.cancel()

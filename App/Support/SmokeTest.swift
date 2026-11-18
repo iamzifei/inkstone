@@ -1,5 +1,7 @@
 #if DEBUG && os(macOS)
 import Foundation
+import AppKit
+import SwiftUI
 import InkstoneCore
 
 /// Drives the real app through a real vault, from the command line.
@@ -37,6 +39,8 @@ enum SmokeTest {
     }
 
     private static func run() async {
+        await checkFindBar()
+
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "inkstone-smoke-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -80,6 +84,31 @@ enum SmokeTest {
         check("index the note", workspace.index.notes[note] != nil)
         check("collect its tag", workspace.index.tagCounts["smoketag"] == 1)
         check("record the unresolved link", workspace.index.unresolved["Second Note"] == 1)
+
+        // --- rebuild index ---
+        // An edit that keeps its modification date (a restored backup, rsync -t)
+        // is invisible to the incremental index; Rebuild Index reads it.
+        do {
+            // An hour old, and indexed as such, so the incremental rule trusts it.
+            let old = Date.now.addingTimeInterval(-3600)
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: note.path)
+            workspace.rebuildIndex()
+            await waitUntil("the baseline rebuild") { !workspace.isIndexing }
+            try Data("# Smoke\n\nA #smoketag and a #restoredtag.\n".utf8).write(to: note)
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: note.path)
+            workspace.reindex()
+            await waitUntil("the incremental reindex") { !workspace.isIndexing }
+            let staleBefore = workspace.index.tagCounts["restoredtag"] == nil
+            workspace.rebuildIndex()
+            await waitUntil("the full rebuild") { workspace.index.tagCounts["restoredtag"] == 1 }
+            check("Rebuild Index reads an edit that kept its date",
+                  staleBefore && workspace.index.tagCounts["restoredtag"] == 1)
+            try Data(body.utf8).write(to: note)
+            workspace.rebuildIndex()
+            await waitUntil("the index settles") { workspace.index.tagCounts["restoredtag"] == nil }
+        } catch {
+            check("Rebuild Index reads an edit that kept its date", false)
+        }
 
         if let store = workspace.store {
             let hits = SearchEngine.fullText(query: "smoke", in: workspace.index, store: store)
@@ -243,6 +272,36 @@ enum SmokeTest {
     /// continuations, so every indexing check timed out against work that had
     /// never been given a chance to start. `Task.sleep` suspends the caller and
     /// lets it.
+    /// The editor's find bar opens. It did not exist at all before
+    /// 2026-11-18 — the Edit menu had no Find — so this drives the real editor
+    /// view in an off-screen window, asks it for find the way the menu does,
+    /// and checks AppKit reports the bar as visible.
+    private static func checkFindBar() async {
+        var finder: ((Bool) -> Void)?
+        var actions = EditorActions()
+        actions.provideFinder = { finder = $0 }
+        let host = NSHostingView(rootView: MarkdownEditorView(
+            text: .constant("Find me in this note.\n"), style: .fallback, mode: .livePreview, actions: actions))
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 640, height: 420),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        await waitUntil("the editor hands out find") { finder != nil }
+        check("the editor offers find", finder != nil)
+        finder?(false)
+        func scrollView(in view: NSView) -> NSScrollView? {
+            if let s = view as? NSScrollView, s.documentView is NSTextView { return s }
+            for sub in view.subviews { if let s = scrollView(in: sub) { return s } }
+            return nil
+        }
+        let scroll = scrollView(in: host)
+        check("find opens the find bar", scroll?.isFindBarVisible == true)
+        finder?(true)
+        check("find and replace keeps it open", scroll?.isFindBarVisible == true)
+        window.close()
+    }
+
     private static func waitUntil(
         _ what: String, timeout: TimeInterval = 5, _ condition: () -> Bool
     ) async {

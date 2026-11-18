@@ -65,6 +65,7 @@ struct InkstoneApp: App {
         SmokeTest.runIfRequested()
         GuideShots.runIfRequested()
         OnboardingView.dumpIfRequested()
+        SyncHealthSection.dumpIfRequested()
         #endif
     }
 
@@ -918,6 +919,27 @@ struct InkstoneApp: App {
             .disabled(!workspace.canSync)
         }
 
+        CommandGroup(after: .textEditing) {
+            Divider()
+            Button(localized("Find…")) { workspace.presentEditorFind?(false) }
+                .keyboardShortcut("f")
+                .disabled(workspace.presentEditorFind == nil)
+            Button(localized("Find and Replace…")) { workspace.presentEditorFind?(true) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(workspace.presentEditorFind == nil)
+            #if os(macOS)
+            // ⌘G only: ⇧⌘G (the usual Find Previous) is already the graph,
+            // and the find bar has its own previous / next buttons.
+            Button(localized("Find Next")) {
+                let sender = NSMenuItem()
+                sender.tag = NSTextFinder.Action.nextMatch.rawValue
+                NSApp.sendAction(#selector(NSResponder.performTextFinderAction(_:)), to: nil, from: sender)
+            }
+            .keyboardShortcut("g")
+            .disabled(workspace.presentEditorFind == nil)
+            #endif
+        }
+
         // Merged into the system View menu rather than declared as
         // `CommandMenu("View")`, which produced a *second* menu also called
         // "View" sitting next to the built-in one in the menu bar.
@@ -932,6 +954,8 @@ struct InkstoneApp: App {
             }
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(workspace.activeTab?.url == nil)
+            Button(localized("Rebuild Index")) { workspace.rebuildIndex() }
+                .disabled(workspace.root == nil || workspace.isIndexing)
             Button(localized("Calendar")) { workspace.open(.calendar) }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
             Button(localized("Search Vault")) {
