@@ -282,8 +282,11 @@ final class Workspace {
             bookmarks = Bookmarks.load(from: url)
 
             LaunchTiming.mark("vault open start")
-            refreshTree()
-            LaunchTiming.mark("file tree ready")
+            // Off the main thread: on a 9,894-note vault the scan held the
+            // first window frozen for ~375 ms right after it appeared. The
+            // sidebar fills in when it lands (`refreshTreeInBackground`).
+            tree = nil
+            refreshTreeInBackground()
             reindex(full: true)
             startWatching(url)
 
@@ -431,6 +434,10 @@ final class Workspace {
                 guard scanned != self.tree else { return }
                 self.tree = scanned
                 self.attachments = AttachmentIndex(tree: scanned)
+                // Open editors re-resolve embeds against the new attachment
+                // list — on vault open the tree can land after a note opened.
+                self.indexGeneration += 1
+                LaunchTiming.mark("file tree ready")
             }
         }
     }

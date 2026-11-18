@@ -113,21 +113,6 @@ struct VaultScalePerformanceTests {
         print(String(format: "SCALE resolveOnly=%.1fms (resolved %d) urlKeyedAppends=%.1fms", resolveOnly, resolved, urlDict))
         print(String(format: "SCALE breakdown enumerate=%.1fms stat=%.1fms assemble=%.1fms", enumerate, stats, assemble))
 
-        // Launch with the on-disk cache: load it, then the incremental build.
-        let cacheDir = FileManager.default.temporaryDirectory.appending(path: "inkstone-scale-cache-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: cacheDir) }
-        t = DispatchTime.now().uptimeNanoseconds
-        IndexCache.save(incremental, vaultRoot: root, appVersion: "x", in: cacheDir)
-        let cacheSave = Self.ms(t)
-        t = DispatchTime.now().uptimeNanoseconds
-        let fromCache = IndexCache.load(vaultRoot: root, appVersion: "x", in: cacheDir)
-        let cacheLoad = Self.ms(t)
-        t = DispatchTime.now().uptimeNanoseconds
-        _ = await IndexBuilder().build(vaultRoot: root, reusing: fromCache)
-        let afterCache = Self.ms(t)
-        let size = ((try? FileManager.default.attributesOfItem(atPath: IndexCache.url(for: root, in: cacheDir).path)[.size]) as? Int) ?? 0
-        print(String(format: "SCALE indexCache save=%.1fms load=%.1fms incrementalAfterLoad=%.1fms size=%.1fMB", cacheSave, cacheLoad, afterCache, Double(size) / 1e6))
-
         // Sync's local scan: every file read and hashed, versus stamps reused.
         let engine = SyncEngine(
             client: GitHubClient(configuration: .init(repository: "a/b", branch: "main"), token: "t"),
