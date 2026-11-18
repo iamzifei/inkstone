@@ -404,6 +404,7 @@ final class Workspace {
             refreshTreeInBackground()
             reindex(full: true, seedFromDisk: true)
             startWatching(url)
+            deliverSharedItems()
 
             if startingBackgroundWork {
                 if settings.data.gitHubAutoSync {
@@ -1800,6 +1801,25 @@ final class Workspace {
         refreshTree()
         reindex()
         return url
+    }
+
+    /// Moves what was shared from other apps (the share extension leaves it in
+    /// the app group's inbox) into the vault's Inbox note, oldest first.
+    func deliverSharedItems() {
+        #if os(iOS)
+        guard let store, let root else { return }
+        let inbox = root.appending(path: "Inbox.md")
+        var delivered = false
+        SharedInbox.drain { item in
+            if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)) {
+                guard (try? store.write("# Inbox\n", to: inbox)) != nil else { return false }
+            }
+            guard (try? append(SharedInbox.entry(for: item), to: inbox)) != nil else { return false }
+            delivered = true
+            return true
+        }
+        if delivered { refreshTree() }
+        #endif
     }
 
     /// Appends `text` to today's daily note (created if needed).

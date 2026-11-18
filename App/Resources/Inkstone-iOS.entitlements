@@ -29,6 +29,12 @@
 	</array>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
 	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<!-- Shared with the share extension, which leaves what was shared in the
+	     group container's Inbox folder for the app to move into the vault. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.orris.inkstone</string>
+	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudDocuments</string>
