@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Duo folded</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#B03A30}a:hover{color:#8F2E26}
+</style>
+</helmet>
+<div style="width: 466px; height: 678px; box-sizing: border-box; background: #FCFBF8; color: #1F1D1A; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 44px 16px 0; display: flex; align-items: center; justify-content: space-between">
+    <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.5px">Scratch</span>
+    <button aria-label="New note" style="all: unset; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #C0453B">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <label style="margin: 10px 16px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; background: #F1EFE8; border-radius: 10px; font-size: 17px">
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#78736A" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input aria-label="Search notes" placeholder="Search notes and text" style="all: unset; flex: 1; font-size: 17px">
+  </label>
+  <div style="display: flex; flex-direction: column">
+    <div style="display: flex; flex-direction: column; gap: 2px; min-height: 60px; justify-content: center; padding: 0 16px; border-bottom: 1px solid #EFECE4"><span style="font-size: 17px">Reading notes — Calvino</span><span style="font-size: 13px; color: #78736A">10:42 · 3 backlinks</span></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-height: 60px; justify-content: center; padding: 0 16px; border-bottom: 1px solid #EFECE4"><span style="font-size: 17px">Weekly review</span><span style="font-size: 13px; color: #78736A">09:15</span></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; min-height: 60px; justify-content: center; padding: 0 16px; border-bottom: 1px solid #EFECE4"><span style="font-size: 17px">Unfinished books</span><span style="font-size: 13px; color: #78736A">Yesterday</span></div>
+  </div>
+  <div style="margin: auto 16px 24px; padding: 14px 16px; border-radius: 12px; background: #F4F2EC; border: 1px solid #E4E0D6; display: flex; gap: 12px; align-items: center">
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="#C0453B" stroke-width="1.6"><rect x="2" y="5" width="11" height="18" rx="2"/><rect x="15" y="5" width="11" height="18" rx="2"/></svg>
+    <span style="font-size: 14px; color: #57534B; line-height: 1.4">Same app as iPhone. Unfold and the note you are in stays open, at the same line.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":466,"height":678}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
