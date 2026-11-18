@@ -233,7 +233,10 @@ public struct SyncEngine: Sendable {
         _ = try await client.verify()
 
         progress?(SyncProgress(phase: .listing, message: localized("Listing remote files…")))
-        let remote = try await client.listFiles()
+        // Hidden paths (`.github/…`) take no part in sync, so they are dropped
+        // here, before anything counts the remote: a branch holding only
+        // `.github` files must read as empty, not as "every note deleted".
+        let remote = try await client.listFiles().filter { Self.isSyncablePath($0.path) }
         // Not `uniqueKeysWithValues`: Swift compares strings by canonical
         // equivalence, so a repository holding both the NFC and NFD spelling of
         // one name (written by different operating systems) has two entries
@@ -242,6 +245,9 @@ public struct SyncEngine: Sendable {
 
         progress?(SyncProgress(phase: .scanning, message: localized("Scanning vault…")))
         var state = SyncState.load(from: vaultRoot)
+        // Records for hidden paths left by older builds: they take no part in
+        // planning any more, but would still count toward "recorded" files.
+        state.blobs = state.blobs.filter { Self.isSyncablePath($0.key) }
         let scanStarted = Date.now
         var (local, excludedLocally, stamps) = localFiles(
             cache: state.hashes ?? [:],
@@ -273,6 +279,40 @@ public struct SyncEngine: Sendable {
         // "the user deleted it" and the note was removed from GitHub.
         for path in state.blobs.keys where local[path] == nil && isEvictedFromICloud(path) {
             excludedLocally.insert(path)
+        }
+
+        // On a case-insensitive volume (the default on Macs and iPhones) a
+        // local `note.md` and a remote `Note.md` are one file — another device
+        // renamed it by case. Treated as two, the rename deleted the note, or
+        // an edit made here under the old name was overwritten. Pair them up
+        // as one renamed file before planning: the remote's spelling, this
+        // side's content, the old name's base. The ordinary three-way rules
+        // then upload an edit or record an unchanged file, and the file on disk
+        // takes the new spelling. On a case-sensitive volume they really can be
+        // two files, and none of this runs.
+        let caseSensitive = (try? vaultRoot.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+            .volumeSupportsCaseSensitiveNames) ?? false
+        if !caseSensitive {
+            let localOnly = Dictionary(
+                local.keys.filter { remoteByPath[$0] == nil }.map { ($0.lowercased(), $0) },
+                uniquingKeysWith: { first, _ in first })
+            for remotePath in remoteByPath.keys where local[remotePath] == nil {
+                // Only when the *other* side renamed: the local spelling is the
+                // one last synced and the remote spelling is new. When this
+                // side renamed (remote spelling has the base), the planner
+                // already does the right thing — upload the new name, delete
+                // the old one from GitHub.
+                guard let localPath = localOnly[remotePath.lowercased()], localPath != remotePath,
+                      let content = local[localPath],
+                      state.blobs[localPath] != nil, state.blobs[remotePath] == nil else { continue }
+                local[remotePath] = content
+                local.removeValue(forKey: localPath)
+                if state.blobs[remotePath] == nil, let base = state.blobs[localPath] {
+                    state.blobs[remotePath] = base
+                }
+                state.blobs.removeValue(forKey: localPath)
+                adoptCase(of: fileURL(remotePath))
+            }
         }
 
         // Hidden paths take no part in sync. The local scan skips them, but the
@@ -378,7 +418,8 @@ public struct SyncEngine: Sendable {
         // later `deleteLocal note.md` in the same run would then delete the
         // note just downloaded (a case-only rename on another device).
         var writtenFolded: Set<String> = []
-        let localFolded = Dictionary(local.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { first, _ in first })
+        let localFolded = caseSensitive ? [:]
+            : Dictionary(local.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { first, _ in first })
 
         for (index, action) in actions.enumerated() {
             // Progress is saved as it goes, not only at the end: a run killed
@@ -467,7 +508,7 @@ public struct SyncEngine: Sendable {
                     progress?(SyncProgress(
                         message: localized("Removing \(path)…"), completed: index, total: actions.count
                     ))
-                    if writtenFolded.contains(path.lowercased()) {
+                    if !caseSensitive, writtenFolded.contains(path.lowercased()) {
                         // The same file under another case, just written by this
                         // run: only the old name's record goes.
                         state.blobs.removeValue(forKey: path)
@@ -720,7 +761,7 @@ public struct SyncEngine: Sendable {
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        adoptCase(of: url)
+        if !isCaseSensitiveVolume { adoptCase(of: url) }
         try data.write(to: url, options: .atomic)
     }
 
@@ -730,6 +771,11 @@ public struct SyncEngine: Sendable {
     /// rename another device made. Rename the existing file to the exact
     /// spelling first (through a temporary name, since a case-only rename is a
     /// no-op on some volumes).
+    private var isCaseSensitiveVolume: Bool {
+        (try? vaultRoot.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+            .volumeSupportsCaseSensitiveNames) ?? false
+    }
+
     private func adoptCase(of url: URL) {
         let folder = url.deletingLastPathComponent()
         let name = url.lastPathComponent

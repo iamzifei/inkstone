@@ -1,7 +1,7 @@
 import Foundation
 
 /// A heading extracted from a note, used for the outline pane and `[[Note#Heading]]` resolution.
-public struct Heading: Hashable, Sendable {
+public struct Heading: Hashable, Sendable, Codable {
     public let level: Int
     public let text: String
     public let range: NSRange
@@ -17,7 +17,7 @@ public struct Heading: Hashable, Sendable {
 ///
 /// Kept small and value-typed: a 20,000-note vault has to fit in memory, so the
 /// body stays on disk and only metadata is retained.
-public struct NoteMetadata: Identifiable, Hashable, Sendable {
+public struct NoteMetadata: Identifiable, Hashable, Sendable, Codable {
     public let url: URL
     public var id: URL { url }
 

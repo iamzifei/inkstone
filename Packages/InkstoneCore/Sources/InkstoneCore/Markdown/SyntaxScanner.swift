@@ -79,7 +79,7 @@ public struct SyntaxToken: Hashable, Sendable {
 }
 
 /// A parsed `[[wikilink]]` target.
-public struct WikiLink: Hashable, Sendable {
+public struct WikiLink: Hashable, Sendable, Codable {
     /// Note name or path as typed, without extension. Empty for same-note links.
     public let target: String
     /// `#Heading` or `#^blockId` fragment, without the leading `#`.

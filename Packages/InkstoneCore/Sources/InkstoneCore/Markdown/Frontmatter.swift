@@ -5,7 +5,7 @@ import Yams
 ///
 /// Modelled as an enum rather than `Any` so the whole note model stays `Sendable`
 /// and can cross actor boundaries during indexing.
-public enum PropertyValue: Hashable, Sendable {
+public enum PropertyValue: Hashable, Sendable, Codable {
     case text(String)
     case number(Double)
     case boolean(Bool)
@@ -34,7 +34,21 @@ public enum PropertyValue: Hashable, Sendable {
 }
 
 /// Parsed YAML frontmatter plus the byte range it occupied in the source.
-public struct Frontmatter: Hashable, Sendable {
+/// Codable for the on-disk index cache. `sourceRange` indexes into the text
+/// it was parsed from and means nothing without it, so it is not stored (a
+/// cached note decodes with `nil`; nothing outside the parser reads it).
+public struct Frontmatter: Hashable, Sendable, Codable {
+    private enum CodingKeys: String, CodingKey { case properties }
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        properties = try container.decode([String: PropertyValue].self, forKey: .properties)
+        sourceRange = nil
+    }
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(properties, forKey: .properties)
+    }
+
     public var properties: [String: PropertyValue]
     /// Character range of the whole `---` fenced block, so the editor can hide or
     /// render it as a property table without re-scanning the document.

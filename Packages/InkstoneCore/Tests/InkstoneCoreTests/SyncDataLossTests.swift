@@ -62,7 +62,10 @@ extension GitHubClientTests {
         #expect(remote.paths == ["Note.md"])
 
         _ = try await engine(phone, remote).run()
-        #expect(exists("Note.md", in: phone) || exists("note.md", in: phone), "the note vanished from the phone")
+        // Exactly the new spelling, and only it (the APFS test volume is
+        // case-insensitive, the default on Macs and iPhones).
+        #expect(exists("Note.md", in: phone), "the note vanished from the phone or kept its old name")
+        #expect(!exists("note.md", in: phone))
         _ = try await engine(phone, remote).run()
         #expect(remote.contents("Note.md") == "text\n", "the note was deleted from GitHub")
     }
@@ -76,6 +79,7 @@ extension GitHubClientTests {
         _ = try await engine(phone, remote).run()
         _ = try await engine(phone, remote).run()
         #expect(remote.contents(".github/pull_request_template.md") == "template\n")
+        #expect(!FileManager.default.fileExists(atPath: phone.appending(path: ".github").path))
     }
 
     @Test("A file that cannot be read is not treated as deleted")
@@ -100,7 +104,11 @@ extension GitHubClientTests {
         try write("a\n", "a.md", in: mac)
         _ = try await engine(mac, remote).run()
         remote.truncated = true
-        await #expect(throws: (any Error).self) { _ = try await engine(mac, remote).run() }
+        await #expect {
+            _ = try await engine(mac, remote).run()
+        } throws: { error in
+            if case GitHubError.listingTruncated = error { return true } else { return false }
+        }
         #expect(exists("a.md", in: mac))
     }
 
@@ -163,7 +171,11 @@ extension GitHubClientTests {
         try FileManager.default.removeItem(at: other.appending(path: "a.md"))
         _ = try await engine(other, remote).run(confirmingLargeDeletion: true)
         #expect(remote.paths.isEmpty)
-        await #expect(throws: (any Error).self) { _ = try await engine(mac, remote).run() }
+        await #expect {
+            _ = try await engine(mac, remote).run()
+        } throws: { error in
+            if case SyncError.remoteUnexpectedlyEmpty = error { return true } else { return false }
+        }
         let confirmed = try await engine(mac, remote).run(confirmingLargeDeletion: true)
         #expect(confirmed.deletedLocally == ["a.md"])
     }
@@ -177,7 +189,11 @@ extension GitHubClientTests {
         let synced = SyncState.load(from: mac).lastSyncedAt
         for i in 0..<5 { try write("\(i)\n", "new\(i).md", in: mac) }
         remote.failWritesWith = 401
-        await #expect(throws: (any Error).self) { _ = try await engine(mac, remote).run() }
+        await #expect {
+            _ = try await engine(mac, remote).run()
+        } throws: { error in
+            if case GitHubError.unauthorised = error { return true } else { return false }
+        }
         #expect(SyncState.load(from: mac).lastSyncedAt == synced, "a failed run stamped itself as synced")
     }
 
@@ -232,6 +248,48 @@ extension GitHubClientTests {
         })
         #expect(try String(contentsOf: note, encoding: .utf8) == "typed\n")
         #expect(report.deletedLocally.isEmpty)
+    }
+
+    @Test("Renamed by case on one device while edited on the other: the edit survives")
+    func caseRenameVersusEditKeepsTheEdit() async throws {
+        let remote = Remote()
+        let mac = try vault("mac"), phone = try vault("phone")
+        defer { try? FileManager.default.removeItem(at: mac); try? FileManager.default.removeItem(at: phone) }
+        try write("v1\n", "note.md", in: mac)
+        try write("other\n", "keep.md", in: mac)
+        _ = try await engine(mac, remote).run()
+        _ = try await engine(phone, remote).run()
+        try FileManager.default.moveItem(at: mac.appending(path: "note.md"), to: mac.appending(path: "Note.md"))
+        _ = try await engine(mac, remote).run()
+        try write("edited on phone\n", "note.md", in: phone)
+        _ = try await engine(phone, remote).run()
+        // The phone's edit must still exist somewhere, on the phone and on GitHub.
+        let phoneTexts = try FileManager.default.contentsOfDirectory(atPath: phone.path)
+            .filter { $0.hasSuffix(".md") }
+            .compactMap { try? String(contentsOf: phone.appending(path: $0), encoding: .utf8) }
+        #expect(phoneTexts.contains("edited on phone\n"))
+        #expect(remote.paths.compactMap { remote.contents($0) }.contains("edited on phone\n"))
+    }
+
+    @Test("A remote with only hidden files reads as empty, not as every note deleted")
+    func hiddenOnlyRemoteIsEmpty() async throws {
+        let remote = Remote()
+        let mac = try vault("mac"); defer { try? FileManager.default.removeItem(at: mac) }
+        try write("a\n", "a.md", in: mac)
+        _ = try await engine(mac, remote).run()
+        // Someone empties the notes but leaves the repository's own files.
+        let paths = remote.paths
+        let other = try vault("other"); defer { try? FileManager.default.removeItem(at: other) }
+        _ = try await engine(other, remote).run()
+        for path in paths { try FileManager.default.removeItem(at: other.appending(path: path)) }
+        _ = try await engine(other, remote).run(confirmingLargeDeletion: true)
+        remote.put(".github/workflows/ci.yml", "on: push\n")
+        await #expect {
+            _ = try await engine(mac, remote).run()
+        } throws: { error in
+            if case SyncError.remoteUnexpectedlyEmpty = error { return true } else { return false }
+        }
+        #expect(FileManager.default.fileExists(atPath: mac.appending(path: "a.md").path))
     }
 
     @Test("Conflict copy names use Western digits whatever the locale")
