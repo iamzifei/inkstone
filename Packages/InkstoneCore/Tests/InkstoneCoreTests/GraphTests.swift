@@ -391,8 +391,12 @@ struct GraphPerformanceTests {
 
     @Test("Cost is near-linear in node count, not quadratic")
     func staysSubQuadratic() {
-        let small = Self.frameCost(nodes: 1_000)
-        let large = Self.frameCost(nodes: 8_000)
+        // Best of five per size: the minimum is the measurement least disturbed
+        // by other work on the machine. A single timing each failed on main once
+        // (2026-11-18, 26× on a shared CI runner) for a commit whose own run had
+        // passed. Same ceiling as before.
+        let small = (0..<5).map { _ in Self.frameCost(nodes: 1_000) }.min()!
+        let large = (0..<5).map { _ in Self.frameCost(nodes: 8_000) }.min()!
         let ratio = large / small
 
         print(String(format: "layout frame: 1k %.2f ms | 8k %.2f ms | %.1f×", small, large, ratio))
