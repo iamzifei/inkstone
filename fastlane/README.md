@@ -31,6 +31,14 @@ Create the App Store Connect app record. Interactive: needs a 2FA code.
 
 Upload the build, metadata and screenshots, then submit for review.
 
+### ios prepare
+
+```sh
+[bundle exec] fastlane ios prepare
+```
+
+Upload build, metadata and screenshots; stop short of submitting.
+
 ### ios upload_build
 
 ```sh

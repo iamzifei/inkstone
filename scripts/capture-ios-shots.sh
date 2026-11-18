@@ -43,6 +43,9 @@ build_for() {
 seed() {  # seed <device>
   xcrun simctl boot "$1" 2>/dev/null || true
   xcrun simctl bootstatus "$1" -b >/dev/null 2>&1
+  # Apple's own marketing state, and no real clock in the store listing.
+  xcrun simctl status_bar "$1" override --time "9:41" --batteryState charged --batteryLevel 100 \
+    --cellularMode active --cellularBars 4 --wifiBars 3 >/dev/null 2>&1 || true
   xcrun simctl install "$1" "$APP"
   # First launch creates the container and the scratch vault; only then is there
   # somewhere to copy the richer demo vault into.
@@ -79,31 +82,25 @@ shoot "$PHONE" "$OUT/02-live-preview.png" "Home.md"
 shoot "$PHONE" "$OUT/03-typography.png"   "Typography Notes.md"
 shoot "$PHONE" "$OUT/04-measure.png"      "The Measure.md"
 
-# The graph and search need real taps. The device is 1320x2868 px = 440x956 pt at
-# 3x, shown at 100% inside the Simulator window: horizontally centred, and below
-# the title bar. The toolbar icons were measured off a screenshot at device px
-# (683, 251) for search and (771, 251) for the graph, which is (228, 84) and
-# (257, 84) in points.
-open -a Simulator; sleep 5
-read -r WX WY < <(python3 -c "
-import Quartz
-for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements, Quartz.kCGNullWindowID) or []:
-    if 'Simulator' in str(w.get('kCGWindowOwnerName','')) and w.get('kCGWindowName') == '$PHONE':
-        b = w['kCGWindowBounds']; print(int(b['X']) + 27, int(b['Y']) + 63); break
-")
-if [ -n "${WX:-}" ]; then
-  echo "==> taps against the Simulator window at ${WX},${WY}"
-  osascript -e 'tell application "Simulator" to activate' >/dev/null 2>&1; sleep 1.5
-  cliclick -w 40 "c:$((WX + 257)),$((WY + 84))"; sleep 4
-  xcrun simctl io "$PHONE" screenshot "$OUT/05-graph.png" >/dev/null 2>&1
-  echo "    05-graph.png  $(sips -g pixelWidth -g pixelHeight "$OUT/05-graph.png" | tail -2 | tr -d ' \n')"
-  cliclick -w 40 "c:$((WX + 228)),$((WY + 84))"; sleep 3
-  cliclick -w 30 t:"typography"; sleep 3
-  xcrun simctl io "$PHONE" screenshot "$OUT/06-search.png" >/dev/null 2>&1
-  echo "    06-search.png $(sips -g pixelWidth -g pixelHeight "$OUT/06-search.png" | tail -2 | tr -d ' \n')"
-else
-  echo "!! Simulator window for '$PHONE' not found — skipping the graph and search shots" >&2
-fi
+# The graph and search used to be tapped with cliclick against Simulator.app's
+# window, which Xcode 27 no longer has (Device Hub replaced it). DemoDirector
+# drives them instead: a command file the debug build polls.
+CMD="$(mktemp -t inkstone-shots)"
+xcrun simctl terminate "$PHONE" "$BUNDLE" 2>/dev/null || true; sleep 1
+SIMCTL_CHILD_INKSTONE_SCRATCH_VAULT=1 SIMCTL_CHILD_INKSTONE_DEMO_COMMANDS="$CMD" \
+  xcrun simctl launch "$PHONE" "$BUNDLE" >/dev/null 2>&1
+sleep 7
+echo "graph" >> "$CMD"; sleep 6
+xcrun simctl io "$PHONE" screenshot "$OUT/05-graph.png" >/dev/null 2>&1
+echo "    05-graph.png  $(sips -g pixelWidth -g pixelHeight "$OUT/05-graph.png" | tail -2 | tr -d ' \n')"
+xcrun simctl terminate "$PHONE" "$BUNDLE" 2>/dev/null || true; sleep 1; : > "$CMD"
+SIMCTL_CHILD_INKSTONE_SCRATCH_VAULT=1 SIMCTL_CHILD_INKSTONE_DEMO_COMMANDS="$CMD" \
+  xcrun simctl launch "$PHONE" "$BUNDLE" >/dev/null 2>&1
+sleep 7
+echo "switcher typography" >> "$CMD"; sleep 3
+xcrun simctl io "$PHONE" screenshot "$OUT/06-search.png" >/dev/null 2>&1
+echo "    06-search.png $(sips -g pixelWidth -g pixelHeight "$OUT/06-search.png" | tail -2 | tr -d ' \n')"
+rm -f "$CMD"
 
 # --------------------------------------------------------------------- iPad
 build_for "$PAD"
