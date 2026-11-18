@@ -1814,6 +1814,7 @@ final class Workspace {
         // creating a fresh Inbox.md would make a duplicate. Wait for it.
         if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)),
            FileManager.default.fileExists(atPath: root.appending(path: ".Inbox.md.icloud").path(percentEncoded: false)) {
+            try? FileManager.default.startDownloadingUbiquitousItem(at: inbox)
             return
         }
         var delivered = false
@@ -1822,11 +1823,17 @@ final class Workspace {
                 guard (try? store.write("# Inbox\n", to: inbox)) != nil else { return false }
             }
             let entry = SharedInbox.entry(for: item)
-            guard (try? append(entry, to: inbox)) != nil else { return false }
+            let core = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Already in the open note from an earlier try whose save failed:
+            // don't add it a second time, just get it onto disk.
+            if let document = documents[inbox], document.text.contains(core) {
+                document.save()
+            } else {
+                guard (try? append(entry, to: inbox)) != nil else { return false }
+            }
             // Delivered only once it is on disk: an open Inbox note saves
             // through its editor document, whose save can fail quietly.
-            guard let written = try? store.read(inbox),
-                  written.contains(entry.trimmingCharacters(in: .whitespacesAndNewlines)) else { return false }
+            guard let written = try? store.read(inbox), written.contains(core) else { return false }
             delivered = true
             return true
         }

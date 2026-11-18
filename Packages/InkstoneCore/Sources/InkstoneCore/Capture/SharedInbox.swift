@@ -28,8 +28,9 @@ public enum SharedInbox {
         else { return }
         for file in files.filter({ $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             // Not readable right now (file protection while locked, a read
-            // error): leave it for the next time, never delete it.
-            guard let data = try? Data(contentsOf: file) else { return }
+            // error): leave it for the next time, never delete it — and do
+            // not let it hold up the items behind it.
+            guard let data = try? Data(contentsOf: file) else { continue }
             guard let item = try? JSONDecoder().decode(Capture.SharedItem.self, from: data) else {
                 try? FileManager.default.removeItem(at: file)   // not an item at all: never deliverable
                 continue

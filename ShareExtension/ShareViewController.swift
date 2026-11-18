@@ -143,7 +143,8 @@ private struct ShareView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: cancel) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(model.isLoading || (model.text.isEmpty && model.item.url == nil))
+                        .disabled(model.isLoading
+                                  || (model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.item.url == nil))
                 }
             }
         }
