@@ -74,9 +74,27 @@ extension GitHubClientTests {
         for i in 0..<20 { try Data("\(i)\n".utf8).write(to: big.appending(path: "n\(i).md")) }
         _ = try await engine(big, remote2).run()
         for i in 0..<15 { try FileManager.default.removeItem(at: big.appending(path: "n\(i).md")) }
+        let bigBefore = snapshot(big)
         let mass = try await engine(big, remote2).preview()
         #expect(mass.wouldStopForLargeDeletion)
         #expect(mass.deletesRemote.count == 15)
+        #expect(snapshot(big) == bigBefore, "preview wrote to the vault")
+    }
+
+    /// A remote that has gone empty while files were recorded is far more often
+    /// a wrong branch or a token that lost access than a real deletion. The
+    /// preview says so, rather than listing every note under "Delete here".
+    @Test("An empty remote is reported as such, not as a list of local deletions")
+    func previewReportsAnEmptyRemote() async throws {
+        let remote = Remote()
+        let mac = try vault("mac"); defer { try? FileManager.default.removeItem(at: mac) }
+        try Data("a\n".utf8).write(to: mac.appending(path: "a.md"))
+        _ = try await engine(mac, remote).run()
+        for path in remote.paths { remote.put(path, "") }
+        let emptied = Remote()
+        let preview = try await engine(mac, emptied).preview()
+        #expect(preview.remoteLooksEmpty)
+        #expect(preview.deletesLocal.isEmpty)
     }
   }
 }

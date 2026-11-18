@@ -3921,6 +3921,28 @@
         }
       }
     },
+    "GitHub shows no files on this branch, although this vault has synced before. Sync will stop rather than delete your notes — check the repository, branch and token.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub shows no files on this branch, although this vault has synced before. Sync will stop rather than delete your notes — check the repository, branch and token."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub 上这个分支没有任何文件，但这个库以前同步过。同步会停下来，不会删除你的笔记——请检查仓库、分支和令牌。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub 上這個分支沒有任何檔案，但這個庫以前同步過。同步會停下來，不會刪除你的筆記——請檢查倉庫、分支和權杖。"
+          }
+        }
+      }
+    },
     "GitHub would not let Inkstone write %@.%@": {
       "extractionState": "manual",
       "localizations": {

@@ -77,6 +77,10 @@ private struct PreviewSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if preview.remoteLooksEmpty {
+                Label("GitHub shows no files on this branch, although this vault has synced before. Sync will stop rather than delete your notes — check the repository, branch and token.",
+                      systemImage: "exclamationmark.triangle")
+            }
             if preview.needsFirstSyncDirection {
                 Label("First sync: \(preview.conflicts.count) file(s) differ on the two sides. Sync will ask which side to keep.",
                       systemImage: "questionmark.circle")
@@ -85,7 +89,7 @@ private struct PreviewSummary: View {
                 Label("Sync would stop and ask before deleting this many files.",
                       systemImage: "exclamationmark.triangle")
             }
-            if preview.isEmpty {
+            if preview.isEmpty, !preview.remoteLooksEmpty {
                 Label("Nothing to sync — already up to date.", systemImage: "checkmark.circle")
             }
             row("Upload", preview.uploads, "arrow.up")

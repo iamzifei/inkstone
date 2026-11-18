@@ -272,7 +272,8 @@ public struct SyncEngine: Sendable {
         let scanStarted = Date.now
         var (local, excludedLocally, stamps) = localFiles(
             cache: state.hashes ?? [:],
-            trustBefore: state.hashesRecordedAt?.addingTimeInterval(-3) ?? .distantPast
+            trustBefore: state.hashesRecordedAt?.addingTimeInterval(-3) ?? .distantPast,
+            skipPlaceholders: dryRun
         )
         state.hashes = stamps
         state.hashesRecordedAt = scanStarted
@@ -291,9 +292,14 @@ public struct SyncEngine: Sendable {
         // Confirmable like any other mass deletion: when the last file really
         // was deleted on another device, refusing forever wedged every other one.
         if remote.isEmpty, !state.blobs.isEmpty, !confirmingLargeDeletion {
-            if dryRun { preview.wouldStopForLargeDeletion = true } else {
-                throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
+            // Said as what it most likely is — a wrong branch or a token that
+            // lost access — rather than planned out as a list of every note
+            // under "Delete here".
+            if dryRun {
+                preview.remoteLooksEmpty = true
+                return (nil, preview)
             }
+            throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
         }
 
         // A synced file that is missing locally because iCloud evicted it (iOS
@@ -664,7 +670,8 @@ public struct SyncEngine: Sendable {
     /// when nothing had changed.
     func localFiles(
         cache: [String: HashStamp],
-        trustBefore: Date
+        trustBefore: Date,
+        skipPlaceholders: Bool = false
     ) -> (files: [String: String], excluded: Set<String>, stamps: [String: HashStamp]) {
         var stamps: [String: HashStamp] = [:]
         var result: [String: String] = [:]
@@ -752,6 +759,15 @@ public struct SyncEngine: Sendable {
                old.changed == changed, modified < trustLimit, changed < trustLimit {
                 result[relative] = old.sha
                 stamps[relative] = old
+                continue
+            }
+            // A preview only looks: reading an iCloud placeholder would download
+            // it. Not carried this time, which is never read as a deletion.
+            if skipPlaceholders,
+               let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+                   .ubiquitousItemDownloadingStatus,
+               status != .current {
+                excluded.insert(relative)
                 continue
             }
             // Unreadable (permissions, a file another app holds, a placeholder)
@@ -896,6 +912,9 @@ public struct SyncPreview: Sendable, Hashable {
     public var needsFirstSyncDirection = false
     /// A run would stop at the mass-deletion guard and ask for confirmation.
     public var wouldStopForLargeDeletion = false
+    /// GitHub lists no files although this vault has synced before. A run would
+    /// stop; usually a wrong branch or a token that lost access.
+    public var remoteLooksEmpty = false
 
     public init() {}
 

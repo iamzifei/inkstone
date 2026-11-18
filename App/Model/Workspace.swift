@@ -297,6 +297,7 @@ final class Workspace {
             bookmarks = Bookmarks.load(from: url)
 
             LaunchTiming.mark("vault open start")
+            loadLastSuccessfulSync()
             // Off the main thread: on a 9,894-note vault the scan held the
             // first window frozen for ~375 ms right after it appeared. The
             // sidebar fills in when it lands (`refreshTreeInBackground`).
@@ -768,6 +769,7 @@ final class Workspace {
     var syncPreviewError: String?
 
     func previewSync() async {
+        guard !isPreviewingSync, !isSyncing else { return }
         guard let root, syncBinding.isConfigured, let client = gitHubClient() else {
             syncPreviewError = GitHubError.notConfigured.localizedDescription
             return
@@ -785,10 +787,17 @@ final class Workspace {
     }
 
     /// When the last complete sync finished, from the vault's own sync record —
-    /// so it survives relaunches, unlike the in-memory status line.
-    var lastSuccessfulSync: Date? {
-        guard let root else { return nil }
-        return SyncState.load(from: root).lastSyncedAt
+    /// so it survives relaunches, unlike the in-memory status line. Stored, not
+    /// computed: sync.json holds thousands of hash stamps, and decoding it on
+    /// every redraw of Settings was real main-thread work.
+    private(set) var lastSuccessfulSync: Date?
+
+    private func loadLastSuccessfulSync() {
+        guard let root else { lastSuccessfulSync = nil; return }
+        let url = root.appending(path: ".inkstone/sync.json")
+        struct Stamp: Decodable { let lastSyncedAt: Date? }
+        lastSuccessfulSync = (try? Data(contentsOf: url))
+            .flatMap { try? JSONDecoder().decode(Stamp.self, from: $0) }?.lastSyncedAt
     }
 
     /// Conflict copies sync left in the vault (`… (conflict 2026-…).md`), each
@@ -826,6 +835,8 @@ final class Workspace {
 
         syncStatus = .running("Starting…")
         syncProgress = SyncProgress(message: "Starting…")
+        // A preview describes the state before this run; after it, it is stale.
+        syncPreview = nil
         pendingFirstSync = nil
         pendingLargeDeletion = nil
         do {
@@ -840,6 +851,7 @@ final class Workspace {
             }
             syncProgress = nil
             syncStatus = .finished(report)
+            loadLastSuccessfulSync()
             // Files may have arrived or vanished underneath us.
             refreshTree()
             reindex()
