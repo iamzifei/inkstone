@@ -85,6 +85,31 @@ enum SmokeTest {
         check("collect its tag", workspace.index.tagCounts["smoketag"] == 1)
         check("record the unresolved link", workspace.index.unresolved["Second Note"] == 1)
 
+        // --- rebuild index ---
+        // An edit that keeps its modification date (a restored backup, rsync -t)
+        // is invisible to the incremental index; Rebuild Index reads it.
+        do {
+            // An hour old, and indexed as such, so the incremental rule trusts it.
+            let old = Date.now.addingTimeInterval(-3600)
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: note.path)
+            workspace.rebuildIndex()
+            await waitUntil("the baseline rebuild") { !workspace.isIndexing }
+            try Data("# Smoke\n\nA #smoketag and a #restoredtag.\n".utf8).write(to: note)
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: note.path)
+            workspace.reindex()
+            await waitUntil("the incremental reindex") { !workspace.isIndexing }
+            let staleBefore = workspace.index.tagCounts["restoredtag"] == nil
+            workspace.rebuildIndex()
+            await waitUntil("the full rebuild") { workspace.index.tagCounts["restoredtag"] == 1 }
+            check("Rebuild Index reads an edit that kept its date",
+                  staleBefore && workspace.index.tagCounts["restoredtag"] == 1)
+            try Data(body.utf8).write(to: note)
+            workspace.rebuildIndex()
+            await waitUntil("the index settles") { workspace.index.tagCounts["restoredtag"] == nil }
+        } catch {
+            check("Rebuild Index reads an edit that kept its date", false)
+        }
+
         if let store = workspace.store {
             let hits = SearchEngine.fullText(query: "smoke", in: workspace.index, store: store)
             check("find it by full-text search", hits.contains { $0.url == note })

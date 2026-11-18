@@ -314,6 +314,17 @@ private struct FilesSettings: View {
                 TextField("Date format", text: $settings.data.dailyNoteFormat)
                 Toggle("Week starts on Monday", isOn: $settings.data.weekStartsOnMonday)
             }
+            Section {
+                LabeledContent("Notes indexed", value: "\(workspace.index.noteCount)")
+                Button(workspace.isIndexing ? "Rebuilding…" : "Rebuild Index") {
+                    workspace.rebuildIndex()
+                }
+                .disabled(workspace.root == nil || workspace.isIndexing)
+            } header: {
+                Text("Index")
+            } footer: {
+                Text("Reads every note again. Only needed if links, tags or search look out of date after notes were changed by another app with their dates preserved (for example a restored backup).")
+            }
         }
         .formStyle(.grouped)
     }

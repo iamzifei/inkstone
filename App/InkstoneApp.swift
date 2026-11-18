@@ -953,6 +953,8 @@ struct InkstoneApp: App {
             }
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(workspace.activeTab?.url == nil)
+            Button(localized("Rebuild Index")) { workspace.rebuildIndex() }
+                .disabled(workspace.root == nil || workspace.isIndexing)
             Button(localized("Calendar")) { workspace.open(.calendar) }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
             Button(localized("Search Vault")) {

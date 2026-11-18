@@ -4364,6 +4364,28 @@
         }
       }
     },
+    "Index": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "索引"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "索引"
+          }
+        }
+      }
+    },
     "Indexing %lld of %lld notes…": {
       "extractionState": "manual",
       "localizations": {
@@ -6227,6 +6249,28 @@
         }
       }
     },
+    "Notes indexed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes indexed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已索引笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已索引筆記"
+          }
+        }
+      }
+    },
     "Notes tagged #%@": {
       "extractionState": "manual",
       "localizations": {
@@ -7377,6 +7421,28 @@
         }
       }
     },
+    "Reads every note again. Only needed if links, tags or search look out of date after notes were changed by another app with their dates preserved (for example a restored backup).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reads every note again. Only needed if links, tags or search look out of date after notes were changed by another app with their dates preserved (for example a restored backup)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新读取每一篇笔记。只有当笔记被其他 App 修改且保留了原修改时间（例如从备份还原）后，链接、标签或搜索看起来没有更新时才需要。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新讀取每一篇筆記。只有當筆記被其他 App 修改且保留了原修改時間（例如從備份還原）後，連結、標籤或搜尋看起來沒有更新時才需要。"
+          }
+        }
+      }
+    },
     "Ready. Runs on this Mac; nothing is sent anywhere.": {
       "extractionState": "manual",
       "localizations": {
@@ -7400,6 +7466,28 @@
         }
       }
     },
+    "Rebuild Index": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuild Index"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重建索引"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重建索引"
+          }
+        }
+      }
+    },
     "Rebuild the graph and lay it out again": {
       "extractionState": "manual",
       "localizations": {
@@ -7419,6 +7507,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "重建關係圖並重新佈局"
+          }
+        }
+      }
+    },
+    "Rebuilding…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuilding…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在重建…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在重建…"
           }
         }
       }

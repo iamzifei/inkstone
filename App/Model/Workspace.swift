@@ -965,6 +965,15 @@ final class Workspace {
     /// is unchanged since the current snapshot are reused (see
     /// `IndexBuilder.build(vaultRoot:reusing:)`). `full` re-parses everything —
     /// used when a vault is opened, as the consistency backstop.
+    /// Everything from scratch: the file tree and a full re-parse of every
+    /// note. The incremental index trusts modification dates, so a change that
+    /// kept its date (a restored backup, `rsync -t`) is only picked up by the
+    /// periodic full rebuild; this is the button for not waiting.
+    func rebuildIndex() {
+        refreshTree()
+        reindex(full: true)
+    }
+
     func reindex(full: Bool = false) {
         guard let root else { return }
         reindexTask?.cancel()
