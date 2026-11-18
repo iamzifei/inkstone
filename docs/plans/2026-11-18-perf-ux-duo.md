@@ -105,6 +105,10 @@ Note: the `INKSTONE_BENCH` hook is DEBUG-only and the app is sandboxed, so the b
 Follow-up found: the remaining ~16 ms per keystroke is the whole-document syntax scan (cache misses on every edit). Incremental scanning is its own project — logged for P1 follow-up, not done in this pass.
 Behaviour fix found by the equivalence test: on a vault whose path contains a space, path-style links (`/Folder/note`) fell through to name matching and could resolve to a different note with the same name; they now resolve to the exact path (Obsidian's rule).
 
+## Closed decisions
+- 2026-11-18 (James): keep Inkstone's behaviour where it differs from Obsidian on purpose — tables without a blank line before them render (GFM); a bare URL ends at full-width punctuation instead of swallowing the Chinese text after it.
+- 2026-11-18 (James): iOS CI builds on GitHub's `xcode-27` preview image (PR #5) so the Duo code is compiled.
+
 ## Progress log
 - 2026-11-18: plan written after code survey + SDK verification; James approved (all phases, runtime download OK, merge after green + independent review).
 - 2026-11-18: P1.1 incremental index + string resolve + background tree refresh; P1.2 iOS viewport styling + debounced word count. 582 core tests green; macOS + iOS builds green. CI caught a reuse-window bug (margin measured from now, not from previous build) → fixed + mutation-verified. `scripts/test-all.sh` green. Draft PR #1.
