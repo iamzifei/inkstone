@@ -124,6 +124,11 @@ Time Profiler: ~1.6 s of the init→scene gap is UIKit loading a system bundle d
 scripts/record-duo-demo.sh (Duo simulator; app driven by DemoDirector's command file, hinge by Device Hub) → scripts/encode-duo-demo.sh → site/assets/video/duo.{mp4,webm} + duo-poster.webp (24.7 s, ~750 KB each). Folded list → note; unfolded with sidebar, follow a link; half-open book with inspector on the right page; upright half-open with inspector below. New site section "iPhone Duo" after Features in all 8 languages; checked at 1280 px and 390 px (Playwright: no horizontal overflow in en/zh/ja); site tests 96 passed.
 Found while recording: DemoDirector started a second poller each time the scene was rebuilt (every fold/unfold), replaying commands → once per process.
 
+## Release 0.3.0 (2026-11-18, James: release both, prepare all materials, automatic release)
+- iOS: build 11 uploaded with fastlane `prepare`, review notes set with asc, submitted — WAITING_FOR_REVIEW, release AFTER_APPROVAL (automatic). New: PrivacyInfo.xcprivacy; screenshots retaken and composed (6 iPhone 1320x2868, 3 iPad 2064x2752); description corrected (conflicts keep both copies); release notes; review notes describe the real first launch (old ones promised a sample vault).
+- Mac: notarised DMG, GitHub release v0.3.0 (latest/download/Inkstone.dmg → 200), appcast 0.3.0 signed and live on inkslab.app, Homebrew cask 0.3.0, local /Applications updated.
+- Pitfalls hit: name.txt said 'Inkstone' (taken) instead of the listed 'Inkstone Notes'; running package-dmg and package-ios at once shares DerivedData and corrupts the build DB; package-ios's awk exit caused a false SIGPIPE failure.
+
 ## Closed decisions
 - 2026-11-18 (James): keep Inkstone's behaviour where it differs from Obsidian on purpose — tables without a blank line before them render (GFM); a bare URL ends at full-width punctuation instead of swallowing the Chinese text after it.
 - 2026-11-18 (James): iOS CI builds on GitHub's `xcode-27` preview image (PR #5) so the Duo code is compiled.
