@@ -1,196 +1,46 @@
 #!/usr/bin/env python3
-"""The site's iPhone Duo film, with the device drawn around the screen in the
-posture each take shows — folded, unfolded, half-open as a book, half-open
-upright — so the hinge in the picture is where the hinge in the recording is.
+"""The site's iPhone Duo film, in Apple's official iPhone Duo bezels, in the
+posture each take shows:
 
+    folded     Outer Closed Portrait           (PNG bezel)
+    unfolded   Inner Open Landscape            (PNG bezel)
+    book       Inner Partially Open Landscape  (Photoshop template)
+    upright    Inner Partially Open Portrait   (Photoshop template)
+
+    scripts/duo_bezel.py extract /Volumes/Bezel-iPhone-Duo   # once
     scripts/frame-duo-demo.py
 
-Reads the raw takes from assets/footage-duo (record-duo-demo.sh) and writes
-site/assets/video/duo.mp4 / duo.webm / duo-poster.webp, replacing what
-encode-duo-demo.sh makes. The device frame is drawn here (PIL), not a
-photograph or Apple's device art; the screen in it is the unedited recording,
-fitted flat or warped onto the two halves for the half-open postures.
+The bezels come from Apple Design Resources and are not in this repository
+(see duo_bezel.py). Nothing in them is redrawn: for the PNG bezels the
+recording is laid *under* the bezel, so the screen's rounded corners are
+Apple's own anti-aliased edge; the half-open templates are rendered exactly
+as Photoshop would (duo_bezel.py, checked against Photoshop's composite).
 
-Per take: the recording is normalised (rotation applied, variable frame rate
-made constant, trimmed, held on its last frame), then the screen — or each
-half of it — is scaled, perspective-warped onto its place, masked to the
-screen's shape and laid over the drawn body. The takes are joined with the
-same dissolves as before.
+Each frame is rendered at twice the film's size and scaled down once at the
+end (Lanczos), so no edge is ever cut at the final resolution.
 """
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from duo_bezel import BEZEL, PartialTemplate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 IN = ROOT / "assets" / "footage-duo"
 OUT = ROOT / "site" / "assets" / "video"
 W, H, FPS, XFADE = 1600, 1000, 30, 0.5
-PAPER = (241, 239, 232)
-SS = 3  # supersampling for the drawn body
-
-BODY = (40, 40, 44)        # graphite
-RIM = (120, 120, 128)      # the polished edge, catching light
-GLASS = (12, 12, 14)       # black glass around the panel
-
-
-def poly_image(size, layers):
-    """Draws [(polygon, fill, blur)] supersampled, returns RGBA at size."""
-    w, h = size
-    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
-    for points, fill, blur in layers:
-        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        ImageDraw.Draw(layer).polygon([(x * SS, y * SS) for x, y in points], fill=fill)
-        if blur:
-            layer = layer.filter(ImageFilter.GaussianBlur(blur * SS))
-        img = Image.alpha_composite(img, layer)
-    return img.resize(size, Image.LANCZOS)
-
-
-def rounded(size, box, radius, fill, blur=0):
-    w, h = size
-    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
-    ImageDraw.Draw(img).rounded_rectangle([c * SS for c in box], radius * SS, fill=fill)
-    if blur:
-        img = img.filter(ImageFilter.GaussianBlur(blur * SS))
-    return img.resize(size, Image.LANCZOS)
-
-
-def flat_device(screen_w, screen_h, *, hinge_side=None, crease=None):
-    """A device lying face-on: body, rim, glass, and the screen's box and mask."""
-    x0, y0 = (W - screen_w) // 2, (H - screen_h) // 2
-    screen = (x0, y0, x0 + screen_w, y0 + screen_h)
-    bezel, radius = 16, 64
-    body = (screen[0] - bezel, screen[1] - bezel, screen[2] + bezel, screen[3] + bezel)
-    img = Image.new("RGBA", (W, H), PAPER + (255,))
-    shadow = rounded((W, H), (body[0] + 6, body[1] + 22, body[2] - 6, body[3] + 26), radius, (0, 0, 0, 90), blur=22)
-    img = Image.alpha_composite(img, shadow)
-    img = Image.alpha_composite(img, rounded((W, H), body, radius, RIM + (255,)))
-    img = Image.alpha_composite(img, rounded((W, H), (body[0] + 3, body[1] + 3, body[2] - 3, body[3] - 3), radius - 3, BODY + (255,)))
-    img = Image.alpha_composite(img, rounded((W, H), (screen[0] - 6, screen[1] - 6, screen[2] + 6, screen[3] + 6), radius - 12, GLASS + (255,)))
-    if hinge_side == "left":
-        # The fold, seen edge-on: a slightly raised, lit cylinder along one side.
-        img = Image.alpha_composite(img, rounded((W, H), (body[0] - 7, body[1] + 30, body[0] + 9, body[3] - 30), 8, (150, 150, 158, 255)))
-        img = Image.alpha_composite(img, rounded((W, H), (body[0] - 3, body[1] + 34, body[0] + 3, body[3] - 34), 3, (205, 205, 212, 255)))
-    # Side buttons.
-    img = Image.alpha_composite(img, rounded((W, H), (body[2] - 1, body[1] + 150, body[2] + 5, body[1] + 230), 3, RIM + (255,)))
-    mask = rounded((W, H), screen, radius - 18, (255, 255, 255, 255))
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    if crease == "vertical":
-        cx = (screen[0] + screen[2]) / 2
-        for dx, a in ((-2, 22), (0, 40), (2, 22)):
-            draw.line([(cx + dx, screen[1]), (cx + dx, screen[3])], fill=(0, 0, 0, a), width=1)
-    # No drawn camera: the simulator's recording already shows the display's own.
-    return img, mask, overlay, screen
-
-
-def warped_device(halves):
-    """A half-open device: each half is (quad, src_crop) — quad = the four
-    corners on the canvas (top-left, top-right, bottom-left, bottom-right)."""
-    layers = []
-    for quad, _ in halves:
-        tl, tr, bl, br = quad
-        outer = [tl, tr, br, bl]
-        # Shadow, rim, body, glass: the same quad grown and shrunk a little.
-        def grow(points, d):
-            cx = sum(p[0] for p in points) / 4
-            cy = sum(p[1] for p in points) / 4
-            return [(cx + (x - cx) * (1 + d), cy + (y - cy) * (1 + d)) for x, y in points]
-        layers.append(([(x + 8, y + 26) for x, y in grow(outer, 0.03)], (0, 0, 0, 80), 20))
-        layers.append((grow(outer, 0.035), RIM + (255,), 0))
-        layers.append((grow(outer, 0.03), BODY + (255,), 0))
-        layers.append((grow(outer, 0.012), GLASS + (255,), 0))
-    body = poly_image((W, H), layers)
-    img = Image.alpha_composite(Image.new("RGBA", (W, H), PAPER + (255,)), body)
-    masks = [poly_image((W, H), [([q[0], q[1], q[3], q[2]], (255, 255, 255, 255), 0)]) for q, _ in halves]
-    return img, masks
-
-
-def run(cmd):
-    subprocess.run(cmd, check=True)
-
-
-def normalise(name, start, hold, work):
-    """Rotation applied, constant frame rate, trimmed, held on its last frame."""
-    out = work / f"{name}-norm.mov"
-    run(["ffmpeg", "-v", "error", "-y", "-i", str(IN / f"{name}.mov"),
-         "-vf", f"fps={FPS},trim=start={start},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={hold}",
-         "-an", "-c:v", "libx264", "-crf", "12", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(out)])
-    probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                            "stream=width,height", "-of", "csv=p=0", str(out)], capture_output=True, text=True)
-    w, h = (int(v) for v in probe.stdout.strip().split(","))
-    return out, w, h
-
-
-def compose_flat(src, sw, sh, frame_kind, out, work):
-    if frame_kind == "folded":
-        screen_h = 880
-        screen_w = round(screen_h * sw / sh)
-        img, mask, overlay, screen = flat_device(screen_w, screen_h, hinge_side="left")
-    else:  # unfolded
-        screen_h = 780
-        screen_w = round(screen_h * sw / sh)
-        img, mask, overlay, screen = flat_device(screen_w, screen_h, crease="vertical")
-    bg, m, ov = work / f"{out.stem}-bg.png", work / f"{out.stem}-mask.png", work / f"{out.stem}-ov.png"
-    img.save(bg); mask.save(m); overlay.save(ov)
-    x0, y0, x1, y1 = screen
-    # Still images loop forever; bound each by the clip, or the graph never ends.
-    t = f"{duration(src):.3f}"
-    run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-t", t, "-i", str(bg), "-i", str(src),
-         "-loop", "1", "-t", t, "-i", str(m), "-loop", "1", "-t", t, "-i", str(ov), "-filter_complex",
-         f"[1:v]scale={x1 - x0}:{y1 - y0}:flags=lanczos,pad={W}:{H}:{x0}:{y0},format=rgba[s];"
-         f"[2:v]format=gray[mk];[s][mk]alphamerge[sm];"
-         f"[0:v][sm]overlay=shortest=1[a];[a][3:v]overlay=shortest=1,format=yuv420p",
-         "-r", str(FPS), "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", str(out)])
-
-
-def compose_warped(src, sw, sh, halves, out, work):
-    """halves: [(quad, (crop_x, crop_y, crop_w, crop_h))] in source pixels."""
-    img, masks = warped_device(halves)
-    bg = work / f"{out.stem}-bg.png"
-    img.save(bg)
-    t = f"{duration(src):.3f}"
-    inputs = ["-loop", "1", "-t", t, "-i", str(bg), "-i", str(src)]
-    graph = "[1:v]split=%d%s;" % (len(halves), "".join(f"[h{i}]" for i in range(len(halves))))
-    for i, (m, (quad, (cx, cy, cw, ch))) in enumerate(zip(masks, halves)):
-        mp = work / f"{out.stem}-mask{i}.png"
-        m.save(mp)
-        inputs += ["-loop", "1", "-t", t, "-i", str(mp)]
-        (x0, y0), (x1, y1), (x2, y2), (x3, y3) = quad
-        graph += (f"[h{i}]crop={cw}:{ch}:{cx}:{cy},scale={W}:{H}:flags=lanczos,"
-                  f"perspective=x0={x0}:y0={y0}:x1={x1}:y1={y1}:x2={x2}:y2={y2}:x3={x3}:y3={y3}:sense=destination,"
-                  f"format=rgba[w{i}];[{2 + i}:v]format=gray[m{i}];[w{i}][m{i}]alphamerge[s{i}];")
-    last = "0:v"
-    for i in range(len(halves)):
-        graph += f"[{last}][s{i}]overlay=shortest=1[o{i}];"
-        last = f"o{i}"
-    graph = graph + f"[{last}]format=yuv420p[v]"
-    run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph, "-map", "[v]",
-         "-r", str(FPS), "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", str(out)])
-
-
-def book_halves(sw, sh):
-    """Half-open like a book, opened towards the viewer: the spine recedes,
-    the outer edges come forward (taller)."""
-    spine_x, spine_top, spine_bottom = W / 2, 175, 825
-    edge_top, edge_bottom, reach = 95, 905, 520
-    left = ((spine_x - reach, edge_top), (spine_x, spine_top), (spine_x - reach, edge_bottom), (spine_x, spine_bottom))
-    right = ((spine_x, spine_top), (spine_x + reach, edge_top), (spine_x, spine_bottom), (spine_x + reach, edge_bottom))
-    return [(left, (0, 0, sw // 2, sh)), (right, (sw // 2, 0, sw - sw // 2, sh))]
-
-
-def upright_halves(sw, sh):
-    """Half-open upright, like a small laptop: the top half leans back (its
-    far edge narrower), the bottom half lies towards the viewer."""
-    hinge_y, hinge_half = 545, 330
-    top = ((W / 2 - 290, 85), (W / 2 + 290, 85), (W / 2 - hinge_half, hinge_y), (W / 2 + hinge_half, hinge_y))
-    bottom = ((W / 2 - hinge_half, hinge_y), (W / 2 + hinge_half, hinge_y), (W / 2 - 400, 915), (W / 2 + 400, 915))
-    return [(top, (0, 0, sw, sh // 2)), (bottom, (0, sh // 2, sw, sh - sh // 2))]
-
+RW, RH = W * 2, H * 2                  # render size
+FIT = 0.94                             # device's share of the frame
+PAPER = np.array([241, 239, 232], np.float32) / 255.0
 
 #        take          start  hold  posture
 SEGS = [("01-folded",   0.0, 1.5, "folded"),
@@ -199,61 +49,176 @@ SEGS = [("01-folded",   0.0, 1.5, "folded"),
         ("04-upright",  1.4, 2.5, "upright")]
 
 
-def duration(path):
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                         capture_output=True, text=True).stdout
-    return float(out.strip())
+def frames(name: str, start: float, hold: float):
+    """The take's frames as float RGB: rotation applied, constant rate,
+    trimmed, held on the last frame."""
+    src = IN / f"{name}.mov"
+    s = json.loads(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                   "stream=width,height:stream_side_data=rotation", "-of", "json", str(src)],
+                                  capture_output=True, text=True, check=True).stdout)["streams"][0]
+    w, h = s["width"], s["height"]
+    rot = next((abs(int(d["rotation"])) for d in s.get("side_data_list", []) if "rotation" in d), 0)
+    if rot in (90, 270):
+        w, h = h, w
+    proc = subprocess.Popen(["ffmpeg", "-v", "error", "-i", str(src), "-vf",
+                             f"fps={FPS},trim=start={start},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={hold}",
+                             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+    size = w * h * 3
+    while True:
+        buf = proc.stdout.read(size)
+        if len(buf) < size:
+            break
+        yield np.frombuffer(buf, np.uint8).reshape(h, w, 3).astype(np.float32) / 255.0
+    proc.wait()
+
+
+class FlatBezel:
+    """A PNG bezel with a transparent screen; the frame goes under it."""
+
+    def __init__(self, png: str):
+        img = np.asarray(Image.open(BEZEL / png).convert("RGBA"), np.float32) / 255.0
+        alpha = img[..., 3]
+        # The screen: the transparent region holding the image centre (the
+        # device's outside is transparent too, but not connected to it).
+        labels, _ = ndimage.label(alpha < 0.5)
+        ys, xs = np.nonzero(labels == labels[alpha.shape[0] // 2, alpha.shape[1] // 2])
+        self.hole = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+        # The device's own outline: solid inside, Apple's anti-aliased alpha
+        # along its outer edge. Everything under the bezel is clipped to it —
+        # the screen's rectangle is wider at the corners than the device's
+        # rounder outer corners, and poked out past them.
+        # Only the solid interior (a few pixels in from the outer edge, where
+        # the bezel itself is opaque): the outer anti-aliased edge stays
+        # exactly Apple's pixels.
+        core = ndimage.binary_erosion(ndimage.binary_fill_holes(alpha > 0.5), iterations=4)
+        self.silhouette = core.astype(np.float32)
+        dys, dxs = np.nonzero(alpha > 0.02)
+        self.device = (dxs.min(), dys.min(), dxs.max() + 1, dys.max() + 1)
+        self.rgba = img
+
+    def render(self, frame: np.ndarray) -> np.ndarray:
+        x0, y0, x1, y1 = self.hole
+        # The bezel's inner edge is anti-aliased (half-transparent pixels):
+        # the screen runs a pixel under it all round so no paper shows there.
+        x0, y0, x1, y1 = x0 - 1, y0 - 1, x1 + 1, y1 + 1
+        screen = np.asarray(Image.fromarray((frame * 255 + 0.5).astype(np.uint8)).resize((x1 - x0, y1 - y0), Image.LANCZOS),
+                            np.float32) / 255.0
+        h, w = self.rgba.shape[:2]
+        rgb = np.zeros((h, w, 3), np.float32)
+        # Black under the whole device first — the panel's border beneath the
+        # glass. Parts of the bezel's inner rim are semi-transparent; without
+        # this the background showed through them as a thin light line.
+        a = self.silhouette.copy()
+        rgb[y0:y1, x0:x1] = screen
+        a[y0:y1, x0:x1] = 1.0
+        a = np.minimum(a, self.silhouette)
+        ba = self.rgba[..., 3:4]
+        out_a = self.rgba[..., 3] + a * (1 - self.rgba[..., 3])
+        with np.errstate(divide="ignore", invalid="ignore"):
+            out_rgb = np.nan_to_num((self.rgba[..., :3] * ba + rgb * a[..., None] * (1 - ba)) / out_a[..., None])
+        return np.dstack([out_rgb, out_a])
+
+
+def place(rgba: np.ndarray, box) -> np.ndarray:
+    """Crops to the device, fits it into the render frame on paper."""
+    x0, y0, x1, y1 = box
+    crop = rgba[y0:y1, x0:x1]
+    ch, cw = crop.shape[:2]
+    k = min(RW * FIT / cw, RH * FIT / ch)
+    tw, th = round(cw * k), round(ch * k)
+    small = np.asarray(Image.fromarray((np.clip(crop, 0, 1) * 255 + 0.5).astype(np.uint8), "RGBA")
+                       .resize((tw, th), Image.LANCZOS), np.float32) / 255.0
+    out = np.tile(PAPER, (RH, RW, 1))
+    ox, oy = (RW - tw) // 2, (RH - th) // 2
+    a = small[..., 3:4]
+    out[oy:oy + th, ox:ox + tw] = small[..., :3] * a + out[oy:oy + th, ox:ox + tw] * (1 - a)
+    return out
+
+
+def encode(name: str, rendered, work: Path) -> Path:
+    out = work / f"{name}.mp4"
+    proc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                             "-s", f"{RW}x{RH}", "-r", str(FPS), "-i", "-",
+                             "-vf", f"scale={W}:{H}:flags=lanczos,format=yuv420p",
+                             "-c:v", "libx264", "-crf", "12", "-preset", "veryfast", str(out)], stdin=subprocess.PIPE)
+    n = 0
+    for frame in rendered:
+        proc.stdin.write((np.clip(frame, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
+        n += 1
+    proc.stdin.close()
+    proc.wait()
+    print(f"    {n} frames", flush=True)
+    return out
+
+
+def duration(path) -> float:
+    return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                 str(path)], capture_output=True, text=True).stdout.strip())
+
+
+def to_content(frame: np.ndarray, posture: str) -> np.ndarray:
+    """The upright template's smart object is landscape, placed a quarter
+    turn: its x runs up the screen's left edge and its y along the top."""
+    if posture == "upright":
+        return np.ascontiguousarray(np.transpose(frame[::-1], (1, 0, 2)))
+    return frame
 
 
 def main() -> int:
+    if not (BEZEL / "partial-Landscape" / "template.json").exists():
+        sys.exit(f"No bezels in {BEZEL}: run scripts/duo_bezel.py extract <mounted Bezel-iPhone-Duo volume>")
+    only = sys.argv[1] if len(sys.argv) > 1 else None    # e.g. "check": first frame of each take only
     OUT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         clips = []
         for name, start, hold, posture in SEGS:
-            print(f"==> {name} ({posture})")
-            src, sw, sh = normalise(name, start, hold, work)
-            out = work / f"{name}-framed.mp4"
+            print(f"==> {name} ({posture})", flush=True)
             if posture in ("folded", "unfolded"):
-                compose_flat(src, sw, sh, posture, out, work)
-            elif posture == "book":
-                compose_warped(src, sw, sh, book_halves(sw, sh), out, work)
+                bezel = FlatBezel("Outer Closed Portrait.png" if posture == "folded" else "Inner Open Landscape.png")
+                render, box = bezel.render, bezel.device
             else:
-                compose_warped(src, sw, sh, upright_halves(sw, sh), out, work)
-            clips.append(out)
-        # Join with dissolves.
+                which = "Landscape" if posture == "book" else "Portrait"
+                full_w, full_h = json.loads((BEZEL / f"partial-{which}" / "template.json").read_text())["size"]
+                # Rendered at the scale the 2x frame needs (the device is
+                # most of the template), not at the template's full size.
+                t = PartialTemplate(which, min(1.0, 1.1 * min(RW * FIT / full_w, RH * FIT / full_h)))
+                ys, xs = np.nonzero(t.load("Hardware.png", "RGBA")[..., 3] > 0.02)
+                box = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+                render = (lambda f, t=t, p=posture: t.render(to_content(f, p)))
+            if only == "check":
+                f = next(iter(frames(name, start + 1.0, 0)))
+                img = place(render(f), box)
+                Image.fromarray((img * 255 + 0.5).astype(np.uint8)).save(IN / f"check-2x-{name}.png")
+                continue
+            clips.append(encode(name, (place(render(f), box) for f in frames(name, start, hold)), work))
+        if only == "check":
+            return 0
+
         inputs, graph, label, acc = [], "", "0:v", duration(clips[0])
         for c in clips:
             inputs += ["-i", str(c)]
         for i in range(1, len(clips)):
-            offset = max(0.0, acc - XFADE)
-            graph += f"[{label}][{i}:v]xfade=transition=fade:duration={XFADE}:offset={offset:.3f}[v{i}];"
+            graph += f"[{label}][{i}:v]xfade=transition=fade:duration={XFADE}:offset={max(0.0, acc - XFADE):.3f}[v{i}];"
             label = f"v{i}"
             acc = acc - XFADE + duration(clips[i])
         joined = work / "joined.mp4"
-        run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph.rstrip(";"), "-map", f"[{label}]",
-             "-an", "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", str(joined)])
-        run(["ffmpeg", "-v", "error", "-y", "-i", str(joined), "-an", "-c:v", "libx264", "-profile:v", "high",
-             "-crf", "26", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(OUT / "duo.mp4")])
-        run(["ffmpeg", "-v", "error", "-y", "-i", str(joined), "-an", "-c:v", "libvpx-vp9", "-crf", "42", "-b:v", "0",
-             "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", str(OUT / "duo.webm")])
+        run = lambda *a: subprocess.run(["ffmpeg", "-v", "error", "-y", *a], check=True)
+        run(*inputs, "-filter_complex", graph.rstrip(";"), "-map", f"[{label}]", "-an",
+            "-c:v", "libx264", "-crf", "12", "-preset", "veryfast", str(joined))
+        run("-i", str(joined), "-an", "-c:v", "libx264", "-profile:v", "high", "-crf", "24", "-preset", "slow",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(OUT / "duo.mp4"))
+        run("-i", str(joined), "-an", "-c:v", "libvpx-vp9", "-crf", "40", "-b:v", "0", "-row-mt", "1",
+            "-deadline", "good", "-cpu-used", "2", str(OUT / "duo.webm"))
         poster = work / "poster.png"
-        run(["ffmpeg", "-v", "error", "-y", "-ss", "1.0", "-i", str(joined), "-vframes", "1", str(poster)])
-        run(["cwebp", "-quiet", "-q", "82", str(poster), "-o", str(OUT / "duo-poster.webp")])
-        # Contact frames for checking: middle of each take.
-        t, sheet = 0.0, []
-        for c in clips:
-            mid = t + duration(c) / 2
-            frame = Path(tmp) / f"check-{len(sheet)}.png"
-            run(["ffmpeg", "-v", "error", "-y", "-ss", f"{mid:.2f}", "-i", str(OUT / "duo.mp4"), "-vframes", "1", str(frame)])
-            sheet.append(Image.open(frame).copy())
-            t += duration(c) - XFADE
-        check = Image.new("RGB", (W, H), "white")
-        for i, im in enumerate(sheet):
-            check.paste(im.resize((W // 2, H // 2)), ((i % 2) * W // 2, (i // 2) * H // 2))
-        check_path = ROOT / "assets" / "footage-duo" / "framed-check.png"
-        check.save(check_path)
-        print(f"duration {duration(OUT / 'duo.mp4'):.1f}s; check sheet {check_path}")
+        run("-ss", "1.0", "-i", str(joined), "-vframes", "1", str(poster))
+        subprocess.run(["cwebp", "-quiet", "-q", "85", str(poster), "-o", str(OUT / "duo-poster.webp")], check=True)
+        t0 = 0.0
+        for i, c in enumerate(clips):
+            run("-ss", f"{t0 + duration(c) / 2:.2f}", "-i", str(OUT / "duo.mp4"), "-vframes", "1",
+                str(IN / f"framed-check-{i + 1}.png"))
+            t0 += duration(c) - XFADE
+        print(f"duration {duration(OUT / 'duo.mp4'):.1f}s; check frames {IN}/framed-check-*.png")
     return 0
 
 

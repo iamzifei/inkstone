@@ -72,7 +72,7 @@ duo:
   title: "iPhone Duo: una nota, cuatro formas"
   sub: "Cerrado, es la app de iPhone. Abierto, la barra lateral y la nota quedan lado a lado. Entreabierto, la nota ocupa un lado del pliegue y sus vínculos de retorno, esquema y propiedades el otro: nada se dibuja sobre el pliegue."
   video_alt: "Una grabación de Inkstone en el iPhone Duo: la lista de notas en la pantalla exterior cerrada, la misma nota abierta junto a la barra lateral, después entreabierto como un libro con el inspector en la página derecha y, en vertical, con el inspector bajo el pliegue."
-  caption: "Grabado en el simulador del iPhone Duo, iOS 27.2. El dispositivo alrededor de la pantalla está dibujado, en la postura de cada toma; la pantalla es la grabación, sin editar salvo los fundidos."
+  caption: 'Grabado en el simulador del iPhone Duo, iOS 27.2, y mostrado en los marcos de producto del iPhone Duo de Apple, en la postura de cada toma; la pantalla es la grabación, sin editar salvo los fundidos.'
 typography:
   title: Componer chino y latín en un mismo renglón
   sub: El caso difícil es una palabra latina dentro de una frase en han. Casi todas las apps lo hacen mal, de una manera que ya no puedes pasar por alto una vez que la has visto.
