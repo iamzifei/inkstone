@@ -17,6 +17,7 @@ final class NoteDocument {
             guard text != oldValue else { return }
             isDirty = true
             scheduleSave()
+            scheduleWordCount()
         }
     }
 
@@ -42,9 +43,25 @@ final class NoteDocument {
             text = ""
             loadError = error
         }
+        wordCount = NoteParser.wordCount(of: text)
     }
 
-    var wordCount: Int { NoteParser.wordCount(of: text) }
+    /// Words in the note, for the status line.
+    ///
+    /// Stored and refreshed shortly after typing pauses. It used to be computed
+    /// from `text` on every read, and the status line reads it in `body` — so
+    /// every keystroke re-counted the whole note on the main thread.
+    private(set) var wordCount = 0
+    private var countTask: Task<Void, Never>?
+
+    private func scheduleWordCount() {
+        countTask?.cancel()
+        countTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            self.wordCount = NoteParser.wordCount(of: self.text)
+        }
+    }
 
     private func scheduleSave() {
         saveTask?.cancel()
