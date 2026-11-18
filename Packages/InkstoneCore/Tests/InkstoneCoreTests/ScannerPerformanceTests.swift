@@ -64,10 +64,6 @@ struct ScannerPerformanceTests {
         return parts.joined(separator: "\n\n")
     }
 
-    static func median(of samples: [Double]) -> Double {
-        samples.sorted()[samples.count / 2]
-    }
-
     /// Best of the runs. Load on a shared runner only ever adds time, so the
     /// fastest run is the closest to what the code itself costs (2026-11-19:
     /// the median still moved with a busy runner and failed at random).
@@ -106,11 +102,10 @@ struct ScannerPerformanceTests {
 
     private func compare(sections: Int, label: String) {
         let text = Self.document(sections: sections)
-        // Paired and interleaved: each run times both engines back to back and
-        // the median of those pairs is compared. Timing all of one engine and
-        // then all of the other let a burst of load on a shared CI runner land
-        // on one side only — main failed once on exactly that (2026-11-18), a
-        // run the same commit had passed on its branch. Same budget as before.
+        // Interleaved: each run times both engines back to back, so a burst of
+        // load on a shared CI runner reaches both rather than one side only
+        // (main failed once on exactly that, 2026-11-18). The fastest run of
+        // each engine is compared (see `best(of:)`).
         let parserScanner = SyntaxScanner(engine: .parser)
         let legacyScanner = SyntaxScanner(engine: .legacy)
         _ = parserScanner.scan(text); _ = legacyScanner.scan(text)   // warm up
@@ -132,7 +127,7 @@ struct ScannerPerformanceTests {
               scan \(label) (\(sizeKB) KB): \
               parser \(String(format: "%.1f", parser)) ms | \
               legacy \(String(format: "%.1f", legacy)) ms | \
-              \(String(format: "%.1f", ratio))× (best of paired runs)
+              \(String(format: "%.1f", ratio))× (fastest run of each, interleaved)
               """)
         // Either within the ratio, or below the point where it could matter. On a
         // 2KB note the parser costs 1.7ms against the scanner's 0.4ms — a 4.6×
@@ -167,6 +162,9 @@ struct ScannerPerformanceTests {
         let large = Self.timeScan(Self.document(sections: 400))
         let ratio = large / small
         print("4× the text costs \(String(format: "%.1f", ratio))× the time")
-        #expect(ratio < 6, "4× the document should cost about 4× the time, not \(ratio)×")
+        // 2026-11-19: 6.3× once on a busy CI runner. CI gets 8 — a quadratic
+        // cost is 16× here, still twice past it.
+        let ceiling = ProcessInfo.processInfo.environment["CI"] == "true" ? 8.0 : 6.0
+        #expect(ratio < ceiling, "4× the document should cost about 4× the time, not \(ratio)×")
     }
 }
