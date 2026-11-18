@@ -110,6 +110,20 @@ enum SmokeTest {
             check("Rebuild Index reads an edit that kept its date", false)
         }
 
+        // --- a background task carrying on from one that is still stopping ---
+        workspace.setSyncStatusForTesting(.running("previous run unwinding"))
+        let stopsLater = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            workspace.setSyncStatusForTesting(.idle)
+        }
+        let settled = await workspace.settleInFlightSync(timeout: .seconds(5))
+        check("a new background task waits for the previous run to stop", settled && !workspace.isSyncing)
+        _ = await stopsLater.value
+        workspace.setSyncStatusForTesting(.running("never stops"))
+        let gaveUp = await workspace.settleInFlightSync(timeout: .milliseconds(500))
+        check("and gives up after its timeout", !gaveUp)
+        workspace.setSyncStatusForTesting(.idle)
+
         if let store = workspace.store {
             let hits = SearchEngine.fullText(query: "smoke", in: workspace.index, store: store)
             check("find it by full-text search", hits.contains { $0.url == note })
