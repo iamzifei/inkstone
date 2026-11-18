@@ -221,6 +221,18 @@ final class Workspace {
     }
 
     var sidebarSection: SidebarSection = .files
+
+    /// Whether the inspector (properties, backlinks, outline) is showing.
+    ///
+    /// Here rather than in the root view so a menu command (⌥⌘I) can toggle
+    /// it. Starts open on a Mac and closed elsewhere: on an iPad the sidebar
+    /// and the inspector are both overlays at these widths, and opening both by
+    /// default left the editor as a strip between two floating panels.
+    #if os(macOS)
+    var isInspectorPresented = true
+    #else
+    var isInspectorPresented = false
+    #endif
     var isQuickSwitcherPresented = false
     var searchQuery = ""
 
