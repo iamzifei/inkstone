@@ -55,6 +55,18 @@ public enum GitHubError: LocalizedError, Sendable {
     /// this client in: every operation was individually fine when tried by hand,
     /// and the failing one could not be identified from the error at all.
     case http(status: Int, message: String, path: String)
+    /// GitHub cut the tree listing short (very large repositories). Files
+    /// missing from a short listing would read as remote deletions, so a run
+    /// that gets one stops instead.
+    case listingTruncated(branch: String)
+
+    /// Errors that every later request in the same run would hit too.
+    var endsRun: Bool {
+        switch self {
+        case .unauthorised, .rateLimited, .branchNotFound, .notConfigured, .badRepository: return true
+        default: return false
+        }
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -89,6 +101,8 @@ public enum GitHubError: LocalizedError, Sendable {
             guard size >= 0 else { return "\(path): \(measured) \(advice)" }
             let megabytes = String(format: "%.1f", Double(size) / 1_048_576)
             return localized("\(path) is \(megabytes) MB. \(measured) \(advice)")
+        case .listingTruncated(let branch):
+            return localized("GitHub returned only part of the file list for \(branch) — the repository is too large to sync safely in one listing. Nothing was changed.")
         case .http(let status, let message, let path):
             let detail = message.isEmpty ? "" : " \(message)"
             return localized("GitHub returned \(status) for \(path).\(detail)")
@@ -309,8 +323,13 @@ public struct GitHubClient: Sendable {
                 let size: Int?
             }
             let tree: [Entry]
+            let truncated: Bool?
         }
-        return try JSONDecoder().decode(Response.self, from: data)
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        if decoded.truncated == true {
+            throw GitHubError.listingTruncated(branch: configuration.branch)
+        }
+        return decoded
             .tree
             .filter { $0.type == "blob" }
             .map { RemoteFile(path: $0.path, sha: $0.sha, size: $0.size ?? 0) }

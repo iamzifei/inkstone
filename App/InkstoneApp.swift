@@ -38,6 +38,7 @@ struct InkstoneApp: App {
     #endif
 
     init() {
+        LaunchTiming.mark("app init")
         #if os(iOS) && DEBUG
         // On-device check of the background wiring. Prints what the scheduler
         // actually accepted, which a successful build says nothing about.
@@ -175,10 +176,68 @@ struct InkstoneApp: App {
         exit(0)
     }
 
+    /// Runs the editor's highlighter over every Markdown file under a folder
+    /// and reports crashes, slow files and any change to the text.
+    ///
+    ///     INKSTONE_CORPUS=/path/to/copy INKSTONE_CORPUS_OUT=/path/report.tsv Inkstone
+    ///
+    /// Point it at a *copy* of a vault: it only reads, but a test corpus should
+    /// never be someone's real notes. The name of each file is written to
+    /// `<out>.current` before it is styled, so if the process dies the file
+    /// that killed it is on disk. The text check matters most: the editor's
+    /// storage *is* the file, so a highlighter that altered a character would
+    /// save that change into the note.
+    @MainActor
+    private static func runCorpusIfRequested() {
+        let env = ProcessInfo.processInfo.environment
+        guard let folder = env["INKSTONE_CORPUS"], let out = env["INKSTONE_CORPUS_OUT"] else { return }
+        let root = URL(fileURLWithPath: folder)
+        let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension.lowercased() == "md" } ?? [])
+            .sorted { $0.path < $1.path }
+        let skip = Int(env["INKSTONE_CORPUS_SKIP"] ?? "") ?? 0
+        var report = "ms\tchars\tchanged\tpath\n"
+        var changed = 0, slowest: [(Double, String)] = []
+        let width = Double(env["INKSTONE_CORPUS_WIDTH"] ?? "") ?? 700
+        for (i, url) in files.enumerated() where i >= skip {
+            try? "\(i)\t\(url.path)\n".write(toFile: out + ".current", atomically: true, encoding: .utf8)
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            let storage = NSTextStorage(string: text)
+            var highlighter = MarkdownHighlighter(style: .fallback, mode: .livePreview)
+            highlighter.availableWidth = CGFloat(width)
+            let folderURL = url.deletingLastPathComponent()
+            highlighter.resolveAttachment = { target in
+                let candidate = folderURL.appending(path: target)
+                return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+            }
+            let started = DispatchTime.now().uptimeNanoseconds
+            highlighter.highlight(storage, caretLineRange: nil)
+            // A second pass with the caret on a middle line: un-concealing a
+            // line is its own code path.
+            let ns = storage.string as NSString
+            let caret = ns.lineRange(for: NSRange(location: ns.length / 2, length: 0))
+            highlighter.highlight(storage, caretLineRange: caret)
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+            let isChanged = storage.string != text
+            if isChanged { changed += 1 }
+            let relative = String(url.path.dropFirst(root.path.count + 1))
+            report += String(format: "%.1f\t%d\t%d\t%@\n", ms, ns.length, isChanged ? 1 : 0, relative)
+            slowest.append((ms, relative))
+        }
+        try? report.write(toFile: out, atomically: true, encoding: .utf8)
+        slowest.sort { $0.0 > $1.0 }
+        var summary = "files \(files.count - skip)  text changed: \(changed)\nslowest:\n"
+        for (ms, path) in slowest.prefix(15) { summary += String(format: "  %7.1f ms  %@\n", ms, path) }
+        FileHandle.standardOutput.write(Data(summary.utf8))
+        try? FileManager.default.removeItem(atPath: out + ".current")
+        exit(0)
+    }
+
     @MainActor
     private static func runHighlightBenchmarkIfRequested() {
         checkICloudIfRequested()
         dumpMathIfRequested()
+        runCorpusIfRequested()
         guard let path = ProcessInfo.processInfo.environment["INKSTONE_BENCH"],
               let text = try? String(contentsOfFile: path, encoding: .utf8)
         else { return }

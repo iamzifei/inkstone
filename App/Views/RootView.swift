@@ -46,6 +46,16 @@ struct RootView: View {
                             .navigationDestination(isPresented: showingDetail) {
                                 DetailView()
                                     .toolbar { toolbarContent }
+                                    // Compact width presents the inspector as a
+                                    // sheet. It was never attached here, so on
+                                    // iPhone the toolbar button did nothing and
+                                    // backlinks, outline and properties were
+                                    // unreachable.
+                                    .inspector(isPresented: $isInspectorPresented) {
+                                        InspectorView()
+                                            .presentationDetents([.medium, .large])
+                                            .presentationDragIndicator(.visible)
+                                    }
                             }
                     }
                 } else {
@@ -58,6 +68,7 @@ struct RootView: View {
         }
         .tint(style.accent)
         .background(style.background)
+        .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
         }
@@ -320,7 +331,13 @@ private struct TabStrip: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 8, weight: .bold))
+                                #if os(iOS)
+                                // An 8 pt target is unhittable with a finger.
+                                .frame(width: 44, height: 44)
+                                .contentShape(.rect)
+                                #endif
                         }
+                        .accessibilityLabel(Text("Close Tab"))
                         .buttonStyle(.plain)
                         .opacity(isActive ? 1 : 0.4)
                     }

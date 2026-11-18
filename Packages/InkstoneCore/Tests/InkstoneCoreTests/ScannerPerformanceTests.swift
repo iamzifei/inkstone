@@ -94,14 +94,33 @@ struct ScannerPerformanceTests {
 
     private func compare(sections: Int, label: String) {
         let text = Self.document(sections: sections)
-        let parser = Self.timeScan(text, engine: .parser)
-        let legacy = Self.timeScan(text, engine: .legacy)
+        // Paired and interleaved: each run times both engines back to back and
+        // the median of those pairs is compared. Timing all of one engine and
+        // then all of the other let a burst of load on a shared CI runner land
+        // on one side only — main failed once on exactly that (2026-11-18), a
+        // run the same commit had passed on its branch. Same budget as before.
+        let parserScanner = SyntaxScanner(engine: .parser)
+        let legacyScanner = SyntaxScanner(engine: .legacy)
+        _ = parserScanner.scan(text); _ = legacyScanner.scan(text)   // warm up
+        var parserSamples: [Double] = [], legacySamples: [Double] = [], ratios: [Double] = []
+        for _ in 0..<7 {
+            var start = DispatchTime.now().uptimeNanoseconds
+            _ = legacyScanner.scan(text)
+            let l = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            start = DispatchTime.now().uptimeNanoseconds
+            _ = parserScanner.scan(text)
+            let p = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            legacySamples.append(l); parserSamples.append(p); ratios.append(p / max(l, 0.001))
+        }
+        let parser = Self.median(of: parserSamples)
+        let legacy = Self.median(of: legacySamples)
+        let ratio = Self.median(of: ratios)
         let sizeKB = text.utf8.count / 1024
         print("""
               scan \(label) (\(sizeKB) KB): \
               parser \(String(format: "%.1f", parser)) ms | \
               legacy \(String(format: "%.1f", legacy)) ms | \
-              \(String(format: "%.1f", parser / legacy))×
+              \(String(format: "%.1f", ratio))× (median of paired runs)
               """)
         // Either within the ratio, or below the point where it could matter. On a
         // 2KB note the parser costs 1.7ms against the scanner's 0.4ms — a 4.6×
@@ -109,7 +128,7 @@ struct ScannerPerformanceTests {
         // anyone can perceive. Failing on that ratio would be measuring a number
         // that has no consequence.
         #expect(
-            parser < legacy * Self.budget || parser < Self.floorMs,
+            ratio < Self.budget || parser < Self.floorMs,
             "the parser engine went from \(legacy) ms to \(parser) ms — more than \(Self.budget)× the scanner it replaced"
         )
     }
