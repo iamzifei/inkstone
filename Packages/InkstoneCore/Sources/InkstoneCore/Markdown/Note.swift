@@ -1,7 +1,7 @@
 import Foundation
 
 /// A heading extracted from a note, used for the outline pane and `[[Note#Heading]]` resolution.
-public struct Heading: Hashable, Sendable {
+public struct Heading: Hashable, Sendable, Codable {
     public let level: Int
     public let text: String
     public let range: NSRange
@@ -17,7 +17,7 @@ public struct Heading: Hashable, Sendable {
 ///
 /// Kept small and value-typed: a 20,000-note vault has to fit in memory, so the
 /// body stays on disk and only metadata is retained.
-public struct NoteMetadata: Identifiable, Hashable, Sendable {
+public struct NoteMetadata: Identifiable, Hashable, Sendable, Codable {
     public let url: URL
     public var id: URL { url }
 
@@ -57,6 +57,11 @@ public struct NoteMetadata: Identifiable, Hashable, Sendable {
 }
 
 public enum NoteParser {
+    /// Bump whenever parsing could produce different metadata for the same
+    /// text: the on-disk index cache (IndexCache) written by another version
+    /// is then ignored instead of served.
+    public static let schemaVersion = 1
+
     private static let scanner = SyntaxScanner()
 
     /// Builds metadata from a note's raw text. Pure and `Sendable`, so indexing

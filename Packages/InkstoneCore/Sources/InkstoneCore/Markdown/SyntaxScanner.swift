@@ -79,7 +79,7 @@ public struct SyntaxToken: Hashable, Sendable {
 }
 
 /// A parsed `[[wikilink]]` target.
-public struct WikiLink: Hashable, Sendable {
+public struct WikiLink: Hashable, Sendable, Codable {
     /// Note name or path as typed, without extension. Empty for same-note links.
     public let target: String
     /// `#Heading` or `#^blockId` fragment, without the leading `#`.
@@ -108,7 +108,7 @@ public struct WikiLink: Hashable, Sendable {
     /// box exactly. The same pipe means display *text* on an ordinary wikilink,
     /// which is why this is nil unless the alias is nothing but digits — a note
     /// embedded as `![[Meeting|notes]]` is not 0 points wide.
-    public struct EmbedSize: Hashable, Sendable {
+    public struct EmbedSize: Hashable, Sendable, Codable {
         public let width: Double
         /// Nil means "keep the picture's own proportions".
         public let height: Double?
