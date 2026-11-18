@@ -758,6 +758,28 @@
         }
       }
     },
+    "Add %@ to today's note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add %@ to today's note"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 %@ 添加到今日笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 %@ 加入今日筆記"
+          }
+        }
+      }
+    },
     "Add a card": {
       "extractionState": "manual",
       "localizations": {
@@ -850,6 +872,50 @@
         }
       }
     },
+    "Add to Today's Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Today's Note"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加到今日笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入今日筆記"
+          }
+        }
+      }
+    },
+    "Added to “%@”.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to “%@”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已添加到「%@」。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加入「%@」。"
+          }
+        }
+      }
+    },
     "Adds a hair space between 中文 and English while rendering. Your files are never modified.": {
       "extractionState": "manual",
       "localizations": {
@@ -892,6 +958,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "在檢查器中新增「助理」分頁，位於筆記屬性和反向連結旁邊。"
+          }
+        }
+      }
+    },
+    "Adds text to the end of today's daily note, creating the note if needed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds text to the end of today's daily note, creating the note if needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把文本添加到今日日记的末尾，没有就先创建。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把文字加到今日日記的末尾，沒有就先建立。"
           }
         }
       }
@@ -2544,6 +2632,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "為這個儲存庫建立一個細粒度權杖，授予「Contents」的讀寫權限。權杖儲存在你的鑰匙圈中，絕不會寫進儲存庫或設定檔。"
+          }
+        }
+      }
+    },
+    "Creates a note in your Inkstone vault.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creates a note in your Inkstone vault."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你的 Inkstone 库中新建一条笔记。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你的 Inkstone 庫中新增一則筆記。"
           }
         }
       }
@@ -6137,6 +6247,28 @@
         }
       }
     },
+    "New note with %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New note with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 %@ 新建笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 %@ 新增筆記"
+          }
+        }
+      }
+    },
     "New notes": {
       "extractionState": "manual",
       "localizations": {
@@ -7185,6 +7317,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "先開啟一篇筆記，才能以它為中心"
+          }
+        }
+      }
+    },
+    "Open a vault in Inkstone first.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a vault in Inkstone first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在 Inkstone 中打开一个库。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先在 Inkstone 中打開一個庫。"
           }
         }
       }
@@ -9000,6 +9154,28 @@
         }
       }
     },
+    "Saved “%@”.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved “%@”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存「%@」。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已儲存「%@」。"
+          }
+        }
+      }
+    },
     "Scanning vault…": {
       "extractionState": "manual",
       "localizations": {
@@ -10373,6 +10549,28 @@
         }
       }
     },
+    "Taken from the first line of the text if left empty.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taken from the first line of the text if left empty."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "留空时取文本的第一行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "留空時取文字的第一行。"
+          }
+        }
+      }
+    },
     "Takes effect after restarting Inkstone.": {
       "extractionState": "manual",
       "localizations": {
@@ -10436,6 +10634,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "範本"
+          }
+        }
+      }
+    },
+    "Text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字"
           }
         }
       }
@@ -10620,6 +10840,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "資料夾及其中的檔案會原樣保留在原處。"
+          }
+        }
+      }
+    },
+    "The note could not be read, so nothing was added to it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The note could not be read, so nothing was added to it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取这条笔记，所以没有添加任何内容。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法讀取這則筆記，所以沒有加入任何內容。"
+          }
+        }
+      }
+    },
+    "The note could not be saved.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The note could not be saved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存笔记。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法儲存筆記。"
           }
         }
       }
@@ -10873,6 +11137,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "主題"
+          }
+        }
+      }
+    },
+    "There is no text to add.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no text to add."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有要添加的文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有要加入的文字。"
           }
         }
       }
@@ -11310,6 +11596,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "這個儲存庫位於 iCloud 雲碟，會自動同步。"
+          }
+        }
+      }
+    },
+    "Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標題"
           }
         }
       }

@@ -355,6 +355,10 @@ final class Workspace {
     init(registry: VaultRegistry = VaultRegistry(), settings: AppSettings = AppSettings()) {
         self.registry = registry
         self.settings = settings
+        // Shortcuts actions reach the vault through the app's workspace. A
+        // reference taken in App.init can be to an instance SwiftUI discards,
+        // so the workspace registers itself (and again when it opens a vault).
+        if IntentHost.current == nil { IntentHost.current = self }
     }
 
     // MARK: - Vault lifecycle
@@ -367,6 +371,9 @@ final class Workspace {
     /// wrong when the OS woke a scene-less process to do exactly one sync — that
     /// combination gave two `sync()` runs racing over the same working tree.
     func open(_ vault: Vault, startingBackgroundWork: Bool = true) {
+        // Only if none is set: smoke tests and guide shots open throwaway
+        // workspaces that must not take the Shortcuts actions with them.
+        if IntentHost.current == nil { IntentHost.current = self }
         closeCurrentVault()
         do {
             let url = try registry.beginAccess(to: vault)
@@ -1633,6 +1640,14 @@ final class Workspace {
     /// Opens (creating if needed) the daily note for a date.
     @discardableResult
     func openDailyNote(for date: Date = .now) -> URL? {
+        guard let url = ensureDailyNote(for: date) else { return nil }
+        openNote(at: url)
+        return url
+    }
+
+    /// The day's note, created from the daily-note template if it does not
+    /// exist yet. Does not open it.
+    func ensureDailyNote(for date: Date = .now) -> URL? {
         guard let store, let root else { return nil }
         let formatter = DateFormatter()
         formatter.dateFormat = settings.data.dailyNoteFormat
@@ -1645,17 +1660,90 @@ final class Workspace {
         let url = folder.appending(path: name + ".md")
 
         if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
-            openNote(at: url)
             return url
         }
 
         let template = settings.data.dailyNoteTemplate.isEmpty
             ? "# \(name)\n\n"
             : settings.data.dailyNoteTemplate
-        try? store.write(template, to: url)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        guard (try? store.write(template, to: url)) != nil else { return nil }
         refreshTree()
         reindex()
-        openNote(at: url)
+        return url
+    }
+
+    // MARK: - Capture (Shortcuts, share sheet)
+
+    enum CaptureError: LocalizedError {
+        case noVault, writeFailed, emptyText, unreadable
+        var errorDescription: String? {
+            switch self {
+            case .noVault: localized("Open a vault in Inkstone first.")
+            case .writeFailed: localized("The note could not be saved.")
+            case .emptyText: localized("There is no text to add.")
+            case .unreadable: localized("The note could not be read, so nothing was added to it.")
+            }
+        }
+    }
+
+    /// Appends text to a note — through the open editor's document if the
+    /// note is open (so the edit and the editor never disagree), else on disk.
+    ///
+    /// Never builds on text it could not read: a failed read (an iCloud
+    /// placeholder, a locked device) or a document that failed to load would
+    /// otherwise replace the whole note with just the appended line.
+    func append(_ text: String, to url: URL) throws {
+        guard let store else { throw CaptureError.noVault }
+        if let document = documents[url] {
+            guard document.loadError == nil else { throw CaptureError.unreadable }
+            // Pick up a change on disk (a sync) the watcher has not delivered yet.
+            document.reloadIfUnchangedLocally()
+            document.text = Capture.appending(text, to: document.text)
+            document.save()
+        } else {
+            let current: String
+            if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+                do { current = try store.read(url) } catch { throw CaptureError.unreadable }
+            } else {
+                current = ""
+            }
+            do { try store.write(Capture.appending(text, to: current), to: url) } catch { throw CaptureError.writeFailed }
+        }
+        reindex()
+    }
+
+    /// Opens the last vault if none is open (an intent can run before any
+    /// window), or fails with a message Shortcuts shows.
+    func vaultForCapture() throws {
+        openMostRecentVaultIfNeeded(startingBackgroundWork: false)
+        guard root != nil, store != nil else { throw CaptureError.noVault }
+    }
+
+    /// A new note with `text`, in the folder for new notes. Not opened.
+    func captureNewNote(title: String?, text: String) throws -> URL {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw CaptureError.emptyText }
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? title : nil
+        try vaultForCapture()
+        guard let store, let root else { throw CaptureError.noVault }
+        let firstLine = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? ""
+        let name = Capture.noteName(from: title ?? String(firstLine.trimmingCharacters(in: CharacterSet(charactersIn: "# ")).prefix(60)))
+        let folder = settings.data.defaultNewNoteFolder.isEmpty
+            ? root : root.appending(path: settings.data.defaultNewNoteFolder, directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = store.uniqueURL(for: name, extension: "md", in: folder)
+        do { try store.write(text.hasSuffix("\n") ? text : text + "\n", to: url) } catch { throw CaptureError.writeFailed }
+        refreshTree()
+        reindex()
+        return url
+    }
+
+    /// Appends `text` to today's daily note (created if needed).
+    func captureToDailyNote(_ text: String) throws -> URL {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw CaptureError.emptyText }
+        try vaultForCapture()
+        guard let url = ensureDailyNote() else { throw CaptureError.writeFailed }
+        try append(text, to: url)
         return url
     }
 
