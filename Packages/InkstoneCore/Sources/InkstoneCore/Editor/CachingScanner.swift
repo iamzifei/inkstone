@@ -20,6 +20,8 @@ public struct CachingScanner: Sendable {
     /// that number smaller than the number of calls, so it is worth being able to
     /// assert on.
     public private(set) var scanCount = 0
+    /// Of those, how many re-scanned only the blocks an edit touched.
+    public private(set) var incrementalScans = 0
 
     public init(engine: SyntaxScanner.Engine = .parser) {
         scanner = SyntaxScanner(engine: engine)
@@ -33,7 +35,14 @@ public struct CachingScanner: Sendable {
         // microseconds against the milliseconds it saves.
         if let previous = self.text, previous == text { return cached }
         scanCount += 1
-        let tokens = scanner.scan(text)
+        let tokens: [SyntaxToken]
+        if scanner.engine == .parser, let previous = self.text,
+           let spliced = IncrementalScan.rescan(old: previous, oldTokens: cached, new: text, scanner: scanner) {
+            incrementalScans += 1
+            tokens = spliced
+        } else {
+            tokens = scanner.scan(text)
+        }
         self.text = text
         self.cached = tokens
         return tokens
