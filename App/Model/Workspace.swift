@@ -1131,6 +1131,31 @@ final class Workspace {
     /// note. The incremental index trusts modification dates, so a change that
     /// kept its date (a restored backup, `rsync -t`) is only picked up by the
     /// periodic full rebuild; this is the button for not waiting.
+    /// Brings Spotlight up to date with the index. Runs after the previous
+    /// update finishes, never alongside it (the indexer's record of what it
+    /// pushed would interleave).
+    @ObservationIgnored private var spotlightTask: Task<Void, Never>?
+    func updateSpotlight() {
+        guard let root else { return }
+        let notes = index.notes.mapValues(\.modified)
+        let enabled = settings.data.indexInSpotlight
+        let previous = spotlightTask
+        spotlightTask = Task.detached(priority: .utility) {
+            _ = await previous?.value
+            await SpotlightIndexer.shared.update(root: root, notes: notes, enabled: enabled)
+        }
+    }
+
+    /// A Spotlight result was tapped: open the note, if it is in this vault.
+    func openSpotlightResult(_ identifier: String) {
+        guard let root else { return }
+        let url = URL(filePath: identifier)
+        let rootPath = SpotlightIndexer.identifier(for: root)
+        guard identifier.hasPrefix(rootPath.hasSuffix("/") ? rootPath : rootPath + "/"),
+              FileManager.default.fileExists(atPath: identifier) else { return }
+        openNote(at: url)
+    }
+
     func rebuildIndex() {
         refreshTree()
         reindex(full: true)
@@ -1152,6 +1177,7 @@ final class Workspace {
                 // must not postpone the next.
                 if full { self.lastFullIndex = .now }
                 self.index = snapshot
+                self.updateSpotlight()
                 LaunchTiming.mark("index ready")
                 self.indexGeneration += 1
                 self.isIndexing = false

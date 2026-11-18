@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreSpotlight
 import InkstoneCore
 
 /// Top-level layout: sidebar, editor, inspector.
@@ -70,6 +71,11 @@ struct RootView: View {
         .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String {
+                workspace.openSpotlightResult(id)
+            }
         }
         .sheet(isPresented: $workspace.isTemplatePickerPresented) {
             TemplatePickerView()

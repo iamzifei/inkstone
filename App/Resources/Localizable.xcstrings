@@ -6709,6 +6709,28 @@
         }
       }
     },
+    "Note titles and text are added to this device's search index, so they turn up in system search. Nothing leaves the device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note titles and text are added to this device's search index, so they turn up in system search. Nothing leaves the device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔记标题和正文会加入本设备的搜索索引，可以在系统搜索中找到。数据不会离开本设备。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筆記標題和內文會加入本裝置的搜尋索引，可在系統搜尋中找到。資料不會離開本裝置。"
+          }
+        }
+      }
+    },
     "Notes and canvases always sync. Set the size limit to 0 for no limit.": {
       "extractionState": "manual",
       "localizations": {
@@ -9501,6 +9523,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示行號"
+          }
+        }
+      }
+    },
+    "Show notes in Spotlight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show notes in Spotlight"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在聚焦搜索中显示笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Spotlight 中顯示筆記"
           }
         }
       }

@@ -104,6 +104,8 @@ public struct SettingsData: Codable, Hashable, Sendable {
     /// Folder of templates for Insert Template, vault-relative. Obsidian's
     /// Templates plugin default, so an imported vault's templates just work.
     public var templateFolder = "Templates"
+    /// Notes appear in Spotlight / system search (on this device only).
+    public var indexInSpotlight = true
     public var weekStartsOnMonday = true
 
     // Files
@@ -293,6 +295,7 @@ public struct SettingsData: Codable, Hashable, Sendable {
         dailyNoteFormat = value(.dailyNoteFormat, defaults.dailyNoteFormat)
         dailyNoteTemplate = value(.dailyNoteTemplate, defaults.dailyNoteTemplate)
         templateFolder = value(.templateFolder, defaults.templateFolder)
+        indexInSpotlight = value(.indexInSpotlight, defaults.indexInSpotlight)
         weekStartsOnMonday = value(.weekStartsOnMonday, defaults.weekStartsOnMonday)
 
         attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)

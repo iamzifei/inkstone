@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import CoreGraphics
+import CoreSpotlight
 import os
 import InkstoneCore
 
@@ -106,6 +107,11 @@ enum DemoDirector {
             // As if the command were chosen in the open palette.
             workspace.pendingPaletteCommand = AppCommand.all.first { $0.id == arg }
             workspace.isCommandPalettePresented = false
+        case "spotlight-query":
+            // Asks the system index (not our own) for the app's items matching arg.
+            spotlightQuery(arg)
+        case "spotlight-open":
+            if let url = workspace.root?.appending(path: arg) { workspace.openSpotlightResult(SpotlightIndexer.identifier(for: url)) }
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
         case "caret":
@@ -122,5 +128,23 @@ enum DemoDirector {
             break
         }
     }
+}
+/// CoreSpotlight calls these handlers on its own queue: kept out of the main
+/// actor, or Swift's isolation check traps.
+private nonisolated func spotlightQuery(_ text: String) {
+    final class Found: @unchecked Sendable { var titles: [String] = []; let lock = NSLock() }
+    let found = Found()
+    let log = Logger(subsystem: "com.orris.inkstone", category: "Demo")
+    let context = CSSearchQueryContext()
+    context.fetchAttributes = ["title"]
+    let query = CSSearchQuery(queryString: "textContent == \"*\(text)*\"cd || title == \"*\(text)*\"cd", queryContext: context)
+    query.foundItemsHandler = { @Sendable items in
+        found.lock.lock(); found.titles += items.compactMap { $0.attributeSet.title }; found.lock.unlock()
+    }
+    query.completionHandler = { @Sendable error in
+        found.lock.lock(); let titles = found.titles.sorted(); found.lock.unlock()
+        log.info("demo spotlight \(text, privacy: .public): \(titles.joined(separator: " | "), privacy: .public) \(error?.localizedDescription ?? "", privacy: .public)")
+    }
+    query.start()
 }
 #endif
