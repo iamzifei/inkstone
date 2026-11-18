@@ -36,7 +36,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+JP:wght@300;400;600&display=swap">
 <link rel="stylesheet" href="../assets/styles.css?v=9c82d673">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.3.0","url":"https://inkslab.app/ja/","image":"https://inkslab.app/assets/og-card-zh.png","description":"無料の Mac 向け Markdown ノートアプリ。ノートは自分のフォルダにある素の Markdown ファイル。ウィキリンク、バックリンク、グラフ、キャンバス。Obsidian の保管庫もそのまま開けます。","inLanguage":"ja","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"sameAs":["https://apps.apple.com/app/id6803462651","https://github.com/iamzifei/inkstone"],"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.4.0","url":"https://inkslab.app/ja/","image":"https://inkslab.app/assets/og-card-zh.png","description":"無料の Mac 向け Markdown ノートアプリ。ノートは自分のフォルダにある素の Markdown ファイル。ウィキリンク、バックリンク、グラフ、キャンバス。Obsidian の保管庫もそのまま開けます。","inLanguage":"ja","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"sameAs":["https://apps.apple.com/app/id6803462651","https://github.com/iamzifei/inkstone"],"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script>
 
 </head>
 <body>
@@ -143,7 +143,7 @@
   <div class="feat-text">
     <p class="kicker">二台目のために</p>
     <h3>iCloud か GitHub、そして何を運ぶかはあなたが決める</h3>
-    <p>iCloud で同期するか、保管庫を GitHub のリポジトリへ push します。衝突は一度決着させ、両方を残したりしません。種類ごとのフィルタで添付やメディアを運ぶか決められ、保管庫自身の .gitignore は尊重されます。</p>
+    <p>iCloud で同期するか、保管庫を GitHub のリポジトリへ push します。同期が始まってからは、衝突で何かが上書きされることはありません。両側で変更されたノートは、もう一方の版が競合コピーとしてあなたの版の隣に残ります。種類ごとのフィルタで添付やメディアを運ぶか決められ、保管庫自身の .gitignore は尊重されます。</p>
   </div>
   <figure class="feat-shot"><img src="../assets/shots/sync.webp" srcset="../assets/shots/sync-640.webp 640w, ../assets/shots/sync-960.webp 960w, ../assets/shots/sync.webp 1120w" sizes="(max-width: 900px) 92vw, 620px" width="1120" height="1096" alt="GitHub 同期の設定：リポジトリとブランチの選択、および同期対象をファイル種別で決めるスイッチ。" loading="lazy" decoding="async"></figure>
 </article>
@@ -186,7 +186,7 @@
     <h2 id="specs-h">仕様</h2>
     <p class="rule-sub">何かをダウンロードする前に知っておく価値のある部分。</p>
   </div>
-  <table class="spec-table reveal"><tbody><tr><th scope="row">対応環境</th><td>macOS 26 と iOS 26、ひとつの SwiftUI コードベース。Mac 版はユニバーサルで、Apple シリコンと Intel の両方に対応</td></tr><tr><th scope="row">保存</th><td>自分で選んだフォルダの素の Markdown ファイル。データベースも取り込みもなし</td></tr><tr><th scope="row">互換性</th><td>Obsidian の保管庫をそのまま双方向に開けます。キャンバスは JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown に加え、ウィキリンク、埋め込み、ブロック参照、コールアウト、脚注、数式、Mermaid</td></tr><tr><th scope="row">同期</th><td>iCloud または GitHub リポジトリ、ファイル種別ごとのフィルタ付き</td></tr><tr><th scope="row">表示言語</th><td>English、简体中文、繁體中文</td></tr><tr><th scope="row">ソース</th><td>GitHub で公開。ライセンスはまだ決めていません。</td></tr><tr><th scope="row">プライバシー</th><td>アカウント不要、テレメトリなし、頼んでいない通信もなし</td></tr></tbody></table>
+  <table class="spec-table reveal"><tbody><tr><th scope="row">対応環境</th><td>macOS 26 と iOS 26、ひとつの SwiftUI コードベース。Mac 版はユニバーサルで、Apple シリコンと Intel の両方に対応</td></tr><tr><th scope="row">保存</th><td>自分で選んだフォルダの素の Markdown ファイル。データベースも取り込みもなし</td></tr><tr><th scope="row">互換性</th><td>Obsidian の保管庫をそのまま双方向に開けます。キャンバスは JSON Canvas 1.0</td></tr><tr><th scope="row">Markdown</th><td>GitHub Flavored Markdown に加え、ウィキリンク、埋め込み、ブロック参照、コールアウト、脚注、数式、Mermaid</td></tr><tr><th scope="row">同期</th><td>iCloud または GitHub リポジトリ、ファイル種別ごとのフィルタ付き</td></tr><tr><th scope="row">ワークフロー</th><td>Obsidian と同じプレースホルダのテンプレート、PDF<span class="ac"></span>・<span class="ac"></span>HTML への書き出し、コマンドパレット、Spotlight 検索、ショートカットのアクション</td></tr><tr><th scope="row">表示言語</th><td>English、简体中文、繁體中文</td></tr><tr><th scope="row">ソース</th><td>GitHub で公開。ライセンスはまだ決めていません。</td></tr><tr><th scope="row">プライバシー</th><td>アカウント不要、テレメトリなし、頼んでいない通信もなし</td></tr></tbody></table>
   <div class="closer reveal">
     <p class="closer-line">無料で、何も囲い込まず、書き出されるファイルはあなたがもともと持っていたファイルです。</p>
     <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a>

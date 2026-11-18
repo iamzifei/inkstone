@@ -2,9 +2,17 @@ Inkstone is a Markdown notes app. It needs no account and no sign-in, so there a
 
 Getting started: on first launch, tap "Create Vault in iCloud Drive" (or "Open Folder as Vault" to choose any folder, for example in Files > On My iPhone). A new vault is empty; tap the + button at the bottom of the list to create a note.
 
-New in 0.3, and how to see it:
-- Find and replace: open a note, tap the magnifying-glass-on-document button in the toolbar ("Find in Note"), or press Command-F on a hardware keyboard.
-- iPhone Duo: on an iPhone Duo, half-open the device with a note open; the note is shown on one side of the crease and its backlinks, outline and properties on the other. On other iPhones and on iPad the app behaves as before.
-- Sync health (Settings > Sync): only appears once GitHub sync is set up, which needs the user's own GitHub repository and personal access token. Everything else in the app works without it.
+New in 0.4, and how to see it (open a note first; a new vault is empty, so tap + to create one):
+- Templates: tap the "More" (ellipsis) button in the note's toolbar, then "Insert Template…". It lists notes in the vault's "Templates" folder; with none, it says so and how to add one.
+- Export: "More" > "Export as PDF…" or "Export as HTML…" opens the share sheet with the file.
+- Command palette: "More" > "Command Palette…", then type a few letters of a command's name.
+- Spotlight: after a vault is opened, its notes appear in system search on this device; tapping a result opens the note. It can be turned off in Settings > Files & Links.
+- Shortcuts: the Shortcuts app lists "New Note" and "Add to Today's Note" under Inkstone. They write into the vault opened last in the app.
+- iPhone Duo: folding or unfolding keeps the caret and scroll position in the open note.
 
-Background modes: 'fetch' and 'processing' are used to synchronise a vault to iCloud Drive, or to a GitHub repository the user configures with their own personal access token, while the app is not in the foreground. No data is sent anywhere else; there is no analytics and no server belonging to the developer. Privacy policy: https://inkslab.app/privacy.html
+Still from 0.3:
+- Find and replace: the magnifying-glass-on-document toolbar button ("Find in Note"), or Command-F on a hardware keyboard.
+- iPhone Duo: half-open with a note open; the note is on one side of the crease and its backlinks, outline and properties on the other.
+- Sync health (Settings > Sync): only appears once GitHub sync is set up, which needs the user's own GitHub repository and personal access token. Everything else works without it.
+
+Background modes: 'fetch' and 'processing' are used to synchronise a vault to iCloud Drive, or to a GitHub repository the user configures with their own personal access token, while the app is not in the foreground. No data is sent anywhere else; there is no analytics and no server belonging to the developer. Notes added to system search (Spotlight) stay in this device's search index. Privacy policy: https://inkslab.app/privacy.html

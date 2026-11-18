@@ -1,1 +1,1 @@
-New in 0.3: find and replace, iPhone Duo layouts, safer GitHub sync with a preview of what the next sync will do, and Markdown that matches Obsidian.
+New in 0.4: templates, export to PDF and HTML, a command palette, notes in system search, and Shortcuts actions to capture a note or add to today's.

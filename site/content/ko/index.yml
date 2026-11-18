@@ -66,7 +66,7 @@ features:
     sync:
       kicker: 두 번째 기기
       title: iCloud 또는 GitHub, 무엇이 따라갈지는 당신이 정합니다
-      body: iCloud로 동기화하거나 보관함을 GitHub 저장소로 푸시합니다. 충돌은 한 번에 정리되고 사본 두 개로 남지 않습니다. 종류별 필터가 첨부와 미디어의 동행 여부를 정하며, 보관함 자신의 .gitignore는 존중됩니다.
+      body: 'iCloud로 동기화하거나 보관함을 GitHub 저장소로 푸시합니다. 동기화가 시작된 뒤에는 충돌이 무언가를 덮어쓰는 일은 없습니다. 양쪽에서 바뀐 노트는 다른 쪽 버전이 충돌 사본으로 내 버전 옆에 남습니다. 종류별 필터가 첨부와 미디어의 동행 여부를 정하며, 보관함 자신의 .gitignore는 존중됩니다.'
       alt: 'GitHub 동기화 설정: 저장소와 브랜치 선택, 그리고 파일 종류별 동기화 스위치.'
 duo:
   title: "iPhone Duo: 하나의 노트, 네 가지 형태"
@@ -105,6 +105,8 @@ specs:
     v: GitHub Flavored Markdown에 더해 위키링크, 임베드, 블록 참조, 콜아웃, 각주, 수식, Mermaid
   - k: 동기화
     v: iCloud 또는 GitHub 저장소, 파일 종류별 필터 지원
+  - k: 작업 흐름
+    v: "Obsidian과 같은 자리표시자의 템플릿, PDF·HTML 내보내기, 명령 팔레트, Spotlight 검색, 단축어 동작"
   - k: 인터페이스 언어
     v: English, 简体中文, 繁體中文
   - k: 소스
