@@ -1,6 +1,7 @@
 import Foundation
 import CoreSpotlight
 import UniformTypeIdentifiers
+import CryptoKit
 import os
 import InkstoneCore
 
@@ -21,16 +22,50 @@ actor SpotlightIndexer {
     /// result hands back, to open the note.
     static func identifier(for url: URL) -> String { url.standardizedFileURL.path(percentEncoded: false) }
 
-    func update(root: URL, notes: [URL: Date], enabled: Bool) async {
-        let domain = Self.identifier(for: root)
-        let index = CSSearchableIndex.default()
-        guard enabled, CSSearchableIndex.isIndexingAvailable() else {
-            if !(loadPushed(domain).isEmpty) {
-                try? await index.deleteSearchableItems(withDomainIdentifiers: [domain])
-                savePushed([:], domain)
+    /// The app's own index. On iOS with complete file protection: the note
+    /// text in it is unreadable while the device is locked, as the notes are.
+    private let index: CSSearchableIndex = {
+        #if os(iOS)
+        CSSearchableIndex(name: "notes", protectionClass: .complete)
+        #else
+        CSSearchableIndex(name: "notes")
+        #endif
+    }()
+
+    // Only the latest request matters: each index build sends the whole vault,
+    // so a request still waiting when a newer one arrives is dropped, not queued.
+    private var pending: (root: URL?, notes: [URL: Date], enabled: Bool)?
+    private var running = false
+
+    /// Brings the index up to date with `notes` (nil root: no vault open).
+    func submit(root: URL?, notes: [URL: Date], enabled: Bool) async {
+        pending = (root, notes, enabled)
+        guard !running else { return }
+        running = true
+        while let next = pending {
+            pending = nil
+            if !next.enabled {
+                await removeEverything()
+            } else if let root = next.root {
+                await update(root: root, notes: next.notes)
             }
-            return
         }
+        running = false
+    }
+
+    /// Switched off: every vault's items go, and the records of them.
+    private func removeEverything() async {
+        do {
+            try await index.deleteAllSearchableItems()
+            if let dir = stateDirectory() { try? FileManager.default.removeItem(at: dir) }
+        } catch {
+            log.error("spotlight clear failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func update(root: URL, notes: [URL: Date]) async {
+        guard CSSearchableIndex.isIndexingAvailable() else { return }
+        let domain = Self.identifier(for: root)
         // Keyed by the same normalised path as the stored record, or a
         // /var vs /private/var difference would rewrite every note each time.
         let notes = Dictionary(notes.map { (URL(filePath: Self.identifier(for: $0.key)), $0.value) },
@@ -50,11 +85,14 @@ actor SpotlightIndexer {
         // In batches, so a first push of a big vault neither holds every
         // note's text in memory at once nor loses everything to one failure.
         for batch in stride(from: 0, to: changes.upsert.count, by: 200).map({ Array(changes.upsert[$0..<min($0 + 200, changes.upsert.count)]) }) {
-            if Task.isCancelled { break }
-            let items = batch.compactMap { item(for: $0, domain: domain, modified: notes[$0]) }
+            // Only what was actually read is recorded as pushed; a note that
+            // could not be read (vault closed meanwhile, an iCloud file not
+            // downloaded) is tried again next time.
+            let items = batch.compactMap { url in item(for: url, domain: domain, modified: notes[url]).map { (url, $0) } }
+            guard !items.isEmpty else { continue }
             do {
-                try await index.indexSearchableItems(items)
-                for url in batch { pushed[url] = notes[url] }
+                try await index.indexSearchableItems(items.map(\.1))
+                for (url, _) in items { pushed[url] = notes[url] }
             } catch {
                 log.error("spotlight index failed: \(error.localizedDescription, privacy: .public)")
                 break
@@ -65,9 +103,17 @@ actor SpotlightIndexer {
     }
 
     private func item(for url: URL, domain: String, modified: Date?) -> CSSearchableItem? {
+        // Never read an iCloud file that is not on the device: that would
+        // download it (or block until it is) — the whole vault, for an index.
+        let keys: Set<URLResourceKey> = [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
+        if let values = try? url.resourceValues(forKeys: keys), values.isUbiquitousItem == true,
+           values.ubiquitousItemDownloadingStatus != .current {
+            return nil
+        }
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         let data = (try? handle.read(upToCount: maxTextBytes)) ?? Data()
+        // A cut in the middle of a character decodes as one replacement mark.
         let text = String(decoding: data, as: UTF8.self)
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
         attributes.title = url.deletingPathExtension().lastPathComponent
@@ -83,11 +129,17 @@ actor SpotlightIndexer {
 
     // MARK: - What was pushed, per vault
 
+    private func stateDirectory() -> URL? {
+        try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                     appropriateFor: nil, create: true)
+            .appending(path: "Spotlight", directoryHint: .isDirectory)
+    }
+
+    /// One file per vault, named by a hash of its path (a prefix of the path
+    /// made two deep iCloud vaults share one file).
     private func stateURL(_ domain: String) -> URL? {
-        guard let dir = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
-                                                     appropriateFor: nil, create: true) else { return nil }
-        let name = Data(domain.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_")
-        return dir.appending(path: "Spotlight", directoryHint: .isDirectory).appending(path: name.prefix(120) + ".json")
+        let hash = SHA256.hash(data: Data(domain.utf8)).map { String(format: "%02x", $0) }.joined()
+        return stateDirectory()?.appending(path: hash + ".json")
     }
 
     private func loadPushed(_ domain: String) -> [URL: Date] {

@@ -1134,26 +1134,46 @@ final class Workspace {
     /// Brings Spotlight up to date with the index. Runs after the previous
     /// update finishes, never alongside it (the indexer's record of what it
     /// pushed would interleave).
-    @ObservationIgnored private var spotlightTask: Task<Void, Never>?
     func updateSpotlight() {
-        guard let root else { return }
-        let notes = index.notes.mapValues(\.modified)
+        let root = root
+        let notes = root == nil ? [:] : index.notes.mapValues(\.modified)
         let enabled = settings.data.indexInSpotlight
-        let previous = spotlightTask
-        spotlightTask = Task.detached(priority: .utility) {
-            _ = await previous?.value
-            await SpotlightIndexer.shared.update(root: root, notes: notes, enabled: enabled)
+        Task.detached(priority: .utility) {
+            await SpotlightIndexer.shared.submit(root: root, notes: notes, enabled: enabled)
         }
     }
 
-    /// A Spotlight result was tapped: open the note, if it is in this vault.
+    /// A Spotlight result tapped before a vault was open (cold launch): opened
+    /// once one is.
+    @ObservationIgnored private var pendingSpotlightResult: String?
+
+    /// A Spotlight result was tapped: open the note — switching to its vault
+    /// if another one is open.
     func openSpotlightResult(_ identifier: String) {
-        guard let root else { return }
-        let url = URL(filePath: identifier)
-        let rootPath = SpotlightIndexer.identifier(for: root)
-        guard identifier.hasPrefix(rootPath.hasSuffix("/") ? rootPath : rootPath + "/"),
-              FileManager.default.fileExists(atPath: identifier) else { return }
-        openNote(at: url)
+        let path = URL(filePath: identifier).standardizedFileURL.path(percentEncoded: false)
+        func inside(_ folder: String) -> Bool {
+            let prefix = URL(filePath: folder).standardizedFileURL.path(percentEncoded: false)
+            return path.hasPrefix(prefix.hasSuffix("/") ? prefix : prefix + "/")
+        }
+        if let root, inside(root.path(percentEncoded: false)) {
+            if FileManager.default.fileExists(atPath: path) { openNote(at: URL(filePath: path)) }
+            return
+        }
+        if let owner = registry.vaults.first(where: { inside($0.path) }) {
+            pendingSpotlightResult = path
+            open(owner)
+        } else if vault == nil {
+            // Launched from the result: the last vault is still being restored.
+            pendingSpotlightResult = path
+            openMostRecentVaultIfNeeded()
+        }
+    }
+
+    private func openPendingSpotlightResult() {
+        guard let path = pendingSpotlightResult, let root,
+              path.hasPrefix(root.standardizedFileURL.path(percentEncoded: false)) else { return }
+        pendingSpotlightResult = nil
+        if FileManager.default.fileExists(atPath: path) { openNote(at: URL(filePath: path)) }
     }
 
     func rebuildIndex() {
@@ -1178,6 +1198,7 @@ final class Workspace {
                 if full { self.lastFullIndex = .now }
                 self.index = snapshot
                 self.updateSpotlight()
+                self.openPendingSpotlightResult()
                 LaunchTiming.mark("index ready")
                 self.indexGeneration += 1
                 self.isIndexing = false
