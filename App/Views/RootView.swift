@@ -88,6 +88,9 @@ struct RootView: View {
         } message: {
             Text(workspace.exportFailure ?? "")
         }
+        .sheet(isPresented: $workspace.isCommandPalettePresented) {
+            CommandPaletteView()
+        }
         #if os(macOS)
         .sheet(isPresented: $workspace.isQuickRewritePresented) {
             // Guarded on both: the menu item is disabled without a selection,
@@ -283,6 +286,10 @@ struct RootView: View {
                     }
                     Button("Export as HTML…", systemImage: "chevron.left.forwardslash.chevron.right") {
                         workspace.exportActiveNote(as: .html)
+                    }
+                    Divider()
+                    Button("Command Palette…", systemImage: "command") {
+                        workspace.isCommandPalettePresented = true
                     }
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")

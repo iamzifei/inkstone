@@ -324,6 +324,7 @@ final class Workspace {
     var isInspectorPresented = false
     #endif
     var isQuickSwitcherPresented = false
+    var isCommandPalettePresented = false
     var searchQuery = ""
 
     /// Back/forward navigation, like a browser. Cheap to maintain and users

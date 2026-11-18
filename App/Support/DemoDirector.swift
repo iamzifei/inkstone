@@ -100,6 +100,8 @@ enum DemoDirector {
                     log.error("demo export failed \(error.localizedDescription, privacy: .public)")
                 }
             }
+        case "palette":
+            workspace.isCommandPalettePresented = arg != "off"
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
         case "caret":

@@ -43,6 +43,7 @@ enum SmokeTest {
         await checkFindBar()
         await checkTemplateInsert()
         await checkPDFExport()
+        checkCommandCatalog()
 
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "inkstone-smoke-\(UUID().uuidString)")
@@ -361,6 +362,24 @@ enum SmokeTest {
         } catch {
             check("Export as PDF makes a paginated A4 PDF (\(error.localizedDescription))", false)
         }
+    }
+
+    /// The command palette lists the menu commands under the menus' own
+    /// titles. A title here that no menu item has means the two drifted.
+    private static func checkCommandCatalog() {
+        var titles = Set<String>()
+        func walk(_ menu: NSMenu) {
+            for item in menu.items {
+                titles.insert(item.title)
+                if let sub = item.submenu { walk(sub) }
+            }
+        }
+        if let main = NSApp.mainMenu { walk(main) }
+        // The inspector item is titled Show or Hide by state; the palette has one entry for both.
+        let missing = AppCommand.all.filter { $0.id != "inspector" && !titles.contains($0.localizedTitle) }
+        check("every command palette entry is a menu item\(missing.isEmpty ? "" : " — missing: " + missing.map(\.localizedTitle).joined(separator: ", "))",
+              missing.isEmpty && !titles.isEmpty)
+        check("the menu offers the command palette", titles.contains(localized("Command Palette…")))
     }
 
     private static func waitUntil(
