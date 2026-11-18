@@ -300,6 +300,28 @@
         }
       }
     },
+    "%lld conflict copy(ies) to resolve": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld conflict copy(ies) to resolve"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %lld 个冲突副本待处理"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %lld 個衝突副本待處理"
+          }
+        }
+      }
+    },
     "%lld file%@, %lld of %lld changes selected": {
       "extractionState": "manual",
       "localizations": {
@@ -319,6 +341,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld 個檔案，已選 %3$lld / %4$lld 項變更"
+          }
+        }
+      }
+    },
+    "%lld file(s) failed in the last run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld file(s) failed in the last run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次同步有 %lld 个文件失败"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次同步有 %lld 個檔案失敗"
           }
         }
       }
@@ -2047,6 +2091,28 @@
         }
       }
     },
+    "Conflict (both kept)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conflict (both kept)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冲突（两份都保留）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "衝突（兩份都保留）"
+          }
+        }
+      }
+    },
     "Conflict on %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -2622,6 +2688,50 @@
         }
       }
     },
+    "Delete here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete here"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在本机删除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在本機刪除"
+          }
+        }
+      }
+    },
+    "Delete on GitHub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete on GitHub"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 GitHub 上删除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 GitHub 上刪除"
+          }
+        }
+      }
+    },
     "Delete the selected cards": {
       "extractionState": "manual",
       "localizations": {
@@ -2783,6 +2893,28 @@
         }
       }
     },
+    "Download": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載"
+          }
+        }
+      }
+    },
     "Downloading %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -2894,6 +3026,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "複製副本"
+          }
+        }
+      }
+    },
+    "Each is the GitHub version of a note that was also edited here. Keep the one you want and delete the other.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each is the GitHub version of a note that was also edited here. Keep the one you want and delete the other."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每个副本都是一篇在本机也被编辑过的笔记在 GitHub 上的版本。保留你要的那份，删除另一份。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每個副本都是一篇在本機也被編輯過的筆記在 GitHub 上的版本。保留你要的那份，刪除另一份。"
           }
         }
       }
@@ -3373,6 +3527,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "尋找…"
+          }
+        }
+      }
+    },
+    "First sync: %lld file(s) differ on the two sides. Sync will ask which side to keep.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First sync: %lld file(s) differ on the two sides. Sync will ask which side to keep."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首次同步：两边有 %lld 个文件不一致，同步时会问你保留哪一边。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首次同步：兩邊有 %lld 個檔案不一致，同步時會問你保留哪一邊。"
           }
         }
       }
@@ -4708,6 +4884,28 @@
         }
       }
     },
+    "Last successful sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last successful sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次成功同步"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次成功同步"
+          }
+        }
+      }
+    },
     "Laying out…": {
       "extractionState": "manual",
       "localizations": {
@@ -5440,6 +5638,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "名稱"
+          }
+        }
+      }
+    },
+    "Never": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从未"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從未"
           }
         }
       }
@@ -6409,6 +6629,28 @@
         }
       }
     },
+    "Nothing to sync — already up to date.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to sync — already up to date."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有要同步的内容，已是最新。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有要同步的內容，已是最新。"
+          }
+        }
+      }
+    },
     "OK": {
       "extractionState": "manual",
       "localizations": {
@@ -7118,6 +7360,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "按 ⌘O 開始輸入，就能依名稱開啟筆記。如果沒有符合的筆記，按 Return 即可用這個名稱建立一篇。"
+          }
+        }
+      }
+    },
+    "Preview Next Sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview Next Sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览下次同步"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽下次同步"
+          }
+        }
+      }
+    },
+    "Preview only looks: nothing is uploaded, downloaded or deleted until you sync.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview only looks: nothing is uploaded, downloaded or deleted until you sync."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览只是查看：在你点同步之前，不会上传、下载或删除任何东西。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽只是查看：在你點同步之前，不會上傳、下載或刪除任何東西。"
           }
         }
       }
@@ -9416,6 +9702,28 @@
         }
       }
     },
+    "Sync health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync health"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步状况"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步狀況"
+          }
+        }
+      }
+    },
     "Sync it anyway": {
       "extractionState": "manual",
       "localizations": {
@@ -9550,6 +9858,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "透過 GitHub 同步"
+          }
+        }
+      }
+    },
+    "Sync would stop and ask before deleting this many files.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync would stop and ask before deleting this many files."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除的文件这么多，同步会先停下来问你。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除的檔案這麼多，同步會先停下來問你。"
           }
         }
       }
@@ -10934,6 +11264,28 @@
         }
       }
     },
+    "Upload": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上传"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上傳"
+          }
+        }
+      }
+    },
     "Uploading %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -11873,6 +12225,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "僅提示詞"
+          }
+        }
+      }
+    },
+    "…and %lld more": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "…and %lld more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "…还有 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "…還有 %lld 個"
           }
         }
       }

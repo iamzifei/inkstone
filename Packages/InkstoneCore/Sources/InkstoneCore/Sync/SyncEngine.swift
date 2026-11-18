@@ -229,6 +229,27 @@ public struct SyncEngine: Sendable {
         confirmingLargeDeletion: Bool = false,
         progress: (@Sendable (SyncProgress) -> Void)? = nil
     ) async throws -> SyncReport {
+        try await perform(firstSyncDirection: firstSyncDirection,
+                          confirmingLargeDeletion: confirmingLargeDeletion,
+                          progress: progress, dryRun: false).report!
+    }
+
+    /// What the next `run()` would do, computed by the same code a run uses —
+    /// and nothing more: no file written, renamed or deleted in the vault, no
+    /// request that changes GitHub, no sync.json saved. Questions a run would
+    /// stop to ask (first-sync direction, mass deletion) are flags here.
+    public func preview() async throws -> SyncPreview {
+        try await perform(firstSyncDirection: nil, confirmingLargeDeletion: false,
+                          progress: nil, dryRun: true).preview!
+    }
+
+    private func perform(
+        firstSyncDirection: FirstSyncDirection?,
+        confirmingLargeDeletion: Bool,
+        progress: (@Sendable (SyncProgress) -> Void)?,
+        dryRun: Bool
+    ) async throws -> (report: SyncReport?, preview: SyncPreview?) {
+        var preview = SyncPreview()
         progress?(SyncProgress(phase: .verifying, message: localized("Checking repository…")))
         _ = try await client.verify()
 
@@ -270,7 +291,9 @@ public struct SyncEngine: Sendable {
         // Confirmable like any other mass deletion: when the last file really
         // was deleted on another device, refusing forever wedged every other one.
         if remote.isEmpty, !state.blobs.isEmpty, !confirmingLargeDeletion {
-            throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
+            if dryRun { preview.wouldStopForLargeDeletion = true } else {
+                throw SyncError.remoteUnexpectedlyEmpty(recorded: state.blobs.count)
+            }
         }
 
         // A synced file that is missing locally because iCloud evicted it (iOS
@@ -311,7 +334,7 @@ public struct SyncEngine: Sendable {
                     state.blobs[remotePath] = base
                 }
                 state.blobs.removeValue(forKey: localPath)
-                adoptCase(of: fileURL(remotePath))
+                if !dryRun { adoptCase(of: fileURL(remotePath)) }
             }
         }
 
@@ -349,6 +372,11 @@ public struct SyncEngine: Sendable {
         }
         if !conflicts.isEmpty, state.blobs.isEmpty {
             guard let firstSyncDirection else {
+                if dryRun {
+                    preview.needsFirstSyncDirection = true
+                    preview.fill(from: actions)
+                    return (nil, preview)
+                }
                 throw SyncError.firstSyncNeedsDirection(
                     differing: conflicts.count,
                     localFiles: local.count,
@@ -403,8 +431,14 @@ public struct SyncEngine: Sendable {
                 guard count > Self.deletionsAlwaysAllowed,
                       Double(count) >= Double(recorded) * Self.deletionShareNeedingConfirmation
                 else { continue }
+                if dryRun { preview.wouldStopForLargeDeletion = true; continue }
                 throw SyncError.tooManyDeletions(deleting: count, of: recorded, side: side)
             }
+        }
+
+        if dryRun {
+            preview.fill(from: actions)
+            return (nil, preview)
         }
 
         let stamp = timestamp()
@@ -602,7 +636,7 @@ public struct SyncEngine: Sendable {
         try? state.save(to: vaultRoot)
 
         if interrupted { throw CancellationError() }
-        return report
+        return (report, nil)
     }
 
     // MARK: - Local side
@@ -848,5 +882,37 @@ public struct SyncEngine: Sendable {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd HHmmss"
         return formatter.string(from: date)
+    }
+}
+
+/// What a sync would do, without doing it. See `SyncEngine.preview()`.
+public struct SyncPreview: Sendable, Hashable {
+    public var uploads: [String] = []
+    public var downloads: [String] = []
+    public var deletesRemote: [String] = []
+    public var deletesLocal: [String] = []
+    public var conflicts: [String] = []
+    /// A first sync with differing files: a run would stop to ask which side wins.
+    public var needsFirstSyncDirection = false
+    /// A run would stop at the mass-deletion guard and ask for confirmation.
+    public var wouldStopForLargeDeletion = false
+
+    public init() {}
+
+    public var isEmpty: Bool {
+        uploads.isEmpty && downloads.isEmpty && deletesRemote.isEmpty && deletesLocal.isEmpty && conflicts.isEmpty
+    }
+
+    mutating func fill(from actions: [SyncAction]) {
+        for action in actions {
+            switch action {
+            case .upload(let p): uploads.append(p)
+            case .download(let p): downloads.append(p)
+            case .deleteRemote(let p): deletesRemote.append(p)
+            case .deleteLocal(let p): deletesLocal.append(p)
+            case .conflict(let p): conflicts.append(p)
+            case .skip: break
+            }
+        }
     }
 }

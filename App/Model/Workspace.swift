@@ -762,6 +762,47 @@ final class Workspace {
     /// button as anything else: saying yes here is the irreversible one.
     var pendingLargeDeletion: SyncError?
 
+    /// Result of "Preview Next Sync": what a run would do, nothing done.
+    var syncPreview: SyncPreview?
+    var isPreviewingSync = false
+    var syncPreviewError: String?
+
+    func previewSync() async {
+        guard let root, syncBinding.isConfigured, let client = gitHubClient() else {
+            syncPreviewError = GitHubError.notConfigured.localizedDescription
+            return
+        }
+        saveAll()
+        isPreviewingSync = true
+        defer { isPreviewingSync = false }
+        syncPreviewError = nil
+        do {
+            syncPreview = try await SyncEngine(client: client, vaultRoot: root, policy: settings.data.syncPolicy).preview()
+        } catch {
+            syncPreview = nil
+            syncPreviewError = error.localizedDescription
+        }
+    }
+
+    /// When the last complete sync finished, from the vault's own sync record —
+    /// so it survives relaunches, unlike the in-memory status line.
+    var lastSuccessfulSync: Date? {
+        guard let root else { return nil }
+        return SyncState.load(from: root).lastSyncedAt
+    }
+
+    /// Conflict copies sync left in the vault (`… (conflict 2026-…).md`), each
+    /// waiting for the user to keep one version.
+    var conflictCopies: [URL] {
+        var found: [URL] = []
+        func walk(_ node: FileNode) {
+            if !node.isDirectory, node.name.contains(" (conflict ") { found.append(node.url) }
+            node.children?.forEach(walk)
+        }
+        tree.map(walk)
+        return found.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
     func sync(
         firstSyncDirection: FirstSyncDirection? = nil,
         confirmingLargeDeletion: Bool = false

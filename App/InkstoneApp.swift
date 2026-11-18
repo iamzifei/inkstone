@@ -65,6 +65,7 @@ struct InkstoneApp: App {
         SmokeTest.runIfRequested()
         GuideShots.runIfRequested()
         OnboardingView.dumpIfRequested()
+        SyncHealthSection.dumpIfRequested()
         #endif
     }
 

@@ -934,6 +934,10 @@ private struct SyncSettings: View {
                     .foregroundStyle(.secondary)
             }
 
+            if workspace.syncBinding.isConfigured {
+                SyncHealthSection()
+            }
+
             #if os(iOS)
             // Only iOS suspends the app, so only iOS needs to explain what the
             // system did with the sync requests.
