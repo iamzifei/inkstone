@@ -143,8 +143,16 @@ struct LegacyScanner: Sendable {
         // pattern here disagreed on six kinds of case — `#a#b`, `(#a)`, `+#a`,
         // `！#短`, `&#x2014;`, `#tag。` — so the editor highlighted tags the index
         // did not have.
+        // A `#` inside a wiki link is a heading or block reference
+        // (`[[#Heading]]`, `[[note|#alias]]`), not a tag; the parser engine
+        // claims link ranges before tags for the same reason.
+        var links = IndexSet()
+        for link in LegacyPatterns.wikiLink.matches(in: text, range: full) {
+            links.insert(integersIn: Range(link.range) ?? 0..<0)
+        }
         for run in ObsidianSyntax.Patterns.tagRun.matches(in: text, range: full) {
-            guard !maskedRegions.intersects(run.range) else { continue }
+            guard !maskedRegions.intersects(run.range),
+                  !links.intersects(integersIn: Range(run.range) ?? 0..<0) else { continue }
             var location = run.range.location
             let end = NSMaxRange(run.range)
             while location < end,

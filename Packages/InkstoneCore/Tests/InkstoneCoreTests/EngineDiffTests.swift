@@ -332,6 +332,8 @@ struct LegacyTagParityTests {
         "#a#b two tags", "……！#短 not a tag", "+#tag not a tag", "**#bold** tag", "==#mark== tag",
         "~~#strike~~ tag", "[#bracket] tag", "(#paren) not", "a#b not", "#1 not", "#2024年 tag",
         "x #a/b/c nested", "#tag。 cjk stop", "#tag, comma", "line\n#start", "&#x2014; entity",
+        // Review: a # inside a wiki link is a heading or block reference, not a tag.
+        "see [[#Heading]]", "![[#^blockid]]", "[[note|#alias]]", "[[a#b]] and #real",
     ])
     func sameTagsAsTheParser(_ text: String) {
         #expect(tags(.legacy, text) == tags(.parser, text), "\(text)")
