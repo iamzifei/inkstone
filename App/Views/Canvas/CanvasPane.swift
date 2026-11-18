@@ -117,6 +117,7 @@ struct CanvasPane: View {
                         .font(style.uiFont.weight(.medium))
                     if let file = node.file, let root = workspace.root, let store = workspace.store {
                         FileCardPreview(url: root.appending(path: file), store: store,
+                                        generation: workspace.indexGeneration,
                                         color: style.secondaryText)
                     }
                 }
@@ -346,14 +347,20 @@ extension Color {
 
 /// The first few hundred characters of a file shown on a canvas card.
 ///
-/// Read once, off the main thread, and again only when the card points at a
-/// different file. It used to be read inside `body`, so every redraw of the
-/// canvas — each frame of a pan or zoom — read every file card from disk.
+/// Read off the main thread when the card appears, when it points at another
+/// file, and after each re-index (which follows every save and external edit),
+/// so an edited note's card catches up. It used to be read inside `body`, so
+/// every redraw of the canvas — each frame of a pan or zoom — read every file
+/// card from disk.
 private struct FileCardPreview: View {
     let url: URL
     let store: NoteStore
+    let generation: Int
     let color: Color
     @State private var text: String?
+    @State private var shownURL: URL?
+
+    private struct Key: Equatable { let url: URL; let generation: Int }
 
     var body: some View {
         Group {
@@ -364,11 +371,17 @@ private struct FileCardPreview: View {
                     .lineLimit(12)
             }
         }
-        .task(id: url) {
+        .task(id: Key(url: url, generation: generation)) {
             let url = url, store = store
-            text = await Task.detached(priority: .userInitiated) {
+            // Another file's preview must not linger while this one loads.
+            if shownURL != url { text = nil; shownURL = url }
+            let read = await Task.detached(priority: .userInitiated) {
                 (try? store.read(url)).map { String($0.prefix(400)) }
             }.value
+            // `.task` cancels this when the key changes; a read that finishes
+            // after that belongs to a file the card no longer shows.
+            guard !Task.isCancelled else { return }
+            text = read
         }
     }
 }

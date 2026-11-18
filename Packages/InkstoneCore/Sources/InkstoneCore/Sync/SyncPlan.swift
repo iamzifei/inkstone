@@ -150,8 +150,6 @@ public enum SyncPlanner {
     }
 }
 
-/// What the last clean sync looked like, persisted in the vault's `.inkstone`
-/// folder so the next run has a base to compare against.
 /// What a file looked like when its blob SHA was last computed.
 ///
 /// Size, modification date and status-change date (`ctime`) together: the
@@ -165,6 +163,8 @@ public struct HashStamp: Codable, Hashable, Sendable {
     public var sha: String
 }
 
+/// What the last clean sync looked like, persisted in the vault's `.inkstone`
+/// folder so the next run has a base to compare against.
 public struct SyncState: Codable, Hashable, Sendable {
     /// Vault-relative path to the blob SHA recorded at the last clean sync.
     public var blobs: [String: String]

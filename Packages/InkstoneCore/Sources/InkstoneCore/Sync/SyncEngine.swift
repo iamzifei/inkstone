@@ -509,7 +509,7 @@ public struct SyncEngine: Sendable {
         // `excludedPaths` is this device's rule about what it does not carry.
         // A desktop and a phone share the first and differ on the second.
         let excluder = policy.pathExcluder
-        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey,
+        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .isSymbolicLinkKey,
                                       .contentModificationDateKey, .attributeModificationDateKey]
         let trustLimit = trustBefore.timeIntervalSinceReferenceDate
         // The enumerator hands back paths in whatever form the file system
@@ -571,10 +571,14 @@ public struct SyncEngine: Sendable {
                 excluded.insert(relative)
                 continue
             }
+            // A symlink's size and dates are the link's own, but the bytes read
+            // below are its target's: an edited target would keep a matching
+            // stamp and its new content would never be seen. Always hashed.
+            let isLink = values?.isSymbolicLink == true
             let size = values?.fileSize ?? -1
             let modified = values?.contentModificationDate?.timeIntervalSinceReferenceDate ?? .nan
             let changed = values?.attributeModificationDate?.timeIntervalSinceReferenceDate ?? .nan
-            if let old = cache[relative], old.size == size, old.modified == modified,
+            if !isLink, let old = cache[relative], old.size == size, old.modified == modified,
                old.changed == changed, modified < trustLimit, changed < trustLimit {
                 result[relative] = old.sha
                 stamps[relative] = old
@@ -584,7 +588,7 @@ public struct SyncEngine: Sendable {
 
             let sha = gitBlobSHA(data)
             result[relative] = sha
-            if !modified.isNaN, !changed.isNaN {
+            if !isLink, !modified.isNaN, !changed.isNaN {
                 stamps[relative] = HashStamp(size: size, modified: modified, changed: changed, sha: sha)
             }
         }

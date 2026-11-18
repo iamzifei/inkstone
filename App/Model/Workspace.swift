@@ -364,6 +364,7 @@ final class Workspace {
         autoSyncTask = nil
         reindexTask?.cancel()
         treeTask?.cancel()
+        isIndexing = false
         watcher?.stop()
         watcher = nil
         if let vault { registry.endAccess(to: vault) }
@@ -945,7 +946,6 @@ final class Workspace {
         reindexTask?.cancel()
         isIndexing = true
         let full = full || Date.now.timeIntervalSince(lastFullIndex) > 600
-        if full { lastFullIndex = .now }
         let previous: IndexSnapshot? = full ? nil : index
         reindexTask = Task { [indexBuilder] in
             let snapshot = await indexBuilder.build(vaultRoot: root, reusing: previous)
@@ -953,6 +953,9 @@ final class Workspace {
             await MainActor.run {
                 // The vault may have been closed or switched while building.
                 guard self.root == root, !Task.isCancelled else { return }
+                // Only a full build that was published counts; a cancelled one
+                // must not postpone the next.
+                if full { self.lastFullIndex = .now }
                 self.index = snapshot
                 self.indexGeneration += 1
                 self.isIndexing = false

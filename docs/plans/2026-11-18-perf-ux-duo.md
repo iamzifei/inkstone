@@ -56,6 +56,10 @@ Target (acceptance): autosave round-trip on 10k vault < 50 ms main-thread work; 
 **P5 — Product review**
 - Written review (feature gaps vs Obsidian/Bear/Apple Notes, onboarding, sync clarity) with a ranked proposal list in `docs/plans/`. James picks what gets built; nothing in P5 ships without that.
 
+**P6 — Duo motion demo for the website** (James 2026-11-18: after everything above is done)
+- Record iPhone Duo motion demos from the simulator (Device Hub Closed / Partially Open / Open + `simctl io recordVideo --display=<uuid>`): the core value features (write, link, backlinks, search, sync) and the UI/UX in each posture — folded, unfolding, unfolded, bent (crease across), book/stand.
+- Edit into short loops for inkslab.app (real app footage only, no mockups); per the jamesai.dev thumbnail rule, motion of the core feature.
+
 ## Interrogation (what could go wrong)
 - **Riskiest step: P1.1 incremental index.** A missed delta = stale backlinks/search, which looks like data loss. Mitigation: keep the full rebuild as a periodic/idle consistency check, add property tests that compare incremental vs full rebuild on random edit sequences, keep a debug toggle to force full rebuild.
 - Own-write filter could hide a genuine external edit made in the same second → compare content hash, not just mtime.
@@ -87,6 +91,7 @@ Target (acceptance): autosave round-trip on 10k vault < 50 ms main-thread work; 
 | Embed image decode, 48 MP JPEG → 700 pt (macOS) | 123–159 ms, peak 75 MB | 119–131 ms, peak 67 MB — no real gain on Mac (NSImage already decoded at scale) | `imgbench.swift` (scratch), -O, 2 runs each |
 | Embed image decode (iOS) | UIImage full decode + redraw | ImageIO downsample at 3x; byte budget 96 MB | **unmeasured** — gain is inferred, verify in Instruments on device |
 | Canvas file cards | each card read from disk in `body` (every pan/zoom frame) | read once per file, off main | — |
+| Settings persist per change | 0.069 ms (2 KB JSON, release) | unchanged — far under a frame; debouncing would add a lose-on-quit risk for nothing | throwaway probe, 1000 changes |
 | Mermaid cache | already bounded (64) | unchanged | — |
 | Word count | whole note recounted in `body` every keystroke | stored, refreshed 300 ms after typing pauses | — |
 
@@ -99,4 +104,5 @@ Behaviour fix found by the equivalence test: on a vault whose path contains a sp
 - 2026-11-18: P1.1 incremental index + string resolve + background tree refresh; P1.2 iOS viewport styling + debounced word count. 582 core tests green; macOS + iOS builds green. CI caught a reuse-window bug (margin measured from now, not from previous build) → fixed + mutation-verified. `scripts/test-all.sh` green. Draft PR #1.
 - 2026-11-18: independent review of PR #1 (report only): 1 medium (late background tree scan could overwrite a newer synchronous refresh → generation counter), low: no periodic full index (→ full rebuild if last > 10 min), iOS overscroll/first-layout styled whole note (→ clamp), Package.resolved churn (→ reverted), reindex could publish after vault close (pre-existing → guarded + cancelled).
 - 2026-11-18: P1.3/P1.4 ImageIO embeds + byte budget, async canvas file cards.
+- 2026-11-18: second review (sync stamps + images): symlinked notes would keep a stale SHA (stamp = link, bytes = target) → never cached, mutation-verified test; canvas cards never refreshed / late read could overwrite → keyed on index generation + cancellation; isIndexing stuck after close; cancelled full build reset the 10-min clock; iPhone first layout styled only the top until scrolled; sync.json round-trip test. P1.6 measured (0.069 ms/save) → no change. P1 complete.
 - 2026-11-18: P1.5 sync hash stamps (586 tests). Duo simulator (iOS 27.2) boots; Device Hub drives Closed / Partially Open / Open; screenshots per display work (`simctl io … screenshot --display=<uuid>`; inner AA1D87E1…, outer 21E0C8A9… on this machine).
