@@ -105,6 +105,11 @@ struct IncrementalIndexTests {
         try "# Changed in the same second\n".write(to: file, atomically: false, encoding: .utf8)
         try FileManager.default.setAttributes([.modificationDate: pinned], ofItemAtPath: file.path)
 
+        // A slow machine: the next build happens well after the 3 s margin.
+        // CI hit exactly this (two builds 4 s apart) when the margin was
+        // measured from "now" instead of from the previous build.
+        try await Task.sleep(for: .seconds(4))
+
         let after = await IndexBuilder().build(vaultRoot: root, reusing: before)
         // Look the note up by name: the scanner may report the temporary
         // directory through its /private symlink, so the URL keys differ.

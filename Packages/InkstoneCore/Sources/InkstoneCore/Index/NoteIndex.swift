@@ -59,6 +59,11 @@ public struct IndexSnapshot: Sendable {
     /// URL-based lookup.
     var pathIndex: [String: URL] = [:]
 
+    /// When the build that produced this snapshot started listing and reading
+    /// files. An incremental build trusts a note from here only if the file's
+    /// modification date is safely *before* this moment — see `build`.
+    var buildStarted: Date?
+
     public init() {}
 
     public var noteCount: Int { notes.count }
@@ -172,11 +177,18 @@ public actor IndexBuilder {
         let scanner = VaultScanner()
         let store = NoteStore(root: vaultRoot)
         let files = scanner.markdownFiles(in: vaultRoot)
+        let started = Date.now
         let reusable = previous?.notes ?? [:]
-        // Timestamps on HFS+ (1 s) and exFAT (2 s) are coarse: two writes in the
-        // same second can leave the same modification date. Anything touched in
-        // the last few seconds is therefore always re-parsed, whatever its date.
-        let settledBefore = Date.now.addingTimeInterval(-3)
+        // A note from `previous` is reused only if its file was last modified
+        // well before `previous` began reading files. Otherwise a write could
+        // have landed in the same timestamp tick as (or after) that read, and
+        // the date would match while the content does not. Timestamps on HFS+
+        // (1 s) and exFAT (2 s) are coarse, hence the 3 s margin.
+        //
+        // Measured against the *previous* build, not this one: an earlier
+        // version used "3 s before now", and on a slow CI runner the two builds
+        // were 4 s apart, so a same-second edit was silently reused.
+        let settledBefore = previous?.buildStarted?.addingTimeInterval(-3) ?? .distantPast
 
         // Parse files concurrently; parsing is CPU-bound and embarrassingly parallel.
         var parsed: [NoteMetadata] = []
@@ -203,7 +215,9 @@ public actor IndexBuilder {
             }
         }
 
-        return Self.assemble(parsed, vaultRoot: vaultRoot)
+        var snapshot = Self.assemble(parsed, vaultRoot: vaultRoot)
+        snapshot.buildStarted = started
+        return snapshot
     }
 
     /// Pure assembly step, separated so it can be unit-tested without touching disk.
