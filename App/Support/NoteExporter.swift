@@ -36,15 +36,35 @@ enum NoteExporter {
         try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
     }
 
+    /// Removes export folders over an hour old — ones a share sheet handed
+    /// on and has long finished with. Not newer ones: an extension may still
+    /// be reading a file after its sheet closed.
+    static func sweepOldExports() {
+        let fm = FileManager.default
+        let folders = (try? fm.contentsOfDirectory(at: fm.temporaryDirectory,
+                                                   includingPropertiesForKeys: [.creationDateKey])) ?? []
+        let cutoff = Date.now.addingTimeInterval(-3600)
+        for dir in folders where dir.lastPathComponent.hasPrefix("Export-") {
+            let created = (try? dir.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+            if created < cutoff { try? fm.removeItem(at: dir) }
+        }
+    }
+
     /// Writes the export to a temporary file named after the note.
     static func export(_ url: URL, as format: Format, in workspace: Workspace) async throws -> URL {
         guard let html = html(for: url, in: workspace) else { throw CocoaError(.fileReadUnknown) }
+        sweepOldExports()
         let dir = FileManager.default.temporaryDirectory.appending(path: "Export-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let out = dir.appending(path: url.deletingPathExtension().lastPathComponent + "." + format.fileExtension)
-        switch format {
-        case .html: try Data(html.utf8).write(to: out)
-        case .pdf: try await PDFPrinter().print(html, to: out)
+        do {
+            switch format {
+            case .html: try Data(html.utf8).write(to: out)
+            case .pdf: try await PDFPrinter().print(html, to: out)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: dir)
+            throw error
         }
         return out
     }

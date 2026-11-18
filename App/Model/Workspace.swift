@@ -136,8 +136,15 @@ final class Workspace {
                 panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
                 guard panel.runModal() == .OK, let destination = panel.url else { return }
                 if FileManager.default.fileExists(atPath: destination.path) {
-                    // Atomic: the old file is only gone once the new one is in place.
-                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: file)
+                    // Atomic: the old file is only gone once the new one is in
+                    // place. The sandbox may refuse the swap file it needs next
+                    // to the destination; then overwrite in place, which the
+                    // save panel's grant does cover.
+                    do {
+                        _ = try FileManager.default.replaceItemAt(destination, withItemAt: file)
+                    } catch {
+                        try Data(contentsOf: file).write(to: destination)
+                    }
                 } else {
                     try FileManager.default.copyItem(at: file, to: destination)
                 }

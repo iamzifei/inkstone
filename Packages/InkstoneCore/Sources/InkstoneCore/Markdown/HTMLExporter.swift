@@ -101,19 +101,15 @@ public enum HTMLExporter {
                 // line opens a CommonMark HTML block, and the lines after it
                 // would come out as raw text. Embed sizes are left to the
                 // stylesheet (max-width: 100%).
-                let image = "![\(markdownEscape(link.target))](data:\(type);base64,\(data.base64EncodedString()))"
+                // Empty alt: a file name with * or _ in it would otherwise be
+                // read as Markdown there.
+                let image = "![](data:\(type);base64,\(data.base64EncodedString()))"
                 cache[link.target] = image
                 return image
             }
         }
         // A note, or a file we do not inline: say what was embedded.
         return #"<span class="embed">"# + escape(link.displayText) + "</span>"
-    }
-
-    private static func markdownEscape(_ s: String) -> String {
-        s.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "[", with: "\\[")
-            .replacingOccurrences(of: "]", with: "\\]")
     }
 
     static func escape(_ s: String) -> String {
