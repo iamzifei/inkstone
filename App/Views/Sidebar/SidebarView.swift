@@ -10,7 +10,10 @@ struct SidebarView: View {
     @Environment(\.style) private var style
 
     #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// True only when this list is the whole screen (iPhone, Duo folded). A
+    /// split view's sidebar column also reports a compact width, which put
+    /// the phone's bottom bar into the Duo's and iPad's sidebar.
+    @Environment(\.isPhoneRootList) private var isPhoneRoot
     #if DEBUG
     /// Opens Settings at launch, so the sheet can be looked at without driving a
     /// tap — the same reason the other debug hooks exist, and the only way to
@@ -77,7 +80,7 @@ struct SidebarView: View {
             // On iPhone this list is the whole screen and had no way to make a
             // note or jump to one: both lived in a toolbar that only appears
             // once a note is open. Bottom edge, where a thumb reaches.
-            if sizeClass == .compact { CompactListBar() }
+            if isPhoneRoot { CompactListBar() }
         }
         .sheet(isPresented: $isShowingSettings) {
             SettingsView(onDone: { isShowingSettings = false })
@@ -829,6 +832,14 @@ struct OutlinePane: View {
 }
 
 #if os(iOS)
+private struct PhoneRootListKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var isPhoneRootList: Bool {
+        get { self[PhoneRootListKey.self] }
+        set { self[PhoneRootListKey.self] = newValue }
+    }
+}
+
 /// The bottom bar of the iPhone vault list: jump to a note, how many there
 /// are, and a new-note button (long-press for canvas and daily note).
 private struct CompactListBar: View {
