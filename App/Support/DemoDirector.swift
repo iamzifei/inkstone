@@ -17,6 +17,8 @@ import InkstoneCore
 ///     switcher on|off           show / hide the quick switcher
 ///     switcher <query>          open the quick switcher with a query typed
 ///     graph                     open the graph (of the open note, or the vault)
+///     templates                 open Insert Template
+///     insert-template <name>    insert a template from the template folder
 ///     back                      go back
 ///     close                     close the open note (back to the list on iPhone)
 ///
@@ -74,6 +76,12 @@ enum DemoDirector {
             // `switcher on|off`, or `switcher <query>` to open it with a query.
             if arg != "on", arg != "off" { workspace.quickSwitcherSeed = arg }
             workspace.isQuickSwitcherPresented = arg != "off"
+        case "templates":
+            workspace.isTemplatePickerPresented = true
+        case "insert-template":
+            if let url = workspace.templateFiles.first(where: { $0.deletingPathExtension().lastPathComponent == arg }) {
+                workspace.insertTemplate(url)
+            }
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
         case "caret":

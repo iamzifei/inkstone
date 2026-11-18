@@ -101,6 +101,9 @@ public struct SettingsData: Codable, Hashable, Sendable {
     public var dailyNoteFolder = "Daily"
     public var dailyNoteFormat = "yyyy-MM-dd"
     public var dailyNoteTemplate = ""
+    /// Folder of templates for Insert Template, vault-relative. Obsidian's
+    /// Templates plugin default, so an imported vault's templates just work.
+    public var templateFolder = "Templates"
     public var weekStartsOnMonday = true
 
     // Files
@@ -289,6 +292,7 @@ public struct SettingsData: Codable, Hashable, Sendable {
         dailyNoteFolder = value(.dailyNoteFolder, defaults.dailyNoteFolder)
         dailyNoteFormat = value(.dailyNoteFormat, defaults.dailyNoteFormat)
         dailyNoteTemplate = value(.dailyNoteTemplate, defaults.dailyNoteTemplate)
+        templateFolder = value(.templateFolder, defaults.templateFolder)
         weekStartsOnMonday = value(.weekStartsOnMonday, defaults.weekStartsOnMonday)
 
         attachmentFolder = value(.attachmentFolder, defaults.attachmentFolder)

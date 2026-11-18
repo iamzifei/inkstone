@@ -88,6 +88,39 @@ final class Workspace {
     @ObservationIgnored var setEditorCaret: ((NSRange) -> Void)?
     /// The active editor's caret, read live (DemoDirector `report`).
     @ObservationIgnored var editorCaret: (() -> NSRange)?
+    /// Inserts text at the active editor's caret (replacing any selection), as
+    /// one undoable edit. Set by the most recently built editor.
+    @ObservationIgnored var insertAtEditorCaret: ((String) -> Void)?
+    var isTemplatePickerPresented = false
+
+    /// Markdown files in the template folder, sorted by name.
+    var templateFiles: [URL] {
+        guard let root else { return [] }
+        let folder = settings.data.templateFolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        guard !folder.isEmpty else { return [] }
+        // With the trailing slash, so "Templates-old/" is not inside
+        // "Templates/"; case-insensitive, as the file system and Obsidian are.
+        var prefix = root.appending(path: folder, directoryHint: .isDirectory).standardizedFileURL
+            .path(percentEncoded: false).lowercased()
+        if !prefix.hasSuffix("/") { prefix += "/" }
+        var found: [URL] = []
+        func walk(_ node: FileNode) {
+            if !node.isDirectory, node.isMarkdown,
+               node.url.standardizedFileURL.path(percentEncoded: false).lowercased().hasPrefix(prefix) { found.append(node.url) }
+            node.children?.forEach(walk)
+        }
+        tree.map(walk)
+        return found.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    /// Renders a template (Obsidian's {{title}} / {{date}} / {{time}}) for the
+    /// open note and inserts it at the caret.
+    func insertTemplate(_ url: URL) {
+        guard let store, let note = activeTab?.url, let text = try? store.read(url) else { return }
+        let rendered = TemplateRenderer.render(
+            text, title: note.deletingPathExtension().lastPathComponent, locale: .current)
+        insertAtEditorCaret?(rendered)
+    }
     /// Set when ⌥⌘K should open the rewrite sheet.
     var isQuickRewritePresented = false
 

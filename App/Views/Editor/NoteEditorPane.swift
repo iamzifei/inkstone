@@ -80,6 +80,7 @@ struct NoteEditorPane: View {
                         positionChanged: { document.editorPosition = $0 },
                         provideCaretSetter: { workspace.setEditorCaret = $0 },
                         provideCaretGetter: { workspace.editorCaret = $0 },
+                        provideInserter: { workspace.insertAtEditorCaret = $0 },
                         resolveVaultPath: { path in workspace.resolveVaultPath(path, from: url) }
                     ),
                     spellCheck: workspace.settings.data.spellCheck,

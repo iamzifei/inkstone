@@ -930,6 +930,8 @@ struct InkstoneApp: App {
             Button(localized("Find and Replace…")) { workspace.presentEditorFind?(true) }
                 .keyboardShortcut("f", modifiers: [.command, .option])
                 .disabled(workspace.presentEditorFind == nil)
+            Button(localized("Insert Template…")) { workspace.isTemplatePickerPresented = true }
+                .disabled(workspace.presentEditorFind == nil)
             #if os(macOS)
             // ⌘G only: ⇧⌘G (the usual Find Previous) is already the graph,
             // and the find bar has its own previous / next buttons.

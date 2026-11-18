@@ -47,6 +47,8 @@ struct EditorActions {
     var provideCaretSetter: ((@escaping (NSRange) -> Void) -> Void) = { _ in }
     /// Hands out "where is the caret now" for this editor (scripted checks).
     var provideCaretGetter: ((@escaping () -> NSRange) -> Void) = { _ in }
+    /// Hands out "insert this at the caret" for this editor (templates).
+    var provideInserter: ((@escaping (String) -> Void) -> Void) = { _ in }
     /// Resolves such a path to a file that exists, or nil.
     var resolveVaultPath: (String) -> URL? = { _ in nil }
 }
@@ -990,6 +992,18 @@ private struct TextViewRepresentable: NSViewRepresentable {
             textView.performTextFinderAction(sender)
         }
 
+        actions.provideInserter { [weak textView] text in
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            let range = textView.selectedRange()
+            // Through the text system, so it is one undo step and the
+            // delegate sees an ordinary edit.
+            if textView.shouldChangeText(in: range, replacementString: text) {
+                textView.insertText(text, replacementRange: range)
+                textView.didChangeText()
+            }
+        }
+
         // Hand out the replacer now that there is a text view to replace in.
         actions.provideReplacer { [weak textView] replacement in
             guard let textView else { return }
@@ -1848,6 +1862,16 @@ private struct TextViewRepresentable: UIViewRepresentable {
         // The system find bar, with replace: ⌘F on a hardware keyboard, and
         // the toolbar's "Find in Note" on a touch screen.
         textView.isFindInteractionEnabled = true
+        actions.provideInserter { [weak textView] text in
+            guard let textView else { return }
+            // Focused first: the picker sheet took focus, and an unfocused
+            // view may not register the undo. Focus also keeps the range.
+            if !textView.isFirstResponder { textView.becomeFirstResponder() }
+            guard let range = textView.selectedTextRange ?? textView.textRange(
+                from: textView.endOfDocument, to: textView.endOfDocument) else { return }
+            // `replace(_:withText:)` is one undoable edit and calls the delegate.
+            textView.replace(range, withText: text)
+        }
         actions.provideFinder { [weak textView] showReplace in
             guard let textView else { return }
             textView.findInteraction?.presentFindNavigator(showingReplace: showReplace)
