@@ -270,12 +270,12 @@ enum BackgroundSync {
     /// - Returns: whether the scheduler took it. `false` means the caller should
     ///   fall back to an ordinary in-app sync, which still works — it just dies
     ///   when the app is suspended.
-    @discardableResult
     /// - Parameter carryingOn: called from an expiring task to hand the run on.
     ///   The run being handed on is still stopping at that moment — this is the
     ///   same synchronous call that cancelled it — so "already syncing" is the
     ///   expected state, not a reason to refuse; the new task waits it out
     ///   (`settleInFlightSync`). Without this the carry-on was never submitted.
+    @discardableResult
     static func syncVisibly(
         workspace: Workspace, firstSyncDirection: FirstSyncDirection? = nil, carryingOn: Bool = false
     ) -> Bool {
@@ -451,12 +451,16 @@ enum BackgroundSync {
             //
             // Guarded against spinning: three expiries that move nothing and it
             // stops, leaving the periodic tasks to try later.
-            if reached > lastContinuedPercent {
+            // An expiry before this task's own run started (still waiting out
+            // the previous one) moved nothing: fruitless, and the baseline is
+            // left alone. Resetting it to 0 there let the next expiry look like
+            // progress, so a chain that never advanced never hit the limit.
+            if ownRun.done, reached > lastContinuedPercent {
                 fruitlessExpiries = 0
+                lastContinuedPercent = reached
             } else {
                 fruitlessExpiries += 1
             }
-            lastContinuedPercent = reached
 
             guard fruitlessExpiries < fruitlessLimit else {
                 BackgroundSyncLog.record(.skipped, "continued made no progress \(fruitlessLimit)× — leaving it to the periodic tasks")
