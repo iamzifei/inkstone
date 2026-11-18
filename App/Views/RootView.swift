@@ -71,6 +71,9 @@ struct RootView: View {
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
         }
+        .sheet(isPresented: $workspace.isTemplatePickerPresented) {
+            TemplatePickerView()
+        }
         #if os(macOS)
         .sheet(isPresented: $workspace.isQuickRewritePresented) {
             // Guarded on both: the menu item is disabled without a selection,
@@ -250,12 +253,17 @@ struct RootView: View {
             }
 
             #if os(iOS)
-            // Touch has no ⌘F; this is the way into the note's find bar there.
+            // Touch has no menu bar; the note's own actions live here.
             if workspace.presentEditorFind != nil {
-                Button {
-                    workspace.presentEditorFind?(false)
+                Menu {
+                    Button("Find in Note", systemImage: "doc.text.magnifyingglass") {
+                        workspace.presentEditorFind?(false)
+                    }
+                    Button("Insert Template…", systemImage: "doc.on.doc") {
+                        workspace.isTemplatePickerPresented = true
+                    }
                 } label: {
-                    Label("Find in Note", systemImage: "doc.text.magnifyingglass")
+                    Label("Note Actions", systemImage: "ellipsis.circle")
                 }
             }
             #endif

@@ -309,6 +309,9 @@ private struct FilesSettings: View {
                 Toggle("Use shortest path when possible", isOn: $settings.data.useShortestPathLinks)
                 Toggle("Update links when a note is renamed", isOn: $settings.data.updateLinksOnRename)
             }
+            Section("Templates") {
+                TextField("Template folder", text: $settings.data.templateFolder)
+            }
             Section("Daily notes") {
                 TextField("Folder", text: $settings.data.dailyNoteFolder)
                 TextField("Date format", text: $settings.data.dailyNoteFormat)

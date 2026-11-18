@@ -3396,6 +3396,28 @@
         }
       }
     },
+    "Find a template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find a template"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找模板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尋找範本"
+          }
+        }
+      }
+    },
     "Find and Replace…": {
       "localizations": {
         "en": {
@@ -4649,6 +4671,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Inkstone 無法顯示這種檔案。"
+          }
+        }
+      }
+    },
+    "Insert Template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert Template"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插入模板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插入範本"
+          }
+        }
+      }
+    },
+    "Insert Template…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert Template…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插入模板…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插入範本…"
           }
         }
       }
@@ -6330,6 +6396,28 @@
         }
       }
     },
+    "No templates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No templates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有模板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有範本"
+          }
+        }
+      }
+    },
     "No token saved.": {
       "extractionState": "manual",
       "localizations": {
@@ -6441,6 +6529,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "筆記"
+          }
+        }
+      }
+    },
+    "Note Actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note Actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔记操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筆記操作"
           }
         }
       }
@@ -7495,6 +7605,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "把關係圖的所有設定恢復預設"
+          }
+        }
+      }
+    },
+    "Put notes in the “%@” folder of this vault, or choose another folder in Settings › Files & Links.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put notes in the “%@” folder of this vault, or choose another folder in Settings › Files & Links."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把笔记放进本库的「%@」文件夹，或在「设置 › 文件与链接」中选择其他文件夹。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把筆記放進本庫的「%@」資料夾，或在「設定 › 檔案與連結」中選擇其他資料夾。"
           }
         }
       }
@@ -10040,6 +10172,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新啟動墨硯後生效。"
+          }
+        }
+      }
+    },
+    "Template folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模板文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "範本資料夾"
+          }
+        }
+      }
+    },
+    "Templates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Templates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "範本"
           }
         }
       }

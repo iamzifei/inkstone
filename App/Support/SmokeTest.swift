@@ -40,6 +40,7 @@ enum SmokeTest {
 
     private static func run() async {
         await checkFindBar()
+        await checkTemplateInsert()
 
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "inkstone-smoke-\(UUID().uuidString)")
@@ -313,6 +314,30 @@ enum SmokeTest {
         check("find opens the find bar", scroll?.isFindBarVisible == true)
         finder?(true)
         check("find and replace keeps it open", scroll?.isFindBarVisible == true)
+        window.close()
+    }
+
+    /// Insert Template puts the rendered template into the note at the caret,
+    /// through the real editor, and the note's text follows.
+    private final class TextBox { var text = "Before.\n" }
+    private static func checkTemplateInsert() async {
+        let box = TextBox()
+        var inserter: ((String) -> Void)?
+        var actions = EditorActions()
+        actions.provideInserter = { inserter = $0 }
+        let binding = Binding(get: { box.text }, set: { box.text = $0 })
+        let host = NSHostingView(rootView: MarkdownEditorView(
+            text: binding, style: .fallback, mode: .livePreview, actions: actions))
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 640, height: 420),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        await waitUntil("the editor hands out an inserter") { inserter != nil }
+        let rendered = TemplateRenderer.render("## {{title}}\n", title: "Smoke")
+        inserter?(rendered)
+        try? await Task.sleep(for: .milliseconds(200))
+        check("Insert Template puts the rendered template into the note", box.text.contains("## Smoke"))
         window.close()
     }
 
