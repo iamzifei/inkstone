@@ -253,17 +253,17 @@ struct RootView: View {
             }
 
             #if os(iOS)
-            // Touch has no menu bar; the note's own actions live here.
+            // Touch has no ⌘F or menu bar; these are the ways in there.
             if workspace.presentEditorFind != nil {
-                Menu {
-                    Button("Find in Note", systemImage: "doc.text.magnifyingglass") {
-                        workspace.presentEditorFind?(false)
-                    }
-                    Button("Insert Template…", systemImage: "doc.on.doc") {
-                        workspace.isTemplatePickerPresented = true
-                    }
+                Button {
+                    workspace.presentEditorFind?(false)
                 } label: {
-                    Label("Note Actions", systemImage: "ellipsis.circle")
+                    Label("Find in Note", systemImage: "doc.text.magnifyingglass")
+                }
+                Button {
+                    workspace.isTemplatePickerPresented = true
+                } label: {
+                    Label("Insert Template…", systemImage: "doc.on.doc")
                 }
             }
             #endif

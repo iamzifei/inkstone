@@ -7,9 +7,10 @@ struct TemplatePickerView: View {
     @Environment(\.style) private var style
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    /// Listed once when the sheet opens, not on every keystroke.
+    @State private var all: [URL] = []
 
     private var templates: [URL] {
-        let all = workspace.templateFiles
         guard !query.isEmpty else { return all }
         return all.filter { $0.deletingPathExtension().lastPathComponent.localizedCaseInsensitiveContains(query) }
     }
@@ -17,7 +18,7 @@ struct TemplatePickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                if workspace.templateFiles.isEmpty {
+                if all.isEmpty {
                     ContentUnavailableView(
                         "No templates",
                         systemImage: "doc.on.doc",
@@ -38,6 +39,7 @@ struct TemplatePickerView: View {
                 }
             }
             .searchable(text: $query, prompt: Text("Find a template"))
+            .onAppear { all = workspace.templateFiles }
             .navigationTitle("Insert Template")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

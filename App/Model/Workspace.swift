@@ -89,7 +89,7 @@ final class Workspace {
     /// The active editor's caret, read live (DemoDirector `report`).
     @ObservationIgnored var editorCaret: (() -> NSRange)?
     /// Inserts text at the active editor's caret (replacing any selection), as
-    /// one undoable edit. Set by the editor; nil when no note is open.
+    /// one undoable edit. Set by the most recently built editor.
     @ObservationIgnored var insertAtEditorCaret: ((String) -> Void)?
     var isTemplatePickerPresented = false
 
@@ -98,11 +98,15 @@ final class Workspace {
         guard let root else { return [] }
         let folder = settings.data.templateFolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         guard !folder.isEmpty else { return [] }
-        let prefix = root.appending(path: folder, directoryHint: .isDirectory).standardizedFileURL.path(percentEncoded: false)
+        // With the trailing slash, so "Templates-old/" is not inside
+        // "Templates/"; case-insensitive, as the file system and Obsidian are.
+        var prefix = root.appending(path: folder, directoryHint: .isDirectory).standardizedFileURL
+            .path(percentEncoded: false).lowercased()
+        if !prefix.hasSuffix("/") { prefix += "/" }
         var found: [URL] = []
         func walk(_ node: FileNode) {
             if !node.isDirectory, node.isMarkdown,
-               node.url.standardizedFileURL.path(percentEncoded: false).hasPrefix(prefix) { found.append(node.url) }
+               node.url.standardizedFileURL.path(percentEncoded: false).lowercased().hasPrefix(prefix) { found.append(node.url) }
             node.children?.forEach(walk)
         }
         tree.map(walk)

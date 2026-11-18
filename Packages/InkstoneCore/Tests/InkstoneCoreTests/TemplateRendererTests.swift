@@ -32,6 +32,24 @@ struct TemplateRendererTests {
         #expect(render("{{date:[Week] W}}") == "Week 47")
     }
 
+    /// Review 2026-11-18: tokens with no single Unicode field were mistranslated.
+    @Test func tokensWithoutAUnicodeEquivalent() {
+        #expect(render("{{date:MMMM Do YYYY}}") == "November 18th 2026")
+        #expect(render("{{date:DDD}}") == "322")          // day of year, unpadded
+        #expect(render("{{date:DDDD}}") == "322")
+        #expect(render("{{date:Q}}") == "4")
+        #expect(render("{{time:h:mm a}}") == "9:05 am")
+        #expect(render("{{time:h:mm A}}") == "9:05 AM")
+        #expect(render("{{date:X}}") == String(Int(Self.date.timeIntervalSince1970)))
+        #expect(render("{{date:x}}") == String(Int(Self.date.timeIntervalSince1970 * 1000)))
+        #expect(render("{{date:GGGG-[W]WW}}") == "2026-W47")
+    }
+
+    @Test func ordinals() {
+        let cases = [(1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (11, "11th"), (12, "12th"), (13, "13th"), (21, "21st"), (22, "22nd"), (23, "23rd")]
+        for (n, s) in cases { #expect(TemplateRenderer.ordinal(n) == s) }
+    }
+
     @Test func unknownPlaceholdersAreLeftAlone() {
         #expect(render("{{tp.date.now()}} and {{unknown}}") == "{{tp.date.now()}} and {{unknown}}")
         #expect(render("no placeholders") == "no placeholders")

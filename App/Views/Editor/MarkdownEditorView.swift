@@ -1863,7 +1863,12 @@ private struct TextViewRepresentable: UIViewRepresentable {
         // the toolbar's "Find in Note" on a touch screen.
         textView.isFindInteractionEnabled = true
         actions.provideInserter { [weak textView] text in
-            guard let textView, let range = textView.selectedTextRange else { return }
+            guard let textView else { return }
+            // Focused first: the picker sheet took focus, and an unfocused
+            // view may not register the undo. Focus also keeps the range.
+            if !textView.isFirstResponder { textView.becomeFirstResponder() }
+            guard let range = textView.selectedTextRange ?? textView.textRange(
+                from: textView.endOfDocument, to: textView.endOfDocument) else { return }
             // `replace(_:withText:)` is one undoable edit and calls the delegate.
             textView.replace(range, withText: text)
         }
