@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Inkstone's privacy manifest. No tracking and no collected data: notes stay in
+  the folder the user picks; sync goes to the user's own iCloud or GitHub
+  repository, and the assistant to the provider the user configures with their
+  own key — none of it to the developer.
+
+  Required-reason APIs, each with what the code actually does:
+  - UserDefaults (CA92.1): the app's own settings and vault list.
+  - File timestamps (3B52.1, C617.1): modification dates of notes in the vault
+    the user chose (incremental indexing, sync change detection, conflict
+    detection) and of files in the app's own container (scratch / iCloud).
+  - System boot time (35F9.1): DispatchTime / uptime to measure elapsed time
+    inside the app (autosave debounce, performance timing). Never sent off device.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>CA92.1</string></array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>3B52.1</string><string>C617.1</string></array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array><string>35F9.1</string></array>
+		</dict>
+	</array>
+</dict>
+</plist>

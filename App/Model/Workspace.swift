@@ -225,6 +225,12 @@ final class Workspace {
 
     var sidebarSection: SidebarSection = .files
 
+    #if DEBUG
+    /// Text the quick switcher opens with, for scripted screenshots
+    /// (DemoDirector's `switcher <query>`). Consumed on appearance.
+    var quickSwitcherSeed = ""
+    #endif
+
     /// Whether the inspector (properties, backlinks, outline) is showing.
     ///
     /// Here rather than in the root view so a menu command (⌥⌘I) can toggle

@@ -80,10 +80,9 @@ platform :ios do
       app_rating_config_path: "./fastlane/metadata/app_store_rating_config.json",
 
       submit_for_review: true,
-      # Approved is not the same as released. This holds the build until it is
-      # released by hand, so the listing is never live before anyone has looked
-      # at how it reads on the store.
-      automatic_release: false,
+      # Released as soon as it is approved (James, 2026-11-18: "自动发布").
+      # Until then a build was held for a manual release.
+      automatic_release: true,
 
       # Declared in Info.plist as ITSAppUsesNonExemptEncryption=false — HTTPS and
       # the Keychain only, which is exempt. Repeating it here stops the upload
@@ -98,6 +97,32 @@ platform :ios do
       force: true,
       run_precheck_before_submit: true,
       precheck_include_in_app_purchases: false,
+      skip_binary_upload: false,
+      skip_screenshots: false,
+      skip_metadata: false,
+      overwrite_screenshots: true
+    )
+  end
+
+  desc "Upload build, metadata and screenshots; stop short of submitting."
+  # For a release whose review details are set separately: the contact details
+  # live in App Store Connect, not in this public repository, and are written
+  # with `asc` between this lane and submission (fastlane/review_notes.txt).
+  lane :prepare do
+    unless File.exist?(IPA_PATH)
+      UI.user_error!("No IPA at #{IPA_PATH}. Build one with Tools/package-ios.sh")
+    end
+    deliver(
+      api_key: asc_key,
+      ipa: IPA_PATH,
+      app_identifier: APP_ID,
+      metadata_path: "./fastlane/metadata",
+      screenshots_path: "./fastlane/screenshots",
+      app_rating_config_path: "./fastlane/metadata/app_store_rating_config.json",
+      submit_for_review: false,
+      automatic_release: true,
+      force: true,
+      run_precheck_before_submit: false,
       skip_binary_upload: false,
       skip_screenshots: false,
       skip_metadata: false,
