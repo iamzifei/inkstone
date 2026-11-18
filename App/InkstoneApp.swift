@@ -933,11 +933,24 @@ struct InkstoneApp: App {
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(workspace.activeTab?.url == nil)
             Button(localized("Calendar")) { workspace.open(.calendar) }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+            Button(localized("Search Vault")) {
+                // The sidebar's search pane: full text and `tag:` queries,
+                // unlike the quick switcher (⌘O), which matches names.
+                workspace.sidebarSection = .search
+            }
+            .keyboardShortcut("f", modifiers: [.command, .shift])
+            Button(workspace.isInspectorPresented ? localized("Hide Inspector") : localized("Show Inspector")) {
+                workspace.isInspectorPresented.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
             Divider()
             Button(localized("Live Preview")) { workspace.settings.data.editorMode = .livePreview }
                 .keyboardShortcut("e", modifiers: [.command])
             Button(localized("Source Mode")) { workspace.settings.data.editorMode = .source }
+                .keyboardShortcut("e", modifiers: [.command, .option])
             Button(localized("Reading Mode")) { workspace.settings.data.editorMode = .reading }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
             Button(localized("Back")) { workspace.goBack() }
                 .keyboardShortcut("[", modifiers: [.command])

@@ -110,6 +110,16 @@ Behaviour fix found by the equivalence test: on a vault whose path contains a sp
 app init ~0.5 s → scene body ~3.0 s → window ~3.3 s → file tree +0.8 s → index ready ~5.8–6.9 s.
 Time Profiler: ~1.6 s of the init→scene gap is UIKit loading a system bundle during launch (SwiftUI → UIKitCore → -[NSBundle loadAndReturnError:], mostly dyld resolving dependents) — not app code; suspected accessibility bundles loaded because the simulator is driven by an accessibility automation tool (unverified). Needs a real-device measurement before acting (HUMAN QUEUE: installing a dev build replaces the App Store build on the phone — James's call).
 
+## P4 Mac shortcuts (2026-11-18)
+| Command | Shortcut |
+|---|---|
+| Search Vault (sidebar full-text / tag: search) | ⇧⌘F |
+| Calendar | ⇧⌘L |
+| Show / Hide Inspector | ⌥⌘I |
+| Source Mode | ⌥⌘E |
+| Reading Mode | ⇧⌘E |
+(Live Preview stays ⌘E.) Checked in the running app's View menu. Inspector state moved into Workspace so the menu can toggle it; zh-Hans/zh-Hant strings added. Same commands apply on iPad/Duo with a hardware keyboard.
+
 ## Closed decisions
 - 2026-11-18 (James): keep Inkstone's behaviour where it differs from Obsidian on purpose — tables without a blank line before them render (GFM); a bare URL ends at full-width punctuation instead of swallowing the Chinese text after it.
 - 2026-11-18 (James): iOS CI builds on GitHub's `xcode-27` preview image (PR #5) so the Duo code is compiled.

@@ -12,15 +12,6 @@ struct RootView: View {
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
-    // The inspector starts open on a Mac and closed everywhere else. On an iPad
-    // the sidebar and the inspector are both overlays at these widths, so
-    // opening both by default left the editor as a strip between two floating
-    // panels — three columns' worth of chrome on a screen that fits two.
-    #if os(macOS)
-    @State private var isInspectorPresented = true
-    #else
-    @State private var isInspectorPresented = false
-    #endif
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -59,7 +50,7 @@ struct RootView: View {
                                     // iPhone the toolbar button did nothing and
                                     // backlinks, outline and properties were
                                     // unreachable.
-                                    .inspector(isPresented: $isInspectorPresented) {
+                                    .inspector(isPresented: $workspace.isInspectorPresented) {
                                         InspectorView()
                                             .presentationDetents([.medium, .large])
                                             .presentationDragIndicator(.visible)
@@ -98,12 +89,13 @@ struct RootView: View {
 
     @ViewBuilder
     private var splitView: some View {
+        @Bindable var workspace = workspace
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
         } detail: {
             DetailView()
-                .inspector(isPresented: $isInspectorPresented) {
+                .inspector(isPresented: $workspace.isInspectorPresented) {
                     InspectorView()
                         .inspectorColumnWidth(min: 240, ideal: 300, max: 420)
                 }
@@ -233,7 +225,7 @@ struct RootView: View {
             } label: {
                 Label("Calendar", systemImage: "calendar")
             }
-            .help("Calendar of daily notes")
+            .help("Calendar of daily notes (⇧⌘L)")
 
             Menu {
                 Button("New Note", systemImage: "doc.badge.plus") { workspace.createNote() }
@@ -258,13 +250,13 @@ struct RootView: View {
             }
 
             Button {
-                isInspectorPresented.toggle()
+                workspace.isInspectorPresented.toggle()
             } label: {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
-            .help(isInspectorPresented
-                  ? localized("Hide the inspector")
-                  : localized("Show the inspector — properties, backlinks, local graph"))
+            .help(workspace.isInspectorPresented
+                  ? localized("Hide the inspector (⌥⌘I)")
+                  : localized("Show the inspector — properties, backlinks, local graph (⌥⌘I)"))
         }
     }
 }

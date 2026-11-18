@@ -1565,6 +1565,28 @@
         }
       }
     },
+    "Calendar of daily notes (⇧⌘L)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar of daily notes (⇧⌘L)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日记日历 (⇧⌘L)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日記日曆 (⇧⌘L)"
+          }
+        }
+      }
+    },
     "Cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -3865,6 +3887,28 @@
         }
       }
     },
+    "Hide Inspector": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Inspector"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏检查器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏檢查器"
+          }
+        }
+      }
+    },
     "Hide links pointing at notes that don't exist yet": {
       "extractionState": "manual",
       "localizations": {
@@ -3907,6 +3951,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "隱藏檢查器"
+          }
+        }
+      }
+    },
+    "Hide the inspector (⌥⌘I)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the inspector (⌥⌘I)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏检查器 (⌥⌘I)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏檢查器 (⌥⌘I)"
           }
         }
       }
@@ -8189,6 +8255,28 @@
         }
       }
     },
+    "Search Vault": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Vault"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索整个库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋整個庫"
+          }
+        }
+      }
+    },
     "Search files…": {
       "extractionState": "manual",
       "localizations": {
@@ -8534,6 +8622,28 @@
         }
       }
     },
+    "Show Inspector": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Inspector"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示检查器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示檢查器"
+          }
+        }
+      }
+    },
     "Show Welcome Guide": {
       "extractionState": "manual",
       "localizations": {
@@ -8645,6 +8755,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示檢查器——屬性、反向連結、局部關係圖"
+          }
+        }
+      }
+    },
+    "Show the inspector — properties, backlinks, local graph (⌥⌘I)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the inspector — properties, backlinks, local graph (⌥⌘I)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示检查器——属性、反向链接、局部关系图 (⌥⌘I)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示檢查器——屬性、反向連結、局部關係圖 (⌥⌘I)"
           }
         }
       }
