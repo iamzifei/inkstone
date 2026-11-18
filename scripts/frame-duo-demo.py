@@ -81,7 +81,10 @@ class FlatBezel:
         # The screen: the transparent region holding the image centre (the
         # device's outside is transparent too, but not connected to it).
         labels, _ = ndimage.label(alpha < 0.5)
-        ys, xs = np.nonzero(labels == labels[alpha.shape[0] // 2, alpha.shape[1] // 2])
+        centre = labels[alpha.shape[0] // 2, alpha.shape[1] // 2]
+        if centre == 0:
+            sys.exit(f"{png}: the image centre is not on the transparent screen")
+        ys, xs = np.nonzero(labels == centre)
         self.hole = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
         # The device's own outline: solid inside, Apple's anti-aliased alpha
         # along its outer edge. Everything under the bezel is clipped to it —

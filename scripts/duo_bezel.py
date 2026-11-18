@@ -153,18 +153,32 @@ class PartialTemplate:
         W, H = self.meta["size"]
         self.scale = scale
         self.size = (round(W * scale), round(H * scale))
-        load = lambda name, mode: np.asarray(
-            Image.open(self.dir / name).convert(mode).resize(self.size, Image.LANCZOS), dtype=np.float32) / 255.0
+        cache: dict = {}
+
+        def load(name, mode):
+            # Layers are static: read and scaled once, not on every frame.
+            if (name, mode) not in cache:
+                cache[(name, mode)] = np.asarray(
+                    Image.open(self.dir / name).convert(mode).resize(self.size, Image.LANCZOS), dtype=np.float32) / 255.0
+            return cache[(name, mode)]
         self.load = load
         self.screen = next(l for l in self.meta["layers"] if l["kind"] == "smartobject")
         self._build_map()
 
+    # Each output pixel samples the screen at 2x2 sub-pixel positions and
+    # averages them: where the warp squeezes the screen (the upright posture's
+    # lower half, ~5x), a single bilinear tap would alias and shimmer.
+    SUB = ((0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75))
+
     def _build_map(self):
+        self.maps = [self._map_at(dx, dy) for dx, dy in self.SUB]
+        self.valid = np.mean([m[2] for m in self.maps], axis=0).astype(np.float32)
+
+    def _map_at(self, dx, dy):
         s, layer = self.scale, self.screen
         w, h = self.size
-        # Pixel centres in template coordinates.
         ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-        X, Y = (xs + 0.5) / s, (ys + 0.5) / s
+        X, Y = (xs + dx) / s, (ys + dy) / s
         verts, warped = layer["vertices"], layer["warped"]
         qx = np.full(X.shape, np.nan)
         qy = np.full(X.shape, np.nan)
@@ -181,14 +195,24 @@ class PartialTemplate:
         to_canvas = homography([(0, 0), (cw, 0), (cw, ch), (0, ch)], [(t[0], t[1]), (t[2], t[3]), (t[4], t[5]), (t[6], t[7])])
         cx, cy = apply_h(np.linalg.inv(to_canvas), qx, qy)
         self.content_size = (cw, ch)
-        self.cx, self.cy = cx / cw, cy / ch          # normalised content coordinates
-        self.valid = ~np.isnan(cx) & (self.cx >= 0) & (self.cx <= 1) & (self.cy >= 0) & (self.cy <= 1)
+        nx, ny = cx / cw, cy / ch                    # normalised content coordinates
+        valid = ~np.isnan(cx) & (nx >= 0) & (nx <= 1) & (ny >= 0) & (ny <= 1)
+        return nx, ny, valid
 
     def sample(self, content: np.ndarray) -> np.ndarray:
-        """Bilinear sample of `content` (h, w, 3 float) at the warped positions."""
+        """The screen at each output pixel: mean of the 2x2 sub-pixel taps."""
+        acc = None
+        for nx, ny, valid in self.maps:
+            tap = self._bilinear(content, nx, ny) * valid[..., None]
+            acc = tap if acc is None else acc + tap
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.nan_to_num(acc / (self.valid[..., None] * len(self.maps)))
+
+    @staticmethod
+    def _bilinear(content, nx, ny):
         ch, cw = content.shape[:2]
-        x = np.clip(np.nan_to_num(self.cx) * cw - 0.5, 0, cw - 1)
-        y = np.clip(np.nan_to_num(self.cy) * ch - 0.5, 0, ch - 1)
+        x = np.clip(np.nan_to_num(nx) * cw - 0.5, 0, cw - 1)
+        y = np.clip(np.nan_to_num(ny) * ch - 0.5, 0, ch - 1)
         x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
         x1, y1 = np.minimum(x0 + 1, cw - 1), np.minimum(y0 + 1, ch - 1)
         fx, fy = (x - x0)[..., None], (y - y0)[..., None]
@@ -235,8 +259,11 @@ class PartialTemplate:
         def over(src_rgb, src_a, blend="NORMAL"):
             nonlocal rgb, alpha
             if blend == "SCREEN":
+                # Separable blend over a partly transparent backdrop, as
+                # Photoshop does: (1 - αb)·Cs + αb·B(Cb, Cs).
                 mixed = 1 - (1 - rgb) * (1 - src_rgb)
-                src_rgb = np.where(alpha[..., None] > 0, mixed, src_rgb)
+                ab = alpha[..., None]
+                src_rgb = (1 - ab) * src_rgb + ab * mixed
             a = src_a[..., None]
             out_a = alpha + src_a * (1 - alpha)
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -288,7 +315,7 @@ def verify(scale: float = 0.5) -> None:
                         dtype=np.float32) / 255.0
         a = (ps[..., 3] > 0.99) & (ours[..., 3] > 0.99)
         diff = np.abs(ours[..., :3] - ps[..., :3])[a] * 255
-        screen = t.valid[a]
+        screen = t.valid[a] > 0.5
         print(f"{posture}: mean |diff| {diff.mean():.2f}/255, 99th pct {np.percentile(diff, 99):.1f}; "
               f"on the screen {diff[screen].mean():.2f}, off it {diff[~screen].mean():.2f}; "
               f"alpha mean |diff| {np.abs(ours[..., 3] - ps[..., 3]).mean() * 255:.2f}")
