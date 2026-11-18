@@ -237,8 +237,14 @@ public struct SyncEngine: Sendable {
         let remoteByPath = Dictionary(uniqueKeysWithValues: remote.map { ($0.path, $0) })
 
         progress?(SyncProgress(phase: .scanning, message: localized("Scanning vault…")))
-        let (local, excludedLocally) = localFiles()
         var state = SyncState.load(from: vaultRoot)
+        let scanStarted = Date.now
+        let (local, excludedLocally, stamps) = localFiles(
+            cache: state.hashes ?? [:],
+            trustBefore: state.hashesRecordedAt?.addingTimeInterval(-3) ?? .distantPast
+        )
+        state.hashes = stamps
+        state.hashesRecordedAt = scanStarted
 
         // A remote that has gone from "files we recorded" to "nothing at all" is
         // either someone deliberately emptying the repository or, far more often,
@@ -474,6 +480,23 @@ public struct SyncEngine: Sendable {
     ///   missing from the map, and only one of them should propagate to the
     ///   remote.
     func localFiles() -> (files: [String: String], excluded: Set<String>) {
+        let scan = localFiles(cache: [:], trustBefore: .distantPast)
+        return (scan.files, scan.excluded)
+    }
+
+    /// As `localFiles()`, but reusing the SHA from `cache` for any file whose
+    /// size, mtime and ctime all match its stamp and whose mtime is earlier
+    /// than `trustBefore` (the previous scan's start minus a margin for coarse
+    /// timestamps — a write in the same tick as that scan's read could
+    /// otherwise match). Returns fresh stamps for every file hashed or reused.
+    ///
+    /// Before this, every sync read and hashed every file in the vault, even
+    /// when nothing had changed.
+    func localFiles(
+        cache: [String: HashStamp],
+        trustBefore: Date
+    ) -> (files: [String: String], excluded: Set<String>, stamps: [String: HashStamp]) {
+        var stamps: [String: HashStamp] = [:]
         var result: [String: String] = [:]
         var excluded: Set<String> = []
         // The vault's own statement of what does not belong in this repository,
@@ -486,7 +509,9 @@ public struct SyncEngine: Sendable {
         // `excludedPaths` is this device's rule about what it does not carry.
         // A desktop and a phone share the first and differ on the second.
         let excluder = policy.pathExcluder
-        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey]
+        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey,
+                                      .contentModificationDateKey, .attributeModificationDateKey]
+        let trustLimit = trustBefore.timeIntervalSinceReferenceDate
         // The enumerator hands back paths in whatever form the file system
         // canonicalises to, which is not always the form the root was written
         // in: a vault under `/var/…` comes back as `/private/var/…`. Comparing
@@ -499,7 +524,7 @@ public struct SyncEngine: Sendable {
             at: vaultRoot,
             includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles]
-        ) else { return (result, excluded) }
+        ) else { return (result, excluded, stamps) }
 
         for case let url as URL in walker {
             let values = try? url.resourceValues(forKeys: Set(keys))
@@ -546,9 +571,22 @@ public struct SyncEngine: Sendable {
                 excluded.insert(relative)
                 continue
             }
+            let size = values?.fileSize ?? -1
+            let modified = values?.contentModificationDate?.timeIntervalSinceReferenceDate ?? .nan
+            let changed = values?.attributeModificationDate?.timeIntervalSinceReferenceDate ?? .nan
+            if let old = cache[relative], old.size == size, old.modified == modified,
+               old.changed == changed, modified < trustLimit, changed < trustLimit {
+                result[relative] = old.sha
+                stamps[relative] = old
+                continue
+            }
             guard let data = try? Data(contentsOf: url) else { continue }
 
-            result[relative] = gitBlobSHA(data)
+            let sha = gitBlobSHA(data)
+            result[relative] = sha
+            if !modified.isNaN, !changed.isNaN {
+                stamps[relative] = HashStamp(size: size, modified: modified, changed: changed, sha: sha)
+            }
         }
 
         // `.gitignore` again, by hand, because `.skipsHiddenFiles` above means
@@ -564,7 +602,7 @@ public struct SyncEngine: Sendable {
             result[SyncFilePolicy.ignoreFileName] = gitBlobSHA(data)
         }
 
-        return (result, excluded)
+        return (result, excluded, stamps)
     }
 
     private func fileURL(_ path: String) -> URL {

@@ -152,12 +152,33 @@ public enum SyncPlanner {
 
 /// What the last clean sync looked like, persisted in the vault's `.inkstone`
 /// folder so the next run has a base to compare against.
+/// What a file looked like when its blob SHA was last computed.
+///
+/// Size, modification date and status-change date (`ctime`) together: the
+/// first two can be preserved or restored by copy tools, but `ctime` is set by
+/// the kernel on every write and cannot be set back, so a rewritten file whose
+/// size and mtime happen to match still misses.
+public struct HashStamp: Codable, Hashable, Sendable {
+    public var size: Int
+    public var modified: Double
+    public var changed: Double
+    public var sha: String
+}
+
 public struct SyncState: Codable, Hashable, Sendable {
     /// Vault-relative path to the blob SHA recorded at the last clean sync.
     public var blobs: [String: String]
     public var lastSyncedAt: Date?
     public var repository: String?
     public var branch: String?
+
+    /// Local file stamps from the last scan, so the next scan can skip reading
+    /// and hashing files that have not changed (git's index does the same).
+    /// Optional so sync files written by older versions still decode.
+    public var hashes: [String: HashStamp]?
+    /// When the scan that produced `hashes` started. A stamp is trusted only
+    /// for files last modified comfortably before this — see `localFiles`.
+    public var hashesRecordedAt: Date?
 
     public init(
         blobs: [String: String] = [:],

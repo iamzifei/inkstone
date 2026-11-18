@@ -113,6 +113,19 @@ struct VaultScalePerformanceTests {
         print(String(format: "SCALE resolveOnly=%.1fms (resolved %d) urlKeyedAppends=%.1fms", resolveOnly, resolved, urlDict))
         print(String(format: "SCALE breakdown enumerate=%.1fms stat=%.1fms assemble=%.1fms", enumerate, stats, assemble))
 
+        // Sync's local scan: every file read and hashed, versus stamps reused.
+        let engine = SyncEngine(
+            client: GitHubClient(configuration: .init(repository: "a/b", branch: "main"), token: "t"),
+            vaultRoot: root, policy: SyncFilePolicy())
+        t = DispatchTime.now().uptimeNanoseconds
+        let cold = engine.localFiles(cache: [:], trustBefore: .distantPast)
+        let syncCold = Self.ms(t)
+        t = DispatchTime.now().uptimeNanoseconds
+        let warmScan = engine.localFiles(cache: cold.stamps, trustBefore: .distantFuture)
+        let syncWarm = Self.ms(t)
+        #expect(warmScan.files == cold.files)
+        print(String(format: "SCALE syncScan cold(hash all)=%.1fms warm(stamps)=%.1fms", syncCold, syncWarm))
+
         print(String(format: "SCALE notes=10000 scan=%.1fms fullIndex=%.1fms saveRoundTrip(full rescan+reindex)=%.1fms incrementalIndex=%.1fms", scan, fullIndex, fullRoundTrip, incrementalIndex))
     }
 }
