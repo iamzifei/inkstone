@@ -88,6 +88,17 @@ struct RootView: View {
         } message: {
             Text(workspace.exportFailure ?? "")
         }
+        .sheet(isPresented: $workspace.isCommandPalettePresented, onDismiss: {
+            // Run the chosen command once the palette is fully gone: several
+            // open a sheet of their own, which cannot present over one that is
+            // still closing.
+            if let command = workspace.pendingPaletteCommand {
+                workspace.pendingPaletteCommand = nil
+                command.run(workspace)
+            }
+        }) {
+            CommandPaletteView()
+        }
         #if os(macOS)
         .sheet(isPresented: $workspace.isQuickRewritePresented) {
             // Guarded on both: the menu item is disabled without a selection,
@@ -274,7 +285,11 @@ struct RootView: View {
                 } label: {
                     Label("Find in Note", systemImage: "doc.text.magnifyingglass")
                 }
-                Menu {
+            }
+            // Always there, so the command palette is reachable from the graph
+            // or calendar too; the note's own actions only with a note open.
+            Menu {
+                if workspace.presentEditorFind != nil {
                     Button("Insert Template…", systemImage: "doc.on.doc") {
                         workspace.isTemplatePickerPresented = true
                     }
@@ -284,9 +299,13 @@ struct RootView: View {
                     Button("Export as HTML…", systemImage: "chevron.left.forwardslash.chevron.right") {
                         workspace.exportActiveNote(as: .html)
                     }
-                } label: {
-                    Label("More", systemImage: "ellipsis.circle")
+                    Divider()
                 }
+                Button("Command Palette…", systemImage: "command") {
+                    workspace.isCommandPalettePresented = true
+                }
+            } label: {
+                Label("More", systemImage: "ellipsis.circle")
             }
             #endif
 

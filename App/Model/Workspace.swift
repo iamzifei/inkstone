@@ -324,6 +324,9 @@ final class Workspace {
     var isInspectorPresented = false
     #endif
     var isQuickSwitcherPresented = false
+    var isCommandPalettePresented = false
+    /// Chosen in the palette; run when its sheet has closed.
+    @ObservationIgnored var pendingPaletteCommand: AppCommand?
     var searchQuery = ""
 
     /// Back/forward navigation, like a browser. Cheap to maintain and users

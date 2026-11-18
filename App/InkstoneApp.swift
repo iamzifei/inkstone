@@ -906,6 +906,8 @@ struct InkstoneApp: App {
             Divider()
             Button(localized("Quick Switcher…")) { workspace.isQuickSwitcherPresented = true }
                 .keyboardShortcut("o")
+            Button(localized("Command Palette…")) { workspace.isCommandPalettePresented = true }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             // The on-device model's home. Disabled without a selection, since
             // there is nothing for it to work on — and it works on selections
             // only, because 4,000 tokens does not stretch further.

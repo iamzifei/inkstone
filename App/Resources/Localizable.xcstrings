@@ -2068,6 +2068,50 @@
         }
       }
     },
+    "Command Palette": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command Palette"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板"
+          }
+        }
+      }
+    },
+    "Command Palette…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command Palette…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板…"
+          }
+        }
+      }
+    },
     "Compress full-width punctuation": {
       "extractionState": "manual",
       "localizations": {
@@ -6300,6 +6344,28 @@
         }
       }
     },
+    "No matching command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的命令"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有符合的命令"
+          }
+        }
+      }
+    },
     "No model": {
       "extractionState": "manual",
       "localizations": {
@@ -9530,6 +9596,28 @@
         }
       }
     },
+    "Show/Hide Inspector": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show/Hide Inspector"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示/隐藏检查器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示/隱藏檢查器"
+          }
+        }
+      }
+    },
     "Sign in to iCloud and turn on iCloud Drive, then try again. You can also open any folder as a vault.": {
       "extractionState": "manual",
       "localizations": {
@@ -11339,6 +11427,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "在助理中輸入 / 即可使用。採用 Claude Code 的格式——指向 ~/.claude/skills 即可。會執行指令碼的技能只提供其說明文字，因為沙盒 App 無法啟動其他程式。"
+          }
+        }
+      }
+    },
+    "Type a command…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a command…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入命令…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "輸入命令…"
           }
         }
       }
