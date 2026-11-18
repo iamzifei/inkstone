@@ -10,6 +10,7 @@ struct SidebarView: View {
     @Environment(\.style) private var style
 
     #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
     #if DEBUG
     /// Opens Settings at launch, so the sheet can be looked at without driving a
     /// tap — the same reason the other debug hooks exist, and the only way to
@@ -72,6 +73,12 @@ struct SidebarView: View {
         }
         .background(style.secondaryBackground)
         #if os(iOS)
+        .safeAreaInset(edge: .bottom) {
+            // On iPhone this list is the whole screen and had no way to make a
+            // note or jump to one: both lived in a toolbar that only appears
+            // once a note is open. Bottom edge, where a thumb reaches.
+            if sizeClass == .compact { CompactListBar() }
+        }
         .sheet(isPresented: $isShowingSettings) {
             SettingsView(onDone: { isShowingSettings = false })
         }
@@ -160,6 +167,9 @@ private struct SectionPicker: View {
                         .font(style.uiIcon(1.0))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
+                        #if os(iOS)
+                        .frame(minHeight: 44)
+                        #endif
                         .foregroundStyle(selection == section ? style.accent : style.secondaryText)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
@@ -168,6 +178,7 @@ private struct SectionPicker: View {
                 }
                 .buttonStyle(.plain)
                 .help(label(for: section))
+                .accessibilityLabel(Text(label(for: section)))
             }
         }
         .padding(.horizontal, 8)
@@ -207,6 +218,33 @@ struct FileTreeView: View {
     @State private var renameText = ""
 
     var body: some View {
+        #if os(iOS)
+        // A `List` on iOS, not a scroll view: swipe actions (bookmark, rename,
+        // trash) only exist on list rows, and they are how a phone expects a
+        // file to be acted on — the context menu stays for everything else.
+        ScrollViewReader { scroller in
+            List {
+                if let tree = workspace.tree, let children = tree.children {
+                    ForEach(children) { node in
+                        FileRow(
+                            node: node,
+                            depth: 0,
+                            expanded: $expanded,
+                            renaming: $renaming,
+                            renameText: $renameText
+                        )
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 44)
+            .onChange(of: workspace.treeReveal) { _, target in
+                guard let target else { return }
+                reveal(target.url, using: scroller)
+            }
+        }
+        #else
         ScrollViewReader { scroller in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
@@ -230,6 +268,7 @@ struct FileTreeView: View {
                 reveal(target.url, using: scroller)
             }
         }
+        #endif
     }
 
     /// Opens every folder above `url` and scrolls the row into view.
@@ -325,6 +364,11 @@ private struct FileRow: View {
         .padding(.leading, CGFloat(depth) * 12 + 10)
         .padding(.trailing, 8)
         .padding(.vertical, 3)
+        #if os(iOS)
+        // Apple's minimum touch target. The rows were ~22 pt, sized for a
+        // pointer, which on a phone meant opening the neighbouring note.
+        .frame(minHeight: 44)
+        #endif
         .background(
             RoundedRectangle(cornerRadius: 5)
                 .fill(isActive ? style.background : .clear)
@@ -413,6 +457,38 @@ private struct FileRow: View {
             }
         }
 
+        #if os(iOS)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            // Trash, not delete: on iOS the store moves the file into the
+            // vault's `.trash` folder, so a full swipe is recoverable.
+            Button(role: .destructive) {
+                workspace.delete(node.url)
+            } label: {
+                Label("Trash", systemImage: "trash")
+            }
+            Button {
+                renameText = node.basename
+                renaming = node.url
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            .tint(style.secondaryText)
+        }
+        .swipeActions(edge: .leading) {
+            if !node.isDirectory {
+                Button {
+                    workspace.toggleBookmark(node.url)
+                } label: {
+                    Label(workspace.isBookmarked(node.url) ? "Remove Bookmark" : "Bookmark",
+                          systemImage: workspace.isBookmarked(node.url) ? "bookmark.slash" : "bookmark")
+                }
+                .tint(style.tagColor)
+            }
+        }
+        #endif
         .sheet(item: $historyTarget) { target in
             VersionHistoryView(url: target.url)
                 .environment(workspace)
@@ -751,3 +827,51 @@ struct OutlinePane: View {
         }
     }
 }
+
+#if os(iOS)
+/// The bottom bar of the iPhone vault list: jump to a note, how many there
+/// are, and a new-note button (long-press for canvas and daily note).
+private struct CompactListBar: View {
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.style) private var style
+
+    var body: some View {
+        HStack {
+            Button {
+                workspace.isQuickSwitcherPresented = true
+            } label: {
+                Label("Jump to note", systemImage: "text.magnifyingglass")
+                    .font(style.uiFont)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(style.secondaryText)
+
+            Spacer()
+            Text("\(workspace.index.noteCount) notes")
+                .font(.caption)
+                .foregroundStyle(style.faintText)
+            Spacer()
+
+            Menu {
+                Button("New Canvas", systemImage: "square.on.circle") { workspace.createCanvas() }
+                Button("Today's Daily Note", systemImage: "sun.max") { workspace.openDailyNote() }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(style.accent))
+            } primaryAction: {
+                workspace.createNote()
+            }
+            .accessibilityLabel(Text("New Note"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(style.secondaryBackground)
+        .overlay(alignment: .top) { Divider().overlay(style.divider) }
+    }
+}
+#endif
