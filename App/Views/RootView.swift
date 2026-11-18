@@ -27,6 +27,11 @@ struct RootView: View {
     #endif
 
     var body: some View {
+        DevicePostureReader { posture in rootContent(posture) }
+    }
+
+    @ViewBuilder
+    private func rootContent(_ posture: DevicePosture) -> some View {
         @Bindable var workspace = workspace
 
         Group {
@@ -40,9 +45,12 @@ struct RootView: View {
                 // Selecting a note here changes workspace state rather than
                 // following a `NavigationLink`, so nothing pushed and the editor
                 // was unreachable: the note highlighted and the view stayed put.
-                if sizeClass == .compact {
+                if case .bent(let crease, let isHorizontal) = posture {
+                    creaseSplit(crease: crease, isHorizontal: isHorizontal)
+                } else if sizeClass == .compact {
                     NavigationStack {
                         SidebarView()
+                            .environment(\.isPhoneRootList, true)
                             .navigationDestination(isPresented: showingDetail) {
                                 DetailView()
                                     .toolbar { toolbarContent }
@@ -104,6 +112,41 @@ struct RootView: View {
     }
 
     #if os(iOS)
+    /// iPhone Duo partly folded: one pane either side of the crease, nothing
+    /// drawn across it. The note gets the first pane (top, or left page); the
+    /// second holds what you look at *while* reading it — backlinks, outline,
+    /// properties. With no note open, the note list and a prompt to pick one.
+    ///
+    /// Laid out from the system's division region rather than from the hinge
+    /// angle, as Apple advises; `crease` is in this view's coordinates.
+    @ViewBuilder
+    private func creaseSplit(crease: CGRect, isHorizontal: Bool) -> some View {
+        let hasNote = workspace.activeTab != nil
+        let first = NavigationStack {
+            Group {
+                if hasNote { DetailView().toolbar { toolbarContent } } else { SidebarView() }
+            }
+        }
+        let second = NavigationStack {
+            Group {
+                if hasNote { InspectorView() } else { EmptyStatePane() }
+            }
+        }
+        if isHorizontal {
+            VStack(spacing: 0) {
+                first.frame(height: max(0, crease.minY))
+                style.secondaryBackground.frame(height: crease.height)
+                second.frame(maxHeight: .infinity)
+            }
+        } else {
+            HStack(spacing: 0) {
+                first.frame(width: max(0, crease.minX))
+                style.secondaryBackground.frame(width: crease.width)
+                second.frame(maxWidth: .infinity)
+            }
+        }
+    }
+
     /// Drives the push, and closes the tab again when the user swipes back — so
     /// returning to the list actually deselects, rather than leaving a note
     /// open that nothing on screen refers to.
