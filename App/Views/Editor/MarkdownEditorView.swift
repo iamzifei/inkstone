@@ -938,8 +938,8 @@ private struct TextViewRepresentable: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        // See makeUIView: read before the text goes in.
-        let saved = actions.savedPosition()
+        // See makeUIView: read before the text goes in; a pending reveal wins.
+        let saved = reveal == nil ? actions.savedPosition() : nil
         context.coordinator.restoringPosition = saved != nil
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -1015,7 +1015,10 @@ private struct TextViewRepresentable: NSViewRepresentable {
             object: scrollView.contentView,
             queue: .main
         ) { [weak coordinator = context.coordinator] _ in
-            MainActor.assumeIsolated { coordinator?.rehighlightForScrollIfNeeded() }
+            MainActor.assumeIsolated {
+                coordinator?.rehighlightForScrollIfNeeded()
+                coordinator?.reportPosition()
+            }
         }
 
         scrollView.postsFrameChangedNotifications = true
@@ -1043,12 +1046,14 @@ private struct TextViewRepresentable: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: min(range.location, length), length: 0))
         }
         if let saved {
-            let length = (textView.string as NSString).length
-            let selection = NSRange(location: min(saved.selection.location, length),
-                                    length: min(saved.selection.length, max(0, length - min(saved.selection.location, length))))
             // After layout, or the scroll lands on a document that has no height yet.
             DispatchQueue.main.async { [weak textView, weak scrollView, weak coordinator = context.coordinator] in
                 guard let textView, let scrollView else { return }
+                // Clamped here, not before the hop: the text can be replaced in
+                // between, and an out-of-range selection throws.
+                let length = (textView.string as NSString).length
+                let location = min(saved.selection.location, length)
+                let selection = NSRange(location: location, length: min(saved.selection.length, length - location))
                 textView.setSelectedRange(selection)
                 scrollView.contentView.scroll(to: NSPoint(x: 0, y: saved.scrollOffset))
                 scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -1504,6 +1509,14 @@ private struct TextViewRepresentable: NSViewRepresentable {
             highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: target)
         }
 
+        /// Caret and scroll, for the document to restore in a rebuilt editor.
+        func reportPosition() {
+            guard !restoringPosition, let textView else { return }
+            actions.positionChanged(EditorPosition(
+                selection: textView.selectedRange(),
+                scrollOffset: textView.enclosingScrollView?.contentView.bounds.origin.y ?? 0))
+        }
+
         func textDidChange(_ notification: Notification) {
             guard !isApplyingAttributes, let textView else { return }
             text.wrappedValue = textView.string
@@ -1518,11 +1531,7 @@ private struct TextViewRepresentable: NSViewRepresentable {
             let selected = textView.selectedRange()
             actions.selectionChanged(selected.length > 0
                 ? (storage.string as NSString).substring(with: selected) : "")
-            if !restoringPosition {
-                actions.positionChanged(EditorPosition(
-                    selection: selected,
-                    scrollOffset: textView.enclosingScrollView?.contentView.bounds.origin.y ?? 0))
-            }
+            reportPosition()
             // Live preview needs a re-run whenever the caret moves to a new line —
             // and only then. Typing fires this *as well as* `textDidChange`, so
             // without the guard every keystroke ran the pass twice.
@@ -1812,8 +1821,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UITextView {
         // Read before the text goes in: setting it moves the caret to the end
-        // and reports that, which overwrote the position being restored.
-        let saved = actions.savedPosition()
+        // and reports that, which overwrote the position being restored. A
+        // pending reveal (outline jump) wins over the old position.
+        let saved = reveal == nil ? actions.savedPosition() : nil
         context.coordinator.restoringPosition = saved != nil
         // TextKit 1 deliberately: we need `layoutManager.characterIndex(for:)`
         // to hit-test link taps, which has no direct TextKit 2 equivalent that
@@ -1895,15 +1905,21 @@ private struct TextViewRepresentable: UIViewRepresentable {
             textView.selectedRange = NSRange(location: min(range.location, textView.textStorage.length), length: 0)
         }
         if let saved {
-            let length = textView.textStorage.length
-            let location = min(saved.selection.location, length)
-            let selection = NSRange(location: location, length: min(saved.selection.length, length - location))
             // After the first layout, or the offset is clamped to an empty view.
             DispatchQueue.main.async { [weak textView, weak coordinator = context.coordinator] in
                 guard let textView else { return }
-                textView.selectedRange = selection
-                let maxOffset = max(0, textView.contentSize.height - textView.bounds.height)
-                textView.contentOffset = CGPoint(x: 0, y: min(saved.scrollOffset, maxOffset))
+                // Clamped here, not before the hop: the text can be replaced in
+                // between, and an out-of-range selection throws on iOS.
+                let length = textView.textStorage.length
+                let location = min(saved.selection.location, length)
+                textView.selectedRange = NSRange(location: location, length: min(saved.selection.length, length - location))
+                // Full layout first: TextKit 1 estimates contentSize, and an
+                // estimate clamped the restored offset short (or to zero).
+                textView.layoutManager.ensureLayout(for: textView.textContainer)
+                textView.layoutIfNeeded()
+                let inset = textView.adjustedContentInset
+                let maxOffset = max(-inset.top, textView.contentSize.height + inset.bottom - textView.bounds.height)
+                textView.contentOffset = CGPoint(x: 0, y: min(max(saved.scrollOffset, -inset.top), maxOffset))
                 coordinator?.restoringPosition = false
             }
         }
