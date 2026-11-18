@@ -491,6 +491,10 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   transition: opacity .8s var(--ease);
 }
 .film-frame[data-ready] { opacity: 1; }
+/* The Duo film is its own proportion: four takes fitted onto a 1600x1000 sheet. */
+.film-frame-duo { aspect-ratio: 16 / 10; }
+.duo { padding-block: var(--section-gap); border-top: 1px solid var(--rule); }
+.duo .film { margin-top: clamp(1.5rem, 4vw, 2.5rem); }
 .film figcaption {
   margin-top: 1rem;
   text-align: center;

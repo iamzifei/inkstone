@@ -120,6 +120,10 @@ Time Profiler: ~1.6 s of the init→scene gap is UIKit loading a system bundle d
 | Reading Mode | ⇧⌘E |
 (Live Preview stays ⌘E.) Checked in the running app's View menu. Inspector state moved into Workspace so the menu can toggle it; zh-Hans/zh-Hant strings added. Same commands apply on iPad/Duo with a hardware keyboard.
 
+## P6 Duo film (2026-11-18)
+scripts/record-duo-demo.sh (Duo simulator; app driven by DemoDirector's command file, hinge by Device Hub) → scripts/encode-duo-demo.sh → site/assets/video/duo.{mp4,webm} + duo-poster.webp (24.7 s, ~750 KB each). Folded list → note; unfolded with sidebar, follow a link; half-open book with inspector on the right page; upright half-open with inspector below. New site section "iPhone Duo" after Features in all 8 languages; checked at 1280 px and 390 px (Playwright: no horizontal overflow in en/zh/ja); site tests 96 passed.
+Found while recording: DemoDirector started a second poller each time the scene was rebuilt (every fold/unfold), replaying commands → once per process.
+
 ## Closed decisions
 - 2026-11-18 (James): keep Inkstone's behaviour where it differs from Obsidian on purpose — tables without a blank line before them render (GFM); a bare URL ends at full-width punctuation instead of swallowing the Chinese text after it.
 - 2026-11-18 (James): iOS CI builds on GitHub's `xcode-27` preview image (PR #5) so the Duo code is compiled.

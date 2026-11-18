@@ -68,6 +68,11 @@ features:
       title: iCloud o GitHub, y tú decides qué viaja
       body: 'Sincroniza por iCloud, o empuja la bóveda a un repositorio de GitHub: los conflictos se resuelven una vez, en lugar de quedarse como dos copias. Unos filtros por tipo de archivo deciden si los adjuntos y el material multimedia van con ella, y se respeta el .gitignore de la propia bóveda.'
       alt: 'Los ajustes de sincronización con GitHub: selectores de repositorio y rama, e interruptores por tipo de archivo.'
+duo:
+  title: "iPhone Duo: una nota, cuatro formas"
+  sub: "Cerrado, es la app de iPhone. Abierto, la barra lateral y la nota quedan lado a lado. Entreabierto, la nota ocupa un lado del pliegue y sus vínculos de retorno, esquema y propiedades el otro: nada se dibuja sobre el pliegue."
+  video_alt: "Una grabación de Inkstone en el iPhone Duo: la lista de notas en la pantalla exterior cerrada, la misma nota abierta junto a la barra lateral, después entreabierto como un libro con el inspector en la página derecha y, en vertical, con el inspector bajo el pliegue."
+  caption: "Grabado en el simulador del iPhone Duo, iOS 27.2. Sin editar salvo los fundidos."
 typography:
   title: Componer chino y latín en un mismo renglón
   sub: El caso difícil es una palabra latina dentro de una frase en han. Casi todas las apps lo hacen mal, de una manera que ya no puedes pasar por alto una vez que la has visto.

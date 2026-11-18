@@ -68,6 +68,11 @@ features:
       title: iCloud oder GitHub, und Sie bestimmen, was mitreist
       body: Synchronisieren Sie über iCloud, oder schieben Sie den Tresor in ein GitHub-Repository — Konflikte werden einmal entschieden, statt als zwei Kopien liegen zu bleiben. Filter je Dateityp entscheiden, ob Anhänge und Medien mitkommen, und die .gitignore des Tresors wird respektiert.
       alt: 'Die Einstellungen der GitHub-Synchronisierung: Auswahl von Repository und Branch sowie Schalter je Dateityp.'
+duo:
+  title: "iPhone Duo: eine Notiz, vier Formen"
+  sub: "Zugeklappt ist es die iPhone-App. Aufgeklappt stehen Seitenleiste und Notiz nebeneinander. Halb geöffnet liegt die Notiz auf der einen Seite des Falzes, Rückverweise, Gliederung und Eigenschaften auf der anderen – nichts wird über den Falz gezeichnet."
+  video_alt: "Eine Aufnahme von Inkstone auf dem iPhone Duo: die Notizliste auf dem zugeklappten Außendisplay, dieselbe Notiz aufgeklappt neben der Seitenleiste, dann halb geöffnet wie ein Buch mit dem Inspektor auf der rechten Seite, dann hochkant mit dem Inspektor unter dem Falz."
+  caption: "Aufgenommen im iPhone-Duo-Simulator, iOS 27.2. Bis auf die Überblendungen ungeschnitten."
 typography:
   title: Chinesisch und Lateinisch auf einer Zeile
   sub: Der schwierige Fall ist ein lateinisches Wort mitten im chinesischen Satz. Fast jede App macht das falsch, und zwar auf eine Weise, die man nach dem ersten Mal nicht mehr übersehen kann.

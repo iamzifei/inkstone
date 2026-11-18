@@ -69,8 +69,8 @@
    *
    *    The fade-in waits for real frames rather than for `loadeddata`, so the
    *    video never appears as a black rectangle on a slow connection. */
-  var film = document.querySelector(".film-frame");
-  if (film) {
+  // Every film on the page (the hero and the iPhone Duo one), each on its own.
+  Array.prototype.forEach.call(document.querySelectorAll(".film-frame"), function (film) {
     if (reduced) {
       film.autoplay = false;
       film.loop = false;
@@ -102,7 +102,7 @@
         }, { threshold: 0.15 }).observe(film);
       }
     }
-  }
+  });
 
   /* 4. Copy the Homebrew command.
    *    The labels come from the button's data attributes, which the build fills

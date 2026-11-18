@@ -68,6 +68,11 @@ features:
       title: iCloud or GitHub, and you choose what travels
       body: Sync through iCloud, or push the vault to a GitHub repository with conflicts settled once rather than left as two copies. Per-type filters decide whether attachments and media go with it, and the vault's own .gitignore is respected.
       alt: 'The GitHub sync settings: repository and branch pickers, and per-file-type switches deciding what is synchronised.'
+duo:
+  title: "iPhone Duo: one note, four shapes"
+  sub: "Folded, it is the iPhone app. Unfolded, the sidebar and the note sit side by side. Half-open, the note takes one side of the crease and its backlinks, outline and properties the other — nothing is drawn across the fold."
+  video_alt: "A recording of Inkstone on iPhone Duo: the note list on the folded outer screen, the same note unfolded beside the sidebar, then half-open like a book with the inspector on the right page, then upright with the inspector below the crease."
+  caption: "Recorded in the iPhone Duo simulator, iOS 27.2. Unedited apart from the dissolves."
 typography:
   title: Setting Chinese and English on one line
   sub: The hard case is a Latin word inside a Han sentence. Nearly every app gets it wrong, in a way that is easy to see once and impossible to unsee after.
