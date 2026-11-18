@@ -21,9 +21,18 @@ public enum CommandMatcher {
     }
 
     /// Greedy left-to-right match, preferring word starts: for each typed
-    /// character take the next word-start occurrence if one comes before the
-    /// next plain occurrence's word ends, else the next occurrence.
+    /// character take a later word-start occurrence over the next plain one —
+    /// but only if the rest of the query still fits after it, so no true
+    /// subsequence is ever missed.
     static func score(_ query: [Character], _ title: [Character]) -> Int? {
+        func fits(_ rest: ArraySlice<Character>, after index: Int) -> Bool {
+            var i = index + 1
+            for ch in rest {
+                guard let found = title[min(i, title.count)...].firstIndex(of: ch) else { return false }
+                i = found + 1
+            }
+            return true
+        }
         func isWordStart(_ i: Int) -> Bool {
             i == 0 || !(title[i - 1].isLetter || title[i - 1].isNumber) || (title[i].isUppercase && title[i - 1].isLowercase)
                 // Scripts without spaces (CJK): every character starts a word.
@@ -32,13 +41,14 @@ public enum CommandMatcher {
         var total = 0
         var position = 0
         var previous = -2
-        for ch in query {
+        for (q, ch) in query.enumerated() {
             guard let next = title[position...].firstIndex(of: ch) else { return nil }
             // A word start further on beats a mid-word hit, unless the mid-word
             // hit continues the previous match.
             var pick = next
             if next != previous + 1, !isWordStart(next),
-               let start = title[next...].indices.first(where: { title[$0] == ch && isWordStart($0) }) {
+               let start = title[next...].indices.first(where: { title[$0] == ch && isWordStart($0) }),
+               fits(query[(q + 1)...], after: start) {
                 pick = start
             }
             total += 1

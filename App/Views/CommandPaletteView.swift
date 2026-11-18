@@ -87,7 +87,7 @@ struct CommandPaletteView: View {
                         return .handled
                     }
                     .onKeyPress(.downArrow) {
-                        highlighted = min(results.count - 1, highlighted + 1)
+                        highlighted = max(0, min(results.count - 1, highlighted + 1))
                         return .handled
                     }
             }
@@ -140,15 +140,11 @@ struct CommandPaletteView: View {
     }
     #endif
 
-    /// Closes the palette first, then runs the command — several open sheets
-    /// of their own, and a sheet cannot present over one that is closing.
+    /// Closes the palette; RootView runs the command from the sheet's
+    /// onDismiss, once it is gone.
     private func run(_ results: [AppCommand]) {
         guard results.indices.contains(highlighted) else { return }
-        let command = results[highlighted]
+        workspace.pendingPaletteCommand = results[highlighted]
         dismiss()
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
-            command.run(workspace)
-        }
     }
 }

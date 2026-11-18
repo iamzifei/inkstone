@@ -30,6 +30,19 @@ struct CommandMatcherTests {
         #expect(rank("vault").first == "Whole Vault Graph" || rank("vault").first == "Search Vault")
     }
 
+    /// Review 2026-11-18: jumping to a later word start must not skip letters
+    /// the rest of the query needs — every true subsequence matches.
+    @Test func neverMissesASubsequence() {
+        #expect(Set(rank("ept")).isSuperset(of: ["Export as PDF…", "Export as HTML…"]))
+        for title in titles {
+            let letters = Array(title.lowercased().filter(\.isLetter))
+            // Every 2- and 3-letter subsequence of each title must match it.
+            for i in 0..<letters.count { for j in (i + 1)..<min(letters.count, i + 6) {
+                #expect(rank(String([letters[i], letters[j]])).contains(title), "\(letters[i])\(letters[j]) → \(title)")
+            } }
+        }
+    }
+
     @Test func otherScriptsMatch() {
         let zh = ["新建笔记", "导出为 PDF…", "插入模板…"]
         #expect(CommandMatcher.rank("导出", zh) { $0 } == ["导出为 PDF…"])

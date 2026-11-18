@@ -30,8 +30,6 @@ extension AppCommand {
             AppCommand(id: "new-canvas", title: "New Canvas", shortcut: "⇧⌘N", systemImage: "rectangle.on.rectangle") { $0.createCanvas() },
             AppCommand(id: "daily-note", title: "Today's Daily Note", shortcut: "⇧⌘D", systemImage: "calendar.badge.clock") { $0.openDailyNote() },
             AppCommand(id: "quick-switcher", title: "Quick Switcher…", shortcut: "⌘O", systemImage: "doc.text.magnifyingglass") { $0.isQuickSwitcherPresented = true },
-            AppCommand(id: "rewrite", title: "Rewrite Selection…", shortcut: "⌥⌘K", systemImage: "wand.and.stars",
-                       isAvailable: { $0.editorSelection?.isEmpty == false }) { $0.isQuickRewritePresented = true },
             AppCommand(id: "save", title: "Save", shortcut: "⌘S", systemImage: "square.and.arrow.down") { $0.saveAll() },
             AppCommand(id: "export-pdf", title: "Export as PDF…", shortcut: "⌥⇧⌘E", systemImage: "doc.richtext",
                        isAvailable: noteOpen) { $0.exportActiveNote(as: .pdf) },
@@ -59,8 +57,10 @@ extension AppCommand {
             AppCommand(id: "live-preview", title: "Live Preview", shortcut: "⌘E", systemImage: "eye") { $0.settings.data.editorMode = .livePreview },
             AppCommand(id: "source-mode", title: "Source Mode", shortcut: "⌥⌘E", systemImage: "chevron.left.forwardslash.chevron.right") { $0.settings.data.editorMode = .source },
             AppCommand(id: "reading-mode", title: "Reading Mode", shortcut: "⇧⌘E", systemImage: "book") { $0.settings.data.editorMode = .reading },
-            AppCommand(id: "back", title: "Back", shortcut: "⌘[", systemImage: "chevron.left") { $0.goBack() },
-            AppCommand(id: "forward", title: "Forward", shortcut: "⌘]", systemImage: "chevron.right") { $0.goForward() },
+            AppCommand(id: "back", title: "Back", shortcut: "⌘[", systemImage: "chevron.left",
+                       isAvailable: { $0.canGoBack }) { $0.goBack() },
+            AppCommand(id: "forward", title: "Forward", shortcut: "⌘]", systemImage: "chevron.right",
+                       isAvailable: { $0.canGoForward }) { $0.goForward() },
         ]
         #if os(macOS)
         list.insert(AppCommand(id: "find-next", title: "Find Next", shortcut: "⌘G", systemImage: "arrow.down",
@@ -68,7 +68,11 @@ extension AppCommand {
             let sender = NSMenuItem()
             sender.tag = NSTextFinder.Action.nextMatch.rawValue
             NSApp.sendAction(#selector(NSResponder.performTextFinderAction(_:)), to: nil, from: sender)
-        }, at: list.firstIndex { $0.id == "insert-template" }!)
+        }, at: list.firstIndex { $0.id == "insert-template" }! + 1)
+        // The rewrite sheet is Mac-only (the on-device model's home there).
+        list.insert(AppCommand(id: "rewrite", title: "Rewrite Selection…", shortcut: "⌥⌘K", systemImage: "wand.and.stars",
+                               isAvailable: { $0.editorSelection?.isEmpty == false }) { $0.isQuickRewritePresented = true },
+                    at: list.firstIndex { $0.id == "save" }!)
         #endif
         return list
     }()

@@ -102,6 +102,10 @@ enum DemoDirector {
             }
         case "palette":
             workspace.isCommandPalettePresented = arg != "off"
+        case "palette-pick":
+            // As if the command were chosen in the open palette.
+            workspace.pendingPaletteCommand = AppCommand.all.first { $0.id == arg }
+            workspace.isCommandPalettePresented = false
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
         case "caret":
