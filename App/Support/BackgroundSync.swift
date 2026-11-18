@@ -271,10 +271,15 @@ enum BackgroundSync {
     ///   fall back to an ordinary in-app sync, which still works — it just dies
     ///   when the app is suspended.
     @discardableResult
+    /// - Parameter carryingOn: called from an expiring task to hand the run on.
+    ///   The run being handed on is still stopping at that moment — this is the
+    ///   same synchronous call that cancelled it — so "already syncing" is the
+    ///   expected state, not a reason to refuse; the new task waits it out
+    ///   (`settleInFlightSync`). Without this the carry-on was never submitted.
     static func syncVisibly(
-        workspace: Workspace, firstSyncDirection: FirstSyncDirection? = nil
+        workspace: Workspace, firstSyncDirection: FirstSyncDirection? = nil, carryingOn: Bool = false
     ) -> Bool {
-        guard !workspace.isSyncing else { return false }
+        guard carryingOn || !workspace.isSyncing else { return false }
 
         let identifier = composedIdentifier()
         guard registerContinued(identifier, workspace: workspace) else {
@@ -380,9 +385,12 @@ enum BackgroundSync {
         // out and its own run, `isSyncing` is briefly false, and a pump that
         // stopped there left the new run reporting nothing — which iOS reads as
         // a stalled task and kills.
+        // Set when this task's own run starts, so the pump never reports the
+        // progress of the run it waited out as its own.
+        let ownRun = Completion()
         let pump = Task { @MainActor in
             while !Task.isCancelled {
-                if workspace.isSyncing, let update = workspace.syncProgress {
+                if ownRun.done, workspace.isSyncing, let update = workspace.syncProgress {
                     // Never backwards: `Progress` treats a decrease as a reset,
                     // and a bar that jumps back reads as a restart.
                     let percent = Int64(update.percent)
@@ -398,11 +406,15 @@ enum BackgroundSync {
 
         let work = Task { @MainActor in
             guard await workspace.settleInFlightSync(), workspace.canSync else {
-                BackgroundSyncLog.record(.skipped, "continued: " + skipReason(workspace))
                 pump.cancel()
+                // Cancelled: the system expired this task during the wait and
+                // the expiration handler has logged and completed it.
+                guard !Task.isCancelled else { return }
+                BackgroundSyncLog.record(.skipped, "continued: " + skipReason(workspace))
                 finish(true)
                 return
             }
+            ownRun.done = true
             await workspace.sync(firstSyncDirection: direction)
             pump.cancel()
             switch workspace.syncStatus {
@@ -450,7 +462,7 @@ enum BackgroundSync {
                 BackgroundSyncLog.record(.skipped, "continued made no progress \(fruitlessLimit)× — leaving it to the periodic tasks")
                 return
             }
-            if syncVisibly(workspace: workspace, firstSyncDirection: direction) {
+            if syncVisibly(workspace: workspace, firstSyncDirection: direction, carryingOn: true) {
                 BackgroundSyncLog.record(.scheduled, "continued (carrying on from \(reached)%)")
             } else {
                 // Submission is only allowed on behalf of the frontmost app, so
@@ -491,6 +503,13 @@ enum BackgroundSync {
             return
         }
 
+        let completion = Completion()
+        func complete(_ success: Bool) {
+            guard !completion.done else { return }
+            completion.done = true
+            task.setTaskCompleted(success: success)
+        }
+
         let work = Task { @MainActor in
             // A run still stopping (a continued task that just expired) is
             // waited out, not treated as a reason to skip this window.
@@ -499,7 +518,7 @@ enum BackgroundSync {
                 // expiration handler has already completed it.
                 guard !Task.isCancelled else { return }
                 BackgroundSyncLog.record(.skipped, skipReason(workspace))
-                task.setTaskCompleted(success: true)
+                complete(true)
                 return
             }
             await workspace.sync()
@@ -518,7 +537,7 @@ enum BackgroundSync {
                 succeeded = true
                 BackgroundSyncLog.record(.finished, task.identifier)
             }
-            task.setTaskCompleted(success: succeeded)
+            complete(succeeded)
         }
 
         // The system gives no warning beyond this.
@@ -537,7 +556,7 @@ enum BackgroundSync {
         task.expirationHandler = {
             BackgroundSyncLog.record(.expired, task.identifier)
             work.cancel()
-            task.setTaskCompleted(success: false)
+            complete(false)
         }
     }
 
