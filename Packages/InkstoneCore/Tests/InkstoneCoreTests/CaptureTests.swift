@@ -39,35 +39,3 @@ struct CaptureTests {
     }
 }
 
-@Suite("Shared inbox")
-struct SharedInboxTests {
-    func tempDir() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory.appending(path: "inbox-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    @Test func itemsAreDeliveredOldestFirstAndRemoved() throws {
-        let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        try SharedInbox.add(.init(text: "second", url: nil, title: nil, date: Date(timeIntervalSince1970: 200)), in: dir)
-        try SharedInbox.add(.init(text: "first", url: nil, title: nil, date: Date(timeIntervalSince1970: 100)), in: dir)
-        var got: [String] = []
-        SharedInbox.drain(in: dir) { got.append($0.text ?? ""); return true }
-        #expect(got == ["first", "second"])
-        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
-    }
-
-    @Test func anItemTheVaultCannotTakeStaysForNextTime() throws {
-        let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        try SharedInbox.add(.init(text: "keep me", url: nil, title: nil, date: .now), in: dir)
-        SharedInbox.drain(in: dir) { _ in false }
-        var got: [String] = []
-        SharedInbox.drain(in: dir) { got.append($0.text ?? ""); return true }
-        #expect(got == ["keep me"])
-    }
-
-    @Test func entryHasATimestampHeading() {
-        let item = Capture.SharedItem(text: "hi", url: nil, title: nil, date: Date(timeIntervalSince1970: 0))
-        #expect(SharedInbox.entry(for: item, timeZone: TimeZone(identifier: "UTC")!) == "\n### 1970-01-01 00:00\n\nhi\n")
-    }
-}

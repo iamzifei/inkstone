@@ -622,7 +622,6 @@ struct InkstoneApp: App {
                         // that would find nothing to do.
                         BackgroundSync.cancelAll()
                         workspace.restartAutoSync()
-                        workspace.deliverSharedItems()
                     default:
                         break
                     }
