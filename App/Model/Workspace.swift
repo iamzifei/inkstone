@@ -238,6 +238,14 @@ final class Workspace {
     private var watcher: VaultWatcher?
     private let indexBuilder = IndexBuilder()
     private var reindexTask: Task<Void, Never>?
+    private var treeTask: Task<Void, Never>?
+    /// Bumped by every synchronous `refreshTree()`, so a background scan that
+    /// started earlier can tell its result is out of date.
+    private var treeGeneration = 0
+    /// When the last full (non-incremental) index build started. Incremental
+    /// builds trust modification dates; a full rebuild every few minutes
+    /// catches the rare edit that keeps its date (`rsync -t`, restored backups).
+    private var lastFullIndex = Date.distantPast
 
     init(registry: VaultRegistry = VaultRegistry(), settings: AppSettings = AppSettings()) {
         self.registry = registry
@@ -274,7 +282,7 @@ final class Workspace {
             bookmarks = Bookmarks.load(from: url)
 
             refreshTree()
-            reindex()
+            reindex(full: true)
             startWatching(url)
 
             if startingBackgroundWork {
@@ -354,6 +362,9 @@ final class Workspace {
         saveAll()
         autoSyncTask?.cancel()
         autoSyncTask = nil
+        reindexTask?.cancel()
+        treeTask?.cancel()
+        isIndexing = false
         watcher?.stop()
         watcher = nil
         if let vault { registry.endAccess(to: vault) }
@@ -382,11 +393,43 @@ final class Workspace {
         self.watcher = watcher
     }
 
+    /// Something changed on disk — often just our own autosave, which writes the
+    /// note and wakes the watcher.
+    ///
+    /// This used to rescan the whole tree on the main thread and rebuild the
+    /// whole index, ~650 ms on a 10,000-note vault after every save. Now the
+    /// tree is rescanned off the main thread and only published when it really
+    /// changed (an autosave never changes it, so no sidebar re-render), and the
+    /// index is rebuilt incrementally, re-parsing only notes whose dates moved.
     private func handleExternalChange() {
-        refreshTree()
+        refreshTreeInBackground()
         reindex()
         for document in documents.values {
             document.reloadIfUnchangedLocally()
+        }
+    }
+
+    /// `refreshTree()` without blocking the main thread, publishing only a
+    /// different tree. Explicit file operations (create, rename, delete) keep
+    /// calling the synchronous `refreshTree()`, because they read `tree` right
+    /// after; this is for watcher-driven refreshes, where nothing is waiting.
+    private func refreshTreeInBackground() {
+        guard let root else { return }
+        treeTask?.cancel()
+        let generation = treeGeneration
+        treeTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let scanned = VaultScanner().scan(root)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                // A synchronous `refreshTree()` since this scan began published
+                // a newer listing (a note just created, renamed or deleted);
+                // this one is older and must not overwrite it.
+                guard let self, self.root == root, !Task.isCancelled,
+                      self.treeGeneration == generation else { return }
+                guard scanned != self.tree else { return }
+                self.tree = scanned
+                self.attachments = AttachmentIndex(tree: scanned)
+            }
         }
     }
 
@@ -394,6 +437,8 @@ final class Workspace {
 
     func refreshTree() {
         guard let root else { return }
+        treeTask?.cancel()
+        treeGeneration &+= 1
         let scanned = VaultScanner().scan(root)
         tree = scanned
         attachments = AttachmentIndex(tree: scanned)
@@ -892,14 +937,25 @@ final class Workspace {
         return index.resolve(target, from: source, vaultRoot: root)
     }
 
-    func reindex() {
+    /// Rebuilds the index. Incremental by default: notes whose modification date
+    /// is unchanged since the current snapshot are reused (see
+    /// `IndexBuilder.build(vaultRoot:reusing:)`). `full` re-parses everything —
+    /// used when a vault is opened, as the consistency backstop.
+    func reindex(full: Bool = false) {
         guard let root else { return }
         reindexTask?.cancel()
         isIndexing = true
+        let full = full || Date.now.timeIntervalSince(lastFullIndex) > 600
+        let previous: IndexSnapshot? = full ? nil : index
         reindexTask = Task { [indexBuilder] in
-            let snapshot = await indexBuilder.build(vaultRoot: root)
+            let snapshot = await indexBuilder.build(vaultRoot: root, reusing: previous)
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                // The vault may have been closed or switched while building.
+                guard self.root == root, !Task.isCancelled else { return }
+                // Only a full build that was published counts; a cancelled one
+                // must not postpone the next.
+                if full { self.lastFullIndex = .now }
                 self.index = snapshot
                 self.indexGeneration += 1
                 self.isIndexing = false

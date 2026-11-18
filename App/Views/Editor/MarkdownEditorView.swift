@@ -1890,6 +1890,10 @@ private struct TextViewRepresentable: UIViewRepresentable {
                 : available - 32
             let horizontal = max(16, (available - measure) / 2)
             textView.textContainerInset = UIEdgeInsets(top: 20, left: horizontal, bottom: 240, right: horizontal)
+            if needsViewportPass, textView.bounds.height > 0, !isApplyingAttributes {
+                needsViewportPass = false
+                rehighlight()
+            }
             textView.textContainer.lineFragmentPadding = 0
 
             // The measure inline pictures are scaled to, which AppKit has always
@@ -1909,6 +1913,72 @@ private struct TextViewRepresentable: UIViewRepresentable {
             }
         }
 
+        /// Same threshold as the Mac editor: below it the whole note is styled in
+        /// one pass (already inside a frame, and no chance of a seam).
+        static let viewportThreshold = 40_000
+
+        /// Character range last styled, so scrolling only restyles when the
+        /// reader approaches its edge.
+        var styledRange: NSRange?
+        /// Set when styling ran before the view had a size; cleared by the
+        /// first pass after layout.
+        var needsViewportPass = false
+
+        /// What is on screen plus half a screen either side — the slice worth
+        /// styling. `nil` below the threshold, meaning "style everything".
+        ///
+        /// This used to be missing on iPhone: every keystroke restyled the whole
+        /// note, while the Mac editor already limited itself to the viewport
+        /// (see the macOS `viewportScope()` for how the padding was chosen).
+        func viewportScope() -> NSRange? {
+            guard let textView else { return nil }
+            let storage = textView.textStorage
+            guard storage.length > Self.viewportThreshold else { return nil }
+            let layoutManager = textView.layoutManager
+            let inset = textView.textContainerInset
+            let height = textView.bounds.height
+            // Not laid out yet: style the top of the note rather than all of it,
+            // and run a proper pass once the view has a size (`updateInsets`).
+            guard height > 0 else {
+                needsViewportPass = true
+                return (storage.string as NSString).paragraphRange(
+                    for: NSRange(location: 0, length: min(storage.length, Self.viewportThreshold / 4)))
+            }
+            // Clamped, so a rubber-band overscroll past either end still finds text
+            // instead of an empty glyph range (which would style everything).
+            let maxOffset = max(0, textView.contentSize.height - height)
+            let offset = min(max(textView.contentOffset.y, 0), maxOffset)
+            let visibleRect = CGRect(
+                x: 0,
+                y: offset - inset.top - height * 0.5,
+                width: textView.bounds.width,
+                height: height * 2
+            )
+            let glyphs = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textView.textContainer)
+            let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+            guard characters.length > 0 else { return nil }
+            // Whole paragraphs, so a structure is never styled from half of itself.
+            return (storage.string as NSString).paragraphRange(for: characters)
+        }
+
+        /// The on-screen characters only, for deciding whether a scroll left the
+        /// styled range.
+        func visibleCharacters() -> NSRange? {
+            guard let textView, textView.textStorage.length > Self.viewportThreshold else { return nil }
+            let rect = CGRect(origin: CGPoint(x: 0, y: textView.contentOffset.y - textView.textContainerInset.top),
+                              size: textView.bounds.size)
+            let glyphs = textView.layoutManager.glyphRange(forBoundingRect: rect, in: textView.textContainer)
+            return textView.layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard !isApplyingAttributes, let visible = visibleCharacters() else { return }
+            if let styled = styledRange,
+               visible.location >= styled.location,
+               NSMaxRange(visible) <= NSMaxRange(styled) { return }
+            rehighlight()
+        }
+
         func rehighlight() {
             guard let textView else { return }
             let storage = textView.textStorage
@@ -1916,7 +1986,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
             defer { isApplyingAttributes = false }
             let caretRange = caretLineRange(in: storage.string as NSString, selection: textView.selectedRange)
             caretTracker.record(caretLine: caretRange)
-            highlighter.highlight(storage, caretLineRange: caretRange)
+            let scope = viewportScope()
+            styledRange = scope
+            highlighter.highlight(storage, caretLineRange: caretRange, visibleRange: scope)
 
             // Ask for a repaint of the hand-drawn layer.
             //

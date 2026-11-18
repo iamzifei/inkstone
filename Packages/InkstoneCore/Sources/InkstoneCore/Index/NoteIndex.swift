@@ -48,6 +48,21 @@ public struct IndexSnapshot: Sendable {
     /// batched parallel read first came out *slower* than reading one file at a
     /// time.
     public var orderedNotes: [URL] = []
+    /// Every note keyed by its decoded path string, built once in `assemble`.
+    ///
+    /// `resolve` used to build two `URL`s per link and look each up in `notes`,
+    /// which hashes the URL's whole string every time; on a 10,000-note vault
+    /// that was ~180 ms of a ~290 ms assembly. Joining path strings and looking
+    /// them up here gives the same answers (`ResolveEquivalenceTests`) for a
+    /// fraction of the cost. Empty or out of step with `notes` (a snapshot
+    /// built by hand, or edited after assembly) → `resolve` falls back to the
+    /// URL-based lookup.
+    var pathIndex: [String: URL] = [:]
+
+    /// When the build that produced this snapshot started listing and reading
+    /// files. An incremental build trusts a note from here only if the file's
+    /// modification date is safely *before* this moment — see `build`.
+    var buildStarted: Date?
 
     public init() {}
 
@@ -73,13 +88,53 @@ public struct IndexSnapshot: Sendable {
     /// 3. among several candidates, the one nearest the linking note.
     public func resolve(_ target: String, from source: URL, vaultRoot: URL) -> URL? {
         guard !target.isEmpty else { return source }
+        let withExtension = target.hasSuffix(".md") ? target : target + ".md"
 
         // 1. Treat the target as a path if it contains a separator or extension.
+        if !pathIndex.isEmpty, pathIndex.count == notes.count {
+            if let hit = pathIndex[Self.join(vaultRoot.path(percentEncoded: false), withExtension)] { return hit }
+            // A leading slash means "from the vault root" (step above). The URL
+            // version never matched such a target against the note's folder —
+            // `appending(path:)` on a folder URL keeps the `//` — so neither do we.
+            if !withExtension.hasPrefix("/") {
+                let sourcePath = source.path(percentEncoded: false)
+                let folder = sourcePath.lastIndex(of: "/").map { String(sourcePath[...$0]) } ?? sourcePath
+                if let hit = pathIndex[Self.join(folder, withExtension)] { return hit }
+            }
+        } else {
+            let asPath = vaultRoot.appending(path: withExtension)
+            if notes[asPath] != nil { return asPath }
+            let relative = source.deletingLastPathComponent().appending(path: withExtension)
+            if notes[relative] != nil { return relative }
+        }
+        return resolveByName(target, from: source)
+    }
+
+    /// The path `URL.appending(path:)` would produce, as a string: `base`, one
+    /// separator, then `relative` with exactly one leading slash removed —
+    /// checked against Foundation for spaces, `%`, `..`, `./`, `//`, CJK.
+    static func join(_ base: String, _ relative: String) -> String {
+        let head = base.hasSuffix("/") ? base : base + "/"
+        return head + (relative.hasPrefix("/") ? String(relative.dropFirst()) : relative)
+    }
+
+    /// The reference for `ResolveEquivalenceTests`: the original algorithm,
+    /// building `URL`s with Foundation, but matching a candidate to a note by
+    /// its decoded path rather than by `URL ==`. (`URL ==` compares spellings,
+    /// so the same file built two ways — a space percent-encoded or not — could
+    /// fail to match and fall through to name matching: on a vault path with a
+    /// space, `/Folder/dup` resolved to a *different* `dup.md`. Matching by path
+    /// is what the rule "exact path relative to the vault root" means.)
+    func resolveReference(_ target: String, from source: URL, vaultRoot: URL) -> URL? {
+        guard !target.isEmpty else { return source }
         let withExtension = target.hasSuffix(".md") ? target : target + ".md"
-        let asPath = vaultRoot.appending(path: withExtension)
-        if notes[asPath] != nil { return asPath }
-        let relative = source.deletingLastPathComponent().appending(path: withExtension)
-        if notes[relative] != nil { return relative }
+        let byPath = Dictionary(notes.keys.map { ($0.path(percentEncoded: false), $0) }, uniquingKeysWith: { a, _ in a })
+        if let hit = byPath[vaultRoot.appending(path: withExtension).path(percentEncoded: false)] { return hit }
+        if let hit = byPath[source.deletingLastPathComponent().appending(path: withExtension).path(percentEncoded: false)] { return hit }
+        return resolveByName(target, from: source)
+    }
+
+    private func resolveByName(_ target: String, from source: URL) -> URL? {
 
         // 2/3. Fall back to name matching.
         let key = (target as NSString).lastPathComponent.lowercased()
@@ -109,10 +164,31 @@ public actor IndexBuilder {
 
     public init() {}
 
-    public func build(vaultRoot: URL) async -> IndexSnapshot {
+    /// Builds a snapshot of the whole vault.
+    ///
+    /// With `previous`, the build is incremental: a note whose modification date
+    /// still matches the one recorded in `previous` is reused as-is instead of
+    /// being read and parsed again, so a save re-parses one file rather than all
+    /// of them (on a 10,000-note vault that is the difference between ~420 ms and
+    /// a few tens of ms). Link resolution and every derived table are still
+    /// rebuilt from the complete set in `assemble`, so an incremental snapshot is
+    /// identical to a full one — `IncrementalIndexTests` checks exactly that.
+    public func build(vaultRoot: URL, reusing previous: IndexSnapshot? = nil) async -> IndexSnapshot {
         let scanner = VaultScanner()
         let store = NoteStore(root: vaultRoot)
         let files = scanner.markdownFiles(in: vaultRoot)
+        let started = Date.now
+        let reusable = previous?.notes ?? [:]
+        // A note from `previous` is reused only if its file was last modified
+        // well before `previous` began reading files. Otherwise a write could
+        // have landed in the same timestamp tick as (or after) that read, and
+        // the date would match while the content does not. Timestamps on HFS+
+        // (1 s) and exFAT (2 s) are coarse, hence the 3 s margin.
+        //
+        // Measured against the *previous* build, not this one: an earlier
+        // version used "3 s before now", and on a slow CI runner the two builds
+        // were 4 s apart, so a same-second edit was silently reused.
+        let settledBefore = previous?.buildStarted?.addingTimeInterval(-3) ?? .distantPast
 
         // Parse files concurrently; parsing is CPU-bound and embarrassingly parallel.
         var parsed: [NoteMetadata] = []
@@ -120,9 +196,12 @@ public actor IndexBuilder {
 
         await withTaskGroup(of: NoteMetadata?.self) { group in
             for url in files {
+                let old = reusable[url]
                 group.addTask {
-                    guard let text = try? store.read(url) else { return nil }
                     let dates = store.modificationDates(of: url)
+                    // Unchanged on disk since the previous snapshot: keep it.
+                    if let old, old.modified == dates.modified, dates.modified < settledBefore { return old }
+                    guard let text = try? store.read(url) else { return nil }
                     return NoteParser.parse(
                         text: text,
                         url: url,
@@ -136,7 +215,9 @@ public actor IndexBuilder {
             }
         }
 
-        return Self.assemble(parsed, vaultRoot: vaultRoot)
+        var snapshot = Self.assemble(parsed, vaultRoot: vaultRoot)
+        snapshot.buildStarted = started
+        return snapshot
     }
 
     /// Pure assembly step, separated so it can be unit-tested without touching disk.
@@ -152,6 +233,10 @@ public actor IndexBuilder {
                 snapshot.tagCounts[tag, default: 0] += 1
             }
         }
+
+        snapshot.pathIndex = Dictionary(
+            snapshot.notes.keys.map { ($0.path(percentEncoded: false), $0) },
+            uniquingKeysWith: { first, _ in first })
 
         // Second pass: resolution needs the complete name table from pass one.
         for note in notes {

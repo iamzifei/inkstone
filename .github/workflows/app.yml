@@ -1,0 +1,42 @@
+# App checks on every push and pull request: the InkstoneCore test suite
+# (unit, e2e against a fake GitHub, regressions) and debug builds of the app for
+# macOS and the iOS simulator. Before this, CI built only the website.
+name: App
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["site/**", "docs/**", "*.md"]
+  pull_request:
+    paths-ignore: ["site/**", "docs/**", "*.md"]
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)" && xcodebuild -version
+      - name: InkstoneCore tests
+        working-directory: Packages/InkstoneCore
+        run: swift test
+
+  build:
+    runs-on: macos-26
+    strategy:
+      matrix:
+        destination: ["platform=macOS", "generic/platform=iOS Simulator"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)" && xcodebuild -version
+      - run: brew install xcodegen && xcodegen generate
+      - name: Build
+        run: |
+          xcodebuild -project Inkstone.xcodeproj -scheme Inkstone -configuration Debug \
+            -destination '${{ matrix.destination }}' CODE_SIGNING_ALLOWED=NO build | tail -20
+          test ${PIPESTATUS[0]} -eq 0
