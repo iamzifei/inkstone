@@ -1131,6 +1131,54 @@ final class Workspace {
     /// note. The incremental index trusts modification dates, so a change that
     /// kept its date (a restored backup, `rsync -t`) is only picked up by the
     /// periodic full rebuild; this is the button for not waiting.
+    /// Brings Spotlight up to date with the index. Runs after the previous
+    /// update finishes, never alongside it (the indexer's record of what it
+    /// pushed would interleave).
+    @ObservationIgnored private var spotlightSequence = 0
+    func updateSpotlight() {
+        let root = root
+        let notes = root == nil ? [:] : index.notes.mapValues(\.modified)
+        let enabled = settings.data.indexInSpotlight
+        spotlightSequence += 1
+        let sequence = spotlightSequence
+        Task.detached(priority: .utility) {
+            await SpotlightIndexer.shared.submit(sequence: sequence, root: root, notes: notes, enabled: enabled)
+        }
+    }
+
+    /// A Spotlight result tapped before a vault was open (cold launch): opened
+    /// once one is.
+    @ObservationIgnored private var pendingSpotlightResult: String?
+
+    /// A Spotlight result was tapped: open the note — switching to its vault
+    /// if another one is open.
+    func openSpotlightResult(_ identifier: String) {
+        let path = URL(filePath: identifier).standardizedFileURL.path(percentEncoded: false)
+        func inside(_ folder: String) -> Bool {
+            let prefix = URL(filePath: folder).standardizedFileURL.path(percentEncoded: false)
+            return path.hasPrefix(prefix.hasSuffix("/") ? prefix : prefix + "/")
+        }
+        if let root, inside(root.path(percentEncoded: false)) {
+            if FileManager.default.fileExists(atPath: path) { openNote(at: URL(filePath: path)) }
+            return
+        }
+        if let owner = registry.vaults.first(where: { inside($0.path) }) {
+            pendingSpotlightResult = path
+            open(owner)
+        } else if vault == nil {
+            // Launched from the result: the last vault is still being restored.
+            pendingSpotlightResult = path
+            openMostRecentVaultIfNeeded()
+        }
+    }
+
+    private func openPendingSpotlightResult() {
+        guard let path = pendingSpotlightResult, let root,
+              path.hasPrefix(root.standardizedFileURL.path(percentEncoded: false)) else { return }
+        pendingSpotlightResult = nil
+        if FileManager.default.fileExists(atPath: path) { openNote(at: URL(filePath: path)) }
+    }
+
     func rebuildIndex() {
         refreshTree()
         reindex(full: true)
@@ -1152,6 +1200,8 @@ final class Workspace {
                 // must not postpone the next.
                 if full { self.lastFullIndex = .now }
                 self.index = snapshot
+                self.updateSpotlight()
+                self.openPendingSpotlightResult()
                 LaunchTiming.mark("index ready")
                 self.indexGeneration += 1
                 self.isIndexing = false

@@ -312,6 +312,12 @@ private struct FilesSettings: View {
             Section("Templates") {
                 TextField("Template folder", text: $settings.data.templateFolder)
             }
+            Section {
+                Toggle("Show notes in Spotlight", isOn: $settings.data.indexInSpotlight)
+                    .onChange(of: settings.data.indexInSpotlight) { workspace.updateSpotlight() }
+            } footer: {
+                Text("Note titles and text are added to this device's search index, so they turn up in system search. Nothing leaves the device.")
+            }
             Section("Daily notes") {
                 TextField("Folder", text: $settings.data.dailyNoteFolder)
                 TextField("Date format", text: $settings.data.dailyNoteFormat)
