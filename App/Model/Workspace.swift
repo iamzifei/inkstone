@@ -502,6 +502,25 @@ final class Workspace {
     @ObservationIgnored private var autoSyncTask: Task<Void, Never>?
     var isSyncing: Bool { if case .running = syncStatus { return true }; return false }
 
+    /// Waits for a sync that is still unwinding to stop. True when idle.
+    ///
+    /// A background task that expires cancels its sync, and cancellation is
+    /// not instant: the run stops at its next network call. The task submitted
+    /// to carry on could launch in that gap, find `isSyncing`, log "skipped"
+    /// and end — and then nothing carried the sync on (2026-11-18 review).
+    func settleInFlightSync(timeout: Duration = .seconds(15)) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while isSyncing, !Task.isCancelled, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return !isSyncing && !Task.isCancelled
+    }
+
+    #if DEBUG
+    /// For the smoke test: a sync "still running" without a network.
+    func setSyncStatusForTesting(_ status: SyncStatus) { syncStatus = status }
+    #endif
+
     /// Whether the vault has never completed a sync against this repository.
     ///
     /// The expensive case, and the one worth treating differently: a first sync
