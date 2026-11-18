@@ -26,10 +26,17 @@ jobs:
         run: swift test
 
   build:
-    runs-on: macos-26
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        destination: ["platform=macOS", "generic/platform=iOS Simulator"]
+        include:
+          - destination: "platform=macOS"
+            runner: macos-26
+          # Xcode 27 (GitHub's preview image): its iOS SDK has the iPhone Duo
+          # APIs (iOS 27.1+). On macos-26 (Xcode 26.6) that code is compiled
+          # out, so CI would never build the Duo path.
+          - destination: "generic/platform=iOS Simulator"
+            runner: xcode-27
     steps:
       - uses: actions/checkout@v4
       - name: Xcode
