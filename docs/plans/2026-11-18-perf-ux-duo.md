@@ -81,6 +81,7 @@ Target (acceptance): autosave round-trip on 10k vault < 50 ms main-thread work; 
 - Fresh-context review subagent on each PR (report only).
 
 ## HUMAN QUEUE
+- Decide whether I may install a development build on your iPhone to measure real launch time (it replaces the App Store "Inkstone Notes" on that phone until reinstalled).
 - Install the iOS 27.1+ simulator runtime in Xcode (Settings → Components) so the Duo simulator can boot — currently only iOS 27.0 is installed. (Or confirm I may download it.)
 - On-device test on your iPhone Duo for bent and stand postures (I'll give a short checklist).
 - Approve releases (Sparkle / App Store) and pick P5 items.
@@ -104,6 +105,10 @@ Target (acceptance): autosave round-trip on 10k vault < 50 ms main-thread work; 
 Note: the `INKSTONE_BENCH` hook is DEBUG-only and the app is sandboxed, so the benchmark build is Debug with `SWIFT_OPTIMIZATION_LEVEL=-O`, no entitlements, ad-hoc signed (`codesign --force --deep -s -`).
 Follow-up found: the remaining ~16 ms per keystroke is the whole-document syntax scan (cache misses on every edit). Incremental scanning is its own project — logged for P1 follow-up, not done in this pass.
 Behaviour fix found by the equivalence test: on a vault whose path contains a space, path-style links (`/Folder/note`) fell through to name matching and could resolve to a different note with the same name; they now resolve to the exact path (Obsidian's rule).
+
+## iOS launch (measured 2026-11-18, Duo simulator, -O build, 9,894-note copy)
+app init ~0.5 s → scene body ~3.0 s → window ~3.3 s → file tree +0.8 s → index ready ~5.8–6.9 s.
+Time Profiler: ~1.6 s of the init→scene gap is UIKit loading a system bundle during launch (SwiftUI → UIKitCore → -[NSBundle loadAndReturnError:], mostly dyld resolving dependents) — not app code; suspected accessibility bundles loaded because the simulator is driven by an accessibility automation tool (unverified). Needs a real-device measurement before acting (HUMAN QUEUE: installing a dev build replaces the App Store build on the phone — James's call).
 
 ## Closed decisions
 - 2026-11-18 (James): keep Inkstone's behaviour where it differs from Obsidian on purpose — tables without a blank line before them render (GFM); a bare URL ends at full-width punctuation instead of swallowing the Chinese text after it.

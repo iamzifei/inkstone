@@ -55,6 +55,7 @@ struct InkstoneApp: App {
         // identifier — a second registration of the same identifier terminates
         // the app. A view is too late and too often.
         BackgroundSync.register(workspace: workspace)
+        LaunchTiming.mark("background tasks registered")
         #endif
 
         // Debug hooks are macOS-only: they measure through AppKit text metrics
@@ -597,6 +598,7 @@ struct InkstoneApp: App {
     #endif
 
     var body: some Scene {
+        let _ = LaunchTiming.mark("scene body")
         WindowGroup {
             StyledRoot { RootView() }
                 .environment(workspace)
@@ -625,6 +627,7 @@ struct InkstoneApp: App {
                 }
                 #endif
                 .onAppear {
+                    LaunchTiming.mark("root onAppear")
                     #if os(macOS)
                     // Once per guide version; see OnboardingLauncher.
                     if OnboardingLauncher.consumeFirstShow() {
