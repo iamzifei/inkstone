@@ -1,1 +1,1 @@
-markdown,notes,wiki,zettelkasten,backlink,graph,canvas,plain text,writing,editor,obsidian,vault
+knowledge base,AI context,context management,second brain,organize,markdown,notes,obsidian,PARA

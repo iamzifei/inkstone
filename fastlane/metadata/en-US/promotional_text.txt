@@ -1,1 +1,1 @@
-New in 0.4: templates, export to PDF and HTML, a command palette, notes in system search, and Shortcuts actions to capture a note or add to today's.
+New in 0.5: create a knowledge base in three steps, drop anything in and it is filed for you — by your own rules, on device, and every round can be undone.

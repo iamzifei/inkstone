@@ -1,38 +1,30 @@
-Inkstone keeps your notes as what they already are: plain Markdown files, in a folder you choose, on your own device.
+Inkstone turns a folder into an AI knowledge base: drop anything in, and it is filed for you — by rules you can read and change, with an AI that runs on your device.
 
-There is no database, no import step and no proprietary format. A vault another Markdown app created opens here, and a vault created here opens there. If Inkstone disappeared tomorrow, you would still have a folder of Markdown.
+CREATE ONE IN THREE STEPS
+Give it a name and a place — iCloud Drive, any folder, or a folder you already have. Inkstone lays out the folders (inbox, projects, areas, resources, media, outputs, private), writes the organizing rules, and opens it. A folder you already have keeps every file where it is.
 
-WRITING
-Headings, bold, quotes, callouts, checkboxes, tables and code all render in place as you type, with the syntax revealed only on the line the cursor is on. Reading mode is a separate, read-only view for when you want the page without the scaffolding. Body font, code font and their sizes are set independently.
+DROP ANYTHING IN
+Notes, PDFs, photos, screenshots, recordings, whole folders. Drag them onto the window or add them from Files — and share links and text from any other app. The first time, choose copy or move — copy is the default, and a move only removes the original after a complete, identical copy.
 
-LINKING
-[[Note]], [[Note#Heading]], [[Note^block]], ![[Embeds]] and aliases declared in frontmatter all resolve into one index. Every note shows what points at it, what it points at, and which of its links have no target yet. Rename a note and every link that pointed at it is rewritten across the whole vault, in the same action.
+IT FILES THEM FOR YOU
+Each file is read — its text, the date a photo was taken, the text in a picture — and placed: by your own rules first, then into the project it names, then by the on-device model. It is renamed by date and topic, and Markdown notes get their source and date added without a word of their text changing. Exact copies are put aside, look-alikes are flagged for you, and anything private-looking goes to the private folder.
 
-SEEING THE SHAPE
-The graph view draws your notes as nodes joined by their links, and the simulation is deterministic — the same vault draws the same picture every time, so you can learn its layout instead of re-reading it on every open.
+NOTHING IS LOST
+Nothing is ever deleted. Anything unsure waits in a review folder for you. Every move is written to a log first, and every round can be undone — byte for byte, without overwriting anything you changed since. Rounds of more than 20 files, or with duplicates, wait for your yes.
 
-SPATIAL NOTES
-The canvas puts cards, files and connections on an infinite sheet, saved as JSON Canvas 1.0 — the same open format other implementations read and write.
+READY FOR AI
+Inkstone writes and maintains AGENTS.md, README.md and SOURCE_OF_TRUTH.md: what the knowledge base is, where everything lives, and which file is the source of truth for what. Give the folder to any AI assistant or agent and it knows its way around. Only the part between Inkstone's markers is rewritten; what you add stays.
 
-FINDING THINGS
-A fuzzy switcher opens over every note with one gesture. Full-text search understands tag: and path:, and tags work inline or in frontmatter, nested, in any script. Find and replace works inside any note. Notes also turn up in system search, and open from there.
-
-TEMPLATES, EXPORT, COMMANDS
-Keep templates in a folder and insert them with {{title}}, {{date}} and {{time}} filled in — the same placeholders as Obsidian's Templates plugin. Export a note as a PDF or a self-contained HTML file. The command palette finds any command by typing a few letters of its name.
-
-SHORTCUTS
-"New Note" and "Add to Today's Note" are Shortcuts actions: capture from Siri, the Action button or a home-screen shortcut without opening the app.
-
-TYPOGRAPHY THAT HANDLES CJK
-Chinese sets solid — no word spaces — so a Latin word dropped into a Han sentence collides with it. Inkstone sets the gap between scripts properly, and lets you choose fonts and sizes that suit both.
-
-IPHONE DUO
-Folded, it is the iPhone app. Unfolded, the sidebar and the note sit side by side. Half-open, the note takes one side of the crease and its backlinks, outline and properties the other — nothing is drawn across the fold.
-
-TWO DEVICES
-Sync a vault through iCloud, or push it to a GitHub repository. Once a vault is syncing, a conflict never overwrites anything: when both sides changed a note, the other version is kept beside yours as a conflict copy. Sync health shows when the last sync finished, what failed, and previews what the next sync will do before it does it. Per-file-type filters decide whether attachments and media travel with it.
+YOUR RULES, IN PLAIN WORDS
+The organizing rules are a file in the knowledge base. Edit them in Settings in plain words — "Invoices → 20-Areas/Finance" — and the rules come before everything else.
 
 PRIVATE BY CONSTRUCTION
-No account. No telemetry. No network call you did not ask for. Your files are on your device and go only where you send them.
+The on-device model runs on your device; nothing leaves it. You can choose your own AI model instead, with your own key — then only the name and start of a file the rules can't place is sent, never a file that looks private. No account, no telemetry.
+
+A FULL MARKDOWN EDITOR
+Everything stays plain Markdown. Live preview as you type, [[links]] and backlinks that are rewritten when you rename a note, a graph view, a canvas in the open JSON Canvas format, full-text search with tag: and path:, templates, export to PDF and HTML, a command palette, Shortcuts actions, and typography that handles Chinese and English side by side. A vault from another Markdown app opens as it is — and is never reorganized.
+
+SYNC AND IPHONE DUO
+Sync through iCloud or a GitHub repository, without conflicts overwriting anything. On iPhone Duo the note and its context sit on either side of the fold.
 
 Interface in English, Simplified Chinese and Traditional Chinese.
