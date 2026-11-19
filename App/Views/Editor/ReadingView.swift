@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import InkstoneCore
 
 #if os(macOS)
@@ -78,7 +79,10 @@ struct ReadingView: View {
         }
         // Pictures decode in the background and stand in as blank placeholders
         // until they land; typeset again then, or reading mode keeps the blank.
-        .onReceive(NotificationCenter.default.publisher(for: AttachmentImageCache.didDecode)) { _ in
+        // Debounced like the editor's restyle: twelve pictures landing one by one
+        // are one typesetting pass, not twelve.
+        .onReceive(NotificationCenter.default.publisher(for: AttachmentImageCache.didDecode)
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)) { _ in
             mermaidGeneration += 1
         }
     }
