@@ -33,7 +33,7 @@ how:
   - title: Glissez n'importe quoi
     body: Glissez des fichiers sur la fenêtre ou ajoutez-les depuis l'app Fichiers. La première fois, copier ou déplacer — copier par défaut.
   - title: C'est classé pour vous
-    body: D'abord par vos règles, puis par le modèle sur l'appareil. Renommé par date et sujet. Ce qui est incertain attend dans un dossier à vérifier.
+    body: Ce qui semble privé va d'abord dans le dossier privé, puis vos règles, puis le modèle sur l'appareil. Renommé par date et sujet. Ce qui est incertain attend dans un dossier à vérifier.
   alts:
   - 'Étape 1 : créer votre base de connaissances IA'
   - 'Étape 2 : copier ou déplacer ?'
@@ -43,9 +43,9 @@ safe:
   points:
   - Rien n'est jamais supprimé. Les doublons vont dans un dossier à supprimer, que vous videz vous-même.
   - Chaque déplacement est noté avant d'être fait — un tableau Markdown lisible.
-  - Annuler remet toute une passe en place, octet par octet, sans écraser ce que vous avez modifié depuis.
+  - Annuler remet toute une passe en place, sans écraser ce que vous avez modifié depuis.
   - Plus de 20 fichiers, ou des doublons ? Vous voyez d'abord tout le plan, et rien ne bouge sans votre accord.
-  - 'Le texte d''une note n''est jamais réécrit : seuls sa source et sa date sont ajoutées en tête.'
+  - 'Le texte d''une note n''est jamais réécrit : seules des propriétés comme sa source et sa date sont ajoutées en tête.'
   alt: 'La base de connaissances après une passe : ses dossiers dans la barre latérale et un bandeau — 5 fichiers rangés, Annuler.'
 ai:
   kicker: Gestion du contexte IA
@@ -62,7 +62,7 @@ ai:
   alt: AGENTS.md ouvert dans Inkstone sur Mac.
 rules:
   title: Vos règles, en mots simples
-  body: Les règles de rangement sont un fichier de votre base de connaissances. Modifiez-les dans les Réglages comme une note — une ligne par règle — et elles passent avant tout le reste.
+  body: Les règles de rangement sont un fichier de votre base de connaissances. Modifiez-les dans les Réglages comme une note — une ligne par règle. Elles passent juste après le contrôle de confidentialité, avant tout le reste.
   example: '## My rules
 
 
@@ -77,7 +77,7 @@ private:
   - title: L'IA sur votre appareil
     body: Le modèle d'Apple sur l'appareil décide où va un fichier, sur les appareils compatibles. Rien ne quitte l'appareil.
   - title: Ou votre propre modèle
-    body: Désactivé par défaut. Avec votre propre clé, seuls le nom et le début d'un fichier que les règles ne savent pas placer sont envoyés — jamais un fichier qui semble privé.
+    body: Désactivé par défaut. Avec votre propre clé, sont envoyés le nom et le début d'un fichier que les règles ne savent pas placer, avec vos noms de dossiers et vos règles — jamais un fichier qui semble privé.
   - title: Juste des fichiers
     body: Pas de compte, pas de mesure d'audience, pas de serveur à nous. Votre base de connaissances est un dossier de fichiers ordinaires.
 features:

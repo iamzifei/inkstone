@@ -33,7 +33,7 @@ how:
   - title: Drop anything in
     body: Drag files onto the window, or add them from the Files app. The first time, choose copy or move — copy is the default.
   - title: It is filed for you
-    body: By your rules first, then by the on-device model. Renamed by date and topic. Anything unsure waits in a review folder for you to decide.
+    body: Private-looking files go to the private folder first, then your rules, then the on-device model. Renamed by date and topic. Anything unsure waits in a review folder for you to decide.
   alts:
   - 'Step 1 on iPhone: Your AI knowledge base — Create my knowledge base'
   - 'Step 2: Copy or move 3 items into your knowledge base?'
@@ -43,9 +43,9 @@ safe:
   points:
   - Nothing is ever deleted. Duplicates are put aside in a to-delete folder, for you to empty.
   - Every move is written to a log before it is made — a Markdown table you can read.
-  - Undo puts a whole round back, byte for byte, without overwriting anything you changed since.
+  - Undo puts a whole round back, without overwriting anything you changed since.
   - More than 20 files, or duplicates? You see the whole plan first, and nothing moves until you say so.
-  - 'A note''s text is never rewritten: only its source and date are added at the top.'
+  - 'A note''s text is never rewritten: only properties such as its source and date are added at the top.'
   alt: 'The knowledge base after a round: its folders in the sidebar, and a banner — Organized 5 files, Undo.'
 ai:
   kicker: AI context management
@@ -62,7 +62,7 @@ ai:
   alt: 'AGENTS.md open in Inkstone on a Mac: what this is, rules for AI agents, and where everything lives.'
 rules:
   title: Your rules, in plain words
-  body: The organizing rules are a file in your knowledge base. Edit them in Settings like a note — one line per rule — and they come before everything else.
+  body: The organizing rules are a file in your knowledge base. Edit them in Settings like a note — one line per rule. They come right after the privacy check, before everything else.
   example: '## My rules
 
 
@@ -77,7 +77,7 @@ private:
   - title: AI on your device
     body: Apple's on-device model decides where a file goes, on devices that support it. Nothing leaves the device.
   - title: Or your own model
-    body: Off by default. With your own key, only the name and start of a file the rules can't place is sent — never a file that looks private.
+    body: Off by default. With your own key, it is sent the name and start of a file the rules can't place, with your folder names and rules — never a file that looks private.
   - title: Just files
     body: No account, no analytics, no server of ours. Your knowledge base is a folder of ordinary files you can open with anything.
 features:

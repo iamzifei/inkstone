@@ -10,13 +10,14 @@
 - Create a knowledge base in iCloud Drive or any folder: inbox, projects, areas,
   resources, media, outputs, private, review and archive folders, plus an
   editable rules file at `_System/Organizing Rules.md`.
-- Drop files in (copy by default, or move). Each is filed by the person's own
-  rules first, then privacy, then a named project, then media by type and month;
+- Drop files in (copy by default, or move). Files that look private go to the
+  private folder first; then the person's own rules, a named project, and media
+  by type and month;
   what is left goes to Apple's on-device model, and anything below 0.7
   confidence waits in the review folder. An optional cloud model uses the
   person's own key, is off by default, and never receives files that look private.
 - Nothing is deleted: duplicates go to `_Archive/To-Delete/`, every move is
-  logged before it happens, and a whole round can be undone byte for byte.
+  logged before it happens, and a whole round can be undone.
 - AI context management: AGENTS.md, README.md and SOURCE_OF_TRUTH.md are written
   at the top of the knowledge base and rewritten (between Inkstone's markers
   only) whenever the folders change.

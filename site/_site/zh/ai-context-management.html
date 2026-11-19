@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+SC:wght@300;400;600&display=swap">
-<link rel="stylesheet" href="../assets/styles.css?v=33b4726c">
+<link rel="stylesheet" href="../assets/styles.css?v=7553905c">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.5.0","url":"https://inkslab.app/zh/ai-context-management.html","image":"https://inkslab.app/assets/og-card-zh.png","description":"给 AI 助手正确的上下文：Inkstone 在你的知识库里自动维护 AGENTS.md、README.md 和 SOURCE_OF_TRUTH.md，任何智能体都知道东西在哪、以哪个文件为准。","inLanguage":"zh-Hans","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"sameAs":["https://apps.apple.com/app/id6803462651","https://github.com/iamzifei/inkstone"],"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"zh-Hans","mainEntity":[{"@type":"Question","name":"哪些 AI 工具会读 AGENTS.md？","acceptedAnswer":{"@type":"Answer","text":"它就是文件夹顶层的一个普通 Markdown 文件，拿到这个文件夹的助手或智能体都能读；很多编程智能体会按名字主动找它。"}},{"@type":"Question","name":"我能自己改 AGENTS.md 吗？","acceptedAnswer":{"@type":"Answer","text":"能。Inkstone 只重写它标记之间的那一段，你写在上面或下面的说明都会保留。"}},{"@type":"Question","name":"不用 AI 整理也能用吗？","acceptedAnswer":{"@type":"Answer","text":"能。建知识库时就会写好入口文件；不管文件是按你的规则归档还是由模型归档，入口文件都会保持最新。"}}]}</script>
 
 </head>
@@ -49,10 +49,10 @@
       <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
     </a>
     <nav class="nav-links" aria-label="章节">
-      <a href="../#how">怎么用</a>
-      <a href="../#ai">给 AI</a>
-      <a href="../#features">编辑器</a>
-      <a href="../#faq">常见问题</a>
+      <a href="./#how">怎么用</a>
+      <a href="./#ai">给 AI</a>
+      <a href="./#features">编辑器</a>
+      <a href="./#faq">常见问题</a>
       <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
       <details class="lang-menu">
         <summary aria-label="Language">简体中文</summary>
@@ -64,12 +64,12 @@
 </header>
 <main class="wrap" id="main">
 <article class="article">
-  <p class="crumbs"><a href="../">Inkstone</a> › AI 上下文管理</p>
+  <p class="crumbs"><a href="./">Inkstone</a> › AI 上下文管理</p>
   <h1>AI 上下文管理，自动帮你更新</h1>
   <p class="article-lede">AI 助手好不好用，取决于你交给它哪些文件、怎么跟它说明这些文件。Inkstone 把这些上下文写进你的知识库，文件夹每变一次就重写一次。</p>
   <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">下载<span class="ac"></span>macOS<span class="ac"></span>版</a><a class="btn btn-quiet" href="https://apps.apple.com/app/id6803462651" rel="noopener">在 App Store 下载 iPhone / iPad 版</a></div>
   <figure class="article-hero"><img src="../assets/kb/zh-Hans/mac-k3-agents.webp" srcset="../assets/kb/zh-Hans/mac-k3-agents-900.webp 900w, ../assets/kb/zh-Hans/mac-k3-agents-1800.webp 1800w, ../assets/kb/zh-Hans/mac-k3-agents.webp 2652w" sizes="(max-width: 1100px) 96vw, 1000px" width="2652" height="1692" alt="在 Mac 上的 Inkstone 里打开 AGENTS.md：这是什么、给 AI 智能体的规则、东西放哪里。" loading="eager" fetchpriority="high" decoding="async"></figure>
-  <h2>什么是 AI 上下文管理？</h2><p>上下文就是 AI 模型回答之前看到的东西：文件，以及关于这些文件的说明。管理上下文，就是决定助手读哪些文件、告诉它文件夹怎么组织、两个文件说法不一时以谁为准。</p><p>手写的上下文，写完一周就过时了。笔记挪了位置、文件夹改了名，助手就会理直气壮地答错。</p><h2>三个入口文件，由 Inkstone 来写</h2><p>AGENTS.md 是编程智能体和 AI 助手已经会在文件夹顶层去找的约定。Inkstone 只重写它自己标记之间的部分，你在旁边加的内容原样保留。</p><ol><li>AGENTS.md——这个知识库是什么，以及 AI 在这里要守的规则：新文件放哪、不删除任何东西、私密文件夹不碰。</li><li>README.md——文件夹地图，人和机器都能读。</li><li>SOURCE_OF_TRUTH.md——什么信息以哪个文件为准，智能体不用在两个版本之间瞎猜。</li></ol><h2>上下文跟着文件夹走</h2><p>Inkstone 每整理一次，就把入口文件更新成当前真实存在的文件夹。周一交给助手也好，三个月后交也好，地图都是最新的。</p><figure class="article-shot"><img src="../assets/kb/zh-Hans/iphone-k3-agents.webp" srcset="../assets/kb/zh-Hans/iphone-k3-agents-340.webp 340w, ../assets/kb/zh-Hans/iphone-k3-agents-680.webp 680w, ../assets/kb/zh-Hans/iphone-k3-agents.webp 1350w" sizes="(max-width: 900px) 92vw, 760px" width="1350" height="2760" alt="iPhone 上的 AGENTS.md。" loading="lazy" decoding="async"></figure><h2>默认就保护隐私</h2><p>整理用的模型在你的设备上运行。AGENTS.md 里写明私密文件夹不许碰；即使你打开了云端模型，看起来涉及隐私的文件也绝不发送。</p>
+  <h2>什么是 AI 上下文管理？</h2><p>上下文就是 AI 模型回答之前看到的东西：文件，以及关于这些文件的说明。管理上下文，就是决定助手读哪些文件、告诉它文件夹怎么组织、两个文件说法不一时以谁为准。</p><p>手写的上下文，写完一周就过时了。笔记挪了位置、文件夹改了名，助手就会理直气壮地答错。</p><h2>三个入口文件，由 Inkstone 来写</h2><p>AGENTS.md 是编程智能体和 AI 助手已经会在文件夹顶层去找的约定。Inkstone 只重写它自己标记之间的部分，你在旁边加的内容原样保留。</p><ol><li>AGENTS.md——这个知识库是什么，以及 AI 在这里要守的规则：新文件放哪、不删除任何东西、私密文件夹不碰。</li><li>README.md——文件夹地图，人和机器都能读。</li><li>SOURCE_OF_TRUTH.md——什么信息以哪个文件为准，智能体不用在两个版本之间瞎猜。</li></ol><h2>上下文跟着文件夹走</h2><p>Inkstone 每整理一次，就把入口文件更新成当前真实存在的文件夹。周一交给助手也好，三个月后交也好，地图都是最新的。</p><figure class="article-phone"><img src="../assets/kb/zh-Hans/iphone-k3-agents.webp" srcset="../assets/kb/zh-Hans/iphone-k3-agents-340.webp 340w, ../assets/kb/zh-Hans/iphone-k3-agents-680.webp 680w, ../assets/kb/zh-Hans/iphone-k3-agents.webp 1350w" sizes="(max-width: 700px) 70vw, 280px" width="1350" height="2760" alt="iPhone 上的 AGENTS.md。" loading="lazy" decoding="async"></figure><h2>默认就保护隐私</h2><p>整理用的模型在你的设备上运行。AGENTS.md 里写明私密文件夹不许碰；即使你打开了云端模型，看起来涉及隐私的文件也绝不发送。</p>
   <section class="faq" aria-labelledby="faq-h"><h2 id="faq-h">常见问题</h2><div class="qa"><h3>哪些 AI 工具会读 AGENTS.md？</h3><p>它就是文件夹顶层的一个普通 Markdown 文件，拿到这个文件夹的助手或智能体都能读；很多编程智能体会按名字主动找它。</p></div><div class="qa"><h3>我能自己改 AGENTS.md 吗？</h3><p>能。Inkstone 只重写它标记之间的那一段，你写在上面或下面的说明都会保留。</p></div><div class="qa"><h3>不用 AI 整理也能用吗？</h3><p>能。建知识库时就会写好入口文件；不管文件是按你的规则归档还是由模型归档，入口文件都会保持最新。</p></div></section>
 </article>
 </main>

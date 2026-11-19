@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+TC:wght@300;400;600&display=swap">
-<link rel="stylesheet" href="../assets/styles.css?v=33b4726c">
+<link rel="stylesheet" href="../assets/styles.css?v=7553905c">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.5.0","url":"https://inkslab.app/zh-Hant/ai-context-management.html","image":"https://inkslab.app/assets/og-card-zh.png","description":"給 AI 助理正確的上下文：Inkstone 在你的知識庫裡自動維護 AGENTS.md、README.md 和 SOURCE_OF_TRUTH.md，任何智慧代理都知道東西在哪、以哪個檔案為準。","inLanguage":"zh-Hant","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"sameAs":["https://apps.apple.com/app/id6803462651","https://github.com/iamzifei/inkstone"],"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"zh-Hant","mainEntity":[{"@type":"Question","name":"哪些 AI 工具會讀 AGENTS.md？","acceptedAnswer":{"@type":"Answer","text":"它就是資料夾頂層的一個普通 Markdown 檔案，拿到這個資料夾的助理或智慧代理都能讀；很多程式設計智慧代理會依名稱主動找它。"}},{"@type":"Question","name":"我能自己改 AGENTS.md 嗎？","acceptedAnswer":{"@type":"Answer","text":"能。Inkstone 只重寫它標記之間的那一段，你寫在上面或下面的說明都會保留。"}},{"@type":"Question","name":"不用 AI 整理也能用嗎？","acceptedAnswer":{"@type":"Answer","text":"能。建立知識庫時就會寫好入口檔案；不管檔案是依你的規則歸檔還是由模型歸檔，入口檔案都會保持最新。"}}]}</script>
 
 </head>
@@ -49,10 +49,10 @@
       <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
     </a>
     <nav class="nav-links" aria-label="章節">
-      <a href="../#how">怎麼用</a>
-      <a href="../#ai">給 AI</a>
-      <a href="../#features">編輯器</a>
-      <a href="../#faq">常見問題</a>
+      <a href="./#how">怎麼用</a>
+      <a href="./#ai">給 AI</a>
+      <a href="./#features">編輯器</a>
+      <a href="./#faq">常見問題</a>
       <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
       <details class="lang-menu">
         <summary aria-label="Language">繁體中文</summary>
@@ -64,12 +64,12 @@
 </header>
 <main class="wrap" id="main">
 <article class="article">
-  <p class="crumbs"><a href="../">Inkstone</a> › AI 上下文管理</p>
+  <p class="crumbs"><a href="./">Inkstone</a> › AI 上下文管理</p>
   <h1>AI 上下文管理，自動幫你更新</h1>
   <p class="article-lede">AI 助理好不好用，取決於你交給它哪些檔案、怎麼跟它說明這些檔案。Inkstone 把這些上下文寫進你的知識庫，資料夾每變一次就重寫一次。</p>
   <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">下載<span class="ac"></span>macOS<span class="ac"></span>版</a><a class="btn btn-quiet" href="https://apps.apple.com/app/id6803462651" rel="noopener">在 App Store 下載 iPhone / iPad 版</a></div>
   <figure class="article-hero"><img src="../assets/kb/zh-Hant/mac-k3-agents.webp" srcset="../assets/kb/zh-Hant/mac-k3-agents-900.webp 900w, ../assets/kb/zh-Hant/mac-k3-agents-1800.webp 1800w, ../assets/kb/zh-Hant/mac-k3-agents.webp 2652w" sizes="(max-width: 1100px) 96vw, 1000px" width="2652" height="1692" alt="在 Mac 上的 Inkstone 裡開啟 AGENTS.md：這是什麼、給 AI 智慧代理的規則、東西放哪裡。" loading="eager" fetchpriority="high" decoding="async"></figure>
-  <h2>什麼是 AI 上下文管理？</h2><p>上下文就是 AI 模型回答之前看到的東西：檔案，以及關於這些檔案的說明。管理上下文，就是決定助理讀哪些檔案、告訴它資料夾怎麼組織、兩個檔案說法不一時以誰為準。</p><p>手寫的上下文，寫完一週就過時了。筆記挪了位置、資料夾改了名，助理就會理直氣壯地答錯。</p><h2>三個入口檔案，由 Inkstone 來寫</h2><p>AGENTS.md 是程式設計智慧代理和 AI 助理已經會在資料夾頂層去找的慣例。Inkstone 只重寫它自己標記之間的部分，你在旁邊加的內容原樣保留。</p><ol><li>AGENTS.md——這個知識庫是什麼，以及 AI 在這裡要守的規則：新檔案放哪、不刪除任何東西、私密資料夾不碰。</li><li>README.md——資料夾地圖，人和機器都能讀。</li><li>SOURCE_OF_TRUTH.md——什麼資訊以哪個檔案為準，智慧代理不用在兩個版本之間亂猜。</li></ol><h2>上下文跟著資料夾走</h2><p>Inkstone 每整理一次，就把入口檔案更新成目前真實存在的資料夾。週一交給助理也好，三個月後交也好，地圖都是最新的。</p><figure class="article-shot"><img src="../assets/kb/zh-Hant/iphone-k3-agents.webp" srcset="../assets/kb/zh-Hant/iphone-k3-agents-340.webp 340w, ../assets/kb/zh-Hant/iphone-k3-agents-680.webp 680w, ../assets/kb/zh-Hant/iphone-k3-agents.webp 1350w" sizes="(max-width: 900px) 92vw, 760px" width="1350" height="2760" alt="iPhone 上的 AGENTS.md。" loading="lazy" decoding="async"></figure><h2>預設就保護隱私</h2><p>整理用的模型在你的裝置上執行。AGENTS.md 裡寫明私密資料夾不許碰；即使你開啟了雲端模型，看起來涉及隱私的檔案也絕不傳送。</p>
+  <h2>什麼是 AI 上下文管理？</h2><p>上下文就是 AI 模型回答之前看到的東西：檔案，以及關於這些檔案的說明。管理上下文，就是決定助理讀哪些檔案、告訴它資料夾怎麼組織、兩個檔案說法不一時以誰為準。</p><p>手寫的上下文，寫完一週就過時了。筆記挪了位置、資料夾改了名，助理就會理直氣壯地答錯。</p><h2>三個入口檔案，由 Inkstone 來寫</h2><p>AGENTS.md 是程式設計智慧代理和 AI 助理已經會在資料夾頂層去找的慣例。Inkstone 只重寫它自己標記之間的部分，你在旁邊加的內容原樣保留。</p><ol><li>AGENTS.md——這個知識庫是什麼，以及 AI 在這裡要守的規則：新檔案放哪、不刪除任何東西、私密資料夾不碰。</li><li>README.md——資料夾地圖，人和機器都能讀。</li><li>SOURCE_OF_TRUTH.md——什麼資訊以哪個檔案為準，智慧代理不用在兩個版本之間亂猜。</li></ol><h2>上下文跟著資料夾走</h2><p>Inkstone 每整理一次，就把入口檔案更新成目前真實存在的資料夾。週一交給助理也好，三個月後交也好，地圖都是最新的。</p><figure class="article-phone"><img src="../assets/kb/zh-Hant/iphone-k3-agents.webp" srcset="../assets/kb/zh-Hant/iphone-k3-agents-340.webp 340w, ../assets/kb/zh-Hant/iphone-k3-agents-680.webp 680w, ../assets/kb/zh-Hant/iphone-k3-agents.webp 1350w" sizes="(max-width: 700px) 70vw, 280px" width="1350" height="2760" alt="iPhone 上的 AGENTS.md。" loading="lazy" decoding="async"></figure><h2>預設就保護隱私</h2><p>整理用的模型在你的裝置上執行。AGENTS.md 裡寫明私密資料夾不許碰；即使你開啟了雲端模型，看起來涉及隱私的檔案也絕不傳送。</p>
   <section class="faq" aria-labelledby="faq-h"><h2 id="faq-h">常見問題</h2><div class="qa"><h3>哪些 AI 工具會讀 AGENTS.md？</h3><p>它就是資料夾頂層的一個普通 Markdown 檔案，拿到這個資料夾的助理或智慧代理都能讀；很多程式設計智慧代理會依名稱主動找它。</p></div><div class="qa"><h3>我能自己改 AGENTS.md 嗎？</h3><p>能。Inkstone 只重寫它標記之間的那一段，你寫在上面或下面的說明都會保留。</p></div><div class="qa"><h3>不用 AI 整理也能用嗎？</h3><p>能。建立知識庫時就會寫好入口檔案；不管檔案是依你的規則歸檔還是由模型歸檔，入口檔案都會保持最新。</p></div></section>
 </article>
 </main>

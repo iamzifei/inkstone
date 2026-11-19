@@ -22,8 +22,8 @@ the word "vault". Plan and reasoning: `docs/plans/20261119-ai-knowledge-base-0.5
   share links and text from other apps. The first time: copy or move, with
   "always do this"; copy is the default, and a move removes the original
   only after a complete, identical copy.
-- **It files itself.** Your rules first, privacy words, a project named in
-  the file, media by type and month, then Apple's on-device model (or your
+- **It files itself.** Privacy words first (to the private folder), then your
+  rules, a project named in the file, media by type and month, then Apple's on-device model (or your
   own model, off by default) — renamed by date and topic, Markdown notes
   given their source and date without a word of text changing. Exact copies
   go to to-delete; look-alikes and anything unsure wait for you. Rounds of

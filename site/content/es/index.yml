@@ -33,7 +33,7 @@ how:
   - title: Arrastra lo que sea
     body: Arrastra archivos a la ventana o añádelos desde la app Archivos. La primera vez eliges copiar o mover; copiar es lo predeterminado.
   - title: Se archiva por ti
-    body: Primero con tus reglas, luego con el modelo del dispositivo. Renombrado por fecha y tema. Lo dudoso espera en una carpeta de revisión.
+    body: Lo que parece privado va primero a la carpeta privada; luego tus reglas, luego el modelo del dispositivo. Renombrado por fecha y tema. Lo dudoso espera en una carpeta de revisión.
   alts:
   - 'Paso 1: crea tu base de conocimiento con IA'
   - 'Paso 2: ¿copiar o mover?'
@@ -43,9 +43,9 @@ safe:
   points:
   - Nunca se borra nada. Los duplicados van a una carpeta para borrar, que vacías tú.
   - Cada movimiento se anota antes de hacerse, en una tabla Markdown que puedes leer.
-  - Deshacer devuelve toda una ronda byte a byte, sin sobrescribir lo que cambiaste después.
+  - Deshacer devuelve toda una ronda, sin sobrescribir lo que cambiaste después.
   - ¿Más de 20 archivos o duplicados? Primero ves el plan completo y nada se mueve hasta que digas que sí.
-  - 'El texto de una nota nunca se reescribe: solo se añaden arriba su origen y la fecha.'
+  - 'El texto de una nota nunca se reescribe: solo se añaden arriba propiedades como su origen y la fecha.'
   alt: 'La base de conocimiento tras una ronda: carpetas en la barra lateral y un aviso —5 archivos organizados, Deshacer.'
 ai:
   kicker: Gestión de contexto para IA
@@ -62,7 +62,7 @@ ai:
   alt: AGENTS.md abierto en Inkstone en un Mac.
 rules:
   title: Tus reglas, en palabras sencillas
-  body: Las reglas de organización son un archivo de tu base de conocimiento. Edítalas en Ajustes como una nota —una línea por regla— y van antes que todo lo demás.
+  body: Las reglas de organización son un archivo de tu base de conocimiento. Edítalas en Ajustes como una nota, una línea por regla. Van justo después de la comprobación de privacidad, antes que todo lo demás.
   example: '## My rules
 
 
@@ -77,7 +77,7 @@ private:
   - title: IA en tu dispositivo
     body: El modelo de Apple en el dispositivo decide dónde va un archivo, en los dispositivos compatibles. Nada sale del dispositivo.
   - title: O tu propio modelo
-    body: Desactivado por defecto. Con tu propia clave, solo se envía el nombre y el inicio de un archivo que las reglas no pueden colocar, nunca uno que parezca privado.
+    body: Desactivado por defecto. Con tu propia clave, se envía el nombre y el inicio de un archivo que las reglas no pueden colocar, junto con los nombres de tus carpetas y tus reglas; nunca un archivo que parezca privado.
   - title: Solo archivos
     body: Sin cuenta, sin analítica, sin servidor nuestro. Tu base de conocimiento es una carpeta de archivos normales.
 features:

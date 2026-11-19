@@ -953,7 +953,7 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
 .dark .kicker { color: #E8968E; }
 .files { list-style: none; display: grid; gap: .55rem; margin-bottom: 1.1rem; color: var(--band-ink-2); }
 .files code { font-family: var(--mono); color: #F6E7A8; font-size: .95em; }
-.dark .fine { color: var(--band-faint); }
+.dark .split-text > p.fine { color: var(--band-faint); }
 .fine { font-size: var(--t-small, .92rem); color: var(--ink-faint); }
 
 .rules-example {
@@ -985,6 +985,11 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
 .article-lede { font-size: var(--t-lede); line-height: 1.6; }
 .article-hero, .article-shot { margin: 2.5rem calc(50% - min(50vw, 32rem)) 1rem; }
 .article-hero img, .article-shot img { width: 100%; }
+.article-phone { margin: 2rem auto; width: min(17.5rem, 70vw); }
+.article-phone img { width: 100%; filter: drop-shadow(0 16px 26px rgb(0 0 0 / .14)); }
+/* The dark band breaks out to the full viewport width; 100vw counts a visible
+ * scrollbar, so clip the few pixels it would otherwise scroll by. */
+html, body { overflow-x: clip; }
 
 @media (prefers-reduced-motion: reduce) {
   .phone img, .hero-phone { filter: none; }

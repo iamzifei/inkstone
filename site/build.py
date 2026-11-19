@@ -341,7 +341,9 @@ def nav(page: Page, by_slug: dict) -> str:
     up = page.up
     home = up if page.depth else "./"
     # On the home page the sections are on this page; elsewhere, on the home page.
-    anchor = "" if page.slug == "index" else home
+    # Every language keeps its home page in the same directory as its other
+    # pages, so a landing page reaches its own sections with "./".
+    anchor = "" if page.slug == "index" else "./"
     return f"""<a class="skip" href="#main">{e(get(d, 'nav.skip'))}</a>
 <header class="nav" id="nav">
   <div class="nav-inner">
@@ -783,11 +785,15 @@ def landing(page: Page) -> str:
         if sec.get("list"):
             parts.append("<ol>" + "".join(f"<li>{e(x)}</li>" for x in sec["list"]) + "</ol>")
         if sec.get("shot"):
-            parts.append(f'<figure class="article-shot">{kb_img(page, sec["shot"], sec.get("alt", ""), "(max-width: 900px) 92vw, 760px")}</figure>')
+            if sec["shot"].startswith("iphone-"):
+                # A portrait phone is shown at phone size, not stretched to the
+                # width a Mac window gets.
+                parts.append(f'<figure class="article-phone">{kb_img(page, sec["shot"], sec.get("alt", ""), "(max-width: 700px) 70vw, 280px")}</figure>')
+            else:
+                parts.append(f'<figure class="article-shot">{kb_img(page, sec["shot"], sec.get("alt", ""), "(max-width: 900px) 92vw, 760px")}</figure>')
     qa = "".join(f'<div class="qa"><h3>{e(x["q"])}</h3><p>{e(x["a"])}</p></div>' for x in get(d, "faq.items"))
-    home = page.up if page.depth else "./"
     return f"""<article class="article">
-  <p class="crumbs"><a href="{home}">Inkstone</a> › {e(get(d, 'crumb'))}</p>
+  <p class="crumbs"><a href="./">Inkstone</a> › {e(get(d, 'crumb'))}</p>
   <h1>{e(get(d, 'h1'))}</h1>
   <p class="article-lede">{e(get(d, 'lede'))}</p>
   <div class="hero-actions">{cta(page)}{appstore(page)}</div>

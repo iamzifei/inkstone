@@ -33,7 +33,7 @@ how:
   - title: Alles hineinziehen
     body: Dateien aufs Fenster ziehen oder aus der App „Dateien“ hinzufügen. Beim ersten Mal wählst du Kopieren oder Verschieben – Kopieren ist voreingestellt.
   - title: Es wird für dich abgelegt
-    body: Zuerst nach deinen Regeln, dann vom Modell auf dem Gerät. Umbenannt nach Datum und Thema. Unsicheres wartet in einem Prüfordner auf dich.
+    body: Privat wirkende Dateien kommen zuerst in den privaten Ordner, dann gelten deine Regeln, dann das Modell auf dem Gerät. Umbenannt nach Datum und Thema. Unsicheres wartet in einem Prüfordner auf dich.
   alts:
   - 'Schritt 1: Deine KI-Wissensdatenbank anlegen'
   - 'Schritt 2: Kopieren oder verschieben?'
@@ -43,9 +43,9 @@ safe:
   points:
   - Nichts wird je gelöscht. Duplikate landen in einem Ordner zum Löschen, den du selbst leerst.
   - Jede Verschiebung wird vorher protokolliert – eine Markdown-Tabelle, die du lesen kannst.
-  - Rückgängig stellt eine ganze Runde Byte für Byte wieder her, ohne deine späteren Änderungen zu überschreiben.
+  - Rückgängig stellt eine ganze Runde wieder her, ohne deine späteren Änderungen zu überschreiben.
   - Mehr als 20 Dateien oder Duplikate? Du siehst erst den ganzen Plan, und nichts bewegt sich ohne dein Ja.
-  - 'Der Text einer Notiz wird nie umgeschrieben: oben kommen nur Quelle und Datum dazu.'
+  - 'Der Text einer Notiz wird nie umgeschrieben: oben kommen nur Eigenschaften wie Quelle und Datum dazu.'
   alt: 'Die Wissensdatenbank nach einer Runde: Ordner in der Seitenleiste und ein Banner – 5 Dateien geordnet, Rückgängig.'
 ai:
   kicker: KI-Kontextverwaltung
@@ -62,7 +62,7 @@ ai:
   alt: AGENTS.md in Inkstone auf dem Mac geöffnet.
 rules:
   title: Deine Regeln, in einfachen Worten
-  body: Die Ordnungsregeln sind eine Datei in deiner Wissensdatenbank. Bearbeite sie in den Einstellungen wie eine Notiz – eine Zeile pro Regel – und sie gehen allem anderen vor.
+  body: Die Ordnungsregeln sind eine Datei in deiner Wissensdatenbank. Bearbeite sie in den Einstellungen wie eine Notiz – eine Zeile pro Regel. Sie kommen direkt nach der Privatsphäre-Prüfung, vor allem anderen.
   example: '## My rules
 
 
@@ -77,7 +77,7 @@ private:
   - title: KI auf deinem Gerät
     body: Apples Modell auf dem Gerät entscheidet, wohin eine Datei gehört – auf Geräten, die es unterstützen. Nichts verlässt das Gerät.
   - title: Oder dein eigenes Modell
-    body: Standardmäßig aus. Mit deinem eigenen Schlüssel werden nur Name und Anfang einer Datei gesendet, die die Regeln nicht einordnen – nie eine Datei, die privat aussieht.
+    body: Standardmäßig aus. Mit deinem eigenen Schlüssel werden Name und Anfang einer Datei gesendet, die die Regeln nicht einordnen, dazu deine Ordnernamen und Regeln – nie eine Datei, die privat aussieht.
   - title: Nur Dateien
     body: Kein Konto, keine Analyse, kein Server von uns. Deine Wissensdatenbank ist ein Ordner gewöhnlicher Dateien.
 features:

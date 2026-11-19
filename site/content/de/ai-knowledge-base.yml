@@ -13,7 +13,7 @@ sections:
 - h2: So baut Inkstone sie auf
   list:
   - 'Eine Struktur für Menschen und KI: Eingang, Projekte, Bereiche, Ressourcen, Medien, Ergebnisse und Privat – dazu ein Prüfordner für Unsicheres und ein Archiv für Duplikate.'
-  - 'Zuerst nach Regeln: deine eigenen, dann Privatsphäre (Ausweise, Bank, Medizinisches in den privaten Ordner), dann ein genanntes Projekt, dann Medien nach Typ und Monat.'
+  - 'Zuerst die Privatsphäre: Ausweise, Bank und Medizinisches in den privaten Ordner. Dann deine eigenen Regeln, dann ein genanntes Projekt, dann Medien nach Typ und Monat.'
   - Das Modell auf dem Gerät für den Rest. Es liest den Anfang einer Datei und schlägt Ordner und Titel vor; ist es unsicher, wartet die Datei auf dich.
   - 'Namen zum Überfliegen: 20261119-renovierung-angebot.md – Datum, dann Thema.'
   - 'Einstiegsdateien für KI: AGENTS.md, README.md und SOURCE_OF_TRUTH.md, neu geschrieben, wenn sich die Ordner ändern.'
@@ -21,7 +21,7 @@ sections:
   alt: Die Wissensdatenbank nach einer Runde, mit Rückgängig-Banner.
 - h2: Sicher, sie ordnen zu lassen
   paras:
-  - Nichts wird gelöscht. Jede Verschiebung wird vorher protokolliert, und eine ganze Runde lässt sich Byte für Byte rückgängig machen. Der Text einer Notiz wird nie umgeschrieben. Große Runden und Duplikate warten auf dein Ja.
+  - Nichts wird gelöscht. Jede Verschiebung wird vorher protokolliert, und eine ganze Runde lässt sich rückgängig machen. Der Text einer Notiz wird nie umgeschrieben. Große Runden und Duplikate warten auf dein Ja.
 - h2: Auch auf iPhone und iPad
   paras:
   - Füge Dateien aus der App „Dateien“ hinzu; sie landen im Eingang und werden genauso abgelegt. Die Wissensdatenbank liegt in iCloud Drive, Mac und iPhone sehen denselben Ordner.
@@ -31,7 +31,7 @@ faq:
   title: Fragen
   items:
   - q: Liest die KI alle meine Dateien?
-    a: Das Modell auf dem Gerät liest nur den Anfang einer Datei, die deine Regeln nicht einordnen konnten, auf deinem Gerät. Ein Cloud-Modell wird nur mit deinem eigenen Schlüssel und eingeschaltet genutzt; privat wirkende Dateien werden nie gesendet.
+    a: Das Modell auf dem Gerät liest nur den Anfang einer Datei, die deine Regeln nicht einordnen konnten, auf deinem Gerät. Ein Cloud-Modell wird nur mit deinem eigenen Schlüssel und eingeschaltet genutzt; es bekommt Name und Anfang dieser Datei, deine Ordnernamen und Regeln, und privat wirkende Dateien werden nie gesendet.
   - q: Funktioniert es mit Obsidian?
     a: Ein Obsidian-Tresor öffnet sich unverändert und wird nie umsortiert. Eine Wissensdatenbank von Inkstone ist gewöhnliches Markdown, das auch Obsidian öffnet.
   - q: Welche Geräte?
