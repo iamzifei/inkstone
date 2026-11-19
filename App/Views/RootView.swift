@@ -68,6 +68,34 @@ struct RootView: View {
         }
         .tint(style.accent)
         .background(style.background)
+        .overlay(alignment: .bottom) {
+            if let result = workspace.knowledgeBase.lastResult {
+                OrganizeBanner(result: result)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: workspace.knowledgeBase.lastResult?.batch)
+        // The knowledge base's sheets, one at a time (two `.sheet`s changing
+        // in one transaction can drop the second on iOS): the "ready" card
+        // first, then a round waiting for a yes.
+        .sheet(item: Binding(
+            get: { KnowledgeBaseSheet.current(workspace.knowledgeBase) },
+            set: { if $0 == nil { KnowledgeBaseSheet.closeCurrent(workspace.knowledgeBase) } }
+        )) { sheet in
+            switch sheet {
+            case .ready: KnowledgeBaseReadyCard()
+            case .plan(let plan): ChangePlanSheet(plan: plan)
+            }
+        }
+        .alert("Knowledge base", isPresented: Binding(
+            get: { workspace.knowledgeBase.failure != nil },
+            set: { if !$0 { workspace.knowledgeBase.clearFailure() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(workspace.knowledgeBase.failure ?? "")
+        }
+
         .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()

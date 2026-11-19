@@ -158,6 +158,9 @@ public struct SettingsData: Codable, Hashable, Sendable {
 
     /// Which file types take part in sync.
     public var syncPolicy = SyncFilePolicy()
+
+    /// Knowledge-base behaviour: organizing, its AI engine, dropping files in.
+    public var knowledgeBase = KnowledgeBaseSettings()
     /// "owner/repository" for GitHub sync. The token lives in the Keychain, not
     /// here — this struct is a plain JSON blob in UserDefaults.
     ///
@@ -305,6 +308,7 @@ public struct SettingsData: Codable, Hashable, Sendable {
         gitHubAutoSync = value(.gitHubAutoSync, defaults.gitHubAutoSync)
         gitHubSyncIntervalMinutes = value(.gitHubSyncIntervalMinutes, defaults.gitHubSyncIntervalMinutes)
         syncPolicy = value(.syncPolicy, defaults.syncPolicy)
+        knowledgeBase = value(.knowledgeBase, defaults.knowledgeBase)
         gitHubRepository = value(.gitHubRepository, defaults.gitHubRepository)
         gitHubBranch = value(.gitHubBranch, defaults.gitHubBranch)
         // Every stored property needs a line here. The synthesised `CodingKeys`
@@ -401,3 +405,54 @@ public final class AppSettings {
         }
     }
 }
+
+/// How the knowledge base behaves. Decoded field by field, like
+/// `SettingsData`, so adding a field never drops the others.
+public struct KnowledgeBaseSettings: Codable, Hashable, Sendable {
+    /// What dropping a file into the vault does.
+    public enum DropAction: String, Codable, Hashable, Sendable, CaseIterable {
+        /// Ask each time (the first time, with "always do this").
+        case ask
+        /// Copy it in; the original stays where it was. The default answer.
+        case copy
+        /// Move it in: copied first, the original removed only once the copy
+        /// is complete.
+        case move
+    }
+
+    /// Organize what lands in the inbox without being asked. Rounds that
+    /// need confirmation (> 20 files, duplicates) still wait for it.
+    public var autoOrganize = true
+    /// Ask Apple's on-device model where a file goes when the rules find no
+    /// place. Nothing leaves the device.
+    public var useOnDeviceModel = true
+    /// Ask the assistant's model instead (the person's own key). Off unless
+    /// turned on: the start of each file is sent to that provider.
+    public var useAssistantModel = false
+    /// Read the text in pictures (Vision, on device) to place them.
+    public var recognizeTextInImages = true
+    public var dropAction: DropAction = .ask
+    /// Keep AGENTS.md, README.md and SOURCE_OF_TRUTH.md up to date.
+    public var maintainEntryFiles = true
+
+    public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case autoOrganize, useOnDeviceModel, useAssistantModel, recognizeTextInImages, dropAction, maintainEntryFiles
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = KnowledgeBaseSettings()
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            (try? c.decodeIfPresent(T.self, forKey: key)).flatMap { $0 } ?? fallback
+        }
+        autoOrganize = value(.autoOrganize, d.autoOrganize)
+        useOnDeviceModel = value(.useOnDeviceModel, d.useOnDeviceModel)
+        useAssistantModel = value(.useAssistantModel, d.useAssistantModel)
+        recognizeTextInImages = value(.recognizeTextInImages, d.recognizeTextInImages)
+        dropAction = value(.dropAction, d.dropAction)
+        maintainEntryFiles = value(.maintainEntryFiles, d.maintainEntryFiles)
+    }
+}
+

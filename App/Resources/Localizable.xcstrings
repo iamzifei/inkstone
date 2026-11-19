@@ -436,6 +436,29 @@
         }
       }
     },
+    "%lld left in the inbox": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld left in the inbox"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个留在收件箱"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個留在收件匣"
+          }
+        }
+      }
+    },
     "%lld passages indexed": {
       "extractionState": "manual",
       "localizations": {
@@ -501,6 +524,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld tokens"
+          }
+        }
+      }
+    },
+    "%lld waiting for you to check": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld waiting for you to check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个等你确认"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個等你確認"
           }
         }
       }
@@ -639,6 +685,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "5 分鐘"
+          }
+        }
+      }
+    },
+    "A folder you already have": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A folder you already have"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用已有的文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用現有的資料夾"
+          }
+        }
+      }
+    },
+    "A folder you choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A folder you choose"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自己选一个文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自己選一個資料夾"
           }
         }
       }
@@ -980,6 +1072,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "把文字加到今日日記的末尾，沒有就先建立。"
+          }
+        }
+      }
+    },
+    "Already have notes?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already have notes?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有笔记了？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已經有筆記了？"
           }
         }
       }
@@ -1995,6 +2110,29 @@
         }
       }
     },
+    "Choose Folder…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Folder…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择文件夹…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇資料夾…"
+          }
+        }
+      }
+    },
     "Choose a model": {
       "extractionState": "manual",
       "localizations": {
@@ -2083,6 +2221,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude"
+          }
+        }
+      }
+    },
+    "Close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
           }
         }
       }
@@ -2521,6 +2682,29 @@
         }
       }
     },
+    "Couldn't create the knowledge base": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't create the knowledge base"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能创建知识库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法建立知識庫"
+          }
+        }
+      }
+    },
     "Couldn't open note": {
       "extractionState": "manual",
       "localizations": {
@@ -2540,6 +2724,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法開啟筆記"
+          }
+        }
+      }
+    },
+    "Create": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建立"
           }
         }
       }
@@ -2590,29 +2797,6 @@
         }
       }
     },
-    "Create Vault in iCloud Drive": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Create Vault in iCloud Drive"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 iCloud 云盘创建仓库"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 iCloud 雲碟建立儲存庫"
-          }
-        }
-      }
-    },
     "Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -2632,6 +2816,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "為這個儲存庫建立一個細粒度權杖，授予「Contents」的讀寫權限。權杖儲存在你的鑰匙圈中，絕不會寫進儲存庫或設定檔。"
+          }
+        }
+      }
+    },
+    "Create my knowledge base": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create my knowledge base"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建我的知识库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建立我的知識庫"
           }
         }
       }
@@ -3161,6 +3368,52 @@
         }
       }
     },
+    "Drop anything in": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop anything in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "什么都能拖进来"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "什麼都能拖進來"
+          }
+        }
+      }
+    },
+    "Drop files anywhere in this window — or into %@ — and they are filed for you. Anything Inkstone isn't sure about waits in %@ for you to decide.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop files anywhere in this window — or into %@ — and they are filed for you. Anything Inkstone isn't sure about waits in %@ for you to decide."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把文件拖到这个窗口的任意位置，或者拖进「%@」，它们会被自动整理好。拿不准的会放在「%@」等你决定。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把檔案拖到這個視窗的任意位置，或拖進「%@」，它們會被自動整理好。拿不準的會放在「%@」等你決定。"
+          }
+        }
+      }
+    },
     "Duplicate": {
       "extractionState": "manual",
       "localizations": {
@@ -3180,6 +3433,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "複製副本"
+          }
+        }
+      }
+    },
+    "Duplicates, put aside": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicates, put aside"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复文件，已放一边"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重複檔案，已放一邊"
           }
         }
       }
@@ -3344,6 +3620,29 @@
         }
       }
     },
+    "Everything stays as ordinary files on your device or in iCloud — no account, nothing locked in.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything stays as ordinary files on your device or in iCloud — no account, nothing locked in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有东西都是普通文件，存在你的设备或 iCloud 里——不用注册，也不会被锁住。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有東西都是普通檔案，存在你的裝置或 iCloud 裡——不用註冊，也不會被鎖住。"
+          }
+        }
+      }
+    },
     "Existing files only": {
       "extractionState": "manual",
       "localizations": {
@@ -3475,6 +3774,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "要同步的檔案類型"
+          }
+        }
+      }
+    },
+    "Filed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归档到位"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歸檔到位"
           }
         }
       }
@@ -3910,6 +4232,29 @@
         }
       }
     },
+    "For you to check": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For you to check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等你确认"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等你確認"
+          }
+        }
+      }
+    },
     "Forces": {
       "extractionState": "manual",
       "localizations": {
@@ -4227,6 +4572,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "GitHub 的檔案介面不接受這麼大的檔案——上限約為 40 MB。"
+          }
+        }
+      }
+    },
+    "Got it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Got it"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知道了"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知道了"
           }
         }
       }
@@ -4985,6 +5353,52 @@
         }
       }
     },
+    "It writes AGENTS.md, README.md and SOURCE_OF_TRUTH.md, so any AI assistant knows what is where.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It writes AGENTS.md, README.md and SOURCE_OF_TRUTH.md, so any AI assistant knows what is where."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它会自动写好 AGENTS.md、README.md 和 SOURCE_OF_TRUTH.md，任何 AI 助手都知道东西放在哪。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它會自動寫好 AGENTS.md、README.md 和 SOURCE_OF_TRUTH.md，任何 AI 助理都知道東西放在哪。"
+          }
+        }
+      }
+    },
+    "It's just a folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It's just a folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它就是一个文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它就是一個資料夾"
+          }
+        }
+      }
+    },
     "Jump anywhere with ⌘O": {
       "extractionState": "manual",
       "localizations": {
@@ -5165,6 +5579,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "類型"
+          }
+        }
+      }
+    },
+    "Knowledge base": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Knowledge base"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知识库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知識庫"
           }
         }
       }
@@ -5968,6 +6405,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "名稱"
+          }
+        }
+      }
+    },
+    "Name it, and choose where it lives": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name it, and choose where it lives"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起个名字，选个位置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取個名字，選個位置"
           }
         }
       }
@@ -6796,6 +7256,29 @@
         }
       }
     },
+    "Not now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先不"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先不要"
+          }
+        }
+      }
+    },
     "Note": {
       "extractionState": "manual",
       "localizations": {
@@ -6950,6 +7433,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "帶有 #%@ 標籤的筆記"
+          }
+        }
+      }
+    },
+    "Notes, PDFs, photos, recordings. Inkstone files each one by your rules, names it and keeps a log you can undo.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes, PDFs, photos, recordings. Inkstone files each one by your rules, names it and keeps a log you can undo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔记、PDF、照片、录音都行。Inkstone 按你的规则把每个文件放好、起好名字，并记下日志，随时可以撤销。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筆記、PDF、照片、錄音都行。Inkstone 依你的規則把每個檔案放好、取好名字，並記下日誌，隨時可以復原。"
+          }
+        }
+      }
+    },
+    "Nothing is deleted. Duplicates are put aside in the to-delete folder, and the whole round can be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing is deleted. Duplicates are put aside in the to-delete folder, and the whole round can be undone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不会删除任何东西。重复的文件放到「待删除」文件夹，整轮都可以撤销。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不會刪除任何東西。重複的檔案放到「待刪除」資料夾，整輪都可以復原。"
           }
         }
       }
@@ -7156,6 +7685,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "在這台 Mac 上"
+          }
+        }
+      }
+    },
+    "On this device, or a synced folder (Dropbox, OneDrive …).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On this device, or a synced folder (Dropbox, OneDrive …)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台设备上的文件夹，或同步盘里的文件夹（Dropbox、OneDrive……）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這台裝置上的資料夾，或同步碟裡的資料夾（Dropbox、OneDrive……）。"
           }
         }
       }
@@ -7500,6 +8052,87 @@
           "stringUnit": {
             "state": "translated",
             "value": "也可以輸入 @ 提及筆記，或把檔案拖到這裡"
+          }
+        }
+      }
+    },
+    "Organize": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理"
+          }
+        }
+      }
+    },
+    "Organize %lld files?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize %lld files?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理这 %lld 个文件？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理這 %lld 個檔案？"
+          }
+        }
+      }
+    },
+    "Organized %lld files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Organized %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Organized %lld files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理了 %lld 个文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理了 %lld 個檔案"
           }
         }
       }
@@ -7870,6 +8503,29 @@
         }
       }
     },
+    "Private": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "私密"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "私密"
+          }
+        }
+      }
+    },
     "Properties": {
       "extractionState": "manual",
       "localizations": {
@@ -8213,6 +8869,29 @@
         }
       }
     },
+    "Ready for AI": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready for AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 一看就懂"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 一看就懂"
+          }
+        }
+      }
+    },
     "Ready. Runs on this Mac; nothing is sent anywhere.": {
       "extractionState": "manual",
       "localizations": {
@@ -8322,6 +9001,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近的儲存庫"
+          }
+        }
+      }
+    },
+    "Recommended: on all your devices.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommended: on all your devices."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐：所有设备上都能用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推薦：所有裝置上都能用。"
           }
         }
       }
@@ -9012,6 +9714,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "在這台 Mac 上執行。不會向任何地方傳送內容，也不會產生費用。"
+          }
+        }
+      }
+    },
+    "Same as %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same as %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 %@ 相同"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "與 %@ 相同"
           }
         }
       }
@@ -9930,6 +10655,29 @@
         }
       }
     },
+    "Some files were left as they are: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some files were left as they are: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有些文件保持原样没动：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有些檔案維持原樣沒動：%@"
+          }
+        }
+      }
+    },
     "Source": {
       "extractionState": "manual",
       "localizations": {
@@ -10041,6 +10789,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "開始寫作"
+          }
+        }
+      }
+    },
+    "Still finishing the last round. Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still finishing the last round. Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一轮还没整理完，请稍后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一輪還沒整理完，請稍後再試。"
           }
         }
       }
@@ -11828,6 +12599,29 @@
         }
       }
     },
+    "Undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復原"
+          }
+        }
+      }
+    },
     "Unexpected response from the provider: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -12517,6 +13311,75 @@
         }
       }
     },
+    "Your AI knowledge base": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your AI knowledge base"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的 AI 知识库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的 AI 知識庫"
+          }
+        }
+      }
+    },
+    "Your files stay where they are; Inkstone only adds its rules and entry files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your files stay where they are; Inkstone only adds its rules and entry files."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的文件原地不动，Inkstone 只加上整理规则和入口文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的檔案原地不動，Inkstone 只加上整理規則和入口檔案。"
+          }
+        }
+      }
+    },
+    "Your knowledge base is ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your knowledge base is ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知识库建好了"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "知識庫建好了"
+          }
+        }
+      }
+    },
     "Your notes, as plain files you own.": {
       "extractionState": "manual",
       "localizations": {
@@ -12536,6 +13399,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "你的筆記，是你自己擁有的純文字檔案。"
+          }
+        }
+      }
+    },
+    "Your rules are in %@: change them in plain words, in Settings › Knowledge Base.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your rules are in %@: change them in plain words, in Settings › Knowledge Base."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理规则在「%@」里，可以在「设置 › 知识库」里用大白话修改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理規則在「%@」裡，可以在「設定 › 知識庫」裡用白話修改。"
           }
         }
       }
@@ -12835,6 +13721,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "iCloud 雲碟已登入，但 Inkstone 的儲存空間暫時沒有回應。這通常一兩分鐘後會自行恢復——或者直接開啟任意資料夾作為儲存庫。"
+          }
+        }
+      }
+    },
+    "iCloud Drive isn't available. Sign in to iCloud, or choose a folder instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive isn't available. Sign in to iCloud, or choose a folder instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 云盘用不了。请登录 iCloud，或者改选一个文件夹。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 雲碟無法使用。請登入 iCloud，或改選一個資料夾。"
           }
         }
       }
