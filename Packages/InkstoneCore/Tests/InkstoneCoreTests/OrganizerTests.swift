@@ -661,7 +661,8 @@ struct OrganizerTests {
         try put(root, "30-资料/.note.md\(Metadata.tempMarker)abcd1234", Data("private copy".utf8))
         // 2026-11-19 (review of #28): only leftovers untouched for an hour are
         // swept, so a drop still being copied is never removed. This one is old.
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -7200)],
+        // (Relative to the organizer's clock in this test, fixedDate.)
+        try FileManager.default.setAttributes([.modificationDate: fixedDate.addingTimeInterval(-7200)],
                                               ofItemAtPath: root.appending(path: "30-资料/.note.md\(Metadata.tempMarker)abcd1234").path)
         try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 80))
         let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
