@@ -111,6 +111,28 @@ struct EditorRenderer {
         return visibleRangeCache.range
     }
 
+    /// The characters a draw pass for `rect` has to consider: everything laid
+    /// out through the bottom of `rect`, and nothing past it.
+    ///
+    /// Each pass asks TextKit for the on-screen box of every element it might
+    /// paint. Over the whole storage, that made the layout manager lay out the
+    /// *entire* note to answer for chips and rules far below the window — on a
+    /// note just opened, every redraw until background layout caught up
+    /// (measured: `drawInlineFills` + `drawHeadingRules` were the top main-thread
+    /// cost opening a 60 KB note). Layout is contiguous, so text after the first
+    /// unlaid character cannot be on screen; laying out through `rect` is work
+    /// drawing the glyphs needs anyway. Memoised per rect like the visible range.
+    func drawableRange(for rect: CGRect) -> NSRange {
+        if drawableRangeCache.rect == rect { return drawableRangeCache.range }
+        layoutManager.ensureLayout(forBoundingRect: rect.offsetBy(dx: -origin.x, dy: -origin.y), in: container)
+        let limit = min(storage.length, layoutManager.firstUnlaidCharacterIndex())
+        drawableRangeCache.rect = rect
+        drawableRangeCache.range = NSRange(location: 0, length: limit)
+        return drawableRangeCache.range
+    }
+
+    private let drawableRangeCache = VisibleRangeCache()
+
     /// Draws every hand-painted element that intersects `rect`.
     ///
     /// Order matters where things overlap: fills sit behind their text, rules
@@ -157,7 +179,7 @@ struct EditorRenderer {
     private func drawCalloutDisclosures(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneCalloutFold,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let folded = value as? Bool,
                   let box = calloutDisclosureRect(for: range), box.intersects(rect)
@@ -211,7 +233,7 @@ struct EditorRenderer {
     func drawBlockFills(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneBlockFill,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard value != nil else { return }
             // The union of the block's line fragments, which covers the blank
@@ -444,7 +466,7 @@ struct EditorRenderer {
     func drawInlineImages(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneInlineImage,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let image = value as? PlatformImage else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -648,7 +670,7 @@ struct EditorRenderer {
     func drawProperties(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneProperties,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let block = MainActor.assumeIsolated({ value as? PropertiesBlock }) else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -761,7 +783,7 @@ struct EditorRenderer {
 
         storage.enumerateAttribute(
             .inkstoneHorizontalRule,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard value != nil else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -915,7 +937,7 @@ struct EditorRenderer {
     private func drawInlineText(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneInlineText,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let replacement = value as? String else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -948,7 +970,7 @@ struct EditorRenderer {
     private func drawOnBaseline(_ key: NSAttributedString.Key, in rect: CGRect) {
         storage.enumerateAttribute(
             key,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let image = value as? PlatformImage else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -984,7 +1006,7 @@ struct EditorRenderer {
 
         storage.enumerateAttribute(
             .inkstoneHeadingRule,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard value != nil else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -1035,7 +1057,7 @@ struct EditorRenderer {
     func drawInlineFills(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneInlineFill,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let colour = value as? PlatformColor, range.length > 0 else { return }
             let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? PlatformFont
@@ -1111,7 +1133,7 @@ struct EditorRenderer {
     func drawCheckboxes(in rect: CGRect) {
         storage.enumerateAttribute(
             .inkstoneCheckbox,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             // A `String` now, not a `Bool`: the box has to show *which* state.
             guard let marker = value as? String else { return }
@@ -1240,7 +1262,7 @@ struct EditorRenderer {
 
         storage.enumerateAttribute(
             .inkstoneBullet,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let level = value as? Int else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -1290,7 +1312,7 @@ struct EditorRenderer {
 
         storage.enumerateAttribute(
             .inkstoneQuoteDepth,
-            in: NSRange(location: 0, length: storage.length)
+            in: drawableRange(for: rect)
         ) { value, range, _ in
             guard let depth = value as? Int else { return }
             let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)

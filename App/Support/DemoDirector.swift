@@ -26,6 +26,9 @@ import InkstoneCore
 ///     insert-template <name>    insert a template from the template folder
 ///     back                      go back
 ///     close                     close the open note (back to the list on iPhone)
+///     type <text>               append text to the open note (autosaves)
+///     stall-mark <label>        start a main-thread stall segment
+///     stall-report              append the segment's numbers to INKSTONE_STALL_OUT
 ///
 /// Debug builds only. It reads one file and calls the same methods the UI does.
 @MainActor
@@ -38,6 +41,7 @@ enum DemoDirector {
     static func startIfRequested(workspace: Workspace) {
         guard let path = ProcessInfo.processInfo.environment["INKSTONE_DEMO_COMMANDS"], !started else { return }
         started = true
+        MainStallMonitor.shared.startIfRequested()
         Task { @MainActor in
             var done = 0
             var ticks = 0
@@ -94,6 +98,13 @@ enum DemoDirector {
             return
         case "kb-confirm":
             if let plan = workspace.knowledgeBase.pendingPlan { Task { await workspace.knowledgeBase.confirm(plan) } }
+            return
+        // Main-thread stall measurement (MainStallMonitor, INKSTONE_STALL_OUT).
+        case _ where line.hasPrefix("stall-mark "):
+            MainStallMonitor.shared.mark(String(line.dropFirst("stall-mark ".count)))
+            return
+        case "stall-report":
+            MainStallMonitor.shared.report()
             return
         case "kb-drop":
             // The copy-or-move question, as for three files dropped from the desktop.
@@ -183,6 +194,11 @@ enum DemoDirector {
             }
         case "graph":
             workspace.open(.graph(focus: workspace.activeTab?.url))
+        case "type":
+            // Appends text to the open note as typing would, autosave included.
+            if let url = workspace.activeTab?.url, let document = workspace.document(for: url) {
+                document.text += arg
+            }
         case "caret":
             if let location = Int(arg) { workspace.setEditorCaret?(NSRange(location: location, length: 0)) }
         case "report":

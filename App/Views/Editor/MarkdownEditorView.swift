@@ -120,6 +120,33 @@ struct MarkdownEditorView: View {
 /// Platform-agnostic editing logic, shared by the AppKit and UIKit wrappers.
 @MainActor
 class EditorCoordinator: NSObject {
+    /// Pictures decode off the main thread (AttachmentImageCache) and stand in
+    /// as placeholders meanwhile; when they land the note is styled again so
+    /// the real picture replaces the placeholder. Several finishing together
+    /// are folded into one pass.
+    nonisolated(unsafe) private var imageObserver: (any NSObjectProtocol)?
+    private var imageRestylePending = false
+
+    func restyleWhenImagesDecode(_ restyle: @escaping @MainActor () -> Void) {
+        guard imageObserver == nil else { return }
+        imageObserver = NotificationCenter.default.addObserver(
+            forName: AttachmentImageCache.didDecode, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.imageRestylePending else { return }
+                self.imageRestylePending = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.imageRestylePending = false
+                    restyle()
+                }
+            }
+        }
+    }
+
+    deinit {
+        if let imageObserver { NotificationCenter.default.removeObserver(imageObserver) }
+    }
+
     /// True from building an editor until its saved caret and scroll are back:
     /// the selection and scroll events in between are the editor's own set-up,
     /// not the reader moving, and must not overwrite the saved position.
@@ -186,7 +213,17 @@ class EditorCoordinator: NSObject {
 
     /// Width inline images are scaled to. Tracks the text measure so an embedded
     /// screenshot fits the column instead of overflowing it.
-    var inlineImageWidth: CGFloat = 680
+    ///
+    /// Starts at the width the last editor settled on rather than a fixed 680:
+    /// the window rarely changes between two notes, and starting wrong meant
+    /// every note was styled twice on open — once at 680, then again 120 ms
+    /// later at the real measure (measured on the Mac: the second pass was a
+    /// fifth of the app's main-thread time while switching notes).
+    var inlineImageWidth: CGFloat = EditorCoordinator.lastSettledWidth {
+        didSet { Self.lastSettledWidth = inlineImageWidth }
+    }
+    /// Main thread only (editors are built and laid out there).
+    nonisolated(unsafe) static var lastSettledWidth: CGFloat = 680
 
     #if os(macOS)
     /// Imports whatever the pasteboard holds into the vault and returns the
@@ -759,7 +796,12 @@ final class InkstoneTextView: NSTextView {
         rect.origin.y -= Self.caretOvershoot
         rect.size.height += Self.caretOvershoot * 2
         rect.size.width += Self.caretInset + 1
-        super.setNeedsDisplay(rect, avoidAdditionalLayout: flag)
+        // Not in a window yet (the text is being set in makeNSView): nothing
+        // can be drawn, so don't let the invalidation lay out text for it.
+        // Without this, `textView.string = text` on the fresh, zero-width view
+        // made TextKit fill glyphs and layout for the whole note — measured as
+        // ~45% of main-thread time opening a 60 KB note on the Mac.
+        super.setNeedsDisplay(rect, avoidAdditionalLayout: flag || window == nil)
     }
 
     private static let caretInset: CGFloat = 0.75
@@ -1050,8 +1092,14 @@ private struct TextViewRepresentable: NSViewRepresentable {
         MermaidRenderer.shared.onRendered = { [weak coordinator = context.coordinator] in
             MainActor.assumeIsolated { coordinator?.rehighlight() }
         }
+        context.coordinator.restyleWhenImagesDecode { [weak coordinator = context.coordinator] in
+            coordinator?.rehighlight()
+        }
 
         context.coordinator.applyStyle()
+        // This first pass already styles with the current index; mark it, or
+        // the first updateView sees a "new" generation and styles it all again.
+        _ = context.coordinator.consumeIndexGeneration(indexGeneration)
         context.coordinator.rehighlight()
         actions.provideCaretGetter { [weak textView] in textView?.selectedRange() ?? NSRange(location: -1, length: 0) }
         actions.provideCaretSetter { [weak textView] range in
@@ -1194,7 +1242,9 @@ private struct TextViewRepresentable: NSViewRepresentable {
             // bucket eight times — eight full highlight passes over the document,
             // seven of them for a width that was obsolete before the pass
             // finished. The work is deferred until the width stops moving.
-            if abs(inlineImageWidth - measure) >= 32 {
+            // No width yet (the view is not laid out): nothing to measure. Taking
+            // the -48 this computes as a width styled every note twice on open.
+            if available > 1, abs(inlineImageWidth - measure) >= 32 {
                 inlineImageWidth = measure
                 scheduleWidthRehighlight()
             }
@@ -1908,6 +1958,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
         MermaidRenderer.shared.onRendered = { [weak coordinator = context.coordinator] in
             MainActor.assumeIsolated { coordinator?.rehighlight() }
         }
+        context.coordinator.restyleWhenImagesDecode { [weak coordinator = context.coordinator] in
+            coordinator?.rehighlight()
+        }
 
         #if DEBUG
         // Brings the keyboard up so the accessory row can be seen in a
@@ -1922,6 +1975,9 @@ private struct TextViewRepresentable: UIViewRepresentable {
 
         context.coordinator.textView = textView
         context.coordinator.applyStyle()
+        // This first pass already styles with the current index; mark it, or
+        // the first updateView sees a "new" generation and styles it all again.
+        _ = context.coordinator.consumeIndexGeneration(indexGeneration)
         context.coordinator.rehighlight()
         actions.provideCaretGetter { [weak textView] in textView?.selectedRange ?? NSRange(location: -1, length: 0) }
         actions.provideCaretSetter { [weak textView] range in
