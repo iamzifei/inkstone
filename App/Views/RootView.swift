@@ -106,9 +106,9 @@ struct RootView: View {
             set: { if $0 == nil { KnowledgeBaseSheet.closeCurrent(workspace.knowledgeBase) } }
         )) { sheet in
             switch sheet {
-            case .ready: KnowledgeBaseReadyCard().presentationDetents([.medium])
+            case .ready: KnowledgeBaseReadyCard().presentationDetents([.medium, .large])
             case .plan(let plan): ChangePlanSheet(plan: plan)
-            case .drop(let urls): DropChoiceSheet(urls: urls).presentationDetents([.medium])
+            case .drop(let urls): DropChoiceSheet(urls: urls).presentationDetents([.medium, .large])
             }
         }
         .alert("Knowledge base", isPresented: Binding(

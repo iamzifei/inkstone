@@ -427,22 +427,29 @@ struct DocumentScanner {
         }
 
         /// An HTML block that is only a comment (`<!-- … -->` on lines of its
-        /// own — Inkstone's entry-file markers): hidden when reading.
+        /// own — Inkstone's entry-file markers): hidden when reading. Only
+        /// when the comment is the whole block: `<!-- a --> text <!-- b -->`
+        /// is a block that starts and ends with a comment, not one comment.
         mutating func visitHTMLBlock(_ html: HTMLBlock) {
             let raw = html.rawHTML.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard raw.hasPrefix("<!--"), raw.hasSuffix("-->"), let range = nsRange(html.range) else { return }
+            guard raw.hasPrefix("<!--"), raw.hasSuffix("-->"),
+                  raw.components(separatedBy: "-->").count == 2,
+                  let range = nsRange(html.range) else { return }
             tokens.append(SyntaxToken(kind: .comment, range: range))
             excluded.append(range)
         }
 
         mutating func visitInlineHTML(_ html: InlineHTML) {
-        // `<!-- like this -->` in a line of prose: a comment, hidden when
-        // reading, like Obsidian's %%comments%%.
-        if html.rawHTML.hasPrefix("<!--"), let range = nsRange(html.range) {
-            tokens.append(SyntaxToken(kind: .comment, range: range))
-            excluded.append(range)
-            return
-        }
+            // `<!-- like this -->` in a line of prose: a comment, hidden when
+            // reading. The length comes from the comment's own text:
+            // swift-markdown reports a short end column for inline HTML that
+            // spans lines, which left the closing `>` on screen.
+            if html.rawHTML.hasPrefix("<!--"), let start = nsRange(html.range) {
+                let range = NSRange(location: start.location, length: (html.rawHTML as NSString).length)
+                tokens.append(SyntaxToken(kind: .comment, range: range))
+                excluded.append(range)
+                return
+            }
         guard let range = nsRange(html.range),
               let (name, isClosing) = DocumentScanner.parseTag(html.rawHTML)
         else { return }

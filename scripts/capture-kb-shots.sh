@@ -18,6 +18,7 @@ case "$LANG_CODE" in
   en) LOCALE=en_AU ;; zh-Hans) LOCALE=zh_CN ;; zh-Hant) LOCALE=zh_TW ;;
   *) echo "unknown language $LANG_CODE" >&2; exit 1 ;;
 esac
+[ -d "$APP" ] || { echo "Build the simulator app first (.build-sim)." >&2; exit 1; }
 OUT="$ROOT/assets/ios-shots/$LANG_CODE"
 CMD="$(mktemp -t inkstone-kb-cmd)"
 mkdir -p "$OUT/iphone" "$OUT/ipad"
@@ -41,7 +42,7 @@ launch() {  # launch <device> [extra env assignments…]
   sleep 9
 }
 say() { echo "$1" >> "$CMD"; sleep "${2:-3}"; }
-snap() { xcrun simctl io "$1" screenshot "$2" >/dev/null 2>&1; echo "    $(basename "$2")"; }
+snap() { xcrun simctl io "$1" screenshot "$2" >/dev/null 2>&1 || { echo "screenshot failed: $2" >&2; exit 1; }; echo "    $(basename "$2")"; }
 
 for DEV in "$PHONE" "$PAD"; do
   prepare "$DEV"

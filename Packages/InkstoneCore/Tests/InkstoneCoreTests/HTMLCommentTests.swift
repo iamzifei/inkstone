@@ -19,4 +19,31 @@ struct HTMLCommentTests {
         let md = "```html\n<!-- keep me -->\n```\n"
         #expect(ReadingRenderer.render(md).text.contains("<!-- keep me -->"))
     }
+
+    // Review of #29 (measured cases).
+    @Test func aCommentSpanningLinesInProseIsHiddenWhole() {
+        let out = ReadingRenderer.render("text <!-- a\nb #tag --> more #real\n").text
+        #expect(!out.contains(">"))
+        #expect(out.contains("text"))
+        #expect(out.contains("more"))
+    }
+
+    @Test func textBetweenTwoCommentsOnALineStays() {
+        let out = ReadingRenderer.render("<!-- a --> visible <!-- b -->\n").text
+        #expect(out.contains("visible"))
+    }
+
+    @Test func tagsAndLinksInsideACommentAreNotIndexed() {
+        let tokens = SyntaxScanner().scan("<!-- #secret [[Hidden]] -->\n\ntext #real\n")
+        let tags = tokens.compactMap { if case .tag = $0.kind { return $0 } else { return nil } }
+        #expect(tags.count == 1)
+        #expect(SyntaxScanner().links(in: "<!-- [[Hidden]] -->\n").isEmpty)
+    }
+
+    @Test func exportKeepsHTMLCommentsAndDropsObsidianOnes() {
+        let html = HTMLExporter.bodyHTML("- a\n\n<!-- -->\n\n- b\n\n%%private%%\n", resolveAttachment: { _ in nil })
+        #expect(html.contains("<!-- -->"))
+        #expect(!html.contains("private"))
+    }
 }
+

@@ -62,7 +62,12 @@ enum DemoDirector {
         case "welcome":
             // Back to the first-run guide, with the scratch vault forgotten
             // so the screenshot shows what a new person sees.
-            if let vault = workspace.vault { workspace.forget(vault) } else { workspace.closeCurrentVault() }
+            // Only the scratch knowledge base is forgotten, never a real vault.
+            if let vault = workspace.vault, vault.url.path(percentEncoded: false).contains("ScratchKnowledgeBase") {
+                workspace.forget(vault)
+            } else {
+                workspace.closeCurrentVault()
+            }
             return
         case "kb-card-off":
             workspace.knowledgeBase.isShowingReadyCard = false
