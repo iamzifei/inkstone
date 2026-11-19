@@ -41,11 +41,18 @@ public enum DropImporter {
             if source.lastPathComponent.hasPrefix("."), source.pathExtension == "icloud" {
                 return Result(source: source, destination: nil, originalKept: true, error: "not downloaded from iCloud yet")
             }
+            if containsPlaceholders(source) {
+                return Result(source: source, destination: nil, originalKept: true, error: "has files not downloaded from iCloud yet")
+            }
             // Copied under a hidden temporary name first (the organizer
             // skips hidden files, and a crash's leftovers are swept), checked,
             // then given its name — so a half-copied file is never in the
             // inbox, and only our own temporary file is ever removed.
-            let temp = inbox.appending(path: ".\(source.lastPathComponent)\(Metadata.tempMarker)\(UUID().uuidString.prefix(8))")
+            // The name in the temporary name kept short: a name near the
+            // 255-byte limit must still fit with the marker added.
+            var short = source.lastPathComponent
+            while short.utf8.count > 150 { short.removeLast() }
+            let temp = inbox.appending(path: ".\(short)\(Metadata.tempMarker)\(UUID().uuidString.prefix(8))")
             do {
                 try fm.copyItem(at: source, to: temp)
             } catch {
@@ -77,6 +84,23 @@ public enum DropImporter {
         }
     }
 
+    /// Whether a dropped folder holds iCloud placeholders (files not
+    /// downloaded): copying would bring stubs, and a move would remove the
+    /// real files from iCloud.
+    static func containsPlaceholders(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue,
+              let e = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil) else { return false }
+        for case let item as URL in e where item.lastPathComponent.hasPrefix(".") && item.pathExtension == "icloud" { return true }
+        return false
+    }
+
+    /// Temporary copies left by a crash mid-drop (hidden, in the inbox,
+    /// untouched for an hour) — swept when a knowledge base opens.
+    public static func sweepLeftovers(root: URL) {
+        Metadata.purgeOldBackups(root: root, now: .now)
+    }
+
     static func unique(_ url: URL) -> URL {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path(percentEncoded: false)) else { return url }
@@ -102,7 +126,11 @@ public enum DropImporter {
                     return "link:" + ((try? fm.destinationOfSymbolicLink(atPath: url.path(percentEncoded: false))) ?? "?")
                 }
                 if v.isDirectory == true { return "dir" }
-                if v.isRegularFile == true { return "file:\(v.fileSize ?? -1):" + (Fingerprint.sha256(url) ?? "?") }
+                if v.isRegularFile == true {
+                    // A file that can't be read is never "the same".
+                    guard let sha = Fingerprint.sha256(url) else { return nil }
+                    return "file:\(v.fileSize ?? -1):" + sha
+                }
                 return "other"
             }
             guard let top = describe(root) else { return nil }

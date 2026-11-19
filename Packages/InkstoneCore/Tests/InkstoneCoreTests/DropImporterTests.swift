@@ -115,5 +115,27 @@ struct DropImporterTests {
         let names = try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path)
         #expect(names == ["a.md"])
     }
+
+    @Test func aFolderWithNestedPlaceholdersIsNotMoved() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let folder = outside.appending(path: "Docs")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("stub".utf8).write(to: folder.appending(path: ".a.pdf.icloud"))
+        let r = DropImporter.importItems([folder], into: kb, layout: layout, action: .move)
+        #expect(r.first?.destination == nil)
+        #expect(FileManager.default.fileExists(atPath: folder.appending(path: ".a.pdf.icloud").path))
+    }
+
+    @Test func aFreshTemporaryCopyIsNotSweptButAnOldOneIs() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let fresh = kb.appending(path: "00-收件箱/.big.mov\(Metadata.tempMarker)aaaa1111")
+        let old = kb.appending(path: "00-收件箱/.old.mov\(Metadata.tempMarker)bbbb2222")
+        try Data("x".utf8).write(to: fresh); try Data("y".utf8).write(to: old)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -7200)], ofItemAtPath: old.path)
+        DropImporter.sweepLeftovers(root: kb)
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        _ = layout
+    }
 }
 

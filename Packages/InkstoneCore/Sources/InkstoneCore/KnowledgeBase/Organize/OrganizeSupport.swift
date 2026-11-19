@@ -411,7 +411,12 @@ enum Metadata {
             for case let url as URL in e {
                 let name = url.lastPathComponent
                 if name == ".git" || name == "node_modules" { e.skipDescendants(); continue }
-                if name.hasPrefix("."), name.contains(tempMarker) { try? fm.removeItem(at: url) }
+                guard name.hasPrefix("."), name.contains(tempMarker) else { continue }
+                e.skipDescendants()
+                // Only ones untouched for an hour: a drop still being copied
+                // has a fresh date and is left alone.
+                let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
+                if now.timeIntervalSince(modified) > 3_600 { try? fm.removeItem(at: url) }
             }
         }
         let folder = root.appending(path: ".inkstone/undo", directoryHint: .isDirectory)

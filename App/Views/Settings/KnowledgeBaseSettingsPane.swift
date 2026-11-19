@@ -81,8 +81,11 @@ private struct RulesEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !readable {
-                Text("The rules file can't be read right now (it may still be downloading). Try again in a moment.")
-                    .font(.callout).foregroundStyle(.secondary)
+                HStack {
+                    Text("The rules file can't be read right now (it may still be downloading). Try again in a moment.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button("Try Again") { reload() }
+                }
             }
             TextEditor(text: $text)
                 .font(.system(.callout, design: .monospaced))
@@ -98,6 +101,8 @@ private struct RulesEditor: View {
                             do {
                                 try RulesFile.save(text, expected: onDisk, root: root, layout: layout)
                                 saved = text; self.onDisk = nil
+                            } catch RulesFile.SaveError.changedOnDisk(let current) {
+                                self.onDisk = current            // changed again: show the newest
                             } catch { problem = error.localizedDescription }
                         }
                     }
@@ -132,6 +137,7 @@ private struct RulesEditor: View {
     }
 
     private func reload() {
+        onDisk = nil; problem = nil
         if let current = RulesFile.read(root: root, layout: layout) {
             text = current; saved = current; readable = true
         } else {

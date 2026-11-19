@@ -47,6 +47,9 @@ final class KnowledgeBaseController {
         detach()
         self.root = root
         layout = Self.knowledgeBaseLayout(at: root)
+        if layout != nil {
+            Task.detached(priority: .background) { DropImporter.sweepLeftovers(root: root) }
+        }
         inboxMayHaveChanged(delay: .seconds(1))
     }
 
@@ -85,7 +88,7 @@ final class KnowledgeBaseController {
         let urls = dropped.filter { !$0.standardizedFileURL.path(percentEncoded: false).hasPrefix(base.hasSuffix("/") ? base : base + "/") }
         guard !urls.isEmpty else { return }
         switch settings.data.knowledgeBase.dropAction {
-        case .ask: pendingDrop = urls
+        case .ask: pendingDrop = (pendingDrop ?? []) + urls      // a second drop joins the first
         case .copy: bringIn(urls, action: .copy)
         case .move: bringIn(urls, action: .move)
         }
