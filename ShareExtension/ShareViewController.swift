@@ -33,7 +33,9 @@ final class ShareViewController: UIViewController {
         Task { @MainActor in
             let inputs = extensionContext?.inputItems as? [NSExtensionItem] ?? []
             let item = await Self.collect(from: inputs)
-            model.files = await Self.collectFiles(from: inputs, into: model.staging)
+            let (files, failed) = await Self.collectFiles(from: inputs, into: model.staging)
+            model.files = files
+            model.failedFiles = failed
             model.item = item
             model.text = item.text ?? ""
             model.isLoading = false
@@ -70,9 +72,10 @@ final class ShareViewController: UIViewController {
     /// The files shared (not text or a web link), each copied out while the
     /// system's temporary copy still exists — it is removed as soon as the
     /// load callback returns.
-    static func collectFiles(from items: [NSExtensionItem], into staging: URL) async -> [URL] {
+    static func collectFiles(from items: [NSExtensionItem], into staging: URL) async -> (files: [URL], failed: [String]) {
         try? FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         var out: [URL] = []
+        var failed: [String] = []
         for item in items {
             for provider in item.attachments ?? [] {
                 // The most specific type that is a file's data — not plain
@@ -87,17 +90,31 @@ final class ShareViewController: UIViewController {
                     (t.conforms(to: .data) || t.conforms(to: .package)) && !t.conforms(to: .url)
                         && (isFile || !t.conforms(to: .text))
                 }) else { continue }
-                if let copied = await copyFile(from: provider, type: type, into: staging) { out.append(copied) }
+                if let copied = await copyFile(from: provider, type: type, into: staging) {
+                    out.append(copied)
+                } else {
+                    // Said, not dropped: the sheet lists what couldn't be read.
+                    failed.append(provider.suggestedName ?? type.localizedDescription ?? type.identifier)
+                }
             }
         }
-        return out
+        return (out, failed)
+    }
+
+    /// Whether a provider is a file (handled by `collectFiles`), so `collect`
+    /// does not also read its text into the note.
+    static func isFileProvider(_ provider: NSItemProvider) -> Bool {
+        provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+            || provider.registeredTypeIdentifiers.compactMap(UTType.init).contains { t in
+                (t.conforms(to: .data) || t.conforms(to: .package)) && !t.conforms(to: .url) && !t.conforms(to: .text)
+            }
     }
 
     private static func copyFile(from provider: NSItemProvider, type: UTType, into staging: URL) async -> URL? {
         await withCheckedContinuation { continuation in
             _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
                 guard let url else { continuation.resume(returning: nil); return }
-                var name = provider.suggestedName ?? url.deletingPathExtension().lastPathComponent
+                var name = SharedInbox.safeName(provider.suggestedName ?? url.deletingPathExtension().lastPathComponent)
                 if (name as NSString).pathExtension.isEmpty, let ext = type.preferredFilenameExtension ?? Optional(url.pathExtension), !ext.isEmpty {
                     name += ".\(ext)"
                 }
@@ -121,7 +138,7 @@ final class ShareViewController: UIViewController {
         var title: String?
         for item in items {
             if title == nil, let t = item.attributedContentText?.string, !t.isEmpty { title = t }
-            for provider in item.attachments ?? [] {
+            for provider in item.attachments ?? [] where !isFileProvider(provider) {
                 if url == nil, provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
                    let found = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL,
                    !found.isFileURL {
@@ -157,6 +174,8 @@ final class ShareModel {
     let hasVault = SharedInbox.appHasVault
     /// Files shared, copied out of the host app's hands.
     var files: [URL] = []
+    /// Shared files that couldn't be read (not downloaded, an error).
+    var failedFiles: [String] = []
     let staging = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
@@ -181,6 +200,15 @@ private struct ShareView: View {
                             Text("\(model.files.count) files")
                         } footer: {
                             Text("Added to your knowledge base's inbox and filed the next time Inkstone opens (in another vault: its attachments folder).")
+                        }
+                    }
+                    if !model.failedFiles.isEmpty {
+                        Section {
+                            ForEach(model.failedFiles, id: \.self) { Label($0, systemImage: "exclamationmark.triangle") }
+                        } header: {
+                            Text("Couldn't be read")
+                        } footer: {
+                            Text("These weren't added. If they are in iCloud, download them first, then share again.")
                         }
                     }
                     Section {

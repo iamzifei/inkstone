@@ -172,7 +172,6 @@ targets:
               NSExtensionActivationSupportsFileWithMaxCount: 20
               NSExtensionActivationSupportsImageWithMaxCount: 20
               NSExtensionActivationSupportsMovieWithMaxCount: 10
-              NSExtensionActivationSupportsAttachmentsWithMaxCount: 20
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.orris.inkstone.share

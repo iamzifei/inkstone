@@ -63,7 +63,7 @@ struct SharedInboxTests {
         try SharedInbox.add(.init(text: "second", url: nil, title: nil, date: Date(timeIntervalSince1970: 200)), in: dir)
         try SharedInbox.add(.init(text: "first", url: nil, title: nil, date: Date(timeIntervalSince1970: 100)), in: dir)
         var got: [String] = []
-        SharedInbox.drain(in: dir) { item, _ in got.append(item.text ?? ""); return true }
+        SharedInbox.drain(in: dir) { d in got.append(d.item.text ?? ""); return true }
         #expect(got == ["first", "second"])
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
     }
@@ -71,9 +71,9 @@ struct SharedInboxTests {
     @Test func anItemTheVaultCannotTakeStaysForNextTime() throws {
         let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try SharedInbox.add(.init(text: "keep me", url: nil, title: nil, date: .now), in: dir)
-        SharedInbox.drain(in: dir) { _, _ in false }
+        SharedInbox.drain(in: dir) { _ in false }
         var got: [String] = []
-        SharedInbox.drain(in: dir) { item, _ in got.append(item.text ?? ""); return true }
+        SharedInbox.drain(in: dir) { d in got.append(d.item.text ?? ""); return true }
         #expect(got == ["keep me"])
     }
 
@@ -98,20 +98,55 @@ struct SharedInboxTests {
         defer { try? FileManager.default.removeItem(at: dir); try? FileManager.default.removeItem(at: src) }
         try Data("pdf".utf8).write(to: src.appending(path: "report.pdf"))
         let other = src.appending(path: "b"); try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
-        try Data("pdf2".utf8).write(to: other.appending(path: "report.pdf"))     // same name
-        try SharedInbox.add(.init(text: nil, url: nil, title: nil, date: .now),
-                            files: [src.appending(path: "report.pdf"), other.appending(path: "report.pdf")], in: dir)
-        var seen: [String] = []
-        // Kept when not delivered…
-        SharedInbox.drain(in: dir) { _, files in seen = files.map(\.lastPathComponent); return false }
-        #expect(seen == ["report.pdf", "report 2.pdf"])
-        // …and gone, with its folder, once delivered.
-        SharedInbox.drain(in: dir) { _, files in
-            #expect(files.count == 2)
-            #expect((try? Data(contentsOf: files[1])) == Data("pdf2".utf8))
+        try Data("pdf2".utf8).write(to: other.appending(path: "Report.PDF"))     // same name to APFS
+        try SharedInbox.add(.init(text: "hi", url: nil, title: nil, date: .now),
+                            files: [src.appending(path: "report.pdf"), other.appending(path: "Report.PDF")], in: dir)
+        // First try: one file goes in, then something fails.
+        SharedInbox.drain(in: dir) { d in
+            #expect(d.pendingFiles.map(\.lastPathComponent) == ["report.pdf", "Report 2.PDF"])
+            d.markDelivered(d.pendingFiles[0], as: "00-Inbox/report.pdf")
+            return false
+        }
+        // The retry sees only what is left, and what was done.
+        SharedInbox.drain(in: dir) { d in
+            #expect(d.pendingFiles.map(\.lastPathComponent) == ["Report 2.PDF"])
+            #expect(d.deliveredPlaces == ["00-Inbox/report.pdf"])
+            #expect(!d.noteDone)
+            d.markDelivered(d.pendingFiles[0], as: "00-Inbox/Report 2.PDF")
+            d.markNoteDone()
             return true
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
+    }
+
+    @Test func anItemThatFailsDoesNotHoldUpTheOthers() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try SharedInbox.add(.init(text: "stuck", url: nil, title: nil, date: Date(timeIntervalSince1970: 100)), in: dir)
+        try SharedInbox.add(.init(text: "fine", url: nil, title: nil, date: Date(timeIntervalSince1970: 200)), in: dir)
+        var delivered: [String] = []
+        SharedInbox.drain(in: dir) { d in
+            guard d.item.text == "fine" else { return false }
+            delivered.append("fine"); return true
+        }
+        #expect(delivered == ["fine"])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == 1)   // "stuck" waits
+    }
+
+    @Test func aRecordCannotPointOutsideItsFolder() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir.appending(path: "1-x"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data("secret".utf8).write(to: dir.appending(path: "other.json"))
+        try Data(#"{"date":0,"files":["..","../other.json","ok.txt"]}"#.utf8).write(to: dir.appending(path: "1-x.json"))
+        try Data("ok".utf8).write(to: dir.appending(path: "1-x/ok.txt"))
+        SharedInbox.drain(in: dir) { d in
+            #expect(d.pendingFiles.map(\.lastPathComponent) == ["ok.txt"])
+            return false
+        }
+        #expect(SharedInbox.safeName("a/b.pdf") == "a-b.pdf")
+        #expect(SharedInbox.safeName("..") == "file")
+        #expect(SharedInbox.safeName("") == "file")
     }
 
     @Test func anItemFromTheLastVersionWithoutFilesStillDecodes() throws {
