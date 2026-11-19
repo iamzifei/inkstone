@@ -135,7 +135,10 @@ class EditorCoordinator: NSObject {
             MainActor.assumeIsolated {
                 guard let self, !self.imageRestylePending else { return }
                 self.imageRestylePending = true
-                DispatchQueue.main.async { [weak self] in
+                // A short wait, not one run-loop turn: pictures land one by one,
+                // each in its own hop to the main actor, and a turn would still
+                // mean a full pass per picture.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.imageRestylePending = false
                     restyle()
                 }
@@ -1242,9 +1245,10 @@ private struct TextViewRepresentable: NSViewRepresentable {
             // bucket eight times — eight full highlight passes over the document,
             // seven of them for a width that was obsolete before the pass
             // finished. The work is deferred until the width stops moving.
-            // No width yet (the view is not laid out): nothing to measure. Taking
-            // the -48 this computes as a width styled every note twice on open.
-            if available > 1, abs(inlineImageWidth - measure) >= 32 {
+            // No real width yet (the view is not laid out): nothing to measure.
+            // Taking the -48 this computes as a width styled every note twice on
+            // open. 80, as on iOS: below that no column is being laid out.
+            if measure > 80, abs(inlineImageWidth - measure) >= 32 {
                 inlineImageWidth = measure
                 scheduleWidthRehighlight()
             }

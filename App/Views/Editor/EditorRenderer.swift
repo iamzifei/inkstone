@@ -122,8 +122,18 @@ struct EditorRenderer {
     /// cost opening a 60 KB note). Layout is contiguous, so text after the first
     /// unlaid character cannot be on screen; laying out through `rect` is work
     /// drawing the glyphs needs anyway. Memoised per rect like the visible range.
+    /// (Contiguous layout only — the Mac's; see the guard.)
     func drawableRange(for rect: CGRect) -> NSRange {
         if drawableRangeCache.rect == rect { return drawableRangeCache.range }
+        // Only with contiguous layout does "first unlaid character" mean "end of
+        // what has been laid out". UITextView turns non-contiguous layout on, and
+        // there the first hole can sit above the viewport — capping at it would
+        // leave visible bullets and fills undrawn. So iOS keeps the whole range.
+        guard !layoutManager.allowsNonContiguousLayout else {
+            drawableRangeCache.rect = rect
+            drawableRangeCache.range = NSRange(location: 0, length: storage.length)
+            return drawableRangeCache.range
+        }
         layoutManager.ensureLayout(forBoundingRect: rect.offsetBy(dx: -origin.x, dy: -origin.y), in: container)
         let limit = min(storage.length, layoutManager.firstUnlaidCharacterIndex())
         drawableRangeCache.rect = rect

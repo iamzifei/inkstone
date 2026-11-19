@@ -76,6 +76,11 @@ struct ReadingView: View {
         .onAppear {
             MermaidRenderer.shared.onRendered = { mermaidGeneration += 1 }
         }
+        // Pictures decode in the background and stand in as blank placeholders
+        // until they land; typeset again then, or reading mode keeps the blank.
+        .onReceive(NotificationCenter.default.publisher(for: AttachmentImageCache.didDecode)) { _ in
+            mermaidGeneration += 1
+        }
     }
 }
 
@@ -368,7 +373,9 @@ enum ReadingTypesetter {
     ///
     /// Back to front, so the ranges of the ones not yet replaced stay valid, and
     /// each one silently leaves its text alone when the picture is not available:
-    /// the caches answer nil while they are still working, and a note that shows
+    /// the caches answer nil (or, for pictures, a blank placeholder of the right
+    /// size, replaced when `AttachmentImageCache.didDecode` fires) while they are
+    /// still working, and a note that shows
     /// a file name until the thumbnail arrives is better than one that shows a
     /// gap.
     private static func drawAttachments(

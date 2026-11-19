@@ -66,7 +66,12 @@ final class AttachmentImageCache {
         // (Measured before this: a note embedding 12 photos blocked the main
         // thread for ~1.1 s on open, on the Mac and on iPhone alike.)
         let scale = Self.displayScale
-        if kind == .image, let size = Self.pointSize(of: url, maxWidth: width, scale: scale) {
+        // Decoded before and since evicted (a note with more pictures than the
+        // cache holds): decode here, as before. Going through the background
+        // again would evict another, whose restyle would ask for that one, and
+        // so on for ever.
+        if kind == .image, !decodedOnce.contains(key),
+           let size = Self.pointSize(of: url, maxWidth: width, scale: scale) {
             let placeholder = Self.blank(size)
             placeholders[key] = placeholder
             Task.detached(priority: .userInitiated) {
@@ -92,11 +97,14 @@ final class AttachmentImageCache {
 
     /// Placeholders handed out while their picture decodes.
     private var placeholders: [Key: PlatformImage] = [:]
+    /// Pictures already decoded once in the background (see `image(for:)`).
+    private var decodedOnce: Set<Key> = []
 
     private func finish(_ key: Key, decoded: DecodedImage?) {
         // Cleared meanwhile (removeAll): the placeholder is gone, and so is
         // any reason to keep this picture.
         guard placeholders.removeValue(forKey: key) != nil else { return }
+        decodedOnce.insert(key)
         if let decoded, let image = decoded.platformImage() {
             store(image, for: key)
         } else {
@@ -200,6 +208,7 @@ final class AttachmentImageCache {
     func removeAll() {
         images.removeAll()
         placeholders.removeAll()
+        decodedOnce.removeAll()
         failures.removeAll()
         order.removeAll()
         costs.removeAll()

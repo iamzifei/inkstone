@@ -11,7 +11,7 @@ work. This file is the summary; those are the reasoning.
 
 ### Faster
 - Opening a long note on the Mac blocks the interface a quarter as long as before (measured:
-  2.5 s → 0.6 s over twelve opens of a 60 KB note), and less on iPhone and iPad too.
+  2.5 s → 0.7 s over twelve opens of a 60 KB note), and less on iPhone and iPad too.
 - Notes with pictures open without freezing: images decode in the background while a
   placeholder of the right size holds their place (measured: a note with twelve large photos
   went from a ~1.1 s freeze to under 0.07 s, on Mac and iPhone).
