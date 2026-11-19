@@ -322,6 +322,52 @@
         }
       }
     },
+    "%lld copied, but the originals couldn't be removed, so they are still where they were.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld copied, but the originals couldn't be removed, so they are still where they were."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项已复制，但原文件没能删除，仍在原处。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 項已複製，但原檔案無法刪除，仍在原處。"
+          }
+        }
+      }
+    },
+    "%lld couldn't be added: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld couldn't be added: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项没能添加：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 項無法加入：%@"
+          }
+        }
+      }
+    },
     "%lld file%@, %lld of %lld changes selected": {
       "extractionState": "manual",
       "localizations": {
@@ -872,6 +918,29 @@
         }
       }
     },
+    "Add Files…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Files…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加文件…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入檔案…"
+          }
+        }
+      }
+    },
     "Add a card": {
       "extractionState": "manual",
       "localizations": {
@@ -1095,6 +1164,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "已經有筆記了？"
+          }
+        }
+      }
+    },
+    "Always do this": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always do this"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以后都这样"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以後都這樣"
           }
         }
       }
@@ -2636,6 +2728,52 @@
         }
       }
     },
+    "Copy or move %lld items into your knowledge base?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy or move %lld items into your knowledge base?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把这 %lld 项复制还是移动到知识库？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把這 %lld 項複製還是移動到知識庫？"
+          }
+        }
+      }
+    },
+    "Copy: the originals stay where they are.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy: the originals stay where they are."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制：原文件留在原处。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "複製：原檔案留在原處。"
+          }
+        }
+      }
+    },
     "Could not keep access to that folder: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -3410,6 +3548,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "把檔案拖到這個視窗的任意位置，或拖進「%@」，它們會被自動整理好。拿不準的會放在「%@」等你決定。"
+          }
+        }
+      }
+    },
+    "Drop to add to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop to add to %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "松手放进「%@」"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放開即加入「%@」"
           }
         }
       }
@@ -6363,6 +6524,29 @@
         }
       }
     },
+    "Move": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移動"
+          }
+        }
+      }
+    },
     "Move to…": {
       "extractionState": "manual",
       "localizations": {
@@ -6382,6 +6566,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "移動到…"
+          }
+        }
+      }
+    },
+    "Move: they live only in the knowledge base. The originals are removed after a complete copy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move: they live only in the knowledge base. The originals are removed after a complete copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动：只留在知识库里。完整复制好之后才删除原文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移動：只留在知識庫裡。完整複製好之後才刪除原檔案。"
           }
         }
       }
@@ -8098,6 +8305,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "整理這 %lld 個檔案？"
+          }
+        }
+      }
+    },
+    "Organize Inbox Now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organize Inbox Now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即整理收件箱"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即整理收件匣"
           }
         }
       }
