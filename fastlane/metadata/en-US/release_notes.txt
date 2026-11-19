@@ -1,8 +1,6 @@
-Inkstone is now an AI knowledge base.
+Faster, and files from anywhere.
 
-• Create one in three steps: a name, a place (iCloud Drive, a folder, or a folder you already have) — the folders, rules and entry files are made for you.
-• Drop anything in — notes, PDFs, photos, recordings. The first time you choose copy or move; copy is the default.
-• It is filed for you: by your own rules, then by the on-device model, named by date and topic, duplicates put aside. Anything unsure waits for you. Nothing is ever deleted, and every round can be undone.
-• AGENTS.md, README.md and SOURCE_OF_TRUTH.md are written and kept up to date, so any AI assistant knows what is where.
-• Edit the organizing rules in plain words in Settings › Knowledge Base.
-• Share links and text to Inkstone from other apps; in a knowledge base they are filed too.
+• Share files from any app — Files, Mail, Photos and more — straight into your knowledge base. They land in the inbox and are filed like anything you drop in.
+• Notes with pictures open without freezing: photos load in the background while their space is kept, so the text doesn't jump.
+• Long notes open faster, and switching between notes does less work.
+• Settings › Knowledge Base now opens at the top.
