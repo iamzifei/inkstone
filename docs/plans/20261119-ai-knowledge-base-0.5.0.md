@@ -62,6 +62,13 @@ size: XL
 - SEO：title/description/JSON-LD/llms.txt/sitemap；新增落地页 `ai-knowledge-base`、`ai-context-management`（8 语言）；保留 Obsidian 相关页面但改写为次要。
 - 验收：线上 curl 200、真机尺寸截图、页面无占位、Lighthouse SEO ≥ 95、站内文案逐条对照代码属实。
 
+### P8 Windows 版（James 2026-11-19 追加：P1–P7 全部完成后再做）
+- 范围：知识库核心能力在 Windows 上可用——引导建库、拖入复制/移动、自动整理（规则 + 可选用户自己的模型；Windows 无 Apple 本机模型）、三个入口文件、撤销、编辑 Markdown。
+- 技术路线待定（动工前再定，写进本节）：现有 App 是 SwiftUI，不能直接跑在 Windows。候选：① 把 InkstoneCore 的整理/入口文件逻辑抽成跨平台库，Windows 端另写界面；② 用跨平台框架重写一个精简版。选型依据：维护成本、与 Mac 版行为一致（整理策略、日志格式、撤销必须同一套）、安装包体积。
+- 发布：Microsoft Store 提交 + 网站各语言下载页加 Windows 链接。
+- 验收：Windows 实机/虚拟机跑通建库→拖入→整理→撤销；整理日志与 Mac 版互相可读（同一个库两边都能撤销）；商店提交状态为审核中/已上架；官网 Windows 链接 200。
+- HUMAN QUEUE：Microsoft 开发者账号（Partner Center）、代码签名证书、一台 Windows 测试环境（实机或 VM）。
+
 ## 验收（全局）
 每阶段：核心测试 + `scripts/test-all.sh` + CI 绿、独立评审、UI 有截图、性能项有数字。不删文件、不改正文两条底线有自动化测试守住。
 
