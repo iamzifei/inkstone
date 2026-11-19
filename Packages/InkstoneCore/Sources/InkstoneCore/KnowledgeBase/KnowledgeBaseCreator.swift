@@ -50,6 +50,15 @@ public enum KnowledgeBaseCreator {
     public static func adopt(_ folder: URL, language: KnowledgeBaseLanguage) throws -> [String] {
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))) ?? []
         let isEmpty = contents.allSatisfy { $0.hasPrefix(".") }
-        return try VaultBlueprint.apply(to: folder, language: language, skeleton: isEmpty)
+        var created = try VaultBlueprint.apply(to: folder, language: language, skeleton: isEmpty)
+        // An inbox, so there is somewhere to drop things (the rest of the
+        // skeleton is made as the organizer needs it).
+        let layout = KnowledgeBaseLayout.detect(in: folder) ?? KnowledgeBaseLayout(language: language)
+        let inbox = folder.appending(path: layout.inbox, directoryHint: .isDirectory)
+        if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)) {
+            try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+            created.append(layout.inbox)
+        }
+        return created
     }
 }

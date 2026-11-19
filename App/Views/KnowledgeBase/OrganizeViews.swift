@@ -1,7 +1,31 @@
 import SwiftUI
 import InkstoneCore
 
-/// "Organized 5 files · Undo": shown for a few seconds after each round.
+/// Which knowledge-base sheet is up — at most one.
+enum KnowledgeBaseSheet: Identifiable {
+    case ready
+    case plan(ChangePlan)
+
+    var id: String {
+        switch self {
+        case .ready: return "ready"
+        case .plan(let p): return "plan-" + p.moves.map(\.from).joined(separator: "|")
+        }
+    }
+
+    @MainActor static func current(_ kb: KnowledgeBaseController) -> KnowledgeBaseSheet? {
+        if kb.isShowingReadyCard { return .ready }
+        if let plan = kb.pendingPlan { return .plan(plan) }
+        return nil
+    }
+
+    @MainActor static func closeCurrent(_ kb: KnowledgeBaseController) {
+        if kb.isShowingReadyCard { kb.isShowingReadyCard = false }
+        else if kb.pendingPlan != nil { kb.dismissPlan() }
+    }
+}
+
+/// "Organized 5 files · Undo": shown for half a minute after each round.
 struct OrganizeBanner: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
@@ -31,7 +55,7 @@ struct OrganizeBanner: View {
         .frame(maxWidth: 460)
         .padding(16)
         .task(id: result.batch) {
-            try? await Task.sleep(for: .seconds(10))
+            try? await Task.sleep(for: .seconds(30))
             if kb.lastResult?.batch == result.batch { kb.clearBanner() }
         }
     }

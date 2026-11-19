@@ -56,6 +56,12 @@ struct ProviderPlacementAdvisor: PlacementAdvisor {
     let model: String
 
     func advise(_ facts: FileFacts, context: AdvisorContext) async throws -> PlacementAdvice? {
+        // Nothing that looks private leaves the device: it is filed as
+        // private without asking.
+        guard AdvisorPrompt.maySendOffDevice(facts, context: context) else {
+            return PlacementAdvice(folder: context.layout.privateFolder, confidence: 1, title: nil, tags: [],
+                                   summary: nil, isPrivate: true, reason: "private words; not sent")
+        }
         let system = AdvisorPrompt.instructions(context.layout)
             + "\n\nAnswer with JSON only, in this shape: " + AdvisorPrompt.jsonShape
         let request = CompletionRequest(

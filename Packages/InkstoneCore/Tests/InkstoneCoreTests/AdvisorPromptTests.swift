@@ -47,4 +47,36 @@ struct AdvisorPromptTests {
         #expect(AdvisorPrompt.parse("{\"folder\": \"\"}") == nil)
         #expect(AdvisorPrompt.parse("{broken") == nil)
     }
+
+    @Test func privateFolderNamesAndPrivateTextNeverGoOffDevice() {
+        let context = AdvisorContext(layout: layout, folders: ["私密/病历2025", "30-资料/园艺"], rules: "")
+        let p = AdvisorPrompt.prompt(facts(text: "普通内容"), context: context)
+        #expect(!p.contains("病历2025"))
+        #expect(p.contains("30-资料/园艺"))
+        // A private word past the first 800 characters still stops it.
+        let long = String(repeating: "普通的一句话。", count: 200) + "我的信用卡号码是……"
+        #expect(!AdvisorPrompt.maySendOffDevice(facts(text: long), context: context))
+        #expect(AdvisorPrompt.maySendOffDevice(facts(text: "花市"), context: context))
+    }
+
+    @Test func aHangingAdvisorDoesNotHoldTheRound() async {
+        struct Hang: PlacementAdvisor {
+            func advise(_ facts: FileFacts, context: AdvisorContext) async throws -> PlacementAdvice? {
+                try await Task.sleep(for: .seconds(3600)); return nil
+            }
+        }
+        // Shortened: the same race the organizer uses, checked to return nil
+        // rather than wait; the 20 s bound itself is not waited for here.
+        let start = ContinuousClock.now
+        let answer = await withTaskGroup(of: PlacementAdvice?.self) { group in
+            group.addTask { try? await Hang().advise(facts(text: ""), context: AdvisorContext(layout: layout, folders: [], rules: "")) }
+            group.addTask { try? await Task.sleep(for: .milliseconds(100)); return nil }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        #expect(answer == nil)
+        #expect(ContinuousClock.now - start < .seconds(5))
+    }
 }
+

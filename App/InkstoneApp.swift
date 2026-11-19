@@ -831,8 +831,6 @@ struct InkstoneApp: App {
             .appending(path: "inkstone-scratch-vault").path(percentEncoded: false)
     }
 
-    /// Writes a small vault into the app container and registers it. Exercises the
-    /// same code path a real vault does — scan, index, watch, render.
     /// A few things dropped in the scratch knowledge base's inbox: a note
     /// about a project that exists, a picture and its copy, a private file,
     /// a loose thought — one of each path the organizer takes.
@@ -855,6 +853,8 @@ struct InkstoneApp: App {
         try (data as Data).write(to: inbox.appending(path: "IMG_0001 副本.png"))
     }
 
+    /// Writes a small vault into the app container and registers it. Exercises the
+    /// same code path a real vault does — scan, index, watch, render.
     private func makeScratchVault() throws -> Vault {
         let root = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory()))

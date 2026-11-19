@@ -200,7 +200,7 @@ public struct Organizer: Sendable {
             }
 
             var placed = place(f, rules: rules, index: index)
-            if placed.kind == .review, let advisor, let advice = try? await advisor.advise(f, context: context),
+            if placed.kind == .review, let advisor, let advice = await Self.ask(advisor, f, context),
                let checked = accept(advice, for: f.kind) {
                 placed = checked
             }
@@ -229,6 +229,18 @@ public struct Organizer: Sendable {
             if let sha = f.sha256 { plannedBySHA[sha] = to }
         }
         return ChangePlan(moves: moves, suggestions: suggestions)
+    }
+
+    /// An advisor's answer within 20 seconds, else none (the file goes to
+    /// review): a model that hangs must not hold the whole round.
+    static func ask(_ advisor: PlacementAdvisor, _ facts: FileFacts, _ context: AdvisorContext) async -> PlacementAdvice? {
+        await withTaskGroup(of: PlacementAdvice?.self) { group in
+            group.addTask { try? await advisor.advise(facts, context: context) }
+            group.addTask { try? await Task.sleep(for: .seconds(20)); return nil }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
     }
 
     /// Case- and Unicode-normalization-folded, as APFS compares names.

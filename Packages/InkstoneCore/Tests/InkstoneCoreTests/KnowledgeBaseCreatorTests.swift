@@ -47,7 +47,7 @@ struct KnowledgeBaseCreatorTests {
         try Data("# My readme".utf8).write(to: folder.appending(path: "README.md"))
         try KnowledgeBaseCreator.adopt(folder, language: .english)
         let top = Set(try FileManager.default.contentsOfDirectory(atPath: folder.path))
-        #expect(top == ["Work", "README.md", "_System", "AGENTS.md", "SOURCE_OF_TRUTH.md"])
+        #expect(top == ["Work", "README.md", "_System", "AGENTS.md", "SOURCE_OF_TRUTH.md", "00-Inbox"])
         #expect(try String(contentsOf: folder.appending(path: "README.md"), encoding: .utf8) == "# My readme")
         #expect(try String(contentsOf: folder.appending(path: "Work/plan.md"), encoding: .utf8) == "mine")
     }

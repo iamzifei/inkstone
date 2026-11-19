@@ -167,6 +167,10 @@ struct CreateKnowledgeBaseView: View {
     private func open(_ folder: URL, name: String) throws {
         let vault = try workspace.registry.register(folder: folder, name: name)
         workspace.open(vault)
+        // `open` reports nothing; whether it worked shows in the workspace.
+        guard workspace.vault?.id == vault.id else {
+            throw CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: folder.path])
+        }
         workspace.knowledgeBase.showReadyCard()
     }
 }

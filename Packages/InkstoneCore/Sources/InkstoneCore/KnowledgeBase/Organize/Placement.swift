@@ -111,14 +111,22 @@ enum PrivacyCheck {
     static let words = [
         "身份证", "身份證", "护照", "護照", "驾照", "駕照", "驾驶证", "户口", "戶口", "社保", "医保", "銀行卡", "银行卡",
         "银行流水", "銀行流水", "病历", "病歷", "体检", "體檢", "诊断", "診斷", "处方", "處方", "工资条", "薪资", "薪資",
-        "税单", "稅單", "报税", "報稅", "密码", "密碼", "账号", "帳號",
+        "税单", "稅單", "报税", "報稅", "密码", "密碼", "账号", "帳號", "信用卡", "卡号", "卡號", "社会保障", "医疗卡",
         "passport", "id card", "identity card", "driver licence", "driver license", "driving licence",
         "bank statement", "medical", "prescription", "diagnosis", "payslip", "pay slip", "salary", "tax return",
-        "password", "social security", "ssn",
+        "password", "social security", "ssn", "credit card", "card number", "tax file number", "tfn", "medicare",
+        "national insurance", "bank account", "account number", "routing number", "iban",
     ]
 
     static func looksPrivate(_ facts: FileFacts) -> String? {
         let haystack = "\(facts.name) \(facts.title ?? "") \(facts.text.prefix(800))".lowercased()
+        return words.first { haystack.contains($0) }
+    }
+
+    /// The same check over everything a prompt would carry (the whole
+    /// excerpt, OCR included), before it is sent anywhere.
+    static func looksPrivate(text: String) -> String? {
+        let haystack = text.lowercased()
         return words.first { haystack.contains($0) }
     }
 }

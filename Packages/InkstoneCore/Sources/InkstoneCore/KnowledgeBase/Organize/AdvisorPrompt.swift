@@ -47,9 +47,10 @@ public enum AdvisorPrompt {
             .prefix(max(0, budget / 2 - out.count))
         if !excerpt.isEmpty { out += (en ? "\nContent: " : "\n内容：") + excerpt }
 
-        // Folders a file may go in: the machinery left out.
+        // Folders a file may go in: the machinery and the private folder (its
+        // subfolder names are themselves private) left out.
         let allowed = context.folders.filter { folder in
-            !(layout.systemFolders + [layout.inbox]).contains { folder == $0 || folder.hasPrefix($0 + "/") }
+            !(layout.systemFolders + [layout.inbox, layout.privateFolder]).contains { folder == $0 || folder.hasPrefix($0 + "/") }
         }
         var folders = en ? "\n\nFolders:" : "\n\n文件夹："
         for f in allowed {
@@ -81,6 +82,14 @@ public enum AdvisorPrompt {
             if inSection, !t.isEmpty, !t.hasPrefix("<!--") { lines.append(line) }
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// Whether a file's question may go to a model off the device: nothing in
+    /// the whole of what would be sent looks private. When it does, the file
+    /// is filed as private without asking.
+    public static func maySendOffDevice(_ facts: FileFacts, context: AdvisorContext) -> Bool {
+        PrivacyCheck.looksPrivate(text: prompt(facts, context: context, budget: 6_000)) == nil
+            && PrivacyCheck.looksPrivate(text: facts.text) == nil
     }
 
     /// The JSON a cloud model is asked to answer with.
