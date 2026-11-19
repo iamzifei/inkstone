@@ -54,7 +54,7 @@ struct SettingsView: View {
         if let name = ProcessInfo.processInfo.environment["INKSTONE_OPEN_SETTINGS"],
            let pane = Pane(rawValue: name) { return pane }
         #endif
-        return .appearance
+        return .knowledgeBase
     }()
     #else
     /// A value-driven path rather than view-carrying links, so a pane can be
@@ -78,12 +78,13 @@ struct SettingsView: View {
     /// Both platforms use these: the Mac tags its tabs with them, iOS pushes
     /// them onto a navigation path.
     enum Pane: String, CaseIterable, Identifiable, Hashable {
-        case appearance, typography, editor, files, assistant, sync
+        case knowledgeBase, appearance, typography, editor, files, assistant, sync
 
         var id: String { rawValue }
 
         var title: LocalizedStringKey {
             switch self {
+            case .knowledgeBase: return "Knowledge Base"
             case .appearance: return "Appearance"
             case .typography: return "Typography"
             case .editor: return "Editor"
@@ -95,6 +96,7 @@ struct SettingsView: View {
 
         var symbol: String {
             switch self {
+            case .knowledgeBase: return "books.vertical"
             case .appearance: return "paintpalette"
             case .typography: return "textformat"
             case .editor: return "square.and.pencil"
@@ -106,6 +108,7 @@ struct SettingsView: View {
 
         @ViewBuilder var view: some View {
             switch self {
+            case .knowledgeBase: KnowledgeBaseSettingsPane()
             case .appearance: AppearanceSettings()
             case .typography: TypographySettings()
             case .editor: EditorSettings()

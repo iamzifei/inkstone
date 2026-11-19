@@ -91,20 +91,6 @@ struct RootView: View {
                 if case .success(let urls) = result { workspace.knowledgeBase.receive(urls) }
             }
         }
-        .sheet(isPresented: Binding(
-            get: { workspace.knowledgeBase.pendingDrop != nil },
-            set: { if !$0 { workspace.knowledgeBase.pendingDrop = nil } }
-        )) {
-            if let urls = workspace.knowledgeBase.pendingDrop { DropChoiceSheet(urls: urls) }
-        }
-        .alert("Knowledge base", isPresented: Binding(
-            get: { workspace.knowledgeBase.failure != nil },
-            set: { if !$0 { workspace.knowledgeBase.clearFailure() } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(workspace.knowledgeBase.failure ?? "")
-        }
         .overlay(alignment: .bottom) {
             if let result = workspace.knowledgeBase.lastResult {
                 OrganizeBanner(result: result)
@@ -122,6 +108,7 @@ struct RootView: View {
             switch sheet {
             case .ready: KnowledgeBaseReadyCard()
             case .plan(let plan): ChangePlanSheet(plan: plan)
+            case .drop(let urls): DropChoiceSheet(urls: urls)
             }
         }
         .alert("Knowledge base", isPresented: Binding(
