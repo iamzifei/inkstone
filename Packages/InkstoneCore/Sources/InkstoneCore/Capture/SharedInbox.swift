@@ -48,7 +48,6 @@ public enum SharedInbox {
         set { UserDefaults(suiteName: appGroup)?.set(newValue, forKey: vaultKey) }
     }
 
-    /// The block appended to the Inbox note for one item.
     /// A shared item as a note of its own (for a knowledge base's inbox):
     /// named by when it was shared, the shared text as its body.
     public static func note(for item: Capture.SharedItem, timeZone: TimeZone = .current) -> (name: String, text: String) {
@@ -59,6 +58,7 @@ public enum SharedInbox {
         return ("Shared \(formatter.string(from: item.date)).md", item.markdown.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
     }
 
+    /// The block appended to the Inbox note for one item.
     public static func entry(for item: Capture.SharedItem, timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

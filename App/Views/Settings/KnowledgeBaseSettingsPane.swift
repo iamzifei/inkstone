@@ -73,24 +73,50 @@ private struct RulesEditor: View {
     let layout: KnowledgeBaseLayout
     @State private var text = ""
     @State private var saved = ""
+    @State private var readable = true
     @State private var problem: String?
+    /// What is on disk now, when it changed since the editor read it.
+    @State private var onDisk: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !readable {
+                Text("The rules file can't be read right now (it may still be downloading). Try again in a moment.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             TextEditor(text: $text)
                 .font(.system(.callout, design: .monospaced))
                 .frame(minHeight: 220)
+                .disabled(!readable)
+            if let onDisk {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("The rules changed on disk (another device or app) since you opened them.")
+                        .font(.callout.weight(.medium))
+                    HStack {
+                        Button("Use the Version on Disk") { text = onDisk; saved = onDisk; self.onDisk = nil }
+                        Button("Keep Mine and Save") {
+                            do {
+                                try RulesFile.save(text, expected: onDisk, root: root, layout: layout)
+                                saved = text; self.onDisk = nil
+                            } catch { problem = error.localizedDescription }
+                        }
+                    }
+                }
+            }
             HStack {
                 Button("Restore Default Policy") {
                     text = RulesFile.restoringDefaultPolicy(text, language: layout.language)
                 }
+                .disabled(!readable)
                 Spacer()
                 if text != saved {
                     Button("Revert") { text = saved }
                     Button("Save") {
                         do {
-                            try RulesFile.save(text, root: root, layout: layout)
+                            try RulesFile.save(text, expected: saved, root: root, layout: layout)
                             saved = text
+                        } catch RulesFile.SaveError.changedOnDisk(let current) {
+                            onDisk = current
                         } catch {
                             problem = error.localizedDescription
                         }
@@ -100,9 +126,16 @@ private struct RulesEditor: View {
             }
             if let problem { Text(problem).font(.caption).foregroundStyle(.red) }
         }
-        .task(id: root) {
-            let current = RulesFile.read(root: root, layout: layout)
-            text = current; saved = current
+        .task(id: root) { reload() }
+        // Picks up an edit made elsewhere, unless there are unsaved changes.
+        .onAppear { if text == saved { reload() } }
+    }
+
+    private func reload() {
+        if let current = RulesFile.read(root: root, layout: layout) {
+            text = current; saved = current; readable = true
+        } else {
+            readable = false
         }
     }
 }

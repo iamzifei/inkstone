@@ -1824,7 +1824,12 @@ final class Workspace {
         SharedInbox.appHasVault = true
         // In a knowledge base, each share is a note of its own in the inbox
         // folder, filed by the organizer like anything dropped in.
-        if let layout = KnowledgeBaseController.knowledgeBaseLayout(at: root) {
+        // (The rules file may be an iCloud placeholder not downloaded yet:
+        // the skeleton is enough to know it is a knowledge base here.)
+        if let layout = KnowledgeBaseController.knowledgeBaseLayout(at: root)
+            ?? KnowledgeBaseLayout.detect(in: root).flatMap({ l in
+                FileManager.default.fileExists(atPath: root.appending(path: (l.rulesFile as NSString).deletingLastPathComponent)
+                    .appending(path: "." + (l.rulesFile as NSString).lastPathComponent + ".icloud").path(percentEncoded: false)) ? l : nil }) {
             let folder = root.appending(path: layout.inbox, directoryHint: .isDirectory)
             var delivered = false
             SharedInbox.drain { item in
@@ -1835,7 +1840,7 @@ final class Workspace {
                 while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
                     url = folder.appending(path: (note.name as NSString).deletingPathExtension + " \(n).md"); n += 1
                 }
-                guard (try? Data(note.text.utf8).write(to: url, options: .withoutOverwriting)) != nil else { return false }
+                guard (try? Data(note.text.utf8).write(to: url, options: .atomic)) != nil else { return false }
                 delivered = true
                 return true
             }

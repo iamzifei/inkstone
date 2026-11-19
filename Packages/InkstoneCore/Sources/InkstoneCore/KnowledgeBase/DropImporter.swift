@@ -26,29 +26,53 @@ public enum DropImporter {
         try? fm.createDirectory(at: inbox, withIntermediateDirectories: true)
         let canonicalRoot = CanonicalPath.of(root)
         return urls.map { source in
-            // Something already in the vault: nothing to bring in.
             let real = CanonicalPath.of(source)
+            // Something already in the vault: nothing to bring in.
             if real == canonicalRoot || real.hasPrefix(canonicalRoot + "/") {
                 return Result(source: source, destination: nil, originalKept: true, error: "already in the knowledge base")
             }
-            let target = unique(inbox.appending(path: source.lastPathComponent))
+            // A folder the vault is inside (Documents, a whole drive): it
+            // would be copied into itself.
+            if canonicalRoot.hasPrefix(real + "/") {
+                return Result(source: source, destination: nil, originalKept: true, error: "contains the knowledge base")
+            }
+            // An iCloud placeholder (a file not downloaded): the bytes are not
+            // here, and moving it would remove the file from iCloud.
+            if source.lastPathComponent.hasPrefix("."), source.pathExtension == "icloud" {
+                return Result(source: source, destination: nil, originalKept: true, error: "not downloaded from iCloud yet")
+            }
+            // Copied under a hidden temporary name first (the organizer
+            // skips hidden files, and a crash's leftovers are swept), checked,
+            // then given its name — so a half-copied file is never in the
+            // inbox, and only our own temporary file is ever removed.
+            let temp = inbox.appending(path: ".\(source.lastPathComponent)\(Metadata.tempMarker)\(UUID().uuidString.prefix(8))")
             do {
-                try fm.copyItem(at: source, to: target)
-                guard identical(source, target) else {
-                    try? fm.removeItem(at: target)
-                    return Result(source: source, destination: nil, originalKept: true, error: "the copy did not match")
-                }
-                let rel = "\(layout.inbox)/\(target.lastPathComponent)"
-                guard action == .move else { return Result(source: source, destination: rel, originalKept: true, error: nil) }
-                do {
-                    try fm.removeItem(at: source)
-                    return Result(source: source, destination: rel, originalKept: false, error: nil)
-                } catch {
-                    return Result(source: source, destination: rel, originalKept: true, error: error.localizedDescription)
-                }
+                try fm.copyItem(at: source, to: temp)
             } catch {
-                try? fm.removeItem(at: target)
+                try? fm.removeItem(at: temp)
                 return Result(source: source, destination: nil, originalKept: true, error: error.localizedDescription)
+            }
+            guard identical(source, temp) else {
+                try? fm.removeItem(at: temp)
+                return Result(source: source, destination: nil, originalKept: true, error: "the copy did not match")
+            }
+            var target = unique(inbox.appending(path: source.lastPathComponent))
+            var placed = false
+            for _ in 0..<5 where !placed {
+                // moveItem refuses to overwrite: a name taken meanwhile → the next one.
+                if (try? fm.moveItem(at: temp, to: target)) != nil { placed = true } else { target = unique(target) }
+            }
+            guard placed else {
+                try? fm.removeItem(at: temp)
+                return Result(source: source, destination: nil, originalKept: true, error: "could not name the copy")
+            }
+            let rel = "\(layout.inbox)/\(target.lastPathComponent)"
+            guard action == .move else { return Result(source: source, destination: rel, originalKept: true, error: nil) }
+            do {
+                try fm.removeItem(at: source)
+                return Result(source: source, destination: rel, originalKept: false, error: nil)
+            } catch {
+                return Result(source: source, destination: rel, originalKept: true, error: error.localizedDescription)
             }
         }
     }
@@ -65,29 +89,34 @@ public enum DropImporter {
         }
     }
 
-    /// Same files, same sizes, same contents — a file, or a folder compared
-    /// file by file (hidden files included: a moved folder keeps them).
+    /// Same files, same contents, same symbolic links (to the same place)
+    /// and the same folders, empty ones included — a file, or a folder
+    /// compared entry by entry (hidden ones too: a moved folder keeps them).
     static func identical(_ a: URL, _ b: URL) -> Bool {
         let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: a.path(percentEncoded: false), isDirectory: &isDir) else { return false }
-        if !isDir.boolValue { return Fingerprint.sha256(a) != nil && Fingerprint.sha256(a) == Fingerprint.sha256(b) }
-        func files(_ root: URL) -> [String: Int64] {
-            var out: [String: Int64] = [:]
+        func entries(_ root: URL) -> [String: String]? {
+            let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
+            func describe(_ url: URL) -> String? {
+                guard let v = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+                if v.isSymbolicLink == true {
+                    return "link:" + ((try? fm.destinationOfSymbolicLink(atPath: url.path(percentEncoded: false))) ?? "?")
+                }
+                if v.isDirectory == true { return "dir" }
+                if v.isRegularFile == true { return "file:\(v.fileSize ?? -1):" + (Fingerprint.sha256(url) ?? "?") }
+                return "other"
+            }
+            guard let top = describe(root) else { return nil }
+            var out: [String: String] = ["": top]
+            guard top == "dir" else { return out }
             let base = CanonicalPath.of(root)
-            guard let e = fm.enumerator(at: URL(fileURLWithPath: base, isDirectory: true), includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]) else { return out }
+            guard let e = fm.enumerator(at: URL(fileURLWithPath: base, isDirectory: true), includingPropertiesForKeys: keys) else { return nil }
             for case let url as URL in e {
-                guard let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]), v.isRegularFile == true else { continue }
-                out[String(url.path(percentEncoded: false).dropFirst(base.count))] = Int64(v.fileSize ?? -1)
+                guard let d = describe(url) else { return nil }
+                out[String(url.path(percentEncoded: false).dropFirst(base.count))] = d
             }
             return out
         }
-        let fa = files(a), fb = files(b)
-        guard fa == fb else { return false }
-        for rel in fa.keys {
-            let x = a.appending(path: rel), y = b.appending(path: rel)
-            guard Fingerprint.sha256(x) == Fingerprint.sha256(y) else { return false }
-        }
-        return true
+        guard let ea = entries(a), let eb = entries(b) else { return false }
+        return ea == eb
     }
 }

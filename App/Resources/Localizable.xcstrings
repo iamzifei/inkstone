@@ -5698,6 +5698,29 @@
         }
       }
     },
+    "Keep Mine and Save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Mine and Save"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留我的并保存"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留我的並儲存"
+          }
+        }
+      }
+    },
     "Keep a vault in iCloud Drive to sync it across your devices, or turn on GitHub sync in Settings (⌘,) › Sync. This guide is always under Help › Show Welcome Guide.": {
       "extractionState": "manual",
       "localizations": {
@@ -12418,6 +12441,52 @@
         }
       }
     },
+    "The rules changed on disk (another device or app) since you opened them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rules changed on disk (another device or app) since you opened them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你打开之后，规则文件被别处（其他设备或应用）改过了。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你開啟之後，規則檔案被別處（其他裝置或應用程式）改過了。"
+          }
+        }
+      }
+    },
+    "The rules file can't be read right now (it may still be downloading). Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rules file can't be read right now (it may still be downloading). Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂时读不到整理规则文件（可能还在下载），请稍后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暫時讀不到整理規則檔案（可能還在下載），請稍後再試。"
+          }
+        }
+      }
+    },
     "The skills folder could not be found. Choose it again in Settings.": {
       "extractionState": "manual",
       "localizations": {
@@ -13537,6 +13606,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "盡可能使用最短路徑"
+          }
+        }
+      }
+    },
+    "Use the Version on Disk": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the Version on Disk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用磁盘上的版本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用磁碟上的版本"
           }
         }
       }

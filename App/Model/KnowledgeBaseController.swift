@@ -55,6 +55,7 @@ final class KnowledgeBaseController {
         debounce?.cancel()
         root = nil; layout = nil; pendingPlan = nil; lastResult = nil; failure = nil
         lastSeenInbox = nil; isOrganizing = false; isShowingReadyCard = false
+        pendingDrop = nil; isPickingFiles = false
     }
 
     /// The layout, only for a folder with its rules file (made or adopted by
@@ -77,8 +78,12 @@ final class KnowledgeBaseController {
     var isPickingFiles = false
 
     /// Something dropped on the window or picked with "Add Files…".
-    func receive(_ urls: [URL]) {
-        guard isKnowledgeBase, !urls.isEmpty else { return }
+    func receive(_ dropped: [URL]) {
+        guard isKnowledgeBase, let root else { return }
+        // Something dragged from inside the vault is not "brought in".
+        let base = root.standardizedFileURL.path(percentEncoded: false)
+        let urls = dropped.filter { !$0.standardizedFileURL.path(percentEncoded: false).hasPrefix(base.hasSuffix("/") ? base : base + "/") }
+        guard !urls.isEmpty else { return }
         switch settings.data.knowledgeBase.dropAction {
         case .ask: pendingDrop = urls
         case .copy: bringIn(urls, action: .copy)

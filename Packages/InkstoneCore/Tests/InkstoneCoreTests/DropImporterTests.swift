@@ -73,4 +73,47 @@ struct DropImporterTests {
         #expect(r.first?.originalKept == true)
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
+
+    // Review of #28.
+    @Test func aFolderThatContainsTheVaultIsRefused() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let parent = kb.deletingLastPathComponent()
+        let r = DropImporter.importItems([parent], into: kb, layout: layout, action: .move)
+        #expect(r.first?.destination == nil)
+        #expect(FileManager.default.fileExists(atPath: kb.appending(path: "AGENTS.md").path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path).isEmpty)
+    }
+
+    @Test func symlinksAndEmptyFoldersComeAlongAndAreChecked() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let folder = outside.appending(path: "Proj")
+        try FileManager.default.createDirectory(at: folder.appending(path: "empty"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: folder.appending(path: "a.txt"))
+        try FileManager.default.createSymbolicLink(atPath: folder.appending(path: "link").path, withDestinationPath: "a.txt")
+        let r = DropImporter.importItems([folder], into: kb, layout: layout, action: .copy)
+        #expect(r.first?.destination == "00-收件箱/Proj")
+        let copied = kb.appending(path: "00-收件箱/Proj")
+        #expect(FileManager.default.fileExists(atPath: copied.appending(path: "empty").path))
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: copied.appending(path: "link").path) == "a.txt")
+        #expect(DropImporter.identical(folder, copied))
+        try Data("y".utf8).write(to: copied.appending(path: "a.txt"))
+        #expect(!DropImporter.identical(folder, copied))
+    }
+
+    @Test func anICloudPlaceholderIsNeverMoved() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let placeholder = outside.appending(path: ".report.pdf.icloud"); try Data("stub".utf8).write(to: placeholder)
+        let r = DropImporter.importItems([placeholder], into: kb, layout: layout, action: .move)
+        #expect(r.first?.destination == nil)
+        #expect(FileManager.default.fileExists(atPath: placeholder.path))
+    }
+
+    @Test func noTemporaryCopyIsLeftBehind() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        let file = outside.appending(path: "a.md"); try Data("x".utf8).write(to: file)
+        _ = DropImporter.importItems([file], into: kb, layout: layout, action: .copy)
+        let names = try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path)
+        #expect(names == ["a.md"])
+    }
 }
+

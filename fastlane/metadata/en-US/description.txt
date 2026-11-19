@@ -1,4 +1,4 @@
-Inkstone turns a folder into an AI knowledge base: drop anything in, and it is filed for you — by rules you can read and change, with an AI that runs on your device.
+Inkstone turns a folder into an AI knowledge base: drop anything in, and it is filed for you — by rules you can read and change, with an AI that runs on your device (on supported devices).
 
 CREATE ONE IN THREE STEPS
 Give it a name and a place — iCloud Drive, any folder, or a folder you already have. Inkstone lays out the folders (inbox, projects, areas, resources, media, outputs, private), writes the organizing rules, and opens it. A folder you already have keeps every file where it is.
