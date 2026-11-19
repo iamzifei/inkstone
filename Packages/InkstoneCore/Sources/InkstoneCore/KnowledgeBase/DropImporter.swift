@@ -97,7 +97,7 @@ public enum DropImporter {
         Metadata.purgeOldBackups(root: root, now: .now)
     }
 
-    static func unique(_ url: URL) -> URL {
+    public static func unique(_ url: URL) -> URL {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path(percentEncoded: false)) else { return url }
         let ext = url.pathExtension, stem = url.deletingPathExtension().lastPathComponent

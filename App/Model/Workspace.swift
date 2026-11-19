@@ -1832,16 +1832,26 @@ final class Workspace {
                     .appending(path: "." + (l.rulesFile as NSString).lastPathComponent + ".icloud").path(percentEncoded: false)) ? l : nil }) {
             let folder = root.appending(path: layout.inbox, directoryHint: .isDirectory)
             var delivered = false
-            SharedInbox.drain { item in
-                let note = SharedInbox.note(for: item)
+            SharedInbox.drain { delivery in
+                let item = delivery.item
                 try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                var url = folder.appending(path: note.name)
-                var n = 2
-                while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
-                    url = folder.appending(path: (note.name as NSString).deletingPathExtension + " \(n).md"); n += 1
+                // Shared files go in like dropped ones: copied, checked, then
+                // named — the organizer files them. Each is recorded as it
+                // goes in, so a retry never brings one in twice.
+                for file in delivery.pendingFiles {
+                    guard let place = DropImporter.importItems([file], into: root, layout: layout, action: .copy).first?.destination
+                    else { return false }
+                    delivery.markDelivered(file, as: place)
+                    delivered = true
                 }
-                guard (try? Data(note.text.utf8).write(to: url, options: .atomic)) != nil else { return false }
-                delivered = true
+                // The text or link, if there was one, as a note of its own.
+                if !delivery.noteDone, !item.markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let note = SharedInbox.note(for: item)
+                    let url = DropImporter.unique(folder.appending(path: note.name))
+                    guard (try? Data(note.text.utf8).write(to: url, options: .withoutOverwriting)) != nil else { return false }
+                    delivery.markNoteDone()
+                    delivered = true
+                }
                 return true
             }
             if delivered { knowledgeBase.inboxMayHaveChanged(delay: .milliseconds(500)) }
@@ -1856,12 +1866,33 @@ final class Workspace {
             return
         }
         var delivered = false
-        SharedInbox.drain { item in
+        SharedInbox.drain { delivery in
+            let item = delivery.item
             if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)) {
                 guard (try? store.write("# Inbox\n", to: inbox)) != nil else { return false }
             }
-            let entry = SharedInbox.entry(for: item)
+            // Shared files go to the attachments folder (the vault's own
+            // setting and fallback), each recorded as it goes in.
+            let target = attachmentDestination(for: root)
+            for file in delivery.pendingFiles {
+                let dest = DropImporter.unique(target.appending(path: file.lastPathComponent))
+                guard (try? FileManager.default.copyItem(at: file, to: dest)) != nil else { return false }
+                delivery.markDelivered(file, as: String(dest.path(percentEncoded: false).dropFirst(root.path(percentEncoded: false).count))
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+            }
+            if delivery.noteDone { return true }
+            // Embedded the way this vault writes links.
+            let embeds = delivery.deliveredPlaces.map { embedMarkup(for: root.appending(path: $0), from: inbox) }
+            var entry = SharedInbox.entry(for: item)
+            if !embeds.isEmpty { entry += "\n" + embeds.joined(separator: "\n") + "\n" }
             let core = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            // On disk already (an earlier try wrote it but couldn't confirm):
+            // done, not written twice.
+            if let onDisk = try? store.read(inbox), onDisk.contains(core) {
+                delivery.markNoteDone()
+                delivered = true
+                return true
+            }
             // Already in the open note from an earlier try whose save failed:
             // don't add it a second time, just get it onto disk.
             if let document = documents[inbox], document.text.contains(core) {
@@ -1872,6 +1903,7 @@ final class Workspace {
             // Delivered only once it is on disk: an open Inbox note saves
             // through its editor document, whose save can fail quietly.
             guard let written = try? store.read(inbox), written.contains(core) else { return false }
+            delivery.markNoteDone()
             delivered = true
             return true
         }

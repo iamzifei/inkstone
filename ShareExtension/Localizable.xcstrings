@@ -1,6 +1,64 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%lld files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個檔案"
+          }
+        }
+      }
+    },
+    "Added to your knowledge base's inbox and filed the next time Inkstone opens (in another vault: its attachments folder).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to your knowledge base's inbox and filed the next time Inkstone opens (in another vault: its attachments folder)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次打开 Inkstone 时放进知识库的收件箱并自动整理（其他仓库：放进附件文件夹）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次開啟 Inkstone 時放進知識庫的收件匣並自動整理（其他資料庫：放進附件資料夾）。"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "en": {
@@ -19,6 +77,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消"
+          }
+        }
+      }
+    },
+    "Couldn't be read": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't be read"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没能读取"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法讀取"
           }
         }
       }
@@ -67,24 +148,25 @@
         }
       }
     },
-    "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note.": {
+    "Open Inkstone and choose a vault: what you share waits here until then.": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note."
+            "value": "Open Inkstone and choose a vault: what you share waits here until then."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开 Inkstone 并选择一个仓库：在那之前，你分享的内容会先在这里等着，之后放进仓库的 Inbox 笔记。"
+            "value": "请先打开 Inkstone 选择一个仓库：在那之前，分享的内容会先在这里等着。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "打開 Inkstone 並選擇一個儲存庫：在那之前，你分享的內容會先在這裡等著，之後放進儲存庫的 Inbox 筆記。"
+            "value": "請先開啟 Inkstone 選擇一個資料庫：在那之前，分享的內容會先在這裡等著。"
           }
         }
       }
@@ -111,24 +193,48 @@
         }
       }
     },
-    "Saved to the Inbox note of your vault the next time Inkstone opens.": {
+    "Saved the next time Inkstone opens: in a knowledge base, as a note in its inbox; otherwise in the vault's Inbox note.": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saved to the Inbox note of your vault the next time Inkstone opens."
+            "value": "Saved the next time Inkstone opens: in a knowledge base, as a note in its inbox; otherwise in the vault's Inbox note."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下次打开 Inkstone 时，会保存到库中的 Inbox 笔记。"
+            "value": "下次打开 Inkstone 时保存：在知识库里，作为一篇笔记放进收件箱；在其他仓库里，写进 Inbox 笔记。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "下次打開 Inkstone 時，會儲存到庫中的 Inbox 筆記。"
+            "value": "下次開啟 Inkstone 時儲存：在知識庫裡，作為一篇筆記放進收件匣；在其他資料庫裡，寫進 Inbox 筆記。"
+          }
+        }
+      }
+    },
+    "These weren't added. If they are in iCloud, download them first, then share again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These weren't added. If they are in iCloud, download them first, then share again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些没有添加。如果它们在 iCloud 里，请先下载，再重新分享。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這些沒有加入。如果它們在 iCloud 裡，請先下載，再重新分享。"
           }
         }
       }

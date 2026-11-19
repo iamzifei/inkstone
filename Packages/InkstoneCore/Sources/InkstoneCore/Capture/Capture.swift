@@ -10,6 +10,10 @@ public enum Capture {
         public var url: URL?
         public var title: String?
         public var date: Date
+        /// Files shared along with it (names in the item's own folder in the
+        /// app group, see `SharedInbox`). Optional so items written by an
+        /// earlier version, which had none, still decode.
+        public var files: [String]?
 
         public init(text: String?, url: URL?, title: String?, date: Date = Date(timeIntervalSince1970: 0)) {
             self.text = text; self.url = url; self.title = title; self.date = date
