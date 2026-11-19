@@ -185,7 +185,7 @@ final class VaultIndex {
 /// undo replays. Each step is written before it is taken. Actions are in
 /// English so the log parses the same in every language.
 struct OrganizeLog {
-    enum Action: String { case begin, end, move, mkdir, rmdir, meta, undo }
+    enum Action: String { case begin, end, move, mkdir, rmdir, meta, metaRestored = "meta-restored", undo }
     struct Entry { var batch: String; var action: Action; var from: String; var to: String; var reason: String }
 
     let root: URL
@@ -209,7 +209,14 @@ struct OrganizeLog {
             case "\r": out += "\\r"
             case "\r\n": out += "\\r\\n"
             case "\t": out += "\\t"
-            default: out.append(ch)
+            default:
+                // Any other line separator (U+2028, U+0085, VT, FF …) as its
+                // code, so a row never breaks across lines.
+                if ch.isNewline {
+                    out += ch.unicodeScalars.map { "\\u{\(String($0.value, radix: 16))}" }.joined()
+                } else {
+                    out.append(ch)
+                }
             }
         }
         return out
@@ -219,15 +226,24 @@ struct OrganizeLog {
     /// each side of a cell is padding; anything else is the cell's own.
     static func cells(_ line: String) -> [String] {
         var raw: [String] = [], cell = "", escaped = false
+        var pendingCode: String?
         for ch in line {
             if escaped {
                 switch ch {
                 case "n": cell.append("\n")
                 case "r": cell.append("\r")
                 case "t": cell.append("\t")
+                case "u": pendingCode = ""
                 default: cell.append(ch)
                 }
                 escaped = false
+            } else if var code = pendingCode {
+                // Inside \u{…}
+                if ch == "{" { continue }
+                if ch == "}" {
+                    if let v = UInt32(code, radix: 16), let scalar = Unicode.Scalar(v) { cell.unicodeScalars.append(scalar) }
+                    pendingCode = nil
+                } else { code.append(ch); pendingCode = code }
             } else if ch == "\\" { escaped = true }
             else if ch == "|" { raw.append(cell); cell = "" }
             else { cell.append(ch) }
@@ -361,8 +377,18 @@ enum Metadata {
     /// either the old file or the new one, never a half-written one.
     static func overwriteInPlace(_ url: URL, with data: Data) throws {
         let fm = FileManager.default
-        let temp = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).inkstone-\(UUID().uuidString.prefix(8))")
-        try data.write(to: temp)
+        let temp = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent)\(tempMarker)\(UUID().uuidString.prefix(8))")
+        // On disk before the swap, so a power cut cannot swap in an empty file.
+        guard fm.createFile(atPath: temp.path(percentEncoded: false), contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+        do {
+            let handle = try FileHandle(forWritingTo: temp)
+            defer { try? handle.close() }
+            try handle.write(contentsOf: data)
+            try handle.synchronize()
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw error
+        }
         do {
             _ = try fm.replaceItemAt(url, withItemAt: temp)
         } catch {
@@ -374,8 +400,20 @@ enum Metadata {
     /// Backups of rounds older than 30 days (they may hold private notes):
     /// undo of those rounds still moves files back, without re-writing
     /// their properties.
+    /// In the name of a rewrite's temporary file: one left by a crash is
+    /// removed by `purgeOldBackups` (it is a full copy of a note).
+    static let tempMarker = ".inkstone-tmp-"
+
     static func purgeOldBackups(root: URL, now: Date) {
         let fm = FileManager.default
+        // Temporary copies left behind by a crash mid-rewrite.
+        if let e = fm.enumerator(at: root, includingPropertiesForKeys: nil, options: [.skipsPackageDescendants]) {
+            for case let url as URL in e {
+                let name = url.lastPathComponent
+                if name == ".git" || name == "node_modules" { e.skipDescendants(); continue }
+                if name.hasPrefix("."), name.contains(tempMarker) { try? fm.removeItem(at: url) }
+            }
+        }
         let folder = root.appending(path: ".inkstone/undo", directoryHint: .isDirectory)
         guard let batches = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
         for b in batches {

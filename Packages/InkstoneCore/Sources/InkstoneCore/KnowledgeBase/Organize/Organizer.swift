@@ -474,11 +474,13 @@ public struct Organizer: Sendable {
         guard !entries.contains(where: { $0.action == .undo }) else { throw OrganizeError.alreadyUndone }
         var restored = 0
         var skipped: [String] = []
+        let restoredBackups = Set(entries.filter { $0.action == .metaRestored }.map(\.from))
         for entry in entries.reversed() {
             switch entry.action {
             case .meta:
                 // `from` is the backup, `to` the note, `reason` the hash of
                 // what was written: restored only if the note is still that.
+                if restoredBackups.contains(entry.from) { continue }
                 // A backup is only ever this round's own.
                 guard entry.from.hasPrefix(".inkstone/undo/\(batch)/"), !entry.from.contains(".."),
                       let backup = resolveInside(entry.from), let target = resolveInside(entry.to) else {
@@ -491,6 +493,9 @@ public struct Organizer: Sendable {
                 guard Fingerprint.sha256(target) == entry.reason else { skipped.append("\(entry.to): edited since"); continue }
                 do {
                     try Metadata.overwriteInPlace(target, with: try Data(contentsOf: backup))
+                    // Recorded, so a retry of a partly undone round knows
+                    // this one is done (its backup is gone after this).
+                    try? log.append(batch: batch, action: .metaRestored, from: entry.from, to: entry.to, reason: "", now: now())
                     try? fm.removeItem(at: backup)
                 } catch { skipped.append(entry.to) }
             case .move:
@@ -516,7 +521,7 @@ public struct Organizer: Sendable {
                 }
             case .rmdir:
                 if let folder = resolveInside(entry.from) { try? fm.createDirectory(at: folder, withIntermediateDirectories: true) }
-            case .begin, .end, .undo:
+            case .begin, .end, .undo, .metaRestored:
                 break
             }
         }

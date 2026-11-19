@@ -629,5 +629,40 @@ struct OrganizerTests {
         #expect(try String(contentsOf: filed, encoding: .utf8).contains("来源:"))
         #expect((try filed.resourceValues(forKeys: [.tagNamesKey])).tagNames == ["Red"])
     }
+
+    // MARK: third review
+
+    @Test func unusualLineSeparatorsInNamesRoundTrip() {
+        for name in ["a\u{2028}b.png", "c\u{0085}d.png", "e\u{000B}f\u{000C}g.png", "plain.png"] {
+            let row = "| t | b | move | \(OrganizeLog.escape(name)) | x | r |"
+            let breaks = row.contains { $0.isNewline }
+            #expect(!breaks, "\(name)")
+            #expect(OrganizeLog.cells(row)[3] == name, "\(name)")
+        }
+    }
+
+    @Test func retryingAfterAPartialUndoDoesNotMisreport() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "10-项目/花园"), withIntermediateDirectories: true)
+        try put(root, "\(layout.inbox)/花园.md", Data("Roses.\n".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        try put(root, "\(layout.inbox)/花园.md", Data("in the way".utf8))
+        let first = try organizer.undo(batch: result.batch)
+        #expect(first.skipped.count == 1)                       // the move: its place is taken
+        try FileManager.default.removeItem(at: root.appending(path: "\(layout.inbox)/花园.md"))
+        let second = try organizer.undo(batch: result.batch)
+        #expect(second.skipped.isEmpty)
+        #expect(try String(contentsOf: root.appending(path: "\(layout.inbox)/花园.md"), encoding: .utf8) == "Roses.\n")
+    }
+
+    @Test func aTemporaryCopyLeftByACrashIsCleanedUp() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "30-资料/.note.md\(Metadata.tempMarker)abcd1234", Data("private copy".utf8))
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 80))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        _ = try organizer.execute(try await organizer.plan())
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "30-资料/.note.md\(Metadata.tempMarker)abcd1234").path))
+    }
 }
 
