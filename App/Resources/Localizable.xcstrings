@@ -13633,25 +13633,25 @@
         }
       }
     },
-    "Use the Version on Disk": {
+    "Use the Version on Disk (Discard My Changes)": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the Version on Disk"
+            "value": "Use the Version on Disk (Discard My Changes)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用磁盘上的版本"
+            "value": "用磁盘上的版本（放弃我的修改）"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用磁碟上的版本"
+            "value": "用磁碟上的版本（放棄我的修改）"
           }
         }
       }

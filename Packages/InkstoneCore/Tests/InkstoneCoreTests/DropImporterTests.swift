@@ -137,5 +137,21 @@ struct DropImporterTests {
         #expect(!FileManager.default.fileExists(atPath: old.path))
         _ = layout
     }
+
+    @Test func aCopyWithAnOldDateButAFreshNameIsNotSwept() throws {
+        let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
+        // Just made (the time is in its name), though copying kept the
+        // original's two-year-old date.
+        let temp = kb.appending(path: "\(layout.inbox)/" + Metadata.temporaryName(for: "old video.mov"))
+        try Data("x".utf8).write(to: temp)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -2 * 365 * 86_400)], ofItemAtPath: temp.path)
+        DropImporter.sweepLeftovers(root: kb)
+        #expect(FileManager.default.fileExists(atPath: temp.path))
+        // Made two hours ago: swept.
+        let stale = kb.appending(path: "\(layout.inbox)/" + Metadata.temporaryName(for: "x.mov", now: Date(timeIntervalSinceNow: -7200)))
+        try Data("y".utf8).write(to: stale)
+        DropImporter.sweepLeftovers(root: kb)
+        #expect(!FileManager.default.fileExists(atPath: stale.path))
+    }
 }
 

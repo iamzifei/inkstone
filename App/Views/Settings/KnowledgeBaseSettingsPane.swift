@@ -96,7 +96,7 @@ private struct RulesEditor: View {
                     Text("The rules changed on disk (another device or app) since you opened them.")
                         .font(.callout.weight(.medium))
                     HStack {
-                        Button("Use the Version on Disk") { text = onDisk; saved = onDisk; self.onDisk = nil }
+                        Button("Use the Version on Disk (Discard My Changes)") { text = onDisk; saved = onDisk; self.onDisk = nil }
                         Button("Keep Mine and Save") {
                             do {
                                 try RulesFile.save(text, expected: onDisk, root: root, layout: layout)

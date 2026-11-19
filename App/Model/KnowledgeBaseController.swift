@@ -88,7 +88,10 @@ final class KnowledgeBaseController {
         let urls = dropped.filter { !$0.standardizedFileURL.path(percentEncoded: false).hasPrefix(base.hasSuffix("/") ? base : base + "/") }
         guard !urls.isEmpty else { return }
         switch settings.data.knowledgeBase.dropAction {
-        case .ask: pendingDrop = (pendingDrop ?? []) + urls      // a second drop joins the first
+        case .ask:
+            // A second drop joins the first (each item once).
+            let pending = pendingDrop ?? []
+            pendingDrop = pending + urls.filter { url in !pending.contains { $0.standardizedFileURL == url.standardizedFileURL } }
         case .copy: bringIn(urls, action: .copy)
         case .move: bringIn(urls, action: .move)
         }

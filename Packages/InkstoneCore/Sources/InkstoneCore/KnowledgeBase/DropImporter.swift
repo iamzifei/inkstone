@@ -48,11 +48,7 @@ public enum DropImporter {
             // skips hidden files, and a crash's leftovers are swept), checked,
             // then given its name — so a half-copied file is never in the
             // inbox, and only our own temporary file is ever removed.
-            // The name in the temporary name kept short: a name near the
-            // 255-byte limit must still fit with the marker added.
-            var short = source.lastPathComponent
-            while short.utf8.count > 150 { short.removeLast() }
-            let temp = inbox.appending(path: ".\(short)\(Metadata.tempMarker)\(UUID().uuidString.prefix(8))")
+            let temp = inbox.appending(path: Metadata.temporaryName(for: source.lastPathComponent))
             do {
                 try fm.copyItem(at: source, to: temp)
             } catch {

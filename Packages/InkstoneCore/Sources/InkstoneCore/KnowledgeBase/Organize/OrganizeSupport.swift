@@ -377,7 +377,7 @@ enum Metadata {
     /// either the old file or the new one, never a half-written one.
     static func overwriteInPlace(_ url: URL, with data: Data) throws {
         let fm = FileManager.default
-        let temp = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent)\(tempMarker)\(UUID().uuidString.prefix(8))")
+        let temp = url.deletingLastPathComponent().appending(path: temporaryName(for: url.lastPathComponent))
         // On disk before the swap, so a power cut cannot swap in an empty file.
         guard fm.createFile(atPath: temp.path(percentEncoded: false), contents: nil) else { throw CocoaError(.fileWriteUnknown) }
         do {
@@ -404,6 +404,25 @@ enum Metadata {
     /// removed by `purgeOldBackups` (it is a full copy of a note).
     static let tempMarker = ".inkstone-tmp-"
 
+    /// A temporary name: `.<name>.inkstone-tmp-<seconds since 1970>-<random>`.
+    /// The time it was made is in the name, because a copy keeps the
+    /// original's modification date and would look old at once.
+    static func temporaryName(for name: String, now: Date = .now) -> String {
+        var short = name
+        while short.utf8.count > 150 { short.removeLast() }
+        return ".\(short)\(tempMarker)\(Int(now.timeIntervalSince1970))-\(UUID().uuidString.prefix(6))"
+    }
+
+    /// When a temporary file was made: from its name, else its date.
+    static func madeAt(_ url: URL) -> Date? {
+        let name = url.lastPathComponent
+        if let r = name.range(of: tempMarker),
+           let seconds = name[r.upperBound...].split(separator: "-").first.flatMap({ Double($0) }), seconds > 1_000_000_000 {
+            return Date(timeIntervalSince1970: seconds)
+        }
+        return (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    }
+
     static func purgeOldBackups(root: URL, now: Date) {
         let fm = FileManager.default
         // Temporary copies left behind by a crash mid-rewrite.
@@ -415,8 +434,7 @@ enum Metadata {
                 e.skipDescendants()
                 // Only ones untouched for an hour: a drop still being copied
                 // has a fresh date and is left alone.
-                let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
-                if now.timeIntervalSince(modified) > 3_600 { try? fm.removeItem(at: url) }
+                if now.timeIntervalSince(madeAt(url) ?? now) > 3_600 { try? fm.removeItem(at: url) }
             }
         }
         let folder = root.appending(path: ".inkstone/undo", directoryHint: .isDirectory)
