@@ -204,7 +204,9 @@ enum ObsidianSyntax {
         static let bareURL = make(#"(?<![\p{L}\p{N}/@.:\-])(?:https?://|www\.)[^\s<>\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]+"#)
         static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?![\$\d])"#)
 
-        static let comment = make(#"%%[\s\S]*?%%"#)
+        // Obsidian's %%comments%% and HTML <!-- comments --> (which Obsidian
+    // also hides when reading; Inkstone's own entry-file markers are these).
+    static let comment = make(#"%%[\s\S]*?%%|<!--[\s\S]*?-->"#)
 
         /// `[[target#fragment|alias]]`, optionally prefixed with `!` for embeds.
         static let wikiLink = make(#"!?\[\[([^\[\]\|#]*)(#[^\[\]\|]*)?(\|[^\[\]]*)?\]\]"#)

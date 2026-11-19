@@ -836,11 +836,58 @@ struct InkstoneApp: App {
     /// a loose thought — one of each path the organizer takes.
     private static func seedScratchInbox(_ root: URL, layout: KnowledgeBaseLayout) throws {
         let fm = FileManager.default
-        let inbox = root.appending(path: layout.inbox, directoryHint: .isDirectory)
-        try fm.createDirectory(at: root.appending(path: "\(layout.projects)/装修"), withIntermediateDirectories: true)
-        try Data("# 装修报价\n\n客厅吊顶 12,000，厨房橱柜 18,000。\n".utf8).write(to: inbox.appending(path: "装修报价单.md"))
-        try Data("护照号码与签发日期（示例）。\n".utf8).write(to: inbox.appending(path: "护照扫描.txt"))
-        try Data("今天想到：周末去看看花市。\n".utf8).write(to: inbox.appending(path: "随手记.md"))
+        func put(_ path: String, _ text: String) throws {
+            let url = root.appending(path: path)
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: url)
+        }
+        let L = layout
+        // Already filed: what a knowledge base looks like after a few weeks.
+        let filed: [(String, String)]
+        // Just dropped in: one of each path the organizer takes.
+        let dropped: [(String, String)]
+        let project: String
+        switch L.language {
+        case .simplifiedChinese:
+            project = "装修"
+            filed = [("\(L.projects)/装修/20261102-水电改造方案.md", "# 水电改造方案\n\n厨房新增两路插座。\n"),
+                     ("\(L.projects)/新书稿/20261020-第三章提纲.md", "# 第三章提纲\n"),
+                     ("\(L.areas)/健康/20261015-体检复查.md", "# 体检复查\n"),
+                     ("\(L.areas)/财务/20261101-十月账单.md", "# 十月账单\n"),
+                     ("\(L.resources)/园艺/20261008-玫瑰冬季修剪.md", "# 玫瑰冬季修剪\n"),
+                     ("\(L.resources)/读书笔记/20260930-思考快与慢.md", "# 思考，快与慢\n"),
+                     ("\(L.outputs)/20261110-年度复盘草稿.md", "# 年度复盘草稿\n")]
+            dropped = [("装修报价单.md", "# 装修报价\n\n客厅吊顶 12,000，厨房橱柜 18,000。\n"),
+                       ("护照扫描.txt", "护照号码与签发日期（示例）。\n"),
+                       ("随手记.md", "今天想到：周末去看看花市。\n")]
+        case .traditionalChinese:
+            project = "裝修"
+            filed = [("\(L.projects)/裝修/20261102-水電改造方案.md", "# 水電改造方案\n"),
+                     ("\(L.projects)/新書稿/20261020-第三章大綱.md", "# 第三章大綱\n"),
+                     ("\(L.areas)/健康/20261015-健檢複查.md", "# 健檢複查\n"),
+                     ("\(L.areas)/財務/20261101-十月帳單.md", "# 十月帳單\n"),
+                     ("\(L.resources)/園藝/20261008-玫瑰冬季修剪.md", "# 玫瑰冬季修剪\n"),
+                     ("\(L.resources)/讀書筆記/20260930-快思慢想.md", "# 快思慢想\n"),
+                     ("\(L.outputs)/20261110-年度回顧草稿.md", "# 年度回顧草稿\n")]
+            dropped = [("裝修報價單.md", "# 裝修報價\n\n客廳天花板 12,000，廚房櫥櫃 18,000。\n"),
+                       ("護照掃描.txt", "護照號碼與簽發日期（範例）。\n"),
+                       ("隨手記.md", "今天想到：週末去看看花市。\n")]
+        case .english:
+            project = "Renovation"
+            filed = [("\(L.projects)/Renovation/20261102-Wiring plan.md", "# Wiring plan\n"),
+                     ("\(L.projects)/Book draft/20261020-Chapter 3 outline.md", "# Chapter 3 outline\n"),
+                     ("\(L.areas)/Health/20261015-Check-up results.md", "# Check-up results\n"),
+                     ("\(L.areas)/Money/20261101-October bills.md", "# October bills\n"),
+                     ("\(L.resources)/Gardening/20261008-Winter rose pruning.md", "# Winter rose pruning\n"),
+                     ("\(L.resources)/Reading/20260930-Thinking, Fast and Slow.md", "# Thinking, Fast and Slow\n"),
+                     ("\(L.outputs)/20261110-Year in review draft.md", "# Year in review draft\n")]
+            dropped = [("Renovation quote.md", "# Renovation quote\n\nLiving-room ceiling 12,000; kitchen cabinets 18,000.\n"),
+                       ("passport scan.txt", "Passport number and issue date (sample).\n"),
+                       ("random thought.md", "Thought today: visit the flower market this weekend.\n")]
+        }
+        _ = project
+        for (path, text) in filed { try put(path, text) }
+        for (name, text) in dropped { try put("\(L.inbox)/\(name)", text) }
         let ctx = CGContext(data: nil, width: 120, height: 80, bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.setFillColor(red: 0.85, green: 0.3, blue: 0.25, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
@@ -849,8 +896,10 @@ struct InkstoneApp: App {
         let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil)!
         CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
         CGImageDestinationFinalize(dest)
-        try (data as Data).write(to: inbox.appending(path: "IMG_0001.png"))
-        try (data as Data).write(to: inbox.appending(path: "IMG_0001 副本.png"))
+        let copy = L.language == .english ? "IMG_0001 copy.png" : "IMG_0001 副本.png"
+        try (data as Data).write(to: root.appending(path: "\(L.inbox)/IMG_0001.png"))
+        try (data as Data).write(to: root.appending(path: "\(L.inbox)/\(copy)"))
+        _ = try? EntryFiles.refresh(in: root)
     }
 
     /// Writes a small vault into the app container and registers it. Exercises the

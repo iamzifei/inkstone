@@ -426,7 +426,23 @@ struct DocumentScanner {
             descend(strikethrough)
         }
 
+        /// An HTML block that is only a comment (`<!-- … -->` on lines of its
+        /// own — Inkstone's entry-file markers): hidden when reading.
+        mutating func visitHTMLBlock(_ html: HTMLBlock) {
+            let raw = html.rawHTML.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard raw.hasPrefix("<!--"), raw.hasSuffix("-->"), let range = nsRange(html.range) else { return }
+            tokens.append(SyntaxToken(kind: .comment, range: range))
+            excluded.append(range)
+        }
+
         mutating func visitInlineHTML(_ html: InlineHTML) {
+        // `<!-- like this -->` in a line of prose: a comment, hidden when
+        // reading, like Obsidian's %%comments%%.
+        if html.rawHTML.hasPrefix("<!--"), let range = nsRange(html.range) {
+            tokens.append(SyntaxToken(kind: .comment, range: range))
+            excluded.append(range)
+            return
+        }
         guard let range = nsRange(html.range),
               let (name, isClosing) = DocumentScanner.parseTag(html.rawHTML)
         else { return }
