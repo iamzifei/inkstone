@@ -1,5 +1,8 @@
 #if DEBUG
 import Foundation
+#if os(macOS)
+import AppKit
+#endif
 import CoreGraphics
 import CoreSpotlight
 import os
@@ -68,6 +71,23 @@ enum DemoDirector {
             } else {
                 workspace.closeCurrentVault()
             }
+            return
+        case _ where line.hasPrefix("window "):
+            // window <width> <height> — the main window's size in points.
+            #if os(macOS)
+            let n = line.split(separator: " ").dropFirst().compactMap { Double($0) }
+            if n.count == 2, let w = NSApp.windows.first(where: { $0.isVisible && $0.styleMask.contains(.titled) && $0.frame.width > 500 }) {
+                var f = w.frame
+                f.origin.y += f.height - n[1]; f.size = CGSize(width: n[0], height: n[1])
+                w.setFrame(f, display: true)
+            }
+            #endif
+            return
+        case "settings":
+            // SwiftUI's own openSettings, through RootView (DEBUG only): the
+            // old showSettingsWindow: action does nothing on macOS 26 when
+            // the app isn't in front.
+            NotificationCenter.default.post(name: .inkstoneDemoOpenSettings, object: nil)
             return
         case "kb-card-off":
             workspace.knowledgeBase.isShowingReadyCard = false
@@ -197,3 +217,8 @@ private nonisolated func spotlightQuery(_ text: String) {
     query.start()
 }
 #endif
+
+extension Notification.Name {
+    static let inkstoneDemoOpenSettings = Notification.Name("InkstoneDemoOpenSettings")
+}
+

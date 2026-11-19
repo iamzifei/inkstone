@@ -50,8 +50,9 @@ for DEV in "${DEVICES[@]}"; do
   prepare "$DEV"
   if [ "$DEV" = "$PHONE" ]; then D=iphone; else D=ipad; fi
   echo "==> $D ($LANG_CODE)"
-  launch "$DEV"; say kb-card-off 4;            snap "$DEV" "$OUT/$D/k1-plan.png"
-                 say kb-confirm 3;             snap "$DEV" "$OUT/$D/k2-organized.png"
+  # The first round can take a while (the on-device model's first call).
+  launch "$DEV"; say kb-card-off 12;           snap "$DEV" "$OUT/$D/k1-plan.png"
+                 say kb-confirm 4;             snap "$DEV" "$OUT/$D/k2-organized.png"
   launch "$DEV"; say kb-card-off 3; say kb-confirm 3; say "open AGENTS.md" 4; snap "$DEV" "$OUT/$D/k3-agents.png"
   launch "$DEV"; say kb-card-off 2; say kb-drop 3; snap "$DEV" "$OUT/$D/k4-drop.png"
   launch "$DEV" SIMCTL_CHILD_INKSTONE_OPEN_SETTINGS=knowledgeBase; say kb-card-off 3; snap "$DEV" "$OUT/$D/k5-settings.png"

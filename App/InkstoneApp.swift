@@ -737,6 +737,11 @@ struct InkstoneApp: App {
         // each launch, inside the container), for testing creation and
         // organizing end to end without the folder panel — which runs out of
         // process and cannot be driven from a script.
+        // Screenshots: the app's own appearance setting, whatever the
+        // system's (INKSTONE_APPEARANCE=light|dark).
+        if let mode = ProcessInfo.processInfo.environment["INKSTONE_APPEARANCE"].flatMap(AppearanceMode.init(rawValue:)) {
+            workspace.settings.data.appearance = mode
+        }
         if ProcessInfo.processInfo.environment["INKSTONE_SCRATCH_KB"] != nil {
             let parent = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? URL(fileURLWithPath: NSTemporaryDirectory()))

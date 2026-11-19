@@ -39,3 +39,5 @@ fastlane/Preview.html
 fastlane/test_output/
 .asc/metadata/
 assets/footage-iphone18/
+assets/site-shots/
+.build-mac-shots/

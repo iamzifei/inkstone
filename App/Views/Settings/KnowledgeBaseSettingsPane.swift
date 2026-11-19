@@ -12,9 +12,11 @@ struct KnowledgeBaseSettingsPane: View {
         @Bindable var settings = workspace.settings
         let kb = workspace.knowledgeBase
 
+        ScrollViewReader { proxy in
         Form {
             Section {
                 Toggle("Organize the inbox automatically", isOn: $settings.data.knowledgeBase.autoOrganize)
+                    .id("top")
                 Button("Organize Inbox Now") { Task { await kb.organize() } }
                     .disabled(!kb.isKnowledgeBase)
             } header: {
@@ -63,6 +65,10 @@ struct KnowledgeBaseSettingsPane: View {
             }
         }
         .formStyle(.grouped)
+        // Opens at the top: the rules editor below would otherwise take the
+        // focus on macOS and scroll the pane down to itself.
+        .onAppear { DispatchQueue.main.async { proxy.scrollTo("top", anchor: .top) } }
+        }
     }
 }
 
@@ -77,6 +83,8 @@ private struct RulesEditor: View {
     @State private var problem: String?
     /// What is on disk now, when it changed since the editor read it.
     @State private var onDisk: String?
+    /// Not focused on open (it would scroll the pane down to itself).
+    @FocusState private var editing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -91,6 +99,8 @@ private struct RulesEditor: View {
                 .font(.system(.callout, design: .monospaced))
                 .frame(minHeight: 220)
                 .disabled(!readable)
+                .focused($editing)
+                .onAppear { editing = false }
             if let onDisk {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("The rules changed on disk (another device or app) since you opened them.")
