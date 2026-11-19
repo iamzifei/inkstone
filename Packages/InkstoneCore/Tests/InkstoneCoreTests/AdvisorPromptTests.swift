@@ -71,6 +71,10 @@ struct AdvisorPromptTests {
         let answer = await Organizer.ask(Hang(), facts(text: ""), AdvisorContext(layout: layout, folders: [], rules: ""),
                                          timeout: .milliseconds(100))
         #expect(answer == nil)
-        #expect(ContinuousClock.now - start < .seconds(5))
+        // The advisor hangs for an hour; what matters is not waiting for it.
+        // The bound is loose because CI runs this beside hundreds of tests
+        // doing blocking file I/O, which can hold the shared task threads for
+        // tens of seconds (measured: 24 s there, 0.1 s locally).
+        #expect(ContinuousClock.now - start < .seconds(120))
     }
 }
