@@ -659,6 +659,11 @@ struct OrganizerTests {
     @Test func aTemporaryCopyLeftByACrashIsCleanedUp() async throws {
         let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
         try put(root, "30-资料/.note.md\(Metadata.tempMarker)abcd1234", Data("private copy".utf8))
+        // 2026-11-19 (review of #28): only leftovers made over a day ago are
+        // swept (later raised from an hour), so a drop still being copied is never removed. This one is old.
+        // (Relative to the organizer's clock in this test, fixedDate.)
+        try FileManager.default.setAttributes([.modificationDate: fixedDate.addingTimeInterval(-2 * 86_400)],
+                                              ofItemAtPath: root.appending(path: "30-资料/.note.md\(Metadata.tempMarker)abcd1234").path)
         try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 80))
         let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
         _ = try organizer.execute(try await organizer.plan())

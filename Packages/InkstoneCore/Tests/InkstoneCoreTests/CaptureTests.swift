@@ -81,4 +81,13 @@ struct SharedInboxTests {
         let item = Capture.SharedItem(text: "hi", url: nil, title: nil, date: Date(timeIntervalSince1970: 0))
         #expect(SharedInbox.entry(for: item, timeZone: TimeZone(identifier: "UTC")!) == "\n### 1970-01-01 00:00\n\nhi\n")
     }
+
+    @Test func aShareBecomesANoteOfItsOwnForAKnowledgeBase() {
+        var item = Capture.SharedItem(text: "Great read", url: URL(string: "https://example.com/a"), title: "An article")
+        item.date = ISO8601DateFormatter().date(from: "2026-11-19T09:05:07Z")!
+        let note = SharedInbox.note(for: item, timeZone: TimeZone(identifier: "UTC")!)
+        #expect(note.name == "Shared 2026-11-19 090507.md")
+        #expect(note.text == item.markdown.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
+        #expect(note.text.contains("https://example.com/a"))
+    }
 }

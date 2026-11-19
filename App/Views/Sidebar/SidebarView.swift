@@ -104,6 +104,15 @@ private struct VaultSwitcher: View {
                 }
             }
             Divider()
+            if workspace.knowledgeBase.isKnowledgeBase {
+                Button("Add Files…", systemImage: "tray.and.arrow.down") {
+                    workspace.knowledgeBase.isPickingFiles = true
+                }
+                Button("Organize Inbox Now", systemImage: "wand.and.stars") {
+                    Task { await workspace.knowledgeBase.organize() }
+                }
+                Divider()
+            }
             Button("Open Folder as Vault…", systemImage: "folder.badge.plus") {
                 isPickingFolder = true
             }

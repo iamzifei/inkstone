@@ -1,9 +1,8 @@
-What's new in 0.4
+Inkstone is now an AI knowledge base.
 
-• Templates: keep them in a folder (Templates by default) and insert one into the open note, with {{title}}, {{date}} and {{time}} filled in.
-• Export a note as a PDF (A4 pages) or a self-contained HTML file, from the More menu.
-• Command palette: every command, found by typing a few letters. In the More menu, or ⇧⌘P on a keyboard.
-• Notes in system search: titles and text are added to this device's search index, and a result opens the note. Can be turned off in Settings.
-• Shortcuts actions: New Note and Add to Today's Note, for Siri, the Action button and home-screen shortcuts.
-• iPhone Duo: the caret and scroll position stay put when you fold or unfold.
-• Background sync carries on where it stopped when iOS ends a long first sync early.
+• Create one in three steps: a name, a place (iCloud Drive, a folder, or a folder you already have) — the folders, rules and entry files are made for you.
+• Drop anything in — notes, PDFs, photos, recordings. The first time you choose copy or move; copy is the default.
+• It is filed for you: by your own rules, then by the on-device model, named by date and topic, duplicates put aside. Anything unsure waits for you. Nothing is ever deleted, and every round can be undone.
+• AGENTS.md, README.md and SOURCE_OF_TRUTH.md are written and kept up to date, so any AI assistant knows what is where.
+• Edit the organizing rules in plain words in Settings › Knowledge Base.
+• Share links and text to Inkstone from other apps; in a knowledge base they are filed too.
