@@ -664,5 +664,28 @@ struct OrganizerTests {
         _ = try organizer.execute(try await organizer.plan())
         #expect(!FileManager.default.fileExists(atPath: root.appending(path: "30-资料/.note.md\(Metadata.tempMarker)abcd1234").path))
     }
+
+    // MARK: first real run (2026-11-19)
+
+    @Test func ofTwoIdenticalInboxFilesTheCopyIsPutAside() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let image = png(width: 30, height: 20, seed: 90)
+        try put(root, "\(layout.inbox)/IMG_0001.png", image)
+        try put(root, "\(layout.inbox)/IMG_0001 副本.png", image)
+        let plan = try await Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate }).plan()
+        #expect(plan.moves.first { $0.kind == .duplicate }?.from == "\(layout.inbox)/IMG_0001 副本.png")
+    }
+
+    @Test func anAdvisorCannotFileANoteAmongTheMedia() async throws {
+        struct Media: PlacementAdvisor {
+            func advise(_ facts: FileFacts, context: AdvisorContext) async throws -> PlacementAdvice? {
+                PlacementAdvice(folder: "40-素材", confidence: 0.95, title: "花市计划", tags: [], summary: nil, isPrivate: false, reason: "")
+            }
+        }
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/随手记.md", Data("今天想到：周末去看看花市。\n".utf8))
+        let plan = try await Organizer(root: root, layout: layout, advisor: Media(), now: { self.fixedDate }).plan()
+        #expect(plan.moves.first?.to.hasPrefix(layout.review + "/") == true)
+    }
 }
 

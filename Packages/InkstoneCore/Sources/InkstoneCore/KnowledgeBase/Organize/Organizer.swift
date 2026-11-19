@@ -150,6 +150,9 @@ public struct Organizer: Sendable {
             try Task.checkCancellation()
             facts.append(await FactsExtractor.facts(for: url, ocr: ocr))
         }
+        // Copies come after originals ("IMG_0001.png" before "IMG_0001 副本.png"),
+        // so of two identical files in the inbox the copy is the one put aside.
+        facts.sort { (Self.looksLikeACopy($0.name) ? 1 : 0, $0.url.path) < (Self.looksLikeACopy($1.name) ? 1 : 0, $1.url.path) }
 
         let index = VaultIndex(root: root, layout: layout)
         index.refresh(sizesToHash: Set(facts.filter { !$0.isFolder }.map(\.size)))
@@ -198,7 +201,7 @@ public struct Organizer: Sendable {
 
             var placed = place(f, rules: rules, index: index)
             if placed.kind == .review, let advisor, let advice = try? await advisor.advise(f, context: context),
-               let checked = accept(advice) {
+               let checked = accept(advice, for: f.kind) {
                 placed = checked
             }
 
@@ -268,12 +271,23 @@ public struct Organizer: Sendable {
         }
     }
 
-    func accept(_ advice: PlacementAdvice) -> Placed? {
+    /// Whether a name says it is a copy (`副本`, `copy`, `(1)`, `-2` …).
+    static func looksLikeACopy(_ name: String) -> Bool {
+        name.range(of: #"(副本|拷贝|拷貝|(?i)\bcopy\b|[（(]\s*\d+\s*[)）]|\s\d$)"#, options: .regularExpression) != nil
+    }
+
+    /// An advisor's answer, checked: confident enough, a safe folder, and
+    /// under a folder meant for it — projects, areas, resources, outputs,
+    /// and the media folder only for pictures, video and sound.
+    func accept(_ advice: PlacementAdvice, for kind: FileKind = .other) -> Placed? {
         if advice.isPrivate {
             return Placed(folder: layout.privateFolder, kind: .privateFile, reason: "private: \(advice.reason)",
                           keywords: advice.title)
         }
         guard advice.confidence >= 0.7, let folder = sanitize(advice.folder) else { return nil }
+        var tops = [layout.projects, layout.areas, layout.resources, layout.outputs]
+        if kind.isMedia { tops.append(layout.media) }
+        guard tops.contains(where: { Self.isUnder(folder, $0) }) else { return nil }
         return Placed(folder: folder, kind: .file, reason: advice.reason, keywords: advice.title,
                       tags: advice.tags, summary: advice.summary)
     }
