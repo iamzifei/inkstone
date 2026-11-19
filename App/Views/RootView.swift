@@ -75,8 +75,10 @@ struct RootView: View {
             }
         }
         .animation(.snappy, value: workspace.knowledgeBase.lastResult?.batch)
+        // One sheet at a time: a round waiting for a yes is shown once the
+        // "ready" card is closed (both arrive together after creating).
         .sheet(isPresented: Binding(
-            get: { workspace.knowledgeBase.pendingPlan != nil },
+            get: { workspace.knowledgeBase.pendingPlan != nil && !workspace.knowledgeBase.isShowingReadyCard },
             set: { if !$0, workspace.knowledgeBase.pendingPlan != nil { workspace.knowledgeBase.dismissPlan() } }
         )) {
             if let plan = workspace.knowledgeBase.pendingPlan { ChangePlanSheet(plan: plan) }

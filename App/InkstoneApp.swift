@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import InkstoneCore
 
 @main
@@ -732,6 +733,32 @@ struct InkstoneApp: App {
         // `INKSTONE_SCRATCH_VAULT=1` instead seeds a throwaway vault inside the
         // app's own container — always legal, and enough to exercise the whole
         // post-open UI (sidebar, editor, index) with the shipping entitlements.
+        // A knowledge base made the way the first-run guide makes one (fresh
+        // each launch, inside the container), for testing creation and
+        // organizing end to end without the folder panel — which runs out of
+        // process and cannot be driven from a script.
+        if ProcessInfo.processInfo.environment["INKSTONE_SCRATCH_KB"] != nil {
+            let parent = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSTemporaryDirectory()))
+                .appending(path: "ScratchKnowledgeBase", directoryHint: .isDirectory)
+            try? FileManager.default.removeItem(at: parent)
+            do {
+                try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+                let folder = try KnowledgeBaseCreator.create(
+                    named: KnowledgeBaseCreator.defaultName(workspace.knowledgeBaseLanguage),
+                    in: parent, language: workspace.knowledgeBaseLanguage)
+                if ProcessInfo.processInfo.environment["INKSTONE_SCRATCH_KB"] == "seed" {
+                    try Self.seedScratchInbox(folder, layout: KnowledgeBaseLayout(language: workspace.knowledgeBaseLanguage))
+                }
+                let vault = try workspace.registry.register(folder: folder, name: folder.lastPathComponent)
+                workspace.open(vault)
+                workspace.knowledgeBase.showReadyCard()
+                debugLog("opened scratch knowledge base at \(folder.path)")
+            } catch {
+                debugLog("scratch knowledge base failed: \(error)")
+            }
+            return
+        }
         if ProcessInfo.processInfo.environment["INKSTONE_SCRATCH_VAULT"] != nil
             || FileManager.default.fileExists(atPath: Self.scratchFlagPath) {
             if let vault = try? makeScratchVault() {
@@ -806,6 +833,28 @@ struct InkstoneApp: App {
 
     /// Writes a small vault into the app container and registers it. Exercises the
     /// same code path a real vault does — scan, index, watch, render.
+    /// A few things dropped in the scratch knowledge base's inbox: a note
+    /// about a project that exists, a picture and its copy, a private file,
+    /// a loose thought — one of each path the organizer takes.
+    private static func seedScratchInbox(_ root: URL, layout: KnowledgeBaseLayout) throws {
+        let fm = FileManager.default
+        let inbox = root.appending(path: layout.inbox, directoryHint: .isDirectory)
+        try fm.createDirectory(at: root.appending(path: "\(layout.projects)/装修"), withIntermediateDirectories: true)
+        try Data("# 装修报价\n\n客厅吊顶 12,000，厨房橱柜 18,000。\n".utf8).write(to: inbox.appending(path: "装修报价单.md"))
+        try Data("护照号码与签发日期（示例）。\n".utf8).write(to: inbox.appending(path: "护照扫描.txt"))
+        try Data("今天想到：周末去看看花市。\n".utf8).write(to: inbox.appending(path: "随手记.md"))
+        let ctx = CGContext(data: nil, width: 120, height: 80, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 0.85, green: 0.3, blue: 0.25, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
+        ctx.setFillColor(red: 1, green: 0.9, blue: 0.6, alpha: 1); ctx.fillEllipse(in: CGRect(x: 30, y: 15, width: 50, height: 50))
+        let data = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
+        CGImageDestinationFinalize(dest)
+        try (data as Data).write(to: inbox.appending(path: "IMG_0001.png"))
+        try (data as Data).write(to: inbox.appending(path: "IMG_0001 副本.png"))
+    }
+
     private func makeScratchVault() throws -> Vault {
         let root = (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory()))

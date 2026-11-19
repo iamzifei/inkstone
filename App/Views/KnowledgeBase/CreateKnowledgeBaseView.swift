@@ -190,7 +190,10 @@ struct KnowledgeBaseReadyCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button("Got it") { dismiss() }
+                Button("Got it") {
+                    workspace.knowledgeBase.isShowingReadyCard = false
+                    dismiss()
+                }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
