@@ -7,6 +7,45 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.5.0 — 2026-11-19
+
+Inkstone is now an AI knowledge base, made for people who have never heard
+the word "vault". Plan and reasoning: `docs/plans/20261119-ai-knowledge-base-0.5.0.md`.
+
+- **Create a knowledge base in three steps** — a name and a place (iCloud
+  Drive, a folder, or a folder you already have). The skeleton (inbox,
+  projects, areas, resources, media, outputs, private, review, archive,
+  system), the organizing rules and three entry files are made for you, in
+  the interface language. A folder you already have keeps every file where
+  it is.
+- **Drop anything in.** Drag onto the window (Mac, iPad), Add Files…, or
+  share links and text from other apps. The first time: copy or move, with
+  "always do this"; copy is the default, and a move removes the original
+  only after a complete, identical copy.
+- **It files itself.** Your rules first, privacy words, a project named in
+  the file, media by type and month, then Apple's on-device model (or your
+  own model, off by default) — renamed by date and topic, Markdown notes
+  given their source and date without a word of text changing. Exact copies
+  go to to-delete; look-alikes and anything unsure wait for you. Rounds of
+  more than 20 files or with duplicates wait for your yes.
+- **Nothing is lost.** Nothing is ever deleted. Every step is logged before
+  it is taken, and every round can be undone byte for byte — without
+  overwriting anything changed since.
+- **AGENTS.md, README.md and SOURCE_OF_TRUTH.md**, written and kept up to
+  date, so any AI assistant knows what is where. Only the part between
+  Inkstone's markers is rewritten.
+- **Settings › Knowledge Base**: organizing, the AI engine, what dropping
+  does, and the organizing rules as plain text (the vault's own file), with
+  "Restore Default Policy" and a check that never overwrites an edit made on
+  another device.
+- **Only Inkstone's own knowledge bases are organized** (made or adopted,
+  with their rules file). A vault from another app is opened as it is.
+- HTML comments (`<!-- … -->`) are hidden when reading and folded in live
+  preview, like `%%comments%%`.
+- The iOS share extension ships (links and text to Inkstone).
+
+Notes for 0.3.0 and 0.4.0 are on the GitHub releases page.
+
 ## 0.2.2 — 2026-11-18
 
 - **The welcome guide's screenshots match the guide's language.** Each of the six

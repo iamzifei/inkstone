@@ -1,18 +1,18 @@
-Inkstone is a Markdown notes app. It needs no account and no sign-in, so there are no demo credentials.
+Inkstone is an AI knowledge base built on plain Markdown files. It needs no account and no sign-in, so there are no demo credentials.
 
-Getting started: on first launch, tap "Create Vault in iCloud Drive" (or "Open Folder as Vault" to choose any folder, for example in Files > On My iPhone). A new vault is empty; tap the + button at the bottom of the list to create a note.
+Getting started (new in 0.5): on first launch, tap "Create my knowledge base", keep the suggested name, choose "iCloud Drive" (or "A folder you choose" / "A folder you already have"), and tap "Create". The folders (inbox, projects, areas, resources, media, outputs, private, review, archive, system), the organizing rules and three entry files (AGENTS.md, README.md, SOURCE_OF_TRUTH.md) are created and the knowledge base opens. "Open Folder as Vault" opens an existing Markdown folder as it is, without organizing it.
 
-New in 0.4, and how to see it (open a note first; a new vault is empty, so tap + to create one):
-- Templates: tap the "More" (ellipsis) button in the note's toolbar, then "Insert Template…". It lists notes in the vault's "Templates" folder; with none, it says so and how to add one.
-- Export: "More" > "Export as PDF…" or "Export as HTML…" opens the share sheet with the file.
-- Command palette: "More" > "Command Palette…", then type a few letters of a command's name.
-- Spotlight: after a vault is opened, its notes appear in system search on this device; tapping a result opens the note. It can be turned off in Settings > Files & Links.
-- Shortcuts: the Shortcuts app lists "New Note" and "Add to Today's Note" under Inkstone. They write into the vault opened last in the app.
-- iPhone Duo: folding or unfolding keeps the caret and scroll position in the open note.
+How to see the organizing:
+- Add files: in the vault menu at the top of the sidebar, tap "Add Files…" and pick one or more files (on iPad, files can also be dragged onto the window). The first time, the app asks "Copy or move"; copy is the default.
+- A few seconds later the files in the inbox are filed into folders by the rules in the knowledge base and renamed by date and topic; a banner says "Organized N files" with "Undo", which puts everything back. A round with more than 20 files or with duplicates shows the list first and waits for "Organize".
+- Anything the app is not sure about goes to the review folder. Nothing is ever deleted.
+- "Organize Inbox Now" in the same menu runs it immediately.
+- Settings > Knowledge Base: organizing on or off, the AI engine, what dropping files does, and the organizing rules as editable text.
 
-Still from 0.3:
-- Find and replace: the magnifying-glass-on-document toolbar button ("Find in Note"), or Command-F on a hardware keyboard.
-- iPhone Duo: half-open with a note open; the note is on one side of the crease and its backlinks, outline and properties on the other.
-- Sync health (Settings > Sync): only appears once GitHub sync is set up, which needs the user's own GitHub repository and personal access token. Everything else works without it.
+AI: placement uses Apple's on-device model (Foundation Models) where available; nothing leaves the device. Optionally, a user can use their own model with their own API key (Settings > Knowledge Base > "Use my assistant's model", off by default); then only the name and the start of a file the rules cannot place is sent to that provider, never a file that looks private.
+
+Share extension: in Safari or other apps, Share > Inkstone saves a link or text; in a knowledge base it becomes a note in the inbox and is filed like anything else.
+
+Still from 0.4: templates, export as PDF/HTML and the command palette are in a note's "More" (ellipsis) menu; notes appear in Spotlight (Settings > Files & Links); Shortcuts actions "New Note" and "Add to Today's Note"; on iPhone Duo the caret and scroll position are kept when folding, and half-open shows the note on one side of the crease and its backlinks on the other.
 
 Background modes: 'fetch' and 'processing' are used to synchronise a vault to iCloud Drive, or to a GitHub repository the user configures with their own personal access token, while the app is not in the foreground. No data is sent anywhere else; there is no analytics and no server belonging to the developer. Notes added to system search (Spotlight) stay in this device's search index. Privacy policy: https://inkslab.app/privacy.html

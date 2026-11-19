@@ -25,7 +25,7 @@
 </head>
 <body>
 <main class="wrap legal">
-  <p class="updated">Updated 20 August 2026</p>
+  <p class="updated">Updated 19 November 2026</p>
   <h1>Privacy</h1>
 
   <p>Inkstone collects nothing. There is no account to create, no analytics, no
@@ -38,7 +38,7 @@
   inside that same vault, which you are free to delete.</p>
 
   <h2>The network</h2>
-  <p>Inkstone makes network connections in exactly three situations, all of them
+  <p>Inkstone makes network connections in exactly four situations, all of them
   started by you:</p>
   <ul>
     <li><strong>iCloud sync</strong>, if you put a vault in iCloud Drive. Your
@@ -50,12 +50,30 @@
     <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement">GitHub's
     privacy statement</a>. The token is stored in the system Keychain and is sent
     only to GitHub.</li>
+    <li><strong>An AI model you set up yourself</strong>, if you add one in
+    Settings with your own API key (Anthropic, or an OpenAI-compatible service
+    you choose). What you send in the assistant goes to that provider, under its
+    privacy policy. If you also turn on "Use my assistant's model" for
+    organizing a knowledge base (off by default), the name and the start of a
+    file Inkstone can't place by your rules is sent to it — never a file that
+    looks private, and never the names of your private folder. The key is
+    stored in the system Keychain and sent only to that provider.</li>
     <li><strong>Update checks</strong>, which fetch
     <code>https://inkslab.app/appcast.xml</code> — a static file — to see whether
     a newer version exists. The request carries no identifier we record. You are
     asked on first launch whether to do this automatically, and you can say no.</li>
   </ul>
   <p>Nothing else leaves your device.</p>
+
+  <h2>Organizing and AI on your device</h2>
+  <p>Organizing a knowledge base happens on your device: reading a file's text,
+  a photo's date or the text in a picture, and deciding where it goes — by your
+  rules, and with Apple's on-device model where your device supports it. The
+  on-device model runs locally; nothing is sent anywhere. Every move is written
+  to a log inside your knowledge base (<code>_系统/整理日志.md</code>, or its
+  equivalent in your language), and copies of notes from before Inkstone added
+  their properties are kept for 30 days in the hidden <code>.inkstone</code>
+  folder so a round can be undone.</p>
 
   <h2>This website</h2>
   <p>inkslab.app is static files served by GitHub Pages. There is no analytics
