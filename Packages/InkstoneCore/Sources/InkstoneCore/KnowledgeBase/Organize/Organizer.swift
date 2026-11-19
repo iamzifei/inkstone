@@ -233,10 +233,11 @@ public struct Organizer: Sendable {
 
     /// An advisor's answer within 20 seconds, else none (the file goes to
     /// review): a model that hangs must not hold the whole round.
-    static func ask(_ advisor: PlacementAdvisor, _ facts: FileFacts, _ context: AdvisorContext) async -> PlacementAdvice? {
+    static func ask(_ advisor: PlacementAdvisor, _ facts: FileFacts, _ context: AdvisorContext,
+                    timeout: Duration = .seconds(20)) async -> PlacementAdvice? {
         await withTaskGroup(of: PlacementAdvice?.self) { group in
             group.addTask { try? await advisor.advise(facts, context: context) }
-            group.addTask { try? await Task.sleep(for: .seconds(20)); return nil }
+            group.addTask { try? await Task.sleep(for: timeout); return nil }
             let first = await group.next() ?? nil
             group.cancelAll()
             return first

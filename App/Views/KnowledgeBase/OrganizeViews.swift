@@ -76,7 +76,6 @@ struct OrganizeBanner: View {
 /// "Organize".
 struct ChangePlanSheet: View {
     @Environment(Workspace.self) private var workspace
-    @Environment(\.dismiss) private var dismiss
     let plan: ChangePlan
 
     var body: some View {
@@ -98,13 +97,13 @@ struct ChangePlanSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Not now") { kb.dismissPlan(); dismiss() }
+                    Button("Not now") { kb.dismissPlan() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Organize") {
+                        // confirm() clears pendingPlan at once, which closes this sheet.
                         let plan = plan
                         Task { await kb.confirm(plan) }
-                        dismiss()
                     }
                 }
             }

@@ -49,14 +49,16 @@ struct AdvisorPromptTests {
     }
 
     @Test func privateFolderNamesAndPrivateTextNeverGoOffDevice() {
-        let context = AdvisorContext(layout: layout, folders: ["私密/病历2025", "30-资料/园艺"], rules: "")
+        let context = AdvisorContext(layout: layout, folders: ["私密/病历2025", "20-领域/病历", "30-资料/园艺"], rules: "## 我的规则\n- 银行流水 → 私密\n")
         let p = AdvisorPrompt.prompt(facts(text: "普通内容"), context: context)
         #expect(!p.contains("病历2025"))
+        #expect(!p.contains("20-领域/病历"))
         #expect(p.contains("30-资料/园艺"))
-        // A private word past the first 800 characters still stops it.
+        // A private word anywhere in the file stops it …
         let long = String(repeating: "普通的一句话。", count: 200) + "我的信用卡号码是……"
-        #expect(!AdvisorPrompt.maySendOffDevice(facts(text: long), context: context))
-        #expect(AdvisorPrompt.maySendOffDevice(facts(text: "花市"), context: context))
+        #expect(!AdvisorPrompt.maySendOffDevice(facts(text: long)))
+        // … but private words in folder names or the rules say nothing about this file.
+        #expect(AdvisorPrompt.maySendOffDevice(facts(text: "周末去花市")))
     }
 
     @Test func aHangingAdvisorDoesNotHoldTheRound() async {
@@ -65,18 +67,10 @@ struct AdvisorPromptTests {
                 try await Task.sleep(for: .seconds(3600)); return nil
             }
         }
-        // Shortened: the same race the organizer uses, checked to return nil
-        // rather than wait; the 20 s bound itself is not waited for here.
         let start = ContinuousClock.now
-        let answer = await withTaskGroup(of: PlacementAdvice?.self) { group in
-            group.addTask { try? await Hang().advise(facts(text: ""), context: AdvisorContext(layout: layout, folders: [], rules: "")) }
-            group.addTask { try? await Task.sleep(for: .milliseconds(100)); return nil }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
+        let answer = await Organizer.ask(Hang(), facts(text: ""), AdvisorContext(layout: layout, folders: [], rules: ""),
+                                         timeout: .milliseconds(100))
         #expect(answer == nil)
         #expect(ContinuousClock.now - start < .seconds(5))
     }
 }
-

@@ -178,7 +178,6 @@ struct CreateKnowledgeBaseView: View {
 /// Shown once, right after a knowledge base is made: where things go.
 struct KnowledgeBaseReadyCard: View {
     @Environment(Workspace.self) private var workspace
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.style) private var style
 
     var body: some View {
@@ -195,8 +194,9 @@ struct KnowledgeBaseReadyCard: View {
             HStack {
                 Spacer()
                 Button("Got it") {
+                    // State drives the sheet; dismiss() here could close the
+                    // next one (a round waiting behind this card).
                     workspace.knowledgeBase.isShowingReadyCard = false
-                    dismiss()
                 }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)

@@ -58,7 +58,7 @@ struct ProviderPlacementAdvisor: PlacementAdvisor {
     func advise(_ facts: FileFacts, context: AdvisorContext) async throws -> PlacementAdvice? {
         // Nothing that looks private leaves the device: it is filed as
         // private without asking.
-        guard AdvisorPrompt.maySendOffDevice(facts, context: context) else {
+        guard AdvisorPrompt.maySendOffDevice(facts) else {
             return PlacementAdvice(folder: context.layout.privateFolder, confidence: 1, title: nil, tags: [],
                                    summary: nil, isPrivate: true, reason: "private words; not sent")
         }

@@ -95,14 +95,18 @@ final class KnowledgeBaseController {
     func organize(automatic: Bool = false) async {
         guard let root, let layout, !isOrganizing, pendingPlan == nil else { return }
         let token = generation
+        // Taken before anything is awaited, so two rounds never start together.
+        isOrganizing = true
+        defer { if generation == token { isOrganizing = false } }
         let inbox = await Task.detached(priority: .utility) { Self.inboxSignature(root: root, layout: layout) }.value
         guard generation == token else { return }
         if automatic {
             guard !inbox.isEmpty, inbox != lastSeenInbox else { return }
         }
+        // The inbox as planned. Not overwritten after the round: what is left
+        // (a file that could not move) is tried once more, then left alone;
+        // anything that arrived meanwhile makes it different, so it is seen.
         lastSeenInbox = inbox
-        isOrganizing = true
-        defer { if generation == token { isOrganizing = false } }
         failure = nil
         let organizer = makeOrganizer(root: root, layout: layout)
         do {
@@ -115,16 +119,23 @@ final class KnowledgeBaseController {
             let result = try await Task.detached(priority: .utility) { try organizer.execute(plan) }.value
             guard generation == token else { return }
             lastResult = result
-            lastSeenInbox = Self.inboxSignature(root: root, layout: layout)
         } catch {
-            if generation == token { failure = error.localizedDescription }
+            guard generation == token else { return }
+            failure = error.localizedDescription
+            lastSeenInbox = nil          // a passing problem (busy): try again next time
         }
     }
 
     /// The person said yes to this round (the plan is passed in: the sheet
     /// closing on its own clears `pendingPlan`).
     func confirm(_ plan: ChangePlan) async {
-        guard let root, let layout, !isOrganizing else { return }
+        guard let root, let layout else { return }
+        guard !isOrganizing else {
+            // Not lost: the plan stays, to be confirmed in a moment.
+            pendingPlan = plan
+            failure = localized("Still finishing the last round. Try again in a moment.")
+            return
+        }
         let token = generation
         pendingPlan = nil
         isOrganizing = true
@@ -134,7 +145,6 @@ final class KnowledgeBaseController {
             let result = try await Task.detached(priority: .utility) { try organizer.execute(plan) }.value
             guard generation == token else { return }
             lastResult = result
-            lastSeenInbox = Self.inboxSignature(root: root, layout: layout)
         } catch {
             if generation == token { failure = error.localizedDescription }
         }
@@ -155,7 +165,9 @@ final class KnowledgeBaseController {
             let undone = try await Task.detached(priority: .utility) { try organizer.undo(batch: result.batch) }.value
             guard generation == token else { return }
             // The files are back in the inbox: not filed again until it changes.
-            lastSeenInbox = Self.inboxSignature(root: root, layout: layout)
+            let back = await Task.detached(priority: .utility) { Self.inboxSignature(root: root, layout: layout) }.value
+            guard generation == token else { return }
+            lastSeenInbox = back
             if !undone.skipped.isEmpty {
                 failure = localized("Some files were left as they are: \(undone.skipped.joined(separator: ", "))")
             }

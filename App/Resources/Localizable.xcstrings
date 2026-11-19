@@ -2797,29 +2797,6 @@
         }
       }
     },
-    "Create Vault in iCloud Drive": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Create Vault in iCloud Drive"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 iCloud 云盘创建仓库"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 iCloud 雲碟建立儲存庫"
-          }
-        }
-      }
-    },
     "Create a fine-grained token with Contents: read and write for this repository. It is stored in your Keychain, never in the vault or the settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -10812,6 +10789,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "開始寫作"
+          }
+        }
+      }
+    },
+    "Still finishing the last round. Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still finishing the last round. Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一轮还没整理完，请稍后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一輪還沒整理完，請稍後再試。"
           }
         }
       }
