@@ -68,6 +68,19 @@ struct RootView: View {
         }
         .tint(style.accent)
         .background(style.background)
+        .overlay(alignment: .bottom) {
+            if let result = workspace.knowledgeBase.lastResult {
+                OrganizeBanner(result: result)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: workspace.knowledgeBase.lastResult?.batch)
+        .sheet(isPresented: Binding(
+            get: { workspace.knowledgeBase.pendingPlan != nil },
+            set: { if !$0, workspace.knowledgeBase.pendingPlan != nil { workspace.knowledgeBase.dismissPlan() } }
+        )) {
+            if let plan = workspace.knowledgeBase.pendingPlan { ChangePlanSheet(plan: plan) }
+        }
         .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()

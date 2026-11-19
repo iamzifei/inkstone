@@ -343,6 +343,8 @@ final class Workspace {
     private(set) var bookmarks = Bookmarks()
 
     private var watcher: VaultWatcher?
+    /// Files what lands in a knowledge base's inbox; idle for other vaults.
+    let knowledgeBase: KnowledgeBaseController
     private let indexBuilder = IndexBuilder()
     private var reindexTask: Task<Void, Never>?
     private var treeTask: Task<Void, Never>?
@@ -357,6 +359,7 @@ final class Workspace {
     init(registry: VaultRegistry = VaultRegistry(), settings: AppSettings = AppSettings()) {
         self.registry = registry
         self.settings = settings
+        knowledgeBase = KnowledgeBaseController(settings: settings)
         // Shortcuts actions reach the vault through the app's workspace. A
         // reference taken in App.init can be to an instance SwiftUI discards,
         // so the workspace registers itself (and again when it opens a vault).
@@ -405,6 +408,7 @@ final class Workspace {
             reindex(full: true, seedFromDisk: true)
             startWatching(url)
             deliverSharedItems()
+            knowledgeBase.attach(url)
 
             if startingBackgroundWork {
                 if settings.data.gitHubAutoSync {
@@ -488,6 +492,7 @@ final class Workspace {
         isIndexing = false
         watcher?.stop()
         watcher = nil
+        knowledgeBase.detach()
         if let vault { registry.endAccess(to: vault) }
         vault = nil
         root = nil
@@ -525,6 +530,7 @@ final class Workspace {
     private func handleExternalChange() {
         refreshTreeInBackground()
         reindex()
+        knowledgeBase.inboxMayHaveChanged()
         for document in documents.values {
             document.reloadIfUnchangedLocally()
         }
