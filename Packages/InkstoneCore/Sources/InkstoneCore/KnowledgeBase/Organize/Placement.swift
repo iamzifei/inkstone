@@ -6,16 +6,21 @@ import Foundation
 /// "(1)", "最终版最终", "copy" …) dropped, spaces as `-`, and none of
 /// `/ \ : * ? " < > |`.
 public enum FileNaming {
+    /// Dropped anywhere in a name (they are never part of a word).
     static let noise = [
-        "最终版最终", "最終版最終", "最终版", "最終版", "最终", "最終", "新建", "新增", "副本", "拷贝", "拷貝",
-        "未命名", "untitled", "copy", "final final", "final",
+        "最终版最终", "最終版最終", "最终版", "最終版", "新建", "副本", "拷贝", "拷貝", "未命名",
     ]
+    /// Dropped only as whole words: "copy" goes, "copyright" stays.
+    static let noiseWords = ["untitled", "copy", "final"]
 
     public static func name(keywords raw: String, ext: String, date: Date, timeZone: TimeZone = .current) -> String {
         var k = raw
         k = k.replacingOccurrences(of: #"[（(]\s*\d+\s*[)）]"#, with: " ", options: .regularExpression)   // "(1)"
         for word in noise {
-            k = k.replacingOccurrences(of: word, with: " ", options: [.caseInsensitive])
+            k = k.replacingOccurrences(of: word, with: " ")
+        }
+        for word in noiseWords {
+            k = k.replacingOccurrences(of: "(?i)\\b\(word)\\b", with: " ", options: .regularExpression)
         }
         k = k.replacingOccurrences(of: #"[/\\:*?"<>|]"#, with: "-", options: .regularExpression)
         k = k.replacingOccurrences(of: #"\s+"#, with: "-", options: .regularExpression)
@@ -79,7 +84,7 @@ public struct OrganizingRules: Sendable {
                 let folder = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: " `「」\"'/"))
                 // A rule's keyword is short and its folder a relative path;
                 // prose in the policy that happens to contain an arrow is not.
-                if !keyword.isEmpty, keyword.count <= 40, !folder.isEmpty, !folder.contains(" "), !keyword.contains("（") {
+                if !keyword.isEmpty, keyword.count <= 40, !folder.isEmpty {
                     out.append(Rule(keyword: keyword.lowercased(), folder: folder))
                 }
                 break

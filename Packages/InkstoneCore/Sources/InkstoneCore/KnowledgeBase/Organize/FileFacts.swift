@@ -24,6 +24,8 @@ public struct FileFacts: Sendable, Equatable {
     public var duration: Double?
     public var simHash: UInt64?
     public var perceptualHash: UInt64?
+    /// A package or a folder kept whole (moved as one item, never opened).
+    public var isFolder = false
 
     public init(url: URL, name: String, ext: String, kind: FileKind, size: Int64, sha256: String?,
                 contentDate: Date, contentDateSource: String, text: String, title: String?,
@@ -40,8 +42,16 @@ public enum FactsExtractor {
     /// - Parameter ocr: read the text in images (Vision). Slower; the app
     ///   turns it on, tests leave it off.
     public static func facts(for url: URL, ocr: Bool = false) async -> FileFacts {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .creationDateKey, .contentModificationDateKey, .isDirectoryKey])
+        if values?.isDirectory == true {
+            var f = FileFacts(url: url, name: url.deletingPathExtension().lastPathComponent, ext: url.pathExtension.lowercased(),
+                              kind: .other, size: -1, sha256: nil, contentDate: values?.creationDate ?? .now,
+                              contentDateSource: "file", text: "", title: nil, pixelSize: nil, duration: nil,
+                              simHash: nil, perceptualHash: nil)
+            f.isFolder = true
+            return f
+        }
         let kind = FileKind.detect(url)
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .creationDateKey, .contentModificationDateKey])
         let fileDate = values?.creationDate ?? values?.contentModificationDate ?? .now
         var date = fileDate, dateSource = "file"
         var text = "", title: String?, pixelSize: CGSize?, duration: Double?
@@ -128,16 +138,13 @@ public enum FactsExtractor {
     static func recognizeText(_ url: URL) async -> String {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return "" }
-        return await withCheckedContinuation { continuation in
-            let request = VNRecognizeTextRequest { request, _ in
-                let lines = (request.results as? [VNRecognizedTextObservation] ?? []).compactMap { $0.topCandidates(1).first?.string }
-                continuation.resume(returning: lines.joined(separator: "\n"))
-            }
-            request.recognitionLevel = .accurate
-            request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
-            request.usesLanguageCorrection = true
-            do { try VNImageRequestHandler(cgImage: image).perform([request]) }
-            catch { continuation.resume(returning: "") }
-        }
+        // `perform` runs the request synchronously; its results are read
+        // afterwards, so the continuation is resumed exactly once.
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
+        request.usesLanguageCorrection = true
+        guard (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil else { return "" }
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 }

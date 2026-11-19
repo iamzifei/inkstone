@@ -124,22 +124,210 @@ struct OrganizerTests {
 
     @Test func undoRestoresTheVaultExactly() async throws {
         let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "10-项目/花园"), withIntermediateDirectories: true)
         try put(root, "\(layout.inbox)/a.png", png(width: 32, height: 32, seed: 3))
-        try put(root, "\(layout.inbox)/notes about garden.md", Data("---\ntitle: Garden\n---\nRoses.\n".utf8))
-        try put(root, "\(layout.inbox)/dup.png", png(width: 32, height: 32, seed: 3))
+        try put(root, "\(layout.inbox)/花园笔记.md", Data("---\ntitle: 花园\n---\nRoses.\n".utf8))   // gets front matter
+        try put(root, "\(layout.inbox)/dropped/inner/dup.png", png(width: 32, height: 32, seed: 3))  // a dropped folder
+        _ = try EntryFiles.refresh(in: root)      // the folders made by hand above, already in the entry files
         let before = allFiles(root)
         let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
         let result = try organizer.execute(try await organizer.plan())
+        #expect(result.failures.isEmpty)
+        #expect(result.moved == 3)
         #expect(allFiles(root) != before)
-        try organizer.undo(batch: result.batch)
-        // Every file back where it was with its exact bytes, apart from the
-        // log, which records the round and its undoing.
-        var after = allFiles(root)
-        var expected = before
+        let undone = try organizer.undo(batch: result.batch)
+        #expect(undone.restored == 3)
+        #expect(undone.skipped.isEmpty)
+        // Every file back where it was with its exact bytes — index and
+        // duplicates record included; only the log records the round.
+        var after = allFiles(root), expected = before
         after["/" + layout.logFile] = nil; expected["/" + layout.logFile] = nil
-        after["/" + layout.duplicatesFile] = nil; expected["/" + layout.duplicatesFile] = nil
-        after["/" + layout.indexFile] = nil; expected["/" + layout.indexFile] = nil
         #expect(after == expected)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "\(layout.inbox)/dropped/inner").path))
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "40-素材/图片").appending(path: FileNaming.month(.now)).path))
+        // Twice is refused.
+        #expect(throws: OrganizeError.alreadyUndone) { try organizer.undo(batch: result.batch) }
+    }
+
+    @Test func undoNeverOverwritesANoteEditedSince() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "10-项目/花园"), withIntermediateDirectories: true)
+        try put(root, "\(layout.inbox)/花园笔记.md", Data("Roses.\n".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        let filed = root.appending(path: try #require(result.plan.moves.first).to)
+        let edited = try String(contentsOf: filed, encoding: .utf8) + "My new paragraph.\n"
+        try edited.write(to: filed, atomically: false, encoding: .utf8)
+        let undone = try organizer.undo(batch: result.batch)
+        #expect(undone.skipped.contains { $0.contains("edited since") })
+        // Moved back, with the edit.
+        #expect(try String(contentsOf: root.appending(path: "\(layout.inbox)/花园笔记.md"), encoding: .utf8) == edited)
+    }
+
+    @Test func aMoveThatCannotBeMadeIsReportedAndTheRestGoAhead() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 40))
+        try put(root, "\(layout.inbox)/b.mp3", Data([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0] + Array(repeating: 1, count: 64)))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let plan = try await organizer.plan()
+        // A file where the image month folder must go.
+        let imageFolder = (try #require(plan.moves.first { $0.from.hasSuffix("a.png") }).to as NSString).deletingLastPathComponent
+        try put(root, imageFolder, Data("in the way".utf8))
+        let result = try organizer.execute(plan)
+        #expect(result.failures.map(\.from) == ["\(layout.inbox)/a.png"])
+        #expect(result.moved == 1)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "\(layout.inbox)/a.png").path))
+        let undone = try organizer.undo(batch: result.batch)
+        #expect(undone.restored == 1)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "\(layout.inbox)/b.mp3").path))
+    }
+
+    @Test func aFileChangedAfterPlanningIsLeftAlone() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 41))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let plan = try await organizer.plan()
+        try put(root, "\(layout.inbox)/a.png", png(width: 22, height: 20, seed: 42))
+        let result = try organizer.execute(plan)
+        #expect(result.moved == 0)
+        #expect(result.failures.first?.reason == "changed since planned")
+    }
+
+    @Test func aChangedPlanCannotMoveIntoTheMachineryOrOutOfTheInbox() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 43))
+        try put(root, "30-资料/keep.md", Data("mine\n".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        var plan = try await organizer.plan()
+        plan.moves[0].to = "_系统/a.png"
+        plan.moves.append(OrganizeMove(from: "30-资料/keep.md", to: "30-资料/x/keep.md", kind: .file, reason: ""))
+        plan.moves.append(OrganizeMove(from: "\(layout.inbox)/../30-资料/keep.md", to: "30-资料/y.md", kind: .file, reason: ""))
+        let result = try organizer.execute(plan)
+        #expect(result.moved == 0)
+        #expect(result.failures.count == 3)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "30-资料/keep.md").path))
+    }
+
+    @Test func namesWithLineBreaksAndEdgeSpacesUndoExactly() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let names = ["a\nb.png", " lead.png", "trail .png", "back\\slash|pipe.png"]
+        for (i, n) in names.enumerated() { try put(root, "\(layout.inbox)/\(n)", png(width: 20, height: 20, seed: UInt8(50 + i))) }
+        let before = allFiles(root)
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        #expect(result.moved == names.count)
+        try organizer.undo(batch: result.batch)
+        for n in names { #expect(allFiles(root)["/\(layout.inbox)/\(n)"] == before["/\(layout.inbox)/\(n)"], "\(n)") }
+    }
+
+    @Test func aTamperedLogCannotReachOutsideTheVault() throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let outside = root.deletingLastPathComponent().appending(path: "outside-\(UUID().uuidString).txt")
+        try Data("victim".utf8).write(to: outside); defer { try? FileManager.default.removeItem(at: outside) }
+        let log = OrganizeLog(root: root, layout: layout)
+        try log.append(batch: "b1", action: .move, from: "../\(outside.lastPathComponent)", to: "30-资料/x.txt", reason: "", now: .now)
+        try put(root, "30-资料/x.txt", Data("decoy".utf8))
+        try log.append(batch: "b2", action: .move, from: "30-资料/y.txt", to: "../\(outside.lastPathComponent)", reason: "", now: .now)
+        let organizer = Organizer(root: root, layout: layout, advisor: nil)
+        _ = try organizer.undo(batch: "b1")
+        _ = try organizer.undo(batch: "b2")
+        #expect(try String(contentsOf: outside, encoding: .utf8) == "victim")
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "30-资料/x.txt").path))
+    }
+
+    @Test func aSymlinkedFolderCannotCarryAFileOutOfTheVault() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let elsewhere = root.deletingLastPathComponent().appending(path: "elsewhere-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: elsewhere) }
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "20-领域/link"), withDestinationURL: elsewhere)
+        try put(root, "\(layout.inbox)/n.md", Data("x\n".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let plan = ChangePlan(moves: [OrganizeMove(from: "\(layout.inbox)/n.md", to: "20-领域/link/n.md", kind: .file, reason: "")], suggestions: [])
+        let result = try organizer.execute(plan)
+        #expect(result.moved == 0)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: elsewhere.path).isEmpty)
+    }
+
+    @Test func machineryIsRefusedWhateverTheCase() {
+        let en = KnowledgeBaseLayout(language: .english)
+        let organizer = Organizer(root: URL(fileURLWithPath: "/tmp/x"), layout: en, advisor: nil)
+        for bad in ["_archive/To-Delete", "_SYSTEM", "_review/x", "00-inbox"] { #expect(organizer.sanitize(bad) == nil, "\(bad)") }
+        #expect(organizer.sanitize("10-Projects/Garden") == "10-Projects/Garden")
+    }
+
+    @Test func aLookAlikePictureGoesToReviewNotToTheBin() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "40-素材/图片/2026-11/20261119-原图.png", png(width: 400, height: 300, seed: 13))
+        try put(root, "\(layout.inbox)/小图.png", png(width: 120, height: 90, seed: 13))
+        let plan = try await Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate }).plan()
+        #expect(plan.moves.first?.to.hasPrefix(layout.review + "/") == true)
+        #expect(plan.suggestions.first?.b == "40-素材/图片/2026-11/20261119-原图.png")
+    }
+
+    @Test func aNearlyIdenticalNoteGoesToReviewAndTheFiledOneStays() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let base = (0..<400).map { "Sentence number \($0) talks about gardens, roses and pruning in winter." }.joined(separator: "\n")
+        try put(root, "30-资料/园艺/20260101-玫瑰.md", Data(base.utf8))       // long: past the 4,000-character window
+        try put(root, "\(layout.inbox)/玫瑰 新.md", Data((base.replacingOccurrences(of: "number 7 talks", with: "number 7 speaks") + "\nOne more.").utf8))
+        let plan = try await Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate }).plan()
+        #expect(plan.moves.count == 1)
+        #expect(plan.moves.first?.to.hasPrefix(layout.review + "/") == true)
+        #expect(plan.suggestions.first?.b == "30-资料/园艺/20260101-玫瑰.md")
+    }
+
+    @Test func packagesAndProjectFoldersAreKeptWhole() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/doc.rtfd/TXT.rtf", Data("{\\rtf1 hi}".utf8))
+        try put(root, "\(layout.inbox)/repo/.git/HEAD", Data("ref".utf8))
+        try put(root, "\(layout.inbox)/repo/main.swift", Data("print(1)".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let plan = try await organizer.plan()
+        #expect(Set(plan.moves.map(\.from)) == ["\(layout.inbox)/doc.rtfd", "\(layout.inbox)/repo"])
+        #expect(plan.moves.allSatisfy { $0.kind == .review })
+        let result = try organizer.execute(plan)
+        #expect(result.moved == 2)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "\(layout.review)/repo/.git/HEAD").path))
+    }
+
+    @Test func privacyWinsOverTheRules() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        let rules = root.appending(path: layout.rulesFile)
+        let text = try String(contentsOf: rules, encoding: .utf8).replacingOccurrences(of: "## 我的规则\n", with: "## 我的规则\n\n- 发票 → 20-领域/财务\n")
+        try text.write(to: rules, atomically: true, encoding: .utf8)
+        try put(root, "\(layout.inbox)/发票和身份证.pdf", pdf("x"))
+        let plan = try await Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate }).plan()
+        #expect(plan.moves.first?.kind == .privateFile)
+    }
+
+    @Test func frontmatterThatFailsToParseOrHasABOMIsLeftAlone() {
+        let layout = KnowledgeBaseLayout(language: .simplifiedChinese)
+        for text in ["---\ntitle: {{title}}: x: [\n---\nbody\n", "\u{FEFF}---\na: 1\n---\nbody\n", "---\nopen: only\n"] {
+            #expect(Metadata.withFrontmatter(text, origin: "x", date: .now, tags: [], summary: nil, layout: layout) == nil, "\(text)")
+        }
+        // Windows line endings: the front matter parser does not read them,
+        // so the note is left alone rather than given a second block.
+        let crlf = "---\r\na: 1\r\n---\r\nbody\r\n"
+        #expect(Metadata.withFrontmatter(crlf, origin: "x", date: .now, tags: [], summary: nil, layout: layout) == nil)
+    }
+
+    @Test func addingPropertiesKeepsTheFilesCreationDate() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "10-项目/花园"), withIntermediateDirectories: true)
+        try put(root, "\(layout.inbox)/花园.md", Data("Roses.\n".utf8))
+        let old = Date(timeIntervalSince1970: 1_600_000_000)
+        try FileManager.default.setAttributes([.creationDate: old], ofItemAtPath: root.appending(path: "\(layout.inbox)/花园.md").path)
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        let filed = root.appending(path: try #require(result.plan.moves.first).to)
+        #expect(try String(contentsOf: filed, encoding: .utf8).contains("来源:"))
+        #expect((try filed.resourceValues(forKeys: [.creationDateKey])).creationDate == old)
+    }
+
+    @Test func noiseWordsGoOnlyAsWholeWords() {
+        let date = ISO8601DateFormatter().date(from: "2026-11-19T00:00:00Z")!
+        #expect(FileNaming.name(keywords: "copyright notice copy", ext: "txt", date: date, timeZone: TimeZone(identifier: "UTC")!) == "20261119-copyright-notice.txt")
+        #expect(FileNaming.name(keywords: "最终用户手册", ext: "md", date: date, timeZone: TimeZone(identifier: "UTC")!) == "20261119-最终用户手册.md")
     }
 
     @Test func everyMoveIsLogged() async throws {
@@ -253,8 +441,8 @@ struct OrganizerTests {
 
     @Test func nameCollisionsGetASuffixNeverOverwrite() async throws {
         let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
-        try put(root, "\(layout.inbox)/a.png", png(width: 30, height: 30, seed: 7))
-        try put(root, "\(layout.inbox)/b.png", png(width: 30, height: 30, seed: 8))
+        try put(root, "\(layout.inbox)/x/a.png", png(width: 30, height: 30, seed: 7))
+        try put(root, "\(layout.inbox)/y/A.png", png(width: 30, height: 30, seed: 8))   // same name to APFS
         let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
         let plan = try await organizer.plan()
         #expect(Set(plan.moves.map(\.to)).count == plan.moves.count)
@@ -343,24 +531,6 @@ struct OrganizerTests {
         let result = try organizer.execute(try await organizer.plan())
         try organizer.undo(batch: result.batch)
         #expect(allFiles(root)["/\(layout.inbox)/a|b.png"] == before)
-    }
-
-    @Test func aNewerVersionTakesTheOldOnesPlace() async throws {
-        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
-        let base = (0..<40).map { "Sentence number \($0) talks about gardens, roses and pruning in winter." }.joined(separator: "\n")
-        try put(root, "30-资料/园艺/20260101-玫瑰.md", Data(base.utf8))
-        try put(root, "\(layout.inbox)/玫瑰 新.md", Data((base.replacingOccurrences(of: "number 7 talks", with: "number 7 speaks") + "\nOne more.").utf8))
-        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
-        let plan = try await organizer.plan()
-        let old = try #require(plan.moves.first { $0.from == "30-资料/园艺/20260101-玫瑰.md" })
-        #expect(old.kind == .oldVersion)
-        #expect(old.to.hasPrefix(layout.oldVersions + "/"))
-        #expect(plan.moves.first { $0.from.hasPrefix(layout.inbox) }?.to.hasPrefix("30-资料/园艺/") == true)
-        #expect(plan.needsConfirmation)
-        let before = contents(root, layout: layout)
-        _ = try organizer.execute(plan)
-        // Only moves, apart from the provenance keys added to the new note.
-        #expect(contents(root, layout: layout).values.reduce(0, +) == before.values.reduce(0, +))
     }
 
     @Test func frontmatterThatDoesNotParseIsLeftAlone() async throws {
