@@ -67,7 +67,7 @@ size: XL
 - 技术路线待定（动工前再定，写进本节）：现有 App 是 SwiftUI，不能直接跑在 Windows。候选：① 把 InkstoneCore 的整理/入口文件逻辑抽成跨平台库，Windows 端另写界面；② 用跨平台框架重写一个精简版。选型依据：维护成本、与 Mac 版行为一致（整理策略、日志格式、撤销必须同一套）、安装包体积。
 - 发布：Microsoft Store 提交 + 网站各语言下载页加 Windows 链接。
 - 验收：Windows 实机/虚拟机跑通建库→拖入→整理→撤销；整理日志与 Mac 版互相可读（同一个库两边都能撤销）；商店提交状态为审核中/已上架；官网 Windows 链接 200。
-- HUMAN QUEUE：注册 Microsoft Store 开发者账号——**公司账号（免费）**，在 storedeveloper.microsoft.com 用 Orris 的 D-U-N-S 号与公司域名邮箱（11-19 查过：之前没有）；一台 Windows 测试环境（实机或 VM）。代码签名证书：走 Microsoft Store 不需要（微软重签 MSIX）；只有官网直接分发 .exe 才需要。
+- HUMAN QUEUE：~~注册 Microsoft Store 公司开发者账号~~（11-20 验证通过）；一台 Windows 测试环境（实机或 VM）。代码签名证书：走 Microsoft Store 不需要（微软重签 MSIX）；只有官网直接分发 .exe 才需要。
 
 ## 验收（全局）
 每阶段：核心测试 + `scripts/test-all.sh` + CI 绿、独立评审、UI 有截图、性能项有数字。不删文件、不改正文两条底线有自动化测试守住。
@@ -101,4 +101,5 @@ size: XL
 - 2026-11-20：**P7 素材**：苹果官方 iPhone 18 Pro 边框（Bezel-iPhone-18.dmg，144 MB，许可同 Duo，放在不提交的 `assets/footage-iphone18/`）；iPhone 18 Pro 模拟器截图 1206×2622 与边框屏幕开口逐像素对齐，截图按机身剪影裁切不外溢（实测）。桌面演示按 James 定用**真实 macOS 窗口截图**（不套 Safari 外框：Mac App 套浏览器外框会让人误以为是网页版）。Duo 模块沿用现有演示（编辑器界面未变）。三语言 iPhone + Mac 截图已拍好（`assets/site-shots/`，不提交）。顺手修了 Mac 设置页打开时会跳到规则编辑器底部的问题。
 - 2026-11-20：**P8 微软账号**：James 定用**公司账号**（微软 2026-10-29 文档：公司账号也免费；个人账号只适用于与生意无关的 App）。注册入口 storedeveloper.microsoft.com 已在 James 的 Chrome 打开。需要 James 本人：登录、D-U-N-S（或公司注册文件）、公司域名邮箱、同意协议。
 - 2026-11-20：**微软 Store 公司开发者账号已提交**（James 本人完成）：邮箱验证、雇佣关系验证均已通过；**企业验证人工审核中**（微软称约 5 个工作日，预计 ~2026-11-27，会发邮件到公司邮箱）。发布者名称「Orris Technology」——公司账号的商店卖家名，与苹果卖家名一致，属商店登记，不涉及产品文案。审核通过后点「Finish account setup」，即可开始 P8。
+- 2026-11-20：**微软 Store 公司开发者账号验证全部通过**（James 告知）。P8 的账号前置已满足；剩 Windows 测试环境。按原定顺序 P7 完成后开始 P8。
 
