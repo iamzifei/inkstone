@@ -7,6 +7,23 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.5.1 — 2026-11-20
+
+### Faster
+- Opening a long note on the Mac blocks the interface a quarter as long as before (measured:
+  2.5 s → 0.7 s over twelve opens of a 60 KB note), and less on iPhone and iPad too.
+- Notes with pictures open without freezing: images decode in the background while a
+  placeholder of the right size holds their place (measured: a note with twelve large photos
+  went from a ~1.1 s freeze to under 0.07 s, on Mac and iPhone).
+- Switching notes does less work: each note is styled once when it opens, not three times.
+
+### New on iPhone and iPad
+- Share files from any app — Files, Mail, Photos and others — straight into your knowledge
+  base; they land in the inbox and are filed like anything dropped in.
+
+### Fixed
+- Settings › Knowledge Base opens at the top instead of scrolled down to the rules editor.
+
 ## 0.5.0 — 2026-11-19
 
 Inkstone is now an AI knowledge base, made for people who have never heard

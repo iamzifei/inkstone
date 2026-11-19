@@ -57,8 +57,29 @@ final class AttachmentImageCache {
 
         if let cached = images[key] { return cached }
         if failures.contains(key) { return nil }
+        if let waiting = placeholders[key] { return waiting }
 
         let width = CGFloat(bucket * 32)
+        // A bitmap ImageIO can read is decoded off the main thread. Until it
+        // lands, a blank picture of the right size holds its place, so the
+        // layout is final at once and the text does not jump when it arrives.
+        // (Measured before this: a note embedding 12 photos blocked the main
+        // thread for ~1.1 s on open, on the Mac and on iPhone alike.)
+        let scale = Self.displayScale
+        // Decoded before and since evicted (a note with more pictures than the
+        // cache holds): decode here, as before. Going through the background
+        // again would evict another, whose restyle would ask for that one, and
+        // so on for ever.
+        if kind == .image, !decodedOnce.contains(key),
+           let size = Self.pointSize(of: url, maxWidth: width, scale: scale) {
+            let placeholder = Self.blank(size)
+            placeholders[key] = placeholder
+            Task.detached(priority: .userInitiated) {
+                let decoded = Self.decode(url, maxWidth: width, scale: scale)
+                await MainActor.run { self.finish(key, decoded: decoded) }
+            }
+            return placeholder
+        }
         guard let decoded = kind == .pdf
             ? firstPage(of: url, maxWidth: width)
             : load(url, maxWidth: width)
@@ -66,7 +87,33 @@ final class AttachmentImageCache {
             failures.insert(key)
             return nil
         }
+        store(decoded, for: key)
+        return decoded
+    }
 
+    /// Posted on the main thread when a picture decoded in the background is
+    /// ready; editors showing its placeholder style themselves again.
+    static let didDecode = Notification.Name("AttachmentImageCache.didDecode")
+
+    /// Placeholders handed out while their picture decodes.
+    private var placeholders: [Key: PlatformImage] = [:]
+    /// Pictures already decoded once in the background (see `image(for:)`).
+    private var decodedOnce: Set<Key> = []
+
+    private func finish(_ key: Key, decoded: DecodedImage?) {
+        // Cleared meanwhile (removeAll): the placeholder is gone, and so is
+        // any reason to keep this picture.
+        guard placeholders.removeValue(forKey: key) != nil else { return }
+        decodedOnce.insert(key)
+        if let decoded, let image = decoded.platformImage() {
+            store(image, for: key)
+        } else {
+            failures.insert(key)
+        }
+        NotificationCenter.default.post(name: Self.didDecode, object: nil)
+    }
+
+    private func store(_ decoded: PlatformImage, for key: Key) {
         images[key] = decoded
         order.append(key)
         let cost = Self.byteCost(of: decoded)
@@ -77,7 +124,45 @@ final class AttachmentImageCache {
             images.removeValue(forKey: evicted)
             totalCost -= costs.removeValue(forKey: evicted) ?? 0
         }
-        return decoded
+    }
+
+    /// A decoded bitmap and the point size it is shown at — plain values, so
+    /// it can come back from a background decode.
+    struct DecodedImage: @unchecked Sendable {
+        let image: CGImage
+        let size: CGSize
+
+        func platformImage() -> PlatformImage? {
+            #if os(macOS)
+            return NSImage(cgImage: image, size: size)
+            #else
+            return UIImage(cgImage: image, scale: CGFloat(image.width) / max(size.width, 1), orientation: .up)
+            #endif
+        }
+    }
+
+    nonisolated private static func decode(_ url: URL, maxWidth: CGFloat, scale: CGFloat) -> DecodedImage? {
+        guard let (image, size) = downsampled(url, maxWidth: maxWidth, scale: scale) else { return nil }
+        return DecodedImage(image: image, size: size)
+    }
+
+    /// The size a picture will be shown at, from its header alone (no pixels
+    /// decoded) — or nil when ImageIO cannot read it, which leaves it to the
+    /// synchronous fallback (SVG and the like).
+    nonisolated private static func pointSize(of url: URL, maxWidth: CGFloat, scale: CGFloat) -> CGSize? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let geometry = geometry(of: source, maxWidth: maxWidth, scale: scale)
+        else { return nil }
+        return geometry.pointSize
+    }
+
+    /// A transparent picture of `size` points.
+    private static func blank(_ size: CGSize) -> PlatformImage {
+        #if os(macOS)
+        return NSImage(size: size)
+        #else
+        return UIGraphicsImageRenderer(size: size).image { _ in }
+        #endif
     }
 
     /// The first page of a PDF, drawn at `maxWidth`.
@@ -122,6 +207,8 @@ final class AttachmentImageCache {
 
     func removeAll() {
         images.removeAll()
+        placeholders.removeAll()
+        decodedOnce.removeAll()
         failures.removeAll()
         order.removeAll()
         costs.removeAll()
@@ -158,10 +245,25 @@ final class AttachmentImageCache {
     /// The returned image keeps the old *point* size — the original's natural
     /// size, or `maxWidth` wide if that is smaller — so layout is unchanged;
     /// only the pixels behind it are fewer (or, on Retina, sharper).
-    private func downsampled(_ url: URL, maxWidth: CGFloat) -> (CGImage, CGSize)? {
+    nonisolated private static func downsampled(_ url: URL, maxWidth: CGFloat, scale: CGFloat) -> (CGImage, CGSize)? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, options),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let geometry = geometry(of: source, maxWidth: maxWidth, scale: scale)
+        else { return nil }
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: geometry.maxPixel,
+        ] as CFDictionary
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else { return nil }
+        return (image, geometry.pointSize)
+    }
+
+    /// Where a picture lands — its point size and the pixel size to decode it
+    /// at — read from the header only.
+    nonisolated private static func geometry(of source: CGImageSource, maxWidth: CGFloat, scale: CGFloat) -> (pointSize: CGSize, maxPixel: Int)? {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               var pixelWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
               var pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
               pixelWidth > 0, pixelHeight > 0
@@ -181,16 +283,9 @@ final class AttachmentImageCache {
         let naturalWidth = pixelWidth * pointsPerPixel
         let pointWidth = min(naturalWidth, Double(maxWidth))
         let pointSize = CGSize(width: pointWidth, height: pixelHeight * pointsPerPixel * pointWidth / naturalWidth)
-        let targetWidth = min(pixelWidth, pointWidth * Double(Self.displayScale))
+        let targetWidth = min(pixelWidth, pointWidth * Double(scale))
         let maxPixel = max(1, Int((max(pixelWidth, pixelHeight) * targetWidth / pixelWidth).rounded(.up)))
-        let thumbnailOptions = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
-        ] as CFDictionary
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else { return nil }
-        return (image, pointSize)
+        return (pointSize, maxPixel)
     }
 
     // ImageIO first; the original whole-image path only for what ImageIO
@@ -198,7 +293,7 @@ final class AttachmentImageCache {
     // it rejects), so no format that used to show stops showing.
     #if os(macOS)
     private func load(_ url: URL, maxWidth: CGFloat) -> NSImage? {
-        if let (image, size) = downsampled(url, maxWidth: maxWidth) {
+        if let (image, size) = Self.downsampled(url, maxWidth: maxWidth, scale: Self.displayScale) {
             return NSImage(cgImage: image, size: size)
         }
         guard let image = NSImage(contentsOf: url) else { return nil }
@@ -215,7 +310,7 @@ final class AttachmentImageCache {
     }
     #else
     private func load(_ url: URL, maxWidth: CGFloat) -> UIImage? {
-        if let (image, size) = downsampled(url, maxWidth: maxWidth) {
+        if let (image, size) = Self.downsampled(url, maxWidth: maxWidth, scale: Self.displayScale) {
             return UIImage(cgImage: image, scale: CGFloat(image.width) / max(size.width, 1), orientation: .up)
         }
         guard let image = UIImage(contentsOfFile: url.path) else { return nil }
