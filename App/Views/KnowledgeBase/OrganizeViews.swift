@@ -5,22 +5,27 @@ import InkstoneCore
 enum KnowledgeBaseSheet: Identifiable {
     case ready
     case plan(ChangePlan)
+    case drop([URL])
 
     var id: String {
         switch self {
         case .ready: return "ready"
         case .plan(let p): return "plan-" + p.moves.map(\.from).joined(separator: "|")
+        case .drop(let urls): return "drop-" + urls.map(\.path).joined(separator: "|")
         }
     }
 
     @MainActor static func current(_ kb: KnowledgeBaseController) -> KnowledgeBaseSheet? {
         if kb.isShowingReadyCard { return .ready }
+        // Files just dropped come before a round waiting from before.
+        if let urls = kb.pendingDrop { return .drop(urls) }
         if let plan = kb.pendingPlan { return .plan(plan) }
         return nil
     }
 
     @MainActor static func closeCurrent(_ kb: KnowledgeBaseController) {
         if kb.isShowingReadyCard { kb.isShowingReadyCard = false }
+        else if kb.pendingDrop != nil { kb.pendingDrop = nil }
         else if kb.pendingPlan != nil { kb.dismissPlan() }
     }
 }

@@ -6,7 +6,6 @@ import InkstoneCore
 /// from now on — changeable in Settings › Knowledge Base.
 struct DropChoiceSheet: View {
     @Environment(Workspace.self) private var workspace
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.style) private var style
     let urls: [URL]
     @State private var remember = false
@@ -25,10 +24,10 @@ struct DropChoiceSheet: View {
             .foregroundStyle(style.secondaryText)
             Toggle("Always do this", isOn: $remember)
             HStack {
-                Button("Cancel", role: .cancel) { kb.pendingDrop = nil; dismiss() }
+                Button("Cancel", role: .cancel) { kb.pendingDrop = nil }
                 Spacer()
-                Button("Move") { kb.bringIn(urls, action: .move, remember: remember); dismiss() }
-                Button("Copy") { kb.bringIn(urls, action: .copy, remember: remember); dismiss() }
+                Button("Move") { kb.bringIn(urls, action: .move, remember: remember) }
+                Button("Copy") { kb.bringIn(urls, action: .copy, remember: remember) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
