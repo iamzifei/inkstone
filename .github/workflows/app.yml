@@ -47,3 +47,12 @@ jobs:
           xcodebuild -project Inkstone.xcodeproj -scheme Inkstone -configuration Debug \
             -destination '${{ matrix.destination }}' CODE_SIGNING_ALLOWED=NO build | tail -20
           test ${PIPESTATUS[0]} -eq 0
+      # Release compiles out everything under `#if DEBUG`, so code that only
+      # builds with it (a declaration left outside the block, an import inside
+      # it) passes the Debug build and breaks the shipping one. Caught by hand
+      # packaging 0.5.1; checked here so it is caught on the PR.
+      - name: Build (Release)
+        run: |
+          xcodebuild -project Inkstone.xcodeproj -scheme Inkstone -configuration Release \
+            -destination '${{ matrix.destination }}' CODE_SIGNING_ALLOWED=NO build | tail -20
+          test ${PIPESTATUS[0]} -eq 0

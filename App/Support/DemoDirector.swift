@@ -232,9 +232,12 @@ private nonisolated func spotlightQuery(_ text: String) {
     }
     query.start()
 }
-#endif
 
+/// DemoDirector's `settings` command; observed by RootView in DEBUG builds only.
+/// Inside the DEBUG block: outside it, a Release build has no Foundation import
+/// here and failed to compile (caught packaging 0.5.1 — CI builds Debug only).
 extension Notification.Name {
     static let inkstoneDemoOpenSettings = Notification.Name("InkstoneDemoOpenSettings")
 }
+#endif
 
