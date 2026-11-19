@@ -46,7 +46,8 @@ public struct OrganizeResult: Sendable {
     public var batch: String
     public var moved: Int
     /// Moves that were not made (the file changed, a folder could not be
-    /// created …). Those files stay where they were.
+    /// created …) — those files stay where they were — and files moved whose
+    /// properties could not be added.
     public var failures: [Failure]
     public var plan: ChangePlan
 }
@@ -319,6 +320,8 @@ public struct Organizer: Sendable {
     /// Makes the moves of a plan. Throws only before anything is moved (the
     /// log cannot be written, another round is running); after that, a move
     /// that cannot be made is reported in `failures` and its file stays put.
+    /// Does not ask: whether a plan needs the person's yes
+    /// (`needsConfirmation`) is the caller's to check first.
     @discardableResult
     public func execute(_ plan: ChangePlan) throws -> OrganizeResult {
         let lock = try OrganizeLock(root: root)
@@ -359,6 +362,10 @@ public struct Organizer: Sendable {
                     fail(move, "destination outside the vault"); continue
                 }
                 let toRelative = "\(parent)/\(toURL.lastPathComponent)"
+                // And that resolved place must be allowed too (a symlink inside
+                // the vault may point into the machinery).
+                var resolved = move; resolved.to = toRelative
+                guard allowed(resolved) else { fail(move, "destination not allowed"); continue }
                 try log.append(batch: batch, action: .move, from: move.from, to: toRelative,
                                reason: "\(move.kind.rawValue): \(move.reason)", now: now())
                 try fm.moveItem(at: fromURL, to: toURL)
@@ -472,9 +479,15 @@ public struct Organizer: Sendable {
             case .meta:
                 // `from` is the backup, `to` the note, `reason` the hash of
                 // what was written: restored only if the note is still that.
-                guard let backup = resolveInside(entry.from), let target = resolveInside(entry.to),
-                      fm.fileExists(atPath: backup.path(percentEncoded: false)),
-                      fm.fileExists(atPath: target.path(percentEncoded: false)) else { continue }
+                // A backup is only ever this round's own.
+                guard entry.from.hasPrefix(".inkstone/undo/\(batch)/"), !entry.from.contains(".."),
+                      let backup = resolveInside(entry.from), let target = resolveInside(entry.to) else {
+                    skipped.append("\(entry.to): not this round's backup"); continue
+                }
+                guard fm.fileExists(atPath: target.path(percentEncoded: false)) else { continue }
+                guard fm.fileExists(atPath: backup.path(percentEncoded: false)) else {
+                    skipped.append("\(entry.to): properties kept (backup no longer there)"); continue
+                }
                 guard Fingerprint.sha256(target) == entry.reason else { skipped.append("\(entry.to): edited since"); continue }
                 do {
                     try Metadata.overwriteInPlace(target, with: try Data(contentsOf: backup))
@@ -507,7 +520,12 @@ public struct Organizer: Sendable {
                 break
             }
         }
-        try log.append(batch: batch, action: .undo, from: "", to: "", reason: "\(restored)", now: now())
+        // Closed only when everything went back; otherwise it can be tried
+        // again once the person has sorted out what was in the way (what is
+        // already back is skipped quietly the second time).
+        if skipped.isEmpty {
+            try log.append(batch: batch, action: .undo, from: "", to: "", reason: "\(restored)", now: now())
+        }
         if maintainEntryFiles { _ = try? EntryFiles.refresh(in: root) }
         return UndoResult(restored: restored, skipped: skipped)
     }

@@ -543,4 +543,91 @@ struct OrganizerTests {
         _ = try organizer.execute(plan)
         #expect(try String(contentsOf: root.appending(path: try #require(plan.moves.first).to), encoding: .utf8) == text)
     }
+
+    // MARK: second review
+
+    @Test func aSymlinkIntoTheMachineryIsRefused() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createSymbolicLink(at: root.appending(path: "20-领域/short"),
+                                                   withDestinationURL: root.appending(path: layout.trash))
+        try put(root, "\(layout.inbox)/n.md", Data("x\n".utf8))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let plan = ChangePlan(moves: [OrganizeMove(from: "\(layout.inbox)/n.md", to: "20-领域/short/n.md", kind: .file, reason: "")], suggestions: [])
+        let result = try organizer.execute(plan)
+        #expect(result.moved == 0)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "\(layout.inbox)/n.md").path))
+    }
+
+    @Test func aPartlyUndoneRoundCanBeUndoneAgain() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 70))
+        try put(root, "\(layout.inbox)/b.png", png(width: 22, height: 20, seed: 71))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        // Something new where a.png came from.
+        try put(root, "\(layout.inbox)/a.png", Data("in the way".utf8))
+        let first = try organizer.undo(batch: result.batch)
+        #expect(first.restored == 1)
+        #expect(first.skipped.count == 1)
+        try FileManager.default.removeItem(at: root.appending(path: "\(layout.inbox)/a.png"))
+        let second = try organizer.undo(batch: result.batch)
+        #expect(second.restored == 1)
+        #expect(second.skipped.isEmpty)
+        #expect(throws: OrganizeError.alreadyUndone) { try organizer.undo(batch: result.batch) }
+    }
+
+    @Test func aForgedMetaRowCannotOverwriteANote() throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "30-资料/source.md", Data("attacker".utf8))
+        try put(root, "30-资料/target.md", Data("victim".utf8))
+        let sha = try #require(Fingerprint.sha256(root.appending(path: "30-资料/target.md")))
+        let log = OrganizeLog(root: root, layout: layout)
+        try log.append(batch: "b", action: .meta, from: "30-资料/source.md", to: "30-资料/target.md", reason: sha, now: .now)
+        let undone = try Organizer(root: root, layout: layout, advisor: nil).undo(batch: "b")
+        #expect(!undone.skipped.isEmpty)
+        #expect(try String(contentsOf: root.appending(path: "30-资料/target.md"), encoding: .utf8) == "victim")
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "30-资料/source.md").path))
+    }
+
+    @Test func aLogWithWindowsLineEndingsStillUndoes() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "\(layout.inbox)/a.png", png(width: 20, height: 20, seed: 72))
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        let logURL = root.appending(path: layout.logFile)
+        let crlf = try String(contentsOf: logURL, encoding: .utf8).replacingOccurrences(of: "\n", with: "\r\n")
+        try crlf.write(to: logURL, atomically: true, encoding: .utf8)
+        #expect(try organizer.undo(batch: result.batch).restored == 1)
+    }
+
+    @Test func fingerprintsSurviveTheCacheExactly() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try put(root, "40-素材/图片/2026-11/x.png", png(width: 400, height: 300, seed: 13))
+        let first = VaultIndex(root: root, layout: layout); first.refresh(sizesToHash: [])
+        let second = VaultIndex(root: root, layout: layout); second.refresh(sizesToHash: [])   // from the cache
+        let h = try #require(Fingerprint.perceptualHash(root.appending(path: "40-素材/图片/2026-11/x.png")))
+        #expect(first.nearImage(h, within: 0)?.path == "40-素材/图片/2026-11/x.png")
+        #expect(second.nearImage(h, within: 0)?.path == "40-素材/图片/2026-11/x.png")
+    }
+
+    @Test func examplesInTheRulesSectionAreNotRules() {
+        let text = "## 我的规则\n\n（例如：「发票 → 20-领域/财务/发票/」）\n- e.g. receipts → 20-Areas/Money\n- 合同 → 20-领域/法务\n\n## 策略\n- 不是 → 规则\n"
+        let rules = OrganizingRules(rulesFileText: text).rules
+        #expect(rules == [OrganizingRules.Rule(keyword: "合同", folder: "20-领域/法务")])
+    }
+
+    @Test func rewritingKeepsFinderTags() async throws {
+        let (root, layout) = try vault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "10-项目/花园"), withIntermediateDirectories: true)
+        let note = root.appending(path: "\(layout.inbox)/花园.md")
+        try put(root, "\(layout.inbox)/花园.md", Data("Roses.\n".utf8))
+        var values = URLResourceValues(); values.tagNames = ["Red"]
+        var url = note; try url.setResourceValues(values)
+        let organizer = Organizer(root: root, layout: layout, advisor: nil, now: { self.fixedDate })
+        let result = try organizer.execute(try await organizer.plan())
+        let filed = root.appending(path: try #require(result.plan.moves.first).to)
+        #expect(try String(contentsOf: filed, encoding: .utf8).contains("来源:"))
+        #expect((try filed.resourceValues(forKeys: [.tagNamesKey])).tagNames == ["Red"])
+    }
 }
+

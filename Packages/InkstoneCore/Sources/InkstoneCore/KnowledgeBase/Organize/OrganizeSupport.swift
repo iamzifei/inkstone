@@ -23,9 +23,10 @@ enum CanonicalPath {
 // MARK: - One round at a time
 
 /// An exclusive lock on the vault's organizing (an `flock` on
-/// `.inkstone/organize.lock`), so two rounds — two windows, or the Mac and an
-/// iPad on the same folder through a sync that keeps the file — never
-/// interleave their moves and log rows.
+/// `.inkstone/organize.lock`), so two rounds on this device — two windows, a
+/// share arriving mid-round — never interleave their moves and log rows. It
+/// does not reach other devices (a sync service has no locks); a file system
+/// without `flock` (some network shares) is organized without one.
 final class OrganizeLock {
     private var fd: Int32
 
@@ -34,7 +35,12 @@ final class OrganizeLock {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         fd = open(folder.appending(path: "organize.lock").path(percentEncoded: false), O_CREAT | O_RDWR, 0o644)
         guard fd >= 0 else { throw OrganizeError.logUnwritable }
-        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { close(fd); fd = -1; throw OrganizeError.busy }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            let error = errno
+            close(fd); fd = -1
+            // Held by another round: busy. Not supported here: go on unlocked.
+            if error == EWOULDBLOCK { throw OrganizeError.busy }
+        }
     }
 
     func release() {
@@ -61,8 +67,9 @@ final class VaultIndex {
         var modified: Double
         var created: Double
         var sha: String?
-        var phash: UInt64?
-        var simhash: UInt64?
+        /// 64-bit hashes as hex: JSON numbers lose bits above 2^53.
+        var phash: String?
+        var simhash: String?
         var pixels: Double?
         var length: Int?
         var fingerprinted: Bool
@@ -80,7 +87,7 @@ final class VaultIndex {
         self.root = root; self.layout = layout
     }
 
-    var cacheURL: URL { root.appending(path: ".inkstone/fingerprints.json") }
+    var cacheURL: URL { root.appending(path: ".inkstone/fingerprints-v2.json") }
 
     var excludedTops: Set<String> { Set((layout.systemFolders + [layout.inbox]).map(Organizer.fold)) }
 
@@ -128,12 +135,12 @@ final class VaultIndex {
                     entry.fingerprinted = true
                     switch FileKind.detect(url) {
                     case .image:
-                        entry.phash = Fingerprint.perceptualHash(url)
+                        entry.phash = Fingerprint.perceptualHash(url).map { String($0, radix: 16) }
                         entry.pixels = Double(Self.pixels(url))
                     case .markdown, .text:
                         // The same window the inbox side hashes, so the two compare.
                         let text = String(FactsExtractor.readText(url).prefix(FactsExtractor.excerptLength))
-                        entry.simhash = Fingerprint.simHash(text)
+                        entry.simhash = Fingerprint.simHash(text).map { String($0, radix: 16) }
                         entry.length = text.count
                     default: break
                     }
@@ -153,14 +160,14 @@ final class VaultIndex {
     }
 
     func nearImage(_ hash: UInt64, within limit: Int) -> (path: String, pixels: CGFloat)? {
-        entries.compactMap { path, e in e.phash.map { (path, Fingerprint.distance($0, hash), e.pixels ?? 0) } }
+        entries.compactMap { path, e in e.phash.flatMap { UInt64($0, radix: 16) }.map { (path, Fingerprint.distance($0, hash), e.pixels ?? 0) } }
             .filter { $0.1 <= limit }.min { ($0.1, $0.0) < ($1.1, $1.0) }.map { ($0.0, CGFloat($0.2)) }
     }
 
     /// The most similar note (SimHash distance ≤ 12; ≤ 3 is the same
     /// document, 4–12 an overlapping topic).
     func nearText(_ hash: UInt64) -> (path: String, distance: Int)? {
-        entries.compactMap { path, e in e.simhash.map { (path, Fingerprint.distance($0, hash)) } }
+        entries.compactMap { path, e in e.simhash.flatMap { UInt64($0, radix: 16) }.map { (path, Fingerprint.distance($0, hash)) } }
             .filter { $0.1 <= 12 }.min { ($0.1, $0.0) < ($1.1, $1.0) }
     }
 
@@ -243,7 +250,8 @@ struct OrganizeLog {
 
     func entries(batch: String) -> [Entry] {
         guard let text = try? String(contentsOf: root.appending(path: layout.logFile), encoding: .utf8) else { return [] }
-        return text.split(separator: "\n").compactMap { line in
+        // Any line ending: a sync or an editor may have made them CRLF.
+        return text.split(whereSeparator: \.isNewline).compactMap { line in
             guard line.hasPrefix("|") else { return nil }
             let c = Self.cells(String(line))
             guard c.count >= 6, c[1] == batch, let action = Action(rawValue: c[2]) else { return nil }
@@ -347,14 +355,20 @@ enum Metadata {
         try overwriteInPlace(url, with: newData)
     }
 
-    /// Writes into the same file (not a replacement), so its creation date,
-    /// Finder tags and other extended attributes stay as they were.
+    /// Replaces a file's contents atomically — written next to it, then
+    /// swapped in with `replaceItemAt`, which keeps the original's creation
+    /// date, Finder tags and other metadata. A crash at any point leaves
+    /// either the old file or the new one, never a half-written one.
     static func overwriteInPlace(_ url: URL, with data: Data) throws {
-        let handle = try FileHandle(forUpdating: url)
-        defer { try? handle.close() }
-        try handle.truncate(atOffset: 0)
-        try handle.write(contentsOf: data)
-        try handle.synchronize()
+        let fm = FileManager.default
+        let temp = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).inkstone-\(UUID().uuidString.prefix(8))")
+        try data.write(to: temp)
+        do {
+            _ = try fm.replaceItemAt(url, withItemAt: temp)
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw error
+        }
     }
 
     /// Backups of rounds older than 30 days (they may hold private notes):

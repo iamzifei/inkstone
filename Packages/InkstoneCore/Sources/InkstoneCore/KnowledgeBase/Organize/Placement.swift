@@ -76,6 +76,9 @@ public struct OrganizingRules: Sendable {
         }
         for line in section {
             var l = line.trimmingCharacters(in: .whitespaces)
+            // Explanations and examples, not rules.
+            if l.hasPrefix("（") || l.hasPrefix("(") || l.hasPrefix("<!--") || l.hasPrefix(">")
+                || ["例如", "例：", "比如", "e.g.", "For example"].contains(where: l.contains) { continue }
             if l.hasPrefix("- ") || l.hasPrefix("* ") { l = String(l.dropFirst(2)) }
             for arrow in ["→", "=>", "->"] {
                 let parts = l.components(separatedBy: arrow)
