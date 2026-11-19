@@ -138,12 +138,15 @@ final class ShareViewController: UIViewController {
         var title: String?
         for item in items {
             if title == nil, let t = item.attributedContentText?.string, !t.isEmpty { title = t }
-            for provider in item.attachments ?? [] where !isFileProvider(provider) {
+            for provider in item.attachments ?? [] {
+                // A file's provider still gives its web link (Safari's shared
+                // picture), but not its text: that is the file itself.
+                let isFile = isFileProvider(provider)
                 if url == nil, provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
                    let found = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL,
                    !found.isFileURL {
                     url = found
-                } else if text == nil, provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                } else if !isFile, text == nil, provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                     // Mail and Notes can hand over attributed text or raw data
                     // rather than a String.
                     let loaded = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier)
@@ -204,7 +207,9 @@ private struct ShareView: View {
                     }
                     if !model.failedFiles.isEmpty {
                         Section {
-                            ForEach(model.failedFiles, id: \.self) { Label($0, systemImage: "exclamationmark.triangle") }
+                            ForEach(Array(model.failedFiles.enumerated()), id: \.offset) { _, name in
+                                Label(name, systemImage: "exclamationmark.triangle")
+                            }
                         } header: {
                             Text("Couldn't be read")
                         } footer: {
