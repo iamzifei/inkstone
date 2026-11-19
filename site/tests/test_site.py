@@ -533,3 +533,32 @@ class NoLegalEntityName(BuiltSite):
             if path.is_file() and path.suffix in {".html", ".txt", ".xml", ".js", ".css"}:
                 with self.subTest(path=str(path.relative_to(self.out))):
                     self.assertNotIn(needle, path.read_bytes().lower())
+
+
+class WebmPlaysInWebKit(unittest.TestCase):
+    """Every published WebM is VP9 profile 0 (8-bit 4:2:0).
+
+    2026-11-20: duo.webm had been encoded 4:4:4 (VP9 profile 1). Chrome plays
+    that; WebKit (Safari and every iOS browser) reports it can't
+    (`canPlayType` is empty for vp09.01) yet still picks the WebM source,
+    because the <source> type names no codec — and the video sat blank at 0:00.
+    Read straight from the first frame header, so no ffprobe is needed.
+    """
+
+    @staticmethod
+    def vp9_profile(data: bytes) -> int:
+        cluster = data.find(b"\x1f\x43\xb6\x75")       # first Cluster
+        block = data.find(b"\xa3", cluster + 4)          # first SimpleBlock
+        p = block + 1
+        p += 8 - data[p].bit_length() + 1                # EBML size vint
+        p += 1 + 2 + 1                                   # track number, timecode, flags
+        header = data[p]
+        assert header >> 6 == 0b10, f"not a VP9 frame marker: {header:#x}"
+        return ((header >> 5) & 1) | (((header >> 4) & 1) << 1)
+
+    def test_every_webm_is_vp9_profile_0(self) -> None:
+        videos = sorted((Path(__file__).resolve().parents[1] / "assets" / "video").glob("*.webm"))
+        self.assertTrue(videos)
+        for video in videos:
+            with self.subTest(video=video.name):
+                self.assertEqual(self.vp9_profile(video.read_bytes()), 0)

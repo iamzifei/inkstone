@@ -90,7 +90,7 @@ ffmpeg -v error -y -i "$WORK/joined.mp4" \
 
 echo "==> VP9"
 ffmpeg -v error -y -i "$WORK/joined.mp4" \
-  -an -c:v libvpx-vp9 -crf 42 -b:v 0 -row-mt 1 -deadline good -cpu-used 2 \
+  -an -c:v libvpx-vp9 -pix_fmt yuv420p -crf 42 -b:v 0 -row-mt 1 -deadline good -cpu-used 2 \
   "$OUT/hero.webm"
 
 # ---- 4. poster -----------------------------------------------------------

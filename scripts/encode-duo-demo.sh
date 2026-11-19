@@ -52,7 +52,7 @@ ffmpeg -v error -y "${inputs[@]}" -filter_complex "${filter%;}" -map "[$label]" 
 
 ffmpeg -v error -y -i "$WORK/joined.mp4" -an -c:v libx264 -profile:v high -crf 26 -preset slow \
   -pix_fmt yuv420p -movflags +faststart "$OUT/duo.mp4"
-ffmpeg -v error -y -i "$WORK/joined.mp4" -an -c:v libvpx-vp9 -crf 42 -b:v 0 -row-mt 1 \
+ffmpeg -v error -y -i "$WORK/joined.mp4" -an -c:v libvpx-vp9 -pix_fmt yuv420p -crf 42 -b:v 0 -row-mt 1 \
   -deadline good -cpu-used 2 "$OUT/duo.webm"
 ffmpeg -v error -y -ss 1.0 -i "$WORK/joined.mp4" -vframes 1 "$WORK/poster.png"
 cwebp -quiet -q 82 "$WORK/poster.png" -o "$OUT/duo-poster.webp"
