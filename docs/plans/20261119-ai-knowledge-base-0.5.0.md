@@ -67,7 +67,7 @@ size: XL
 - 技术路线待定（动工前再定，写进本节）：现有 App 是 SwiftUI，不能直接跑在 Windows。候选：① 把 InkstoneCore 的整理/入口文件逻辑抽成跨平台库，Windows 端另写界面；② 用跨平台框架重写一个精简版。选型依据：维护成本、与 Mac 版行为一致（整理策略、日志格式、撤销必须同一套）、安装包体积。
 - 发布：Microsoft Store 提交 + 网站各语言下载页加 Windows 链接。
 - 验收：Windows 实机/虚拟机跑通建库→拖入→整理→撤销；整理日志与 Mac 版互相可读（同一个库两边都能撤销）；商店提交状态为审核中/已上架；官网 Windows 链接 200。
-- HUMAN QUEUE：注册 Microsoft Partner Center 开发者账号（11-19 查过：之前没有）；一台 Windows 测试环境（实机或 VM）。代码签名证书：走 Microsoft Store 不需要（微软重签 MSIX）；只有官网直接分发 .exe 才需要。
+- HUMAN QUEUE：注册 Microsoft Store 开发者账号——**公司账号（免费）**，在 storedeveloper.microsoft.com 用 Orris 的 D-U-N-S 号与公司域名邮箱（11-19 查过：之前没有）；一台 Windows 测试环境（实机或 VM）。代码签名证书：走 Microsoft Store 不需要（微软重签 MSIX）；只有官网直接分发 .exe 才需要。
 
 ## 验收（全局）
 每阶段：核心测试 + `scripts/test-all.sh` + CI 绿、独立评审、UI 有截图、性能项有数字。不删文件、不改正文两条底线有自动化测试守住。
@@ -97,4 +97,7 @@ size: XL
 - 剩余：**P7 官网重做 + SEO**（设计稿 → 实现 → 8 语言 → 新落地页 ai-knowledge-base / ai-context-management），**P8 Windows 版**。
 - 2026-11-19：**P7 开始**。设计稿（Claude Design 画布）：https://claude.ai/artifact/ScrNRf2kEygVFgpGKWKQNY —— 首页桌面版（英）、首页手机版（简中）、落地页 /ai-knowledge-base（英）、设计规范与 SEO 关键词分布。全部用真实截图（iOS 知识库截图 + 现有 Mac 编辑器截图）；配色与字体沿用现有站点 token。实现时需补拍 Mac 浅色主题的知识库截图。
 - 2026-11-19：**P8 前置排查**（子任务只读调查）：没有 Microsoft 开发者账号（Partner Center）的任何邮件痕迹（只查了 iamzifei@gmail.com，飞书两个信箱未查）；没有 Windows 代码签名证书；以前做过 Windows 版的是**灵犀桌面版**（仓库 `/Users/james/Dev/claude-desk`，Electron + electron-builder NSIS，2026-06-27～07-02 在 GitHub Actions 打出 v1.5.1、v1.6.1 **未签名** .exe，安装包在 `/Users/james/Downloads/inknest-win/`、`/Users/james/Downloads/lingxi-win/`，没发过 Release）。上架 Microsoft Store 时由微软重签 MSIX，不必自购证书；官网直接分发 .exe 才需要 OV/EV 证书或 Azure Artifact Signing。
+- 2026-11-20：**iOS 从其他 App 分享文件进知识库**——PR #31 合入（`878e878`）。分享扩展收文件（文件 App、照片、邮件附件等，≤20 个），先放进 App Group 并附带交付进度，App 打开时经 DropImporter 放进收件箱再自动整理；评审两轮修掉「重试时重复」「一条失败堵住后面所有」「读不到的文件静默丢掉」「文本文件交付两次」。模拟器端到端实测通过；**待真机测**：Safari、备忘录、邮件文本、照片 HEIC 与实况照片（HUMAN QUEUE）。随下一个版本（0.5.1）发。
+- 2026-11-20：**P7 素材**：苹果官方 iPhone 18 Pro 边框（Bezel-iPhone-18.dmg，144 MB，许可同 Duo，放在不提交的 `assets/footage-iphone18/`）；iPhone 18 Pro 模拟器截图 1206×2622 与边框屏幕开口逐像素对齐，截图按机身剪影裁切不外溢（实测）。桌面演示按 James 定用**真实 macOS 窗口截图**（不套 Safari 外框：Mac App 套浏览器外框会让人误以为是网页版）。Duo 模块沿用现有演示（编辑器界面未变）。三语言 iPhone + Mac 截图已拍好（`assets/site-shots/`，不提交）。顺手修了 Mac 设置页打开时会跳到规则编辑器底部的问题。
+- 2026-11-20：**P8 微软账号**：James 定用**公司账号**（微软 2026-10-29 文档：公司账号也免费；个人账号只适用于与生意无关的 App）。注册入口 storedeveloper.microsoft.com 已在 James 的 Chrome 打开。需要 James 本人：登录、D-U-N-S（或公司注册文件）、公司域名邮箱、同意协议。
 
