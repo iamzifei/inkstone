@@ -3,8 +3,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 import InkstoneCore
 
-/// The iOS share sheet's "Inkstone": a page, a link or some text, saved to the
-/// vault's Inbox note.
+/// The iOS share sheet's "Inkstone": a page, a link, some text — or files
+/// (from Files, Photos, Mail or any app) — added to the vault: in a knowledge
+/// base, into its inbox to be filed; otherwise to the Inbox note.
 ///
 /// An extension cannot reach the vault (its folder is the app's, through a
 /// security-scoped bookmark), so it drops the item into the app group's inbox
@@ -30,7 +31,9 @@ final class ShareViewController: UIViewController {
         host.didMove(toParent: self)
 
         Task { @MainActor in
-            let item = await Self.collect(from: extensionContext?.inputItems as? [NSExtensionItem] ?? [])
+            let inputs = extensionContext?.inputItems as? [NSExtensionItem] ?? []
+            let item = await Self.collect(from: inputs)
+            model.files = await Self.collectFiles(from: inputs, into: model.staging)
             model.item = item
             model.text = item.text ?? ""
             model.isLoading = false
@@ -44,7 +47,8 @@ final class ShareViewController: UIViewController {
         item.text = text.isEmpty ? nil : model.text
         item.date = .now
         do {
-            try SharedInbox.add(item)
+            try SharedInbox.add(item, files: model.files)
+            try? FileManager.default.removeItem(at: model.staging)
             finish(cancelled: false)
         } catch {
             // Shown, not swallowed: the user would otherwise think it was saved.
@@ -55,10 +59,58 @@ final class ShareViewController: UIViewController {
     private func finish(cancelled: Bool) {
         guard !finished else { return }
         finished = true
+        if cancelled { try? FileManager.default.removeItem(at: model.staging) }
         if cancelled {
             extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
         } else {
             extensionContext?.completeRequest(returningItems: nil)
+        }
+    }
+
+    /// The files shared (not text or a web link), each copied out while the
+    /// system's temporary copy still exists — it is removed as soon as the
+    /// load callback returns.
+    static func collectFiles(from items: [NSExtensionItem], into staging: URL) async -> [URL] {
+        try? FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        var out: [URL] = []
+        for item in items {
+            for provider in item.attachments ?? [] {
+                // The most specific type that is a file's data — not plain
+                // text or a web link, which `collect` handles.
+                // A file handed over as a file (Files, Mail attachments) is a
+                // file whatever it holds; otherwise only non-text data —
+                // pictures, video, sound, PDF — is: text and web links are
+                // what `collect` turns into the note.
+                let types = provider.registeredTypeIdentifiers.compactMap(UTType.init)
+                let isFile = provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+                guard let type = types.first(where: { t in
+                    (t.conforms(to: .data) || t.conforms(to: .package)) && !t.conforms(to: .url)
+                        && (isFile || !t.conforms(to: .text))
+                }) else { continue }
+                if let copied = await copyFile(from: provider, type: type, into: staging) { out.append(copied) }
+            }
+        }
+        return out
+    }
+
+    private static func copyFile(from provider: NSItemProvider, type: UTType, into staging: URL) async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
+                guard let url else { continuation.resume(returning: nil); return }
+                var name = provider.suggestedName ?? url.deletingPathExtension().lastPathComponent
+                if (name as NSString).pathExtension.isEmpty, let ext = type.preferredFilenameExtension ?? Optional(url.pathExtension), !ext.isEmpty {
+                    name += ".\(ext)"
+                }
+                let folder = staging.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+                let dest = folder.appending(path: name)
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try FileManager.default.copyItem(at: url, to: dest)
+                    continuation.resume(returning: dest)
+                } catch {
+                    continuation.resume(returning: nil)
+                }
+            }
         }
     }
 
@@ -103,6 +155,9 @@ final class ShareModel {
     var isLoading = true
     var error: String?
     let hasVault = SharedInbox.appHasVault
+    /// Files shared, copied out of the host app's hands.
+    var files: [URL] = []
+    let staging = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
 private struct ShareView: View {
@@ -116,13 +171,27 @@ private struct ShareView: View {
                 if model.isLoading {
                     Section { ProgressView().frame(maxWidth: .infinity) }
                 } else {
+                    if !model.files.isEmpty {
+                        Section {
+                            ForEach(model.files, id: \.self) { file in
+                                Label(file.lastPathComponent, systemImage: "doc")
+                                    .lineLimit(1)
+                            }
+                        } header: {
+                            Text("\(model.files.count) files")
+                        } footer: {
+                            Text("Added to your knowledge base's inbox and filed the next time Inkstone opens (in another vault: its attachments folder).")
+                        }
+                    }
                     Section {
                         TextEditor(text: $model.text)
-                            .frame(minHeight: 120)
+                            .frame(minHeight: model.files.isEmpty ? 120 : 60)
                     } footer: {
-                        Text(model.hasVault
-                             ? "Saved to the Inbox note of your vault the next time Inkstone opens."
-                             : "Open Inkstone and choose a vault: what you share waits here until then, and goes into the vault's Inbox note.")
+                        if model.files.isEmpty {
+                            Text(model.hasVault
+                                 ? "Saved the next time Inkstone opens: in a knowledge base, as a note in its inbox; otherwise in the vault's Inbox note."
+                                 : "Open Inkstone and choose a vault: what you share waits here until then.")
+                        }
                     }
                     if let url = model.item.url {
                         Section("Link") {
@@ -144,7 +213,8 @@ private struct ShareView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
                         .disabled(model.isLoading
-                                  || (model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.item.url == nil))
+                                  || (model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                      && model.item.url == nil && model.files.isEmpty))
                 }
             }
         }

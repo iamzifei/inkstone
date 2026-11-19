@@ -63,7 +63,7 @@ struct SharedInboxTests {
         try SharedInbox.add(.init(text: "second", url: nil, title: nil, date: Date(timeIntervalSince1970: 200)), in: dir)
         try SharedInbox.add(.init(text: "first", url: nil, title: nil, date: Date(timeIntervalSince1970: 100)), in: dir)
         var got: [String] = []
-        SharedInbox.drain(in: dir) { got.append($0.text ?? ""); return true }
+        SharedInbox.drain(in: dir) { item, _ in got.append(item.text ?? ""); return true }
         #expect(got == ["first", "second"])
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
     }
@@ -71,9 +71,9 @@ struct SharedInboxTests {
     @Test func anItemTheVaultCannotTakeStaysForNextTime() throws {
         let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try SharedInbox.add(.init(text: "keep me", url: nil, title: nil, date: .now), in: dir)
-        SharedInbox.drain(in: dir) { _ in false }
+        SharedInbox.drain(in: dir) { _, _ in false }
         var got: [String] = []
-        SharedInbox.drain(in: dir) { got.append($0.text ?? ""); return true }
+        SharedInbox.drain(in: dir) { item, _ in got.append(item.text ?? ""); return true }
         #expect(got == ["keep me"])
     }
 
@@ -90,4 +90,35 @@ struct SharedInboxTests {
         #expect(note.text == item.markdown.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
         #expect(note.text.contains("https://example.com/a"))
     }
+
+    @Test func sharedFilesTravelWithTheirItemAndGoWithIt() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "share-\(UUID().uuidString)")
+        let src = FileManager.default.temporaryDirectory.appending(path: "src-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir); try? FileManager.default.removeItem(at: src) }
+        try Data("pdf".utf8).write(to: src.appending(path: "report.pdf"))
+        let other = src.appending(path: "b"); try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try Data("pdf2".utf8).write(to: other.appending(path: "report.pdf"))     // same name
+        try SharedInbox.add(.init(text: nil, url: nil, title: nil, date: .now),
+                            files: [src.appending(path: "report.pdf"), other.appending(path: "report.pdf")], in: dir)
+        var seen: [String] = []
+        // Kept when not delivered…
+        SharedInbox.drain(in: dir) { _, files in seen = files.map(\.lastPathComponent); return false }
+        #expect(seen == ["report.pdf", "report 2.pdf"])
+        // …and gone, with its folder, once delivered.
+        SharedInbox.drain(in: dir) { _, files in
+            #expect(files.count == 2)
+            #expect((try? Data(contentsOf: files[1])) == Data("pdf2".utf8))
+            return true
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
+    }
+
+    @Test func anItemFromTheLastVersionWithoutFilesStillDecodes() throws {
+        let json = #"{"text":"old","date":0}"#
+        let item = try JSONDecoder().decode(Capture.SharedItem.self, from: Data(json.utf8))
+        #expect(item.files == nil)
+        #expect(item.text == "old")
+    }
 }
+

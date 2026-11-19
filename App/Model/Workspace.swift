@@ -1832,9 +1832,18 @@ final class Workspace {
                     .appending(path: "." + (l.rulesFile as NSString).lastPathComponent + ".icloud").path(percentEncoded: false)) ? l : nil }) {
             let folder = root.appending(path: layout.inbox, directoryHint: .isDirectory)
             var delivered = false
-            SharedInbox.drain { item in
-                let note = SharedInbox.note(for: item)
+            SharedInbox.drain { item, files in
                 try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                // Shared files go in like dropped ones: copied, checked, then
+                // named — the organizer files them.
+                if !files.isEmpty {
+                    let results = DropImporter.importItems(files, into: root, layout: layout, action: .copy)
+                    guard results.allSatisfy({ $0.destination != nil }) else { return false }
+                    delivered = true
+                }
+                // The text or link, if there was one, as a note of its own.
+                guard !item.markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
+                let note = SharedInbox.note(for: item)
                 var url = folder.appending(path: note.name)
                 var n = 2
                 while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
@@ -1856,11 +1865,29 @@ final class Workspace {
             return
         }
         var delivered = false
-        SharedInbox.drain { item in
+        SharedInbox.drain { item, files in
             if !FileManager.default.fileExists(atPath: inbox.path(percentEncoded: false)) {
                 guard (try? store.write("# Inbox\n", to: inbox)) != nil else { return false }
             }
-            let entry = SharedInbox.entry(for: item)
+            // Shared files go to the attachments folder, embedded in the entry.
+            var embeds: [String] = []
+            if !files.isEmpty {
+                let folderName = settings.data.attachmentFolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+                let target = folderName.isEmpty ? root : root.appending(path: folderName, directoryHint: .isDirectory)
+                try? FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+                var copied: [URL] = []
+                for file in files {
+                    let dest = DropImporter.unique(target.appending(path: file.lastPathComponent))
+                    guard (try? FileManager.default.copyItem(at: file, to: dest)) != nil else {
+                        for c in copied { try? FileManager.default.removeItem(at: c) }
+                        return false
+                    }
+                    copied.append(dest)
+                    embeds.append("![[\(dest.lastPathComponent)]]")
+                }
+            }
+            var entry = SharedInbox.entry(for: item)
+            if !embeds.isEmpty { entry += "\n" + embeds.joined(separator: "\n") + "\n" }
             let core = entry.trimmingCharacters(in: .whitespacesAndNewlines)
             // Already in the open note from an earlier try whose save failed:
             // don't add it a second time, just get it onto disk.

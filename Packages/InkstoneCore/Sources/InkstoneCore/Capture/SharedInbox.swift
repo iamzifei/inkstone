@@ -10,19 +10,47 @@ public enum SharedInbox {
             .appending(path: "Inbox", directoryHint: .isDirectory)
     }
 
-    /// Called by the extension.
-    public static func add(_ item: Capture.SharedItem, in directory: URL? = nil) throws {
+    /// Called by the extension. Files shared with the item are copied into a
+    /// folder of its own beside its JSON (`<stem>/`), and listed in it; the
+    /// JSON is written last, so the app never sees an item whose files are
+    /// not all there yet.
+    public static func add(_ item: Capture.SharedItem, files: [URL] = [], in directory: URL? = nil) throws {
         guard let folder = directory ?? folder else { throw CocoaError(.fileNoSuchFile) }
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fm = FileManager.default
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let stem = "\(Int(item.date.timeIntervalSince1970 * 1000))-\(UUID().uuidString)"
+        var item = item
+        if !files.isEmpty {
+            let box = folder.appending(path: stem, directoryHint: .isDirectory)
+            try fm.createDirectory(at: box, withIntermediateDirectories: true)
+            var names: [String] = []
+            do {
+                for file in files {
+                    var name = file.lastPathComponent.isEmpty ? "file" : file.lastPathComponent
+                    var n = 2
+                    while names.contains(name) {
+                        let ext = (file.lastPathComponent as NSString).pathExtension
+                        let base = (file.lastPathComponent as NSString).deletingPathExtension
+                        name = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"; n += 1
+                    }
+                    try fm.copyItem(at: file, to: box.appending(path: name))
+                    names.append(name)
+                }
+            } catch {
+                try? fm.removeItem(at: box)         // nothing half-shared is left behind
+                throw error
+            }
+            item.files = names
+        }
         let data = try JSONEncoder().encode(item)
-        try data.write(to: folder.appending(path: "\(Int(item.date.timeIntervalSince1970 * 1000))-\(UUID().uuidString).json"),
-                       options: .atomic)
+        try data.write(to: folder.appending(path: "\(stem).json"), options: .atomic)
     }
 
-    /// Called by the app: hands each waiting item, oldest first, to `deliver`;
-    /// an item is removed only once `deliver` returns true, so nothing is lost
-    /// if the vault cannot take it now.
-    public static func drain(in directory: URL? = nil, deliver: (Capture.SharedItem) -> Bool) {
+    /// Called by the app: hands each waiting item, oldest first, with its
+    /// files, to `deliver`; an item and its files are removed only once
+    /// `deliver` returns true, so nothing is lost if the vault cannot take it
+    /// now.
+    public static func drain(in directory: URL? = nil, deliver: (Capture.SharedItem, [URL]) -> Bool) {
         guard let folder = directory ?? folder,
               let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         else { return }
@@ -31,12 +59,17 @@ public enum SharedInbox {
             // error): leave it for the next time, never delete it — and do
             // not let it hold up the items behind it.
             guard let data = try? Data(contentsOf: file) else { continue }
+            let box = file.deletingPathExtension()
             guard let item = try? JSONDecoder().decode(Capture.SharedItem.self, from: data) else {
                 try? FileManager.default.removeItem(at: file)   // not an item at all: never deliverable
                 continue
             }
-            guard deliver(item) else { return }
+            let attached = (item.files ?? []).map { box.appending(path: $0) }
+            // A listed file missing (cleared by the system): deliver what is there.
+            let present = attached.filter { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) }
+            guard deliver(item, present) else { return }
             try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: box)
         }
     }
 
