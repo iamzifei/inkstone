@@ -417,7 +417,9 @@ enum Metadata {
     static func madeAt(_ url: URL) -> Date? {
         let name = url.lastPathComponent
         if let r = name.range(of: tempMarker),
-           let seconds = name[r.upperBound...].split(separator: "-").first.flatMap({ Double($0) }), seconds > 1_000_000_000 {
+           let digits = name[r.upperBound...].split(separator: "-").first, !digits.isEmpty,
+           digits.allSatisfy(\.isASCII), digits.allSatisfy(\.isNumber),
+           let seconds = Double(digits), seconds > 1_000_000_000 {
             return Date(timeIntervalSince1970: seconds)
         }
         return (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
@@ -434,7 +436,9 @@ enum Metadata {
                 e.skipDescendants()
                 // Only ones untouched for an hour: a drop still being copied
                 // has a fresh date and is left alone.
-                if now.timeIntervalSince(madeAt(url) ?? now) > 3_600 { try? fm.removeItem(at: url) }
+                // A day: even a very long copy (a huge file over a slow link)
+                // is never swept while it runs.
+                if now.timeIntervalSince(madeAt(url) ?? now) > 86_400 { try? fm.removeItem(at: url) }
             }
         }
         let folder = root.appending(path: ".inkstone/undo", directoryHint: .isDirectory)

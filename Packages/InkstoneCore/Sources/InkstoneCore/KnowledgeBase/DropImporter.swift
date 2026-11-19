@@ -92,7 +92,7 @@ public enum DropImporter {
     }
 
     /// Temporary copies left by a crash mid-drop (hidden, in the inbox,
-    /// untouched for an hour) — swept when a knowledge base opens.
+    /// made over a day ago) — swept when a knowledge base opens.
     public static func sweepLeftovers(root: URL) {
         Metadata.purgeOldBackups(root: root, now: .now)
     }

@@ -131,7 +131,7 @@ struct DropImporterTests {
         let fresh = kb.appending(path: "00-收件箱/.big.mov\(Metadata.tempMarker)aaaa1111")
         let old = kb.appending(path: "00-收件箱/.old.mov\(Metadata.tempMarker)bbbb2222")
         try Data("x".utf8).write(to: fresh); try Data("y".utf8).write(to: old)
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -7200)], ofItemAtPath: old.path)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -2 * 86_400)], ofItemAtPath: old.path)
         DropImporter.sweepLeftovers(root: kb)
         #expect(FileManager.default.fileExists(atPath: fresh.path))
         #expect(!FileManager.default.fileExists(atPath: old.path))
@@ -147,8 +147,8 @@ struct DropImporterTests {
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -2 * 365 * 86_400)], ofItemAtPath: temp.path)
         DropImporter.sweepLeftovers(root: kb)
         #expect(FileManager.default.fileExists(atPath: temp.path))
-        // Made two hours ago: swept.
-        let stale = kb.appending(path: "\(layout.inbox)/" + Metadata.temporaryName(for: "x.mov", now: Date(timeIntervalSinceNow: -7200)))
+        // Made two days ago: swept.
+        let stale = kb.appending(path: "\(layout.inbox)/" + Metadata.temporaryName(for: "x.mov", now: Date(timeIntervalSinceNow: -2 * 86_400)))
         try Data("y".utf8).write(to: stale)
         DropImporter.sweepLeftovers(root: kb)
         #expect(!FileManager.default.fileExists(atPath: stale.path))
