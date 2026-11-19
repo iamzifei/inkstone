@@ -45,5 +45,13 @@ struct HTMLCommentTests {
         #expect(html.contains("<!-- -->"))
         #expect(!html.contains("private"))
     }
+
+    @Test func aCommentSpanningLinesInAQuoteAListOrCRLFIsHiddenWhole() {
+        for md in ["> text <!-- a\n> b --> more\n", "- item <!-- a\n  b --> more\n", "text <!-- a\r\nb\r\nc --> more\r\n"] {
+            let out = ReadingRenderer.render(md).text
+            #expect(!out.contains("->"), "\(md.debugDescription) → \(out.debugDescription)")
+            #expect(out.contains("more"), "\(md.debugDescription)")
+        }
+    }
 }
 

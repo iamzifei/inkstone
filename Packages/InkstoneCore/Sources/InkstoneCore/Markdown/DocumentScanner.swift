@@ -441,11 +441,17 @@ struct DocumentScanner {
 
         mutating func visitInlineHTML(_ html: InlineHTML) {
             // `<!-- like this -->` in a line of prose: a comment, hidden when
-            // reading. The length comes from the comment's own text:
-            // swift-markdown reports a short end column for inline HTML that
-            // spans lines, which left the closing `>` on screen.
+            // reading. Its end is the first `-->` in the source after its
+            // start: swift-markdown reports a short end column for inline HTML
+            // spanning lines, and `rawHTML` lacks the `> ` / indent / `\r` of
+            // continuation lines in quotes, lists and CRLF text — measuring
+            // either way left `->` on screen.
             if html.rawHTML.hasPrefix("<!--"), let start = nsRange(html.range) {
-                let range = NSRange(location: start.location, length: (html.rawHTML as NSString).length)
+                let ns = source as NSString
+                let close = ns.range(of: "-->", range: NSRange(location: start.location + 4,
+                                                               length: max(0, ns.length - start.location - 4)))
+                let end = close.location == NSNotFound ? NSMaxRange(start) : NSMaxRange(close)
+                let range = NSRange(location: start.location, length: end - start.location)
                 tokens.append(SyntaxToken(kind: .comment, range: range))
                 excluded.append(range)
                 return
