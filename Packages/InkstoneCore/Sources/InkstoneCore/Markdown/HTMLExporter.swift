@@ -24,7 +24,9 @@ public enum HTMLExporter {
             case .tag:
                 edits.append((token.range, #"<span class="tag">"# + escape(source.substring(with: token.range)) + "</span>"))
             case .comment:
-                edits.append((token.range, ""))
+                // %%Obsidian comments%% go; HTML comments stay — invisible
+                // anyway, and CommonMark uses `<!-- -->` to separate lists.
+                if source.substring(with: token.range).hasPrefix("%%") { edits.append((token.range, "")) }
             case .highlight:
                 // Only the == delimiters change; what is inside is still Markdown.
                 let open = NSRange(location: token.range.location, length: token.contentRange.location - token.range.location)

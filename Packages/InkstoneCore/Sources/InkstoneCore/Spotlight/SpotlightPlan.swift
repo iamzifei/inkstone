@@ -25,7 +25,7 @@ public enum SpotlightPlan {
     public static func summary(of text: String, limit: Int) -> String {
         var body = String(FrontmatterParser.parse(text).body)
         let patterns: [(String, String)] = [
-            (#"%%[\s\S]*?%%"#, ""),                       // comments
+            (#"%%[\s\S]*?%%|<!--[\s\S]*?-->"#, ""),       // comments
             (#"!?\[\[([^\]|]*\|)?([^\]]*)\]\]"#, "$2"),   // [[target|label]] → label
             (#"!?\[([^\]]*)\]\([^)]*\)"#, "$1"),           // [text](url) → text
             (#"(?m)^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+"#, ""), // block markers

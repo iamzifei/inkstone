@@ -327,7 +327,9 @@ private enum LegacyPatterns {
     static let mathBlock = make(#"\$\$([\s\S]*?)\$\$"#)
     static let mathInline = make(#"(?<!\$)\$(?!\s)([^\$\n]+?)(?<!\s)\$(?![\$\d])"#)
 
-    static let comment = make(#"%%[\s\S]*?%%"#)
+    // Obsidian's %%comments%% and HTML <!-- comments --> (which Obsidian
+    // also hides when reading; Inkstone's own entry-file markers are these).
+    static let comment = make(#"%%[\s\S]*?%%|<!--[\s\S]*?-->"#)
 
     static let heading = make(#"(?m)^(#{1,6})[ \t]+(.*?)[ \t]*#*$"#)
 

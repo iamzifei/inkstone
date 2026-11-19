@@ -39,8 +39,8 @@ struct KnowledgeBaseSettingsPane: View {
             Section("Adding files") {
                 Picker("When files are dropped in", selection: $settings.data.knowledgeBase.dropAction) {
                     Text("Ask each time").tag(KnowledgeBaseSettings.DropAction.ask)
-                    Text("Copy").tag(KnowledgeBaseSettings.DropAction.copy)
-                    Text("Move").tag(KnowledgeBaseSettings.DropAction.move)
+                    Text("Copy Files").tag(KnowledgeBaseSettings.DropAction.copy)
+                    Text("Move Files").tag(KnowledgeBaseSettings.DropAction.move)
                 }
             }
 

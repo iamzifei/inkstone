@@ -57,6 +57,31 @@ enum DemoDirector {
     }
 
     private static func run(_ line: String, workspace: Workspace) {
+        // Knowledge-base states for store screenshots.
+        switch line {
+        case "welcome":
+            // Back to the first-run guide, with the scratch vault forgotten
+            // so the screenshot shows what a new person sees.
+            // Only the scratch knowledge base is forgotten, never a real vault.
+            if let vault = workspace.vault, vault.url.path(percentEncoded: false).contains("ScratchKnowledgeBase") {
+                workspace.forget(vault)
+            } else {
+                workspace.closeCurrentVault()
+            }
+            return
+        case "kb-card-off":
+            workspace.knowledgeBase.isShowingReadyCard = false
+            return
+        case "kb-confirm":
+            if let plan = workspace.knowledgeBase.pendingPlan { Task { await workspace.knowledgeBase.confirm(plan) } }
+            return
+        case "kb-drop":
+            // The copy-or-move question, as for three files dropped from the desktop.
+            let desktop = URL(fileURLWithPath: NSTemporaryDirectory())
+            workspace.knowledgeBase.pendingDrop = ["Q3 report.pdf", "whiteboard.jpg", "meeting.m4a"].map { desktop.appending(path: $0) }
+            return
+        default: break
+        }
         guard !line.isEmpty, let root = workspace.root else { return }
         let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
         let arg = parts.count > 1 ? parts[1] : ""

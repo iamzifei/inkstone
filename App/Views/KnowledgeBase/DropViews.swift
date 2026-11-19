@@ -26,8 +26,8 @@ struct DropChoiceSheet: View {
             HStack {
                 Button("Cancel", role: .cancel) { kb.pendingDrop = nil }
                 Spacer()
-                Button("Move") { kb.bringIn(urls, action: .move, remember: remember) }
-                Button("Copy") { kb.bringIn(urls, action: .copy, remember: remember) }
+                Button("Move Files") { kb.bringIn(urls, action: .move, remember: remember) }
+                Button("Copy Files") { kb.bringIn(urls, action: .copy, remember: remember) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
