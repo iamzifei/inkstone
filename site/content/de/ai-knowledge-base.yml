@@ -1,0 +1,40 @@
+title: KI-Wissensdatenbank, die sich selbst ordnet — Inkstone
+description: 'Eine KI-Wissensdatenbank im einfachen Ordner: Inkstone legt Notizen, PDFs und Fotos nach deinen Regeln ab und schreibt AGENTS.md. Kostenlos.'
+crumb: KI-Wissensdatenbank
+h1: Eine KI-Wissensdatenbank, die sich selbst ordnet
+lede: Notizen, PDFs, Fotos und Aufnahmen in einen Ordner ziehen. Inkstone legt jede Datei nach Regeln in einfachen Worten ab, mit Apples Modell auf dem Gerät – und hält den Ordner für jeden KI-Assistenten lesbar.
+hero_shot: mac-k1-plan
+hero_alt: 'Inkstone auf dem Mac: der Plan für fünf hineingezogene Dateien.'
+sections:
+- h2: Was ist eine KI-Wissensdatenbank?
+  paras:
+  - 'Eine Sammlung deiner eigenen Notizen und Dateien, so geordnet, dass du und ein KI-Assistent finden, was darin ist – und schriftlich festgehalten, wo was liegt und welcher Datei zu trauen ist. Genau der zweite Teil unterscheidet sie von einem gewöhnlichen Notizordner: Eine KI kann dich nicht fragen, wo die Rechnungen liegen.'
+  - Inkstone hält sie als einfachen Ordner aus Markdown und Dateien. Nichts steckt in einer Datenbank; jede App und jeder KI-Agent kann ihn lesen.
+- h2: So baut Inkstone sie auf
+  list:
+  - 'Eine Struktur für Menschen und KI: Eingang, Projekte, Bereiche, Ressourcen, Medien, Ergebnisse und Privat – dazu ein Prüfordner für Unsicheres und ein Archiv für Duplikate.'
+  - 'Zuerst nach Regeln: deine eigenen, dann Privatsphäre (Ausweise, Bank, Medizinisches in den privaten Ordner), dann ein genanntes Projekt, dann Medien nach Typ und Monat.'
+  - Das Modell auf dem Gerät für den Rest. Es liest den Anfang einer Datei und schlägt Ordner und Titel vor; ist es unsicher, wartet die Datei auf dich.
+  - 'Namen zum Überfliegen: 20261119-renovierung-angebot.md – Datum, dann Thema.'
+  - 'Einstiegsdateien für KI: AGENTS.md, README.md und SOURCE_OF_TRUTH.md, neu geschrieben, wenn sich die Ordner ändern.'
+  shot: mac-k2-organized
+  alt: Die Wissensdatenbank nach einer Runde, mit Rückgängig-Banner.
+- h2: Sicher, sie ordnen zu lassen
+  paras:
+  - Nichts wird gelöscht. Jede Verschiebung wird vorher protokolliert, und eine ganze Runde lässt sich Byte für Byte rückgängig machen. Der Text einer Notiz wird nie umgeschrieben. Große Runden und Duplikate warten auf dein Ja.
+- h2: Auch auf iPhone und iPad
+  paras:
+  - Füge Dateien aus der App „Dateien“ hinzu; sie landen im Eingang und werden genauso abgelegt. Die Wissensdatenbank liegt in iCloud Drive, Mac und iPhone sehen denselben Ordner.
+  shot: iphone-k4-drop
+  alt: 'Auf dem iPhone: kopieren oder verschieben?'
+faq:
+  title: Fragen
+  items:
+  - q: Liest die KI alle meine Dateien?
+    a: Das Modell auf dem Gerät liest nur den Anfang einer Datei, die deine Regeln nicht einordnen konnten, auf deinem Gerät. Ein Cloud-Modell wird nur mit deinem eigenen Schlüssel und eingeschaltet genutzt; privat wirkende Dateien werden nie gesendet.
+  - q: Funktioniert es mit Obsidian?
+    a: Ein Obsidian-Tresor öffnet sich unverändert und wird nie umsortiert. Eine Wissensdatenbank von Inkstone ist gewöhnliches Markdown, das auch Obsidian öffnet.
+  - q: Welche Geräte?
+    a: Mac (macOS 26), iPhone und iPad (iOS 26). Das Modell auf dem Gerät braucht Apple Intelligence; ohne wird nach deinen Regeln geordnet.
+  - q: Was kostet es?
+    a: Nichts. Inkstone ist kostenlos auf dem Mac und im App Store, ohne Konto.

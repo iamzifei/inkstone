@@ -221,6 +221,41 @@ def read_shot_sizes() -> dict[str, tuple[int, int, list[int]]]:
 SHOT_SIZES: dict[str, tuple[int, int, list[int]]] = {}
 
 
+def read_kb_sizes() -> dict[str, tuple[int, int, list[int]]]:
+    """The knowledge-base pictures' sizes (scripts/make-site-kb-shots.py)."""
+    manifest = ROOT / "site" / "assets" / "kb" / "manifest.txt"
+    if not manifest.exists():
+        return {}
+    out = {}
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) >= 3:
+            out[parts[0]] = (int(parts[1]), int(parts[2]), [int(w) for w in parts[3:]])
+    return out
+
+
+KB_SIZES: dict[str, tuple[int, int, list[int]]] = {}
+# The pictures exist in three interface languages; the rest show English.
+KB_LANG = {"zh": "zh-Hans", "zh-Hant": "zh-Hant"}
+
+
+def kb_img(page: "Page", name: str, alt: str, sizes_attr: str, css: str = "", eager: bool = False) -> str:
+    """One knowledge-base picture — an iPhone 18 Pro in Apple's bezel, or a
+    real Mac window — in the page's language where one was captured."""
+    rel = f"{KB_LANG.get(page.lang, 'en')}/{name}.webp"
+    src = f"{page.up}assets/kb/{rel}"
+    entry = KB_SIZES.get(rel)
+    cls = f' class="{css}"' if css else ""
+    loading = 'loading="eager" fetchpriority="high"' if eager else 'loading="lazy"'
+    if not entry:
+        return f'<img{cls} src="{src}" alt="{e(alt)}" {loading} decoding="async">'
+    width, height, variants = entry
+    stem = src[:-len(".webp")]
+    srcset = ", ".join([f"{stem}-{w}.webp {w}w" for w in variants] + [f"{src} {width}w"])
+    return (f'<img{cls} src="{src}" srcset="{srcset}" sizes="{sizes_attr}" width="{width}" height="{height}" '
+            f'alt="{e(alt)}" {loading} decoding="async">')
+
+
 def shot_img(name: str, alt: str, up: str, sizes_attr: str, eager: bool = False) -> str:
     """One screenshot, with its intrinsic size and a srcset from the manifest.
 
@@ -305,6 +340,8 @@ def nav(page: Page, by_slug: dict) -> str:
     d = page.data
     up = page.up
     home = up if page.depth else "./"
+    # On the home page the sections are on this page; elsewhere, on the home page.
+    anchor = "" if page.slug == "index" else home
     return f"""<a class="skip" href="#main">{e(get(d, 'nav.skip'))}</a>
 <header class="nav" id="nav">
   <div class="nav-inner">
@@ -314,9 +351,10 @@ def nav(page: Page, by_slug: dict) -> str:
       <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
     </a>
     <nav class="nav-links" aria-label="{e(get(d, 'nav.label'))}">
-      <a href="#features">{e(get(d, 'nav.features'))}</a>
-      <a href="#typography">{e(get(d, 'nav.typography'))}</a>
-      <a href="#specs">{e(get(d, 'nav.specs'))}</a>
+      <a href="{anchor}#how">{e(get(d, 'nav.how'))}</a>
+      <a href="{anchor}#ai">{e(get(d, 'nav.ai'))}</a>
+      <a href="{anchor}#features">{e(get(d, 'nav.features'))}</a>
+      <a href="{anchor}#faq">{e(get(d, 'nav.faq'))}</a>
       <a href="{REPO}" rel="noopener">GitHub</a>
       <details class="lang-menu">
         <summary aria-label="Language">{LANGS[page.lang]['label']}</summary>
@@ -353,11 +391,17 @@ def footer(page: Page, by_slug: dict) -> str:
     # landing page is the whole point missed.
     #
     # The sync guide exists in the three languages the app ships; the rest fall
-    # back to English. The two landing pages are English-only by design — they
+    # back to English. The two Obsidian pages are English-only by design — they
     # answer English queries — so they are marked `hreflang="en"` rather than
     # pretending to be translated.
     guide_dir = guide.LANGS[page.lang][0] if page.lang in guide.LANGS else ""
-    guides = "".join([
+    # The two knowledge-base landing pages exist in every language; their own
+    # breadcrumb is the link text, so no label is translated twice.
+    landings = "".join(
+        f'<li><a href="{page.up}{LANGS[page.lang]["dir"]}{slug}.html">'
+        f'{e(get(by_slug[(page.lang, slug)].data, "crumb"))}</a></li>'
+        for slug in LANDINGS if (page.lang, slug) in by_slug)
+    guides = landings + "".join([
         f'<li><a href="{page.up}{guide_dir}sync.html">{e(get(d, "footer.sync_guide"))}</a></li>',
         f'<li><a href="{page.up}obsidian-alternative.html" hreflang="en">'
         f'{e(get(d, "footer.compare"))}</a></li>',
@@ -398,29 +442,103 @@ def footer(page: Page, by_slug: dict) -> str:
 
 def hero(page: Page) -> str:
     d = page.data
-    up = page.up
-    poster = f"{up}assets/video/poster.webp"
-    return f"""<section class="hero">
-  <p class="eyebrow">{e(get(d, 'hero.eyebrow'))}</p>
-  <h1 class="hero-title">{e(get(d, 'hero.title'))}</h1>
-  <p class="hero-lede">{e(get(d, 'hero.lede'))}</p>
-  <div class="hero-actions">
-    {cta(page)}
-    {appstore(page)}
-    <a class="btn btn-quiet" href="#features">{e(get(d, 'cta.tour'))}</a>
-  </div>
-  {brew(page)}
-  <p class="hero-note">{e(get(d, 'hero.note'))}</p>
-  <figure class="film">
-    <div class="film-mat">
-      <video class="film-frame" poster="{poster}" autoplay muted loop playsinline
-             preload="metadata" aria-label="{e(get(d, 'hero.video_alt'))}">
-        <source src="{up}assets/video/hero.webm" type="video/webm">
-        <source src="{up}assets/video/hero.mp4" type="video/mp4">
-      </video>
+    return f"""<section class="hero hero-kb">
+  <div class="hero-copy">
+    <p class="eyebrow">{e(get(d, 'hero.eyebrow'))}</p>
+    <h1 class="hero-title">{e(get(d, 'hero.title'))}</h1>
+    <p class="hero-lede">{e(get(d, 'hero.lede'))}</p>
+    <div class="hero-actions">
+      {cta(page)}
+      {appstore(page)}
     </div>
-    <figcaption>{e(get(d, 'hero.video_caption'))}</figcaption>
+    {brew(page)}
+    <p class="hero-note">{e(get(d, 'hero.note'))}</p>
+  </div>
+  <figure class="hero-devices">
+    {kb_img(page, "mac-k1-plan", get(d, 'hero.mac_alt'), "(max-width: 900px) 96vw, 880px", "hero-mac", eager=True)}
+    {kb_img(page, "iphone-k1-plan", get(d, 'hero.phone_alt'), "(max-width: 900px) 34vw, 250px", "hero-phone", eager=True)}
   </figure>
+</section>"""
+
+
+def how(page: Page) -> str:
+    """Three steps: name and place, drop, filed."""
+    d = page.data
+    steps = "".join(
+        f'<li class="step reveal"><span class="step-n" aria-hidden="true">{i}</span>'
+        f'<h3>{e(st["title"])}</h3><p>{e(st["body"])}</p></li>'
+        for i, st in enumerate(get(d, "how.steps"), 1))
+    phones = "".join(
+        f'<figure class="phone reveal">{kb_img(page, name, alt, "(max-width: 700px) 60vw, 250px")}</figure>'
+        for name, alt in zip(["iphone-k6-welcome", "iphone-k4-drop", "iphone-k1-plan"], get(d, "how.alts")))
+    return f"""<section class="band" id="how" aria-labelledby="how-h">
+  <div class="rule-head">
+    <h2 id="how-h">{e(get(d, 'how.title'))}</h2>
+    <p class="rule-sub">{e(get(d, 'how.sub'))}</p>
+  </div>
+  <ol class="steps">{steps}</ol>
+  <div class="phones">{phones}</div>
+</section>"""
+
+
+def safe(page: Page) -> str:
+    d = page.data
+    points = "".join(f"<li>{e(x)}</li>" for x in get(d, "safe.points"))
+    return f"""<section class="split" aria-labelledby="safe-h">
+  <figure class="split-shot phone reveal">{kb_img(page, "iphone-k2-organized", get(d, 'safe.alt'), "(max-width: 900px) 70vw, 280px")}</figure>
+  <div class="split-text">
+    <h2 id="safe-h">{e(get(d, 'safe.title'))}</h2>
+    <ul class="dash">{points}</ul>
+  </div>
+</section>"""
+
+
+def ai(page: Page) -> str:
+    d = page.data
+    files = "".join(f'<li><code>{e(f["name"])}</code> — {e(f["desc"])}</li>' for f in get(d, "ai.files"))
+    return f"""<section class="dark" id="ai" aria-labelledby="ai-h">
+  <div class="split split-wide">
+    <div class="split-text">
+      <p class="kicker">{e(get(d, 'ai.kicker'))}</p>
+      <h2 id="ai-h">{e(get(d, 'ai.title'))}</h2>
+      <p>{e(get(d, 'ai.body'))}</p>
+      <ul class="files">{files}</ul>
+      <p class="fine">{e(get(d, 'ai.foot'))}</p>
+    </div>
+    <figure class="split-shot reveal">{kb_img(page, "mac-k3-agents", get(d, 'ai.alt'), "(max-width: 900px) 96vw, 700px")}</figure>
+  </div>
+</section>"""
+
+
+def rules(page: Page) -> str:
+    d = page.data
+    return f"""<section class="split" aria-labelledby="rules-h">
+  <div class="split-text">
+    <h2 id="rules-h">{e(get(d, 'rules.title'))}</h2>
+    <p>{e(get(d, 'rules.body'))}</p>
+    <pre class="rules-example">{e(get(d, 'rules.example'))}</pre>
+    <p class="fine">{e(get(d, 'rules.foot'))}</p>
+  </div>
+  <figure class="split-shot reveal">{kb_img(page, "mac-k5-settings", get(d, 'rules.alt'), "(max-width: 900px) 80vw, 470px")}</figure>
+</section>"""
+
+
+def private(page: Page) -> str:
+    d = page.data
+    cols = "".join(f'<div class="creed-col reveal"><h3>{e(c["title"])}</h3><p>{e(c["body"])}</p></div>'
+                   for c in get(d, "private.cols"))
+    return f"""<section class="band" id="private" aria-labelledby="private-h">
+  <div class="rule-head"><h2 id="private-h">{e(get(d, 'private.title'))}</h2></div>
+  <div class="creed-cols">{cols}</div>
+</section>"""
+
+
+def faq(page: Page) -> str:
+    d = page.data
+    items = "".join(f'<div class="qa"><h3>{e(x["q"])}</h3><p>{e(x["a"])}</p></div>' for x in get(d, "faq.items"))
+    return f"""<section class="faq" id="faq" aria-labelledby="faq-h">
+  <div class="rule-head"><h2 id="faq-h">{e(get(d, 'faq.title'))}</h2></div>
+  {items}
 </section>"""
 
 
@@ -569,9 +687,19 @@ def json_ld(page: Page) -> str:
         app["downloadUrl"] = DOWNLOAD
         app["installUrl"] = DOWNLOAD
         app["releaseNotes"] = f"{REPO}/releases/latest"
-    return ('<script type="application/ld+json">'
-            + json.dumps(app, ensure_ascii=False, separators=(",", ":"))
-            + "</script>")
+    blocks = [app]
+    items = (d.get("faq") or {}).get("items") or []
+    if items:
+        blocks.append({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "inLanguage": LANGS[page.lang]["hreflang"],
+            "mainEntity": [{"@type": "Question", "name": x["q"],
+                            "acceptedAnswer": {"@type": "Answer", "text": x["a"]}} for x in items],
+        })
+    return "".join('<script type="application/ld+json">'
+                   + json.dumps(b, ensure_ascii=False, separators=(",", ":"))
+                   + "</script>" for b in blocks)
 
 
 def head(page: Page, by_slug: dict) -> str:
@@ -643,10 +771,40 @@ LANG_REDIRECT = """<script>
 </script>"""
 
 
+def landing(page: Page) -> str:
+    """A long-form landing page (ai-knowledge-base, ai-context-management):
+    an article, with real pictures and its own questions."""
+    d = page.data
+    parts = []
+    for sec in get(d, "sections"):
+        parts.append(f'<h2>{e(sec["h2"])}</h2>')
+        for para in sec.get("paras", []):
+            parts.append(f"<p>{e(para)}</p>")
+        if sec.get("list"):
+            parts.append("<ol>" + "".join(f"<li>{e(x)}</li>" for x in sec["list"]) + "</ol>")
+        if sec.get("shot"):
+            parts.append(f'<figure class="article-shot">{kb_img(page, sec["shot"], sec.get("alt", ""), "(max-width: 900px) 92vw, 760px")}</figure>')
+    qa = "".join(f'<div class="qa"><h3>{e(x["q"])}</h3><p>{e(x["a"])}</p></div>' for x in get(d, "faq.items"))
+    home = page.up if page.depth else "./"
+    return f"""<article class="article">
+  <p class="crumbs"><a href="{home}">Inkstone</a> › {e(get(d, 'crumb'))}</p>
+  <h1>{e(get(d, 'h1'))}</h1>
+  <p class="article-lede">{e(get(d, 'lede'))}</p>
+  <div class="hero-actions">{cta(page)}{appstore(page)}</div>
+  <figure class="article-hero">{kb_img(page, get(d, 'hero_shot'), get(d, 'hero_alt'), "(max-width: 1100px) 96vw, 1000px", eager=True)}</figure>
+  {''.join(parts)}
+  <section class="faq" aria-labelledby="faq-h"><h2 id="faq-h">{e(get(d, 'faq.title'))}</h2>{qa}</section>
+</article>"""
+
+
 def render(page: Page, by_slug: dict) -> str:
-    body = "\n".join([
-        hero(page), creed(page), features(page), duo(page), typography(page), specs(page),
-    ])
+    if page.slug == "index":
+        body = "\n".join([
+            hero(page), how(page), safe(page), ai(page), rules(page), private(page),
+            features(page), duo(page), faq(page), specs(page),
+        ])
+    else:
+        body = landing(page)
     # One pass, over the assembled body only. Running it over the whole document
     # would put spans inside <title> and the JSON-LD, where they are text rather
     # than markup and would be shown to the reader as literal angle brackets.
@@ -683,16 +841,28 @@ def render(page: Page, by_slug: dict) -> str:
 
 # ----------------------------------------------------------------- build
 
+SHARED_KEYS = {"nav", "cta", "brew", "siblings", "footer"}
+LANDINGS = ["ai-knowledge-base", "ai-context-management"]
+
+
 def read_pages() -> list[Page]:
     pages: list[Page] = []
     for lang in LANGS:
         directory = CONTENT / lang
         if not directory.exists():
             sys.exit(f"missing content directory: {directory}")
-        for src in sorted(directory.glob("*.yml")):
+        home = None
+        for src in sorted(directory.glob("*.yml"), key=lambda f: f.stem != "index"):
             data = yaml.safe_load(src.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 sys.exit(f"{src}: expected a mapping at the top level")
+            if src.stem == "index":
+                home = data
+            elif home is not None:
+                # A landing page carries only its own words; the navigation,
+                # buttons and footer come from the same language's home page,
+                # so a label is translated once and cannot drift between pages.
+                data = {**{k: v for k, v in home.items() if k in SHARED_KEYS}, **data}
             pages.append(Page(lang, src.stem, data))
     return pages
 
@@ -765,8 +935,9 @@ def robots() -> str:
 
 
 def build(out: Path) -> None:
-    global SHOT_SIZES
+    global SHOT_SIZES, KB_SIZES
     SHOT_SIZES = read_shot_sizes()
+    KB_SIZES = read_kb_sizes()
     pages = read_pages()
     by_slug = {(p.lang, p.slug): p for p in pages}
 
@@ -793,9 +964,9 @@ def build(out: Path) -> None:
     if assets_src.exists():
         shutil.copytree(assets_src, out / "assets", dirs_exist_ok=True)
     # The manifest is a build input, not something a visitor should be served.
-    manifest = out / "assets" / "shots" / "manifest.txt"
-    if manifest.exists():
-        manifest.unlink()
+    for manifest in (out / "assets" / "shots" / "manifest.txt", out / "assets" / "kb" / "manifest.txt"):
+        if manifest.exists():
+            manifest.unlink()
 
     # The sync guide, in the languages the app ships. Generated rather than
     # written three times: the structure is identical and only the words differ,

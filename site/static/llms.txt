@@ -1,8 +1,29 @@
 # Inkstone
 
-> A native Markdown notes app for macOS 26 and iOS 26. Plain Markdown files in a
-> folder you choose — no database, no proprietary format, no account, no
-> Electron. Reads and writes the same vaults Obsidian does.
+> An AI knowledge base for macOS 26 and iOS 26 that organizes itself, and a
+> native Markdown editor. Plain files in a folder you choose — no database, no
+> proprietary format, no account, no Electron. Reads and writes the same vaults
+> Obsidian does.
+
+## The knowledge base (since 0.5)
+
+- Create a knowledge base in iCloud Drive or any folder: inbox, projects, areas,
+  resources, media, outputs, private, review and archive folders, plus an
+  editable rules file at `_System/Organizing Rules.md`.
+- Drop files in (copy by default, or move). Each is filed by the person's own
+  rules first, then privacy, then a named project, then media by type and month;
+  what is left goes to Apple's on-device model, and anything below 0.7
+  confidence waits in the review folder. An optional cloud model uses the
+  person's own key, is off by default, and never receives files that look private.
+- Nothing is deleted: duplicates go to `_Archive/To-Delete/`, every move is
+  logged before it happens, and a whole round can be undone byte for byte.
+- AI context management: AGENTS.md, README.md and SOURCE_OF_TRUTH.md are written
+  at the top of the knowledge base and rewritten (between Inkstone's markers
+  only) whenever the folders change.
+- Vaults opened as vaults (e.g. from Obsidian) are never reorganized.
+- Pages: https://inkslab.app/ai-knowledge-base.html and
+  https://inkslab.app/ai-context-management.html (also in de, es, fr, ja, ko,
+  zh, zh-Hant).
 
 Inkstone is free (no price, no subscription, no account) and is made by James
 (GitHub: iamzifei). Its source is public at https://github.com/iamzifei/inkstone

@@ -1,0 +1,36 @@
+title: KI-Kontextverwaltung mit AGENTS.md — Inkstone
+description: Inkstone hält AGENTS.md, README.md und SOURCE_OF_TRUTH.md aktuell, damit jeder KI-Agent weiß, was wo liegt und was gilt.
+crumb: KI-Kontextverwaltung
+h1: KI-Kontextverwaltung, für dich aktuell gehalten
+lede: Ein KI-Assistent ist nur so gut wie die Dateien, die er bekommt, und was man ihm darüber sagt. Inkstone schreibt diesen Kontext in deine Wissensdatenbank – und neu, sobald sich die Ordner ändern.
+hero_shot: mac-k3-agents
+hero_alt: AGENTS.md in Inkstone auf dem Mac.
+sections:
+- h2: Was ist KI-Kontextverwaltung?
+  paras:
+  - 'Kontext ist das, was ein KI-Modell sieht, bevor es antwortet: die Dateien und die Anweisungen dazu. Ihn zu verwalten heißt festzulegen, welche Dateien ein Assistent liest, wie der Ordner aufgebaut ist und welche Datei gilt, wenn zwei sich widersprechen.'
+  - Von Hand geschrieben ist dieser Kontext eine Woche später veraltet. Eine Notiz wandert, ein Ordner wird umbenannt, und der Assistent irrt sich mit Überzeugung.
+- h2: Drei Einstiegsdateien, geschrieben von Inkstone
+  list:
+  - 'AGENTS.md – was diese Wissensdatenbank ist und welche Regeln ein Agent hier befolgt: wohin neue Dateien gehen, dass nichts gelöscht wird, dass der private Ordner privat bleibt.'
+  - README.md – die Ordnerkarte, für Menschen und Maschinen.
+  - SOURCE_OF_TRUTH.md – welche Datei wofür maßgeblich ist, damit ein Agent nicht zwischen zwei Versionen rät.
+  paras:
+  - AGENTS.md ist die Konvention, nach der Coding-Agenten und KI-Assistenten oben in einem Ordner suchen. Inkstone schreibt nur den Teil zwischen seinen Markierungen neu; was du drumherum ergänzt, bleibt.
+- h2: Kontext, der dem Ordner folgt
+  paras:
+  - 'Bei jedem Ordnen aktualisiert Inkstone die Einstiegsdateien passend zu den Ordnern, die jetzt existieren. Ob du den Ordner am Montag oder im März übergibst: Die Karte stimmt.'
+  shot: iphone-k3-agents
+  alt: AGENTS.md auf dem iPhone.
+- h2: Standardmäßig privat
+  paras:
+  - Das Ordnungsmodell läuft auf deinem Gerät. AGENTS.md erklärt den privaten Ordner für tabu, und privat wirkende Dateien werden nie an ein Cloud-Modell gesendet, auch wenn du eines eingeschaltet hast.
+faq:
+  title: Fragen
+  items:
+  - q: Welche KI-Tools lesen AGENTS.md?
+    a: Es ist eine einfache Markdown-Datei oben im Ordner, also kann jeder Assistent oder Agent, der den Ordner bekommt, sie lesen; viele Coding-Agenten suchen gezielt danach.
+  - q: Kann ich AGENTS.md selbst bearbeiten?
+    a: Ja. Inkstone schreibt nur den Abschnitt zwischen seinen Markierungen neu. Deine eigenen Anweisungen darüber oder darunter bleiben.
+  - q: Brauche ich dafür das KI-Ordnen?
+    a: Nein. Die Einstiegsdateien entstehen beim Anlegen der Wissensdatenbank und bleiben aktuell, ob nach deinen Regeln oder vom Modell abgelegt wird.

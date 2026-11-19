@@ -107,6 +107,10 @@ class BuiltSite(unittest.TestCase):
         for page in sorted(self.out.rglob("*.html")):
             base = page.parent.relative_to(self.out)
             for ref in pattern.findall(page.read_text(encoding="utf-8")):
+                # A section link (`./#faq`, from a landing page to the home
+                # page's sections — 2026-11-20, 0.5 site) names a page plus a
+                # fragment; only the page has to exist.
+                ref = ref.split("#", 1)[0] or "./"
                 # `normpath` before comparing: a language page links assets as
                 # `../assets/site.js`, and the unresolved form matches nothing.
                 target = posixpath.normpath(posixpath.join(base.as_posix(), ref))
@@ -466,9 +470,12 @@ class SearchMetadata(BuiltSite):
     """Head tags, structured data and crawler files on the home pages."""
 
     def test_titles_and_descriptions_fit(self) -> None:
+        # 2026-11-20: the two knowledge-base landing pages are held to the same
+        # limits as the home page — they exist to be found in search.
         for lang, meta in build.LANGS.items():
-            with self.subTest(lang=lang):
-                html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
+          for name in ("index.html", "ai-knowledge-base.html", "ai-context-management.html"):
+            with self.subTest(lang=lang, page=name):
+                html = (self.out / meta["dir"] / name).read_text(encoding="utf-8")
                 title = re.search(r"<title>([^<]+)</title>", html).group(1)
                 desc = re.search(r'<meta name="description" content="([^"]+)"', html).group(1)
                 import html as h
@@ -482,8 +489,16 @@ class SearchMetadata(BuiltSite):
                 html = (self.out / meta["dir"] / "index.html").read_text(encoding="utf-8")
                 blocks = re.findall(
                     r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
-                self.assertEqual(len(blocks), 1)
-                data = json.loads(blocks[0])
+                # 2026-11-20 (0.5 site): the home page also carries an FAQPage
+                # for its questions, so there are two blocks; the application
+                # is still exactly one of them.
+                parsed = [json.loads(b) for b in blocks]
+                apps = [b for b in parsed if b["@type"] == "SoftwareApplication"]
+                self.assertEqual(len(apps), 1)
+                faq = [b for b in parsed if b["@type"] == "FAQPage"]
+                self.assertEqual(len(faq), 1)
+                self.assertTrue(faq[0]["mainEntity"])
+                data = apps[0]
                 self.assertEqual(data["@type"], "SoftwareApplication")
                 self.assertEqual(data["softwareVersion"], build.app_version())
                 self.assertEqual(data["offers"]["price"], "0")

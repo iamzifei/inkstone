@@ -1,47 +1,93 @@
-title: "Inkstone墨硯 —— 免費的Mac Markdown筆記軟體，相容Obsidian"
-description: "免費的Mac Markdown筆記軟體：筆記就是你自己資料夾裡的純Markdown檔案，支援雙向連結、反向連結、關聯圖譜與白板，Obsidian的儲存庫直接打開。不必註冊。"
+title: Inkstone 墨硯 — AI 知識庫，Mac、iPhone 與 iPad
+description: 會自己整理的 AI 知識庫：把筆記、PDF、照片、錄音拖進一個資料夾，Inkstone 依你的規則、用本機 AI 自動歸檔，並自動維護 AGENTS.md。免費。
 nav:
   label: 章節
   skip: 跳到內文
-  features: 功能
-  typography: 排版
-  specs: 規格
+  features: 編輯器
+  how: 怎麼用
+  ai: 給 AI
+  faq: 常見問題
 cta:
   download: 下載macOS版
-  appstore: "在 App Store 下載 iPhone / iPad 版"
+  appstore: 在 App Store 下載 iPhone / iPad 版
   source: 看原始碼
-  tour: 看它能做什麼
   kofi: 請我喝杯咖啡
 brew:
-  label: "或者用Homebrew安裝"
-  copy: "複製"
-  copied: "已複製"
-  copy_aria: "複製Homebrew安裝指令"
+  label: 或者用Homebrew安裝
+  copy: 複製
+  copied: 已複製
+  copy_aria: 複製Homebrew安裝指令
 hero:
-  eyebrow: macOS 26 · iOS 26 · 原生SwiftUI
-  title: 筆記本來就是檔案，它就該一直是檔案。
-  lede: Inkstone直接讀寫你指定資料夾裡的Markdown。它能打開你現有的儲存庫， 不會寫下任何別的編輯器打不開的東西，自己的狀態則放在一個隱藏資料夾裡， 你隨時可以刪掉。
-  note: "免費 · Apple晶片與Intel · English · 简体中文 · 繁體中文"
-  video_alt: Inkstone在macOS上的螢幕錄影：打開一個儲存庫、輸入一行中英混排的文字、 點開一個雙向連結、再打開關聯圖譜。
-  video_caption: 錄於macOS 26。除了段落之間的淡入淡出，沒有別的剪接。
-creed:
-  title: 三個決定，其餘一切都是它們的結果
-  sub: 它們是承重的。這個應用程式為什麼這樣表現，答案都在這裡。
-  columns:
-  - title: 檔案才是事實
-    body: 沒有資料庫，沒有匯入步驟，沒有專有格式。Obsidian建的儲存庫在這裡能打開， 這裡建的儲存庫在那邊也能打開。就算Inkstone明天消失，你手上仍然是一個裝著Markdown的資料夾。
-  - title: 斷掉的連結是永久的
-    body: 既然沒有資料庫可以事後修，重新命名一篇筆記時，指向它的每一處雙向連結都會在同一個動作裡被改寫，涵蓋整個儲存庫。這是上一條的直接後果，不是外掛上去的功能。
-  - title: 引擎不知道螢幕的存在
-    body: 解析、索引、搜尋和圖譜都住在一個完全不import任何UI框架的套件裡。 所以它們由真正的測試涵蓋，而不是靠模擬器；也所以同一套引擎日後可以拿去撐起一個命令列工具。
+  eyebrow: AI 知識庫 · Mac · iPhone · iPad
+  title: 什麼都能拖進來，自動整理歸檔。
+  lede: Inkstone 把一個資料夾變成 AI 知識庫。筆記、PDF、照片、錄音，依你看得懂、改得了的規則自動歸檔，AI 在你的裝置上執行。任何東西都不會刪除，每一輪都能復原。
+  note: 免費 · 不用註冊 · English · 简体中文 · 繁體中文
+  mac_alt: Mac 上的 Inkstone：歸檔拖進來的 5 個檔案之前，先列出整理計畫——歸檔到位、私密、重複檔案放一邊——等你按「整理」。
+  phone_alt: iPhone 上的同一份計畫：整理這 5 個檔案？
+how:
+  title: 三步建好知識庫
+  sub: 不用學怎麼設定。取個名字，選個位置，然後往裡拖東西。
+  steps:
+  - title: 取個名字，選個位置
+    body: iCloud 雲碟、任意資料夾，或你現有的資料夾。收件匣、專案、領域、資料、素材、產出、私密，資料夾結構和整理規則自動建好。
+  - title: 什麼都能拖進來
+    body: 拖到視窗上，或從「檔案」App 加入。第一次會問複製還是移動，預設複製。
+  - title: 自動歸檔
+    body: 先依你的規則，再由本機模型判斷，依「日期-主題」命名。拿不準的放在「待確認」等你決定。
+  alts:
+  - 第一步：你的 AI 知識庫——建立我的知識庫
+  - 第二步：把這 3 項複製還是移動到知識庫？
+  - 第三步：整理計畫——歸檔到位、私密、重複檔案放一邊
+safe:
+  title: 什麼都不會丟。
+  points:
+  - 不會刪除任何東西。重複檔案放進「待刪除」，由你來清空。
+  - 每一步移動都先寫進日誌，一張看得懂的 Markdown 表格。
+  - 復原會把整輪逐位元組還原，不覆蓋你之後改過的內容。
+  - 超過 20 個檔案或有重複檔案時，先給你看完整計畫，你點頭才動。
+  - 筆記正文一個字都不改，只在開頭補上來源和日期。
+  alt: 整理完成後的知識庫：側欄裡的資料夾，以及「整理了 5 個檔案 · 復原」提示。
+ai:
+  kicker: AI 上下文管理
+  title: AI 一看就懂，從第一個檔案開始
+  body: 每個知識庫都帶三個入口檔案，由 Inkstone 自動寫好、自動更新。把資料夾交給任何 AI 助理或智慧代理，它都知道這是什麼、東西放在哪、以哪個檔案為準。
+  files:
+  - name: AGENTS.md
+    desc: 這是什麼，以及 AI 在這裡要遵守的規則
+  - name: README.md
+    desc: 資料夾地圖，人和機器都能讀
+  - name: SOURCE_OF_TRUTH.md
+    desc: 什麼資訊以哪個檔案為準
+  foot: 只改寫 Inkstone 標記之間的部分，你在旁邊寫的內容原樣保留。
+  alt: 在 Mac 上的 Inkstone 裡開啟 AGENTS.md：這是什麼、給 AI 智慧代理的規則、東西放哪裡。
+rules:
+  title: 整理規則，用白話寫
+  body: 整理規則就是知識庫裡的一個檔案。在「設定」裡像改筆記一樣改，一行一條，你的規則排第一。
+  example: '## 我的規則
+
+
+    - 發票 → 20-領域/財務/發票
+
+    - 裝修 → 10-專案/裝修'
+  foot: 你的規則下面是預設策略，同樣是白話——可以改，也可以一鍵恢復。
+  alt: Mac 上的「設定 › 知識庫」：自動整理、本機模型、拖入檔案時怎麼做。
+private:
+  title: 隱私從設計上保證
+  cols:
+  - title: AI 在你的裝置上
+    body: 在支援的裝置上，由蘋果本機模型判斷檔案該放哪，什麼都不會傳出去。
+  - title: 也可以用你自己的模型
+    body: 預設關閉。用你自己的 key 時，只傳送規則放不了的檔案的名稱和開頭，看起來涉及隱私的絕不傳送。
+  - title: 就是一些檔案
+    body: 不用註冊，沒有資料收集，我們沒有伺服器。知識庫就是一個普通資料夾，用什麼都能開啟。
 features:
-  title: 裡面有什麼
-  sub: 下面每一條都已經實作並在跑，不是路線圖。
+  title: 也是一個完整的 Markdown 編輯器
+  sub: 所有內容都是一般 Markdown。其他 Markdown 應用的資料庫可以直接開啟——而且永遠不會被重新整理。
   items:
     live_preview:
       kicker: 編輯
       title: 即時預覽，而不是左右分割
-      body: "標題、粗體、引用、callout、待辦、表格、程式碼區塊都隨打隨算繪， 只有游標所在的那一行會露出語法。閱讀模式是獨立的唯讀檢視， 想看沒有鷹架的成品時再切過去。內文字型、程式碼字型和各自的級數分開設定。閱讀模式裡語法符號是被刪掉而不是藏起來的，所以複製一段出來得到的就是乾淨的正文。"
+      body: 標題、粗體、引用、callout、待辦、表格、程式碼區塊都隨打隨算繪， 只有游標所在的那一行會露出語法。閱讀模式是獨立的唯讀檢視， 想看沒有鷹架的成品時再切過去。內文字型、程式碼字型和各自的級數分開設定。閱讀模式裡語法符號是被刪掉而不是藏起來的，所以複製一段出來得到的就是乾淨的正文。
       alt: Inkstone的編輯器：標題、一段中英混排的內文、待辦清單、引用、callout、 對齊的表格和程式碼區塊，全部在原位算繪。
     links:
       kicker: 連結
@@ -61,42 +107,41 @@ features:
     search:
       kicker: 找東西
       title: 模糊切換器，以及支援運算子的搜尋
-      body: "一個快速鍵喚起涵蓋整個儲存庫的模糊切換器。全文搜尋認得tag: 和path:； 標籤寫在行內或frontmatter裡都行，支援多層巢狀，也不挑文種—— #專案/進行中和 #project/active建索引的方式完全一樣。近萬篇的庫上也不會卡——搜尋跑在主執行緒之外，打字不用等磁碟。"
+      body: '一個快速鍵喚起涵蓋整個儲存庫的模糊切換器。全文搜尋認得tag: 和path:； 標籤寫在行內或frontmatter裡都行，支援多層巢狀，也不挑文種—— #專案/進行中和 #project/active建索引的方式完全一樣。近萬篇的庫上也不會卡——搜尋跑在主執行緒之外，打字不用等磁碟。'
       alt: 快速切換器浮在筆記上方，隨著輸入逐字篩選整個儲存庫。
     sync:
       kicker: 兩台機器
       title: iCloud或GitHub，而且由你決定什麼跟著走
-      body: '走iCloud同步，或者把整個儲存庫推到一個GitHub儲存庫。開始同步之後，衝突時不會覆寫任何內容：兩邊都改過的筆記，另一份會作為衝突副本留在你的版本旁邊。按檔案類型的開關決定附件和多媒體要不要跟著走， 儲存庫自己的 .gitignore會被尊重。'
+      body: 走iCloud同步，或者把整個儲存庫推到一個GitHub儲存庫。開始同步之後，衝突時不會覆寫任何內容：兩邊都改過的筆記，另一份會作為衝突副本留在你的版本旁邊。按檔案類型的開關決定附件和多媒體要不要跟著走， 儲存庫自己的 .gitignore會被尊重。
       alt: GitHub同步設定：儲存庫與分支選擇器，以及決定同步範圍的分檔案類型開關。
 duo:
-  title: "iPhone Duo：一篇筆記，四種形態"
-  sub: "闔上時，就是熟悉的 iPhone 版。展開後，側欄和筆記並排。半開時，筆記在摺痕一側，反向連結、大綱和屬性在另一側——沒有任何內容橫跨摺痕。"
-  video_alt: "Inkstone 在 iPhone Duo 上的錄影：闔上時外螢幕的筆記列表；展開後同一篇筆記與側欄並排；像書一樣半開時，檢查器在右頁；直握半開時，檢查器在摺痕下方。"
-  caption: '錄製於 iPhone Duo 模擬器（iOS 27.2），套用 Apple 官方的 iPhone Duo 機身外框，與每段的姿態一致。螢幕內容是錄影原樣，除轉場外未經剪輯。'
-typography:
-  title: 把中文和英文排在同一行裡
-  sub: 難的是漢字句子裡嵌一個拉丁詞。幾乎所有應用程式都排錯，而且是那種看見一次就再也無法忽視的錯法。
-  folio: 字樣 · Source Serif 4配思源宋體
-  specimen_title: 中英文混排與那四分之一字寬
-  specimen_lead: 中文是密排的。字與字之間沒有空格，所以一行是否勻淨，眼睛一看就知道。 往這樣一行裡丟進一個typography，兩種文字就撞在一起了。
-  specimen_body: 內文裡出現Latin單字時，漢字與拉丁字母之間應當有一段約四分之一字寬的間隙——W3C的中文排版需求稱之為文字間隙。這一段文字本身就在示範它：每一處漢字與Latin的交界都由建置時插入的空元素撐開，在支援text-autospace的瀏覽器上則交還給瀏覽器處理，兩者永遠只生效一個。全形標點（，。；：）自帶二分空，因此一律不加。
-  specimen_quote: 排版的存在是為了讓內容體面。它是僕人，而僕人的舉止應當讓人看不見。
-  specimen_cite: Robert Bringhurst《字體排印風格要素》
-  notes:
-  - term: 行長
-    def: 內文一行約66個字元，Bringhurst給出的單欄理想寬度。超過75， 眼睛就找不回下一行的行首了。
-  - term: 同一個字族
-    def: 拉丁用Source Serif 4，漢字用思源宋體——而思源宋體的拉丁伴隨字體正是 Source Serif。混排的那一行出自同一位設計師的襯線，不是兩套字在打架。
-  - term: 顏色即語意
-    def: 只有一種硃砂紅——印章壓在紙上的那種紅——用來標記連結、標籤和目前動作。 除此之外沒有任何東西是彩色的。
-  - term: 動態效果是標點
-    def: 元素出現時上移八個像素，此外什麼都不動。打開「減少動態效果」， 這一切一次都不會發生。
+  title: iPhone Duo：一篇筆記，四種形態
+  sub: 闔上時，就是熟悉的 iPhone 版。展開後，側欄和筆記並排。半開時，筆記在摺痕一側，反向連結、大綱和屬性在另一側——沒有任何內容橫跨摺痕。
+  video_alt: Inkstone 在 iPhone Duo 上的錄影：闔上時外螢幕的筆記列表；展開後同一篇筆記與側欄並排；像書一樣半開時，檢查器在右頁；直握半開時，檢查器在摺痕下方。
+  caption: 錄製於 iPhone Duo 模擬器（iOS 27.2），套用 Apple 官方的 iPhone Duo 機身外框，與每段的姿態一致。螢幕內容是錄影原樣，除轉場外未經剪輯。
+faq:
+  title: 常見問題
+  items:
+  - q: 什麼是 AI 知識庫？
+    a: 一個裝著你的筆記和檔案的資料夾，整理得讓你和 AI 都找得到東西，並附有告訴 AI 東西放在哪的入口檔案。在 Inkstone 裡它始終是普通資料夾。
+  - q: 什麼是 AI 上下文管理？
+    a: 給 AI 助理正確的檔案和使用規則。AGENTS.md 和 SOURCE_OF_TRUTH.md 就是為任何智慧代理做這件事的。
+  - q: 能用我的 Obsidian 資料庫嗎？
+    a: 能。作為資料庫開啟時保持原樣，只有 Inkstone 建立或接手的知識庫才會被自動整理。
+  - q: 支援哪些裝置？
+    a: macOS 26 的 Mac，iOS 26 的 iPhone 和 iPad。本機模型需要支援 Apple Intelligence 的裝置；不支援時依你的規則整理。
+  - q: 要錢嗎？
+    a: 免費，Mac 版和 App Store 版都是。
 specs:
   title: 規格
   sub: 在你下載任何東西之前，值得先知道的部分。
   rows:
+  - k: 知識庫
+    v: 收件匣、專案、領域、資料、素材、產出、私密、待確認、封存——並自動維護 AGENTS.md、README.md、SOURCE_OF_TRUTH.md
+  - k: 自動整理
+    v: 先依你的規則，再用蘋果本機模型（或你自己的模型，預設關閉）。有日誌、能復原、不刪除
   - k: 平台
-    v: "macOS 26與iOS 26，一套SwiftUI程式碼。Mac版是通用應用程式，Apple晶片與Intel都能用"
+    v: macOS 26與iOS 26，一套SwiftUI程式碼。Mac版是通用應用程式，Apple晶片與Intel都能用
   - k: 儲存
     v: 你自己選的資料夾裡的純Markdown檔案。沒有資料庫，不必匯入
   - k: 相容性
@@ -106,28 +151,28 @@ specs:
   - k: 同步
     v: iCloud或GitHub儲存庫，可按檔案類型篩選
   - k: 工作流程
-    v: "與Obsidian相同佔位符的範本、匯出為PDF或HTML、命令面板、在Spotlight中找到筆記、捷徑動作"
+    v: 與Obsidian相同佔位符的範本、匯出為PDF或HTML、命令面板、在Spotlight中找到筆記、捷徑動作
   - k: 介面語言
     v: English、简体中文、繁體中文
   - k: 原始碼
     v: 在GitHub上公開。尚未選定授權條款。
   - k: 隱私
     v: 不必帳號，沒有遙測，不會發起你沒要求過的網路請求
-  closer: 它是免費的，它不扣著你的任何東西，而它寫下的檔案就是你本來就有的那些檔案。
+  closer: 它免費，不向你隱瞞任何東西，建出來的知識庫就是一個本來就屬於你的資料夾。
 siblings:
   audioswitch: 在選單列裡切換音訊裝置
   candela: 控制外接顯示器的亮度
   clipstack: 不礙事的剪貼簿歷史
-  veil: "正在用的視窗保持清晰，後面的一切柔和地模糊掉。免費，MIT 開源。"
-  tapper: "把滑鼠游標變成長桿上的卡通手套，簡報和錄影時一眼看清你指哪裡。免費，MIT 開源。"
+  veil: 正在用的視窗保持清晰，後面的一切柔和地模糊掉。免費，MIT 開源。
+  tapper: 把滑鼠游標變成長桿上的卡通手套，簡報和錄影時一眼看清你指哪裡。免費，MIT 開源。
   tapper_name: 敲黑板 Tapper
 footer:
-  tagline: 一個不動你檔案的筆記應用程式。
-  guides: "指南"
-  sync_guide: "同步指南"
-  compare: "與 Obsidian 的對比"
-  sync_free: "免費同步知識庫"
-  privacy: "隱私"
+  tagline: 會自己整理的 AI 知識庫，檔案始終歸你。
+  guides: 指南
+  sync_guide: 同步指南
+  compare: 與 Obsidian 的對比
+  sync_free: 免費同步知識庫
+  privacy: 隱私
   project: 專案
   issues: 問題回報
   also: 同一雙手做的其他東西

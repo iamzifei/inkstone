@@ -1,0 +1,40 @@
+title: Base de connaissances IA qui se range seule — Inkstone
+description: 'Une base de connaissances IA dans un simple dossier : Inkstone classe notes, PDF et photos selon vos règles et écrit AGENTS.md. Gratuit.'
+crumb: Base de connaissances IA
+h1: Une base de connaissances IA qui se range toute seule
+lede: Glissez notes, PDF, photos et enregistrements dans un dossier. Inkstone classe chaque fichier selon des règles écrites en mots simples, avec le modèle d'Apple sur l'appareil — et garde le dossier lisible par n'importe quel assistant IA.
+hero_shot: mac-k1-plan
+hero_alt: 'Inkstone sur Mac : le plan pour cinq fichiers glissés.'
+sections:
+- h2: Qu'est-ce qu'une base de connaissances IA ?
+  paras:
+  - 'Un ensemble de vos propres notes et fichiers, rangé pour que vous et un assistant IA trouviez ce qu''il contient — avec, par écrit, où se trouvent les choses et à quel fichier se fier. C''est cette seconde partie qui la distingue d''un dossier de notes ordinaire : une IA ne peut pas vous demander où sont les factures.'
+  - Inkstone en fait un simple dossier de Markdown et de fichiers. Rien n'est enfermé dans une base de données ; n'importe quelle app et n'importe quel agent IA peut le lire.
+- h2: Comment Inkstone la construit
+  list:
+  - 'Une structure pour les humains et l''IA : boîte de réception, projets, domaines, ressources, médias, productions et privé — plus un dossier à vérifier pour l''incertain et des archives où attendent les doublons.'
+  - 'D''abord les règles : les vôtres, puis la confidentialité (pièces d''identité, banque, santé vont au dossier privé), puis un projet que le fichier nomme, puis les médias par type et par mois.'
+  - Le modèle sur l'appareil pour le reste. Il lit le début d'un fichier et propose un dossier et un titre ; s'il hésite, le fichier vous attend.
+  - 'Des noms lisibles d''un coup d''œil : 20261119-devis-travaux.md — la date, puis le sujet.'
+  - 'Des fichiers d''entrée pour l''IA : AGENTS.md, README.md et SOURCE_OF_TRUTH.md, réécrits quand les dossiers changent.'
+  shot: mac-k2-organized
+  alt: La base de connaissances après une passe, avec le bandeau Annuler.
+- h2: Le laisser ranger sans crainte
+  paras:
+  - Rien n'est supprimé. Chaque déplacement est noté avant d'avoir lieu, et une passe entière s'annule octet par octet. Le texte d'une note n'est jamais réécrit. Les grosses passes et les doublons attendent votre accord.
+- h2: Sur iPhone et iPad aussi
+  paras:
+  - 'Ajoutez des fichiers depuis l''app Fichiers : ils arrivent dans la boîte de réception et sont classés de la même façon. La base de connaissances vit dans iCloud Drive, le Mac et l''iPhone voient le même dossier.'
+  shot: iphone-k4-drop
+  alt: 'Sur iPhone : copier ou déplacer ?'
+faq:
+  title: Questions
+  items:
+  - q: L'IA lit-elle tous mes fichiers ?
+    a: Le modèle sur l'appareil lit seulement le début d'un fichier que vos règles n'ont pas su placer, sur votre appareil. Un modèle cloud n'est utilisé qu'avec votre propre clé et activé ; les fichiers qui semblent privés ne sont jamais envoyés.
+  - q: Est-ce compatible avec Obsidian ?
+    a: Un coffre Obsidian s'ouvre tel quel et n'est jamais réorganisé. Une base de connaissances créée par Inkstone est du Markdown ordinaire qu'Obsidian ouvre aussi.
+  - q: Quels appareils ?
+    a: Mac (macOS 26), iPhone et iPad (iOS 26). Le modèle sur l'appareil demande Apple Intelligence ; sans lui, le rangement suit vos règles.
+  - q: Combien ça coûte ?
+    a: Rien. Inkstone est gratuit sur Mac et sur l'App Store, sans compte.

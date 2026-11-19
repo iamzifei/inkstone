@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja" data-lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGENTS.md による AI コンテキスト管理 — Inkstone</title>
+<meta name="description" content="AI アシスタントに正しいコンテキストを。Inkstone がナレッジベースの AGENTS.md、README.md、SOURCE_OF_TRUTH.md を最新に保ち、どのエージェントにも何がどこにあり、どのファイルを信頼すべきかを伝えます。">
+<meta name="theme-color" content="#FCFBF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161A" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://inkslab.app/ja/ai-context-management.html">
+<link rel="alternate" hreflang="de" href="https://inkslab.app/de/ai-context-management.html">
+<link rel="alternate" hreflang="en" href="https://inkslab.app/ai-context-management.html">
+<link rel="alternate" hreflang="es" href="https://inkslab.app/es/ai-context-management.html">
+<link rel="alternate" hreflang="fr" href="https://inkslab.app/fr/ai-context-management.html">
+<link rel="alternate" hreflang="ja" href="https://inkslab.app/ja/ai-context-management.html">
+<link rel="alternate" hreflang="ko" href="https://inkslab.app/ko/ai-context-management.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://inkslab.app/zh/ai-context-management.html">
+<link rel="alternate" hreflang="zh-Hant" href="https://inkslab.app/zh-Hant/ai-context-management.html">
+<link rel="alternate" hreflang="x-default" href="https://inkslab.app/ai-context-management.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Inkstone">
+<meta property="og:title" content="AGENTS.md による AI コンテキスト管理 — Inkstone">
+<meta property="og:description" content="AI アシスタントに正しいコンテキストを。Inkstone がナレッジベースの AGENTS.md、README.md、SOURCE_OF_TRUTH.md を最新に保ち、どのエージェントにも何がどこにあり、どのファイルを信頼すべきかを伝えます。">
+<meta property="og:url" content="https://inkslab.app/ja/ai-context-management.html">
+<meta property="og:image" content="https://inkslab.app/assets/og-card-zh.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AGENTS.md による AI コンテキスト管理 — Inkstone">
+<meta name="twitter:description" content="AI アシスタントに正しいコンテキストを。Inkstone がナレッジベースの AGENTS.md、README.md、SOURCE_OF_TRUTH.md を最新に保ち、どのエージェントにも何がどこにあり、どのファイルを信頼すべきかを伝えます。">
+<meta name="twitter:image" content="https://inkslab.app/assets/og-card-zh.png">
+<link rel="icon" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..700&family=Noto+Serif+JP:wght@300;400;600&display=swap">
+<link rel="stylesheet" href="../assets/styles.css?v=40876e28">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Inkstone","alternateName":"墨砚","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 26.0 or later, iOS 26.0 or later, iPadOS 26.0 or later","processorRequirement":"Apple silicon or Intel (universal binary)","softwareVersion":"0.5.0","url":"https://inkslab.app/ja/ai-context-management.html","image":"https://inkslab.app/assets/og-card-zh.png","description":"AI アシスタントに正しいコンテキストを。Inkstone がナレッジベースの AGENTS.md、README.md、SOURCE_OF_TRUTH.md を最新に保ち、どのエージェントにも何がどこにあり、どのファイルを信頼すべきかを伝えます。","inLanguage":"ja","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"James","url":"https://github.com/iamzifei"},"sameAs":["https://apps.apple.com/app/id6803462651","https://github.com/iamzifei/inkstone"],"downloadUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","installUrl":"https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg","releaseNotes":"https://github.com/iamzifei/inkstone/releases/latest"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"ja","mainEntity":[{"@type":"Question","name":"どの AI ツールが AGENTS.md を読みますか？","acceptedAnswer":{"@type":"Answer","text":"フォルダの最上位にある普通の Markdown ファイルなので、フォルダを渡されたアシスタントやエージェントなら読めます。多くのコーディングエージェントは名前で探します。"}},{"@type":"Question","name":"AGENTS.md を自分で編集できますか？","acceptedAnswer":{"@type":"Answer","text":"はい。Inkstone が書き直すのはマーカーの間だけです。その上や下に書いた指示は残ります。"}},{"@type":"Question","name":"AI による整理を使わなくても使えますか？","acceptedAnswer":{"@type":"Answer","text":"はい。入口ファイルはナレッジベースの作成時に書かれ、ルールで振り分けてもモデルで振り分けても最新に保たれます。"}}]}</script>
+
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="../">
+      <img src="../assets/icon.png" alt="" width="28" height="28">
+      <span class="wordmark-name">Inkstone</span>
+      <span class="wordmark-cjk" aria-hidden="true">墨砚</span>
+    </a>
+    <nav class="nav-links" aria-label="セクション">
+      <a href="../#how">使い方</a>
+      <a href="../#ai">AI 向け</a>
+      <a href="../#features">エディタ</a>
+      <a href="../#faq">よくある質問</a>
+      <a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a>
+      <details class="lang-menu">
+        <summary aria-label="Language">日本語</summary>
+        <nav class="lang-menu-list" aria-label="Language"><a class="lang" href="https://inkslab.app/ai-context-management.html" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/ai-context-management.html" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/ai-context-management.html" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><span class="lang-current" aria-current="true">日本語</span><a class="lang" href="https://inkslab.app/ko/ai-context-management.html" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/ai-context-management.html" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/ai-context-management.html" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/ai-context-management.html" hreflang="es" data-lang="es">Español</a></nav>
+      </details>
+      <a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main">
+<article class="article">
+  <p class="crumbs"><a href="../">Inkstone</a> › AI コンテキスト管理</p>
+  <h1>AI コンテキスト管理を、自動で最新に</h1>
+  <p class="article-lede">AI アシスタントの出来は、渡すファイルとその説明しだい。Inkstone はそのコンテキストをナレッジベースに書き込み、フォルダが変わるたびに書き直します。</p>
+  <div class="hero-actions"><a class="btn btn-primary" href="https://github.com/iamzifei/inkstone/releases/latest/download/Inkstone.dmg">macOS 版をダウンロード</a><a class="btn btn-quiet" href="https://apps.apple.com/app/id6803462651" rel="noopener">iPhone<span class="ac"></span>・<span class="ac"></span>iPad 版を App Store で入手</a></div>
+  <figure class="article-hero"><img src="../assets/kb/en/mac-k3-agents.webp" srcset="../assets/kb/en/mac-k3-agents-900.webp 900w, ../assets/kb/en/mac-k3-agents-1800.webp 1800w, ../assets/kb/en/mac-k3-agents.webp 2652w" sizes="(max-width: 1100px) 96vw, 1000px" width="2652" height="1692" alt="Mac の Inkstone で開いた AGENTS.md。" loading="eager" fetchpriority="high" decoding="async"></figure>
+  <h2>AI コンテキスト管理とは？</h2><p>コンテキストとは、AI モデルが答える前に見るもの、つまりファイルとその扱い方の指示です。管理するとは、アシスタントにどのファイルを読ませるか、フォルダの構成をどう伝えるか、2 つが食い違うときどちらを正とするかを決めることです。</p><p>手で書いたコンテキストは 1 週間で古くなります。メモが移動し、フォルダの名前が変わると、アシスタントは自信満々に間違えます。</p><h2>Inkstone が書く 3 つの入口ファイル</h2><p>AGENTS.md は、コーディングエージェントや AI アシスタントがフォルダの最上位で探す慣習のファイルです。Inkstone が書き直すのは自分のマーカーの間だけで、その外に書いた内容は残ります。</p><ol><li>AGENTS.md：このナレッジベースが何か、そしてエージェントが守るルール。新しいファイルの行き先、何も削除しないこと、プライベートフォルダには触れないこと。</li><li>README.md：人にも機械にも読めるフォルダの地図。</li><li>SOURCE_OF_TRUTH.md：何についてどのファイルが正か。エージェントが 2 つの版のあいだで推測せずに済みます。</li></ol><h2>フォルダについていくコンテキスト</h2><p>整理のたびに、Inkstone は入口ファイルを今あるフォルダに合わせて更新します。月曜に渡しても 3 か月後に渡しても、地図は最新です。</p><figure class="article-shot"><img src="../assets/kb/en/iphone-k3-agents.webp" srcset="../assets/kb/en/iphone-k3-agents-340.webp 340w, ../assets/kb/en/iphone-k3-agents-680.webp 680w, ../assets/kb/en/iphone-k3-agents.webp 1350w" sizes="(max-width: 900px) 92vw, 760px" width="1350" height="2760" alt="iPhone の AGENTS.md。" loading="lazy" decoding="async"></figure><h2>初期設定でプライベート</h2><p>整理に使うモデルはデバイス上で動きます。AGENTS.md はプライベートフォルダを立ち入り禁止と明記し、クラウドのモデルをオンにしていても、プライベートに見えるファイルは送りません。</p>
+  <section class="faq" aria-labelledby="faq-h"><h2 id="faq-h">よくある質問</h2><div class="qa"><h3>どの AI ツールが AGENTS.md を読みますか？</h3><p>フォルダの最上位にある普通の Markdown ファイルなので、フォルダを渡されたアシスタントやエージェントなら読めます。多くのコーディングエージェントは名前で探します。</p></div><div class="qa"><h3>AGENTS.md を自分で編集できますか？</h3><p>はい。Inkstone が書き直すのはマーカーの間だけです。その上や下に書いた指示は残ります。</p></div><div class="qa"><h3>AI による整理を使わなくても使えますか？</h3><p>はい。入口ファイルはナレッジベースの作成時に書かれ、ルールで振り分けてもモデルで振り分けても最新に保たれます。</p></div></section>
+</article>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="../assets/icon.png" alt="" width="32" height="32">
+      <p class="footer-tagline">ファイルがずっとあなたのものである AI ナレッジベース。</p>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">プロジェクト</h2>
+      <ul>
+        <li><a href="https://github.com/iamzifei/inkstone" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/iamzifei/inkstone/issues" rel="noopener">課題</a></li>
+        <li><a href="https://ko-fi.com/james_ai/tip" rel="noopener">Ko-fi</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h2 class="footer-h">ガイド</h2>
+      <ul><li><a href="../ja/ai-knowledge-base.html">AI ナレッジベース</a></li><li><a href="../ja/ai-context-management.html">AI コンテキスト管理</a></li><li><a href="../sync.html">同期ガイド</a></li><li><a href="../obsidian-alternative.html" hreflang="en">Obsidian との比較</a></li><li><a href="../obsidian-sync-free.html" hreflang="en">保管庫を無料で同期する</a></li><li><a href="../privacy.html" hreflang="en">プライバシー</a></li></ul>
+    </div>
+    <div class="footer-col footer-siblings">
+      <h2 class="footer-h">同じ作り手の別のもの</h2>
+      <ul><li><a href="https://audioswitch.dev" rel="noopener"><img src="../assets/audioswitch.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">AudioSwitch</span><span class="sib-note">メニューバーからオーディオ機器を切り替える</span></span></a></li><li><a href="https://getcandela.app" rel="noopener"><img src="../assets/candela.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">Candela</span><span class="sib-note">外付けディスプレイの明るさを操作する</span></span></a></li><li><a href="https://getclipstack.app" rel="noopener"><img src="../assets/clipstack.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">ClipStack</span><span class="sib-note">邪魔をしないクリップボード履歴</span></span></a></li><li><a href="https://jamesai.dev/veil/" rel="noopener"><img src="../assets/veil.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">Veil</span><span class="sib-note">作業中のウィンドウだけをくっきり残し、背後をやわらかくぼかします。無料・MIT。</span></span></a></li><li><a href="https://jamesai.dev/tapper/" rel="noopener"><img src="../assets/tapper.png" alt="" width="28" height="28" loading="lazy" decoding="async"><span class="sib-text"><span class="sib-name">Tapper</span><span class="sib-note">マウスポインタを長い棒の先のマンガ風グローブに。デモや画面収録で、指す場所がひと目でわかります。無料・MIT。</span></span></a></li></ul>
+    </div>
+  </div>
+  <nav class="footer-langs" aria-label="Language"><a class="lang" href="https://inkslab.app/ai-context-management.html" hreflang="en" data-lang="en">English</a><a class="lang" href="https://inkslab.app/zh/ai-context-management.html" hreflang="zh-Hans" data-lang="zh">简体中文</a><a class="lang" href="https://inkslab.app/zh-Hant/ai-context-management.html" hreflang="zh-Hant" data-lang="zh-Hant">繁體中文</a><span class="lang-current" aria-current="true">日本語</span><a class="lang" href="https://inkslab.app/ko/ai-context-management.html" hreflang="ko" data-lang="ko">한국어</a><a class="lang" href="https://inkslab.app/de/ai-context-management.html" hreflang="de" data-lang="de">Deutsch</a><a class="lang" href="https://inkslab.app/fr/ai-context-management.html" hreflang="fr" data-lang="fr">Français</a><a class="lang" href="https://inkslab.app/es/ai-context-management.html" hreflang="es" data-lang="es">Español</a></nav>
+  <p class="colophon">Source Serif 4 と源ノ明朝で組んでいます。静的ファイルとして生成し GitHub Pages から配信、解析ツールの類は一切入れていません。</p>
+</footer>
+<script src="../assets/site.js?v=4e0b39b2" defer></script>
+</body>
+</html>
