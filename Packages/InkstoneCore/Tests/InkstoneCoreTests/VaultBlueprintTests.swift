@@ -121,4 +121,73 @@ struct VaultBlueprintTests {
         }
         return out
     }
+
+    // Review 2026-11-19.
+    @Test func aQuotedOrDuplicatedMarkerNeverWipesText() throws {
+        let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
+        _ = try VaultBlueprint.apply(to: root, language: .english)
+        let readme = root.appending(path: "README.md")
+        let original = try String(contentsOf: readme, encoding: .utf8)
+        // The person quotes the marker in their own text, above the block.
+        let quoted = "How it works: Inkstone rewrites what's after `<!-- inkstone:auto:start -->`.\n\nPrecious paragraph.\n\n" + original
+        try quoted.write(to: readme, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: root.appending(path: "10-Projects/New"), withIntermediateDirectories: true)
+        _ = try EntryFiles.refresh(in: root)
+        #expect(try String(contentsOf: readme, encoding: .utf8).contains("Precious paragraph."))
+        // Two blocks: ambiguous, so the file is left alone.
+        let doubled = original + "\n" + original
+        try doubled.write(to: readme, atomically: true, encoding: .utf8)
+        _ = try EntryFiles.refresh(in: root)
+        #expect(try String(contentsOf: readme, encoding: .utf8) == doubled)
+        // Markers inside a code fence are not a block.
+        let fenced = "# Mine\n\n```\n<!-- inkstone:auto:start -->\nexample\n<!-- inkstone:auto:end -->\n```\n"
+        try fenced.write(to: readme, atomically: true, encoding: .utf8)
+        _ = try EntryFiles.refresh(in: root)
+        #expect(try String(contentsOf: readme, encoding: .utf8) == fenced)
+    }
+
+    @Test func aStrayFolderNameDoesNotMakeAVaultLookLikeAnotherLanguage() throws {
+        let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appending(path: "_System"), withIntermediateDirectories: true)
+        #expect(KnowledgeBaseLayout.detect(in: root) == nil)
+        _ = try VaultBlueprint.apply(to: root, language: .simplifiedChinese, skeleton: false)
+        #expect(exists(root, "_系统/整理规则.md"))
+        #expect(!exists(root, "_System/Organizing Rules.md"))
+        #expect(KnowledgeBaseLayout.detect(in: root)?.language == .simplifiedChinese)
+    }
+
+    @Test func folderNamesCannotBreakTheTables() throws {
+        let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
+        _ = try VaultBlueprint.apply(to: root, language: .english)
+        for name in ["a|b", "c`d", "x <!-- inkstone:auto:end --> y"] {
+            try FileManager.default.createDirectory(at: root.appending(path: "10-Projects/\(name)"), withIntermediateDirectories: true)
+        }
+        _ = try EntryFiles.refresh(in: root)
+        let sot = try read(root, "SOURCE_OF_TRUTH.md")
+        #expect(sot.components(separatedBy: "<!-- inkstone:auto:end -->").count == 2)   // exactly one end marker
+        for line in sot.split(separator: "\n") where line.hasPrefix("| ") && line.contains("a") && line.contains("b") && line.contains("10-Projects/a") {
+            #expect(line.components(separatedBy: " | ").count == 3)                     // still three cells
+        }
+        // Refreshing again is stable.
+        #expect(try EntryFiles.refresh(in: root).isEmpty)
+    }
+
+    @Test func longListsAreCapped() throws {
+        let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
+        _ = try VaultBlueprint.apply(to: root, language: .english)
+        for i in 0..<60 { try FileManager.default.createDirectory(at: root.appending(path: "20-Areas/a\(i)"), withIntermediateDirectories: true) }
+        _ = try EntryFiles.refresh(in: root)
+        let sot = try read(root, "SOURCE_OF_TRUTH.md")
+        #expect(sot.components(separatedBy: "20-Areas/a").count - 1 <= 21)
+        #expect(sot.contains("40 more") || sot.contains("more"))
+    }
+
+    @Test func aFileWhereAFolderShouldBeDoesNotAbortSetup() throws {
+        let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
+        try "not a folder".write(to: root.appending(path: "30-资料"), atomically: true, encoding: .utf8)
+        _ = try VaultBlueprint.apply(to: root, language: .simplifiedChinese)
+        #expect(try read(root, "30-资料") == "not a folder")
+        #expect(exists(root, "AGENTS.md"))
+        #expect(exists(root, "50-产出"))
+    }
 }

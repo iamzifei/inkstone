@@ -21,22 +21,40 @@ public enum VaultBlueprint {
         let fm = FileManager.default
         var created: [String] = []
 
-        func folder(_ path: String) throws {
-            let url = root.appending(path: path, directoryHint: .isDirectory)
-            var isDir: ObjCBool = false
-            guard !fm.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDir) else { return }
-            try fm.createDirectory(at: url, withIntermediateDirectories: true)
-            created.append(path)
+        /// Present in any form: a file or folder, or an iCloud placeholder
+        /// for one that is not downloaded (`.name.icloud`), which
+        /// `fileExists` does not see.
+        func present(_ path: String) -> Bool {
+            let url = root.appending(path: path)
+            if fm.fileExists(atPath: url.path(percentEncoded: false)) { return true }
+            let placeholder = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).icloud")
+            return fm.fileExists(atPath: placeholder.path(percentEncoded: false))
+        }
+        func folder(_ path: String) {
+            // Something already there — even a file with that name — is left
+            // alone; the rest of the setup carries on.
+            guard !present(path) else { return }
+            if (try? fm.createDirectory(at: root.appending(path: path, directoryHint: .isDirectory),
+                                        withIntermediateDirectories: true)) != nil {
+                created.append(path)
+            }
         }
         func file(_ path: String, _ text: String) throws {
+            guard !present(path) else { return }
             let url = root.appending(path: path)
-            guard !fm.fileExists(atPath: url.path(percentEncoded: false)) else { return }
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Data(text.utf8).write(to: url, options: .withoutOverwriting)
-            created.append(path)
+            var isDir: ObjCBool = false
+            let parent = url.deletingLastPathComponent()
+            if fm.fileExists(atPath: parent.path(percentEncoded: false), isDirectory: &isDir), !isDir.boolValue { return }
+            try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+            do {
+                try Data(text.utf8).write(to: url, options: .withoutOverwriting)
+                created.append(path)
+            } catch CocoaError.fileWriteFileExists {
+                // Appeared meanwhile (sync, another device): theirs stays.
+            }
         }
 
-        for path in skeleton ? layout.allFolders : [layout.system] { try folder(path) }
+        for path in skeleton ? layout.allFolders : [layout.system] { folder(path) }
         let s = SystemFileText(layout: layout, date: date)
         try file(layout.rulesFile, s.rules(rules ?? OrganizingPolicy.defaultText(layout.language)))
         try file(layout.logFile, s.log)

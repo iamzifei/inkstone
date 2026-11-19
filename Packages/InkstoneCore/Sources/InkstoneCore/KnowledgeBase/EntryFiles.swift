@@ -24,21 +24,62 @@ public enum EntryFiles {
     /// date. Returns the files changed (none when nothing changed).
     @discardableResult
     public static func refresh(in root: URL) throws -> [String] {
+        lock.lock(); defer { lock.unlock() }    // one refresh at a time
         guard let layout = KnowledgeBaseLayout.detect(in: root) else { return [] }
         var changed: [String] = []
         for name in names {
             let url = root.appending(path: name)
             guard let text = try? String(contentsOf: url, encoding: .utf8),
-                  let s = text.range(of: start), let e = text.range(of: end), s.upperBound <= e.lowerBound
-            else { continue }
-            let fresh = "\n" + block(name, in: root, layout: layout) + "\n"
-            guard String(text[s.upperBound..<e.lowerBound]) != fresh else { continue }
-            let updated = String(text[..<s.upperBound]) + fresh + String(text[e.lowerBound...])
-            try Data(updated.utf8).write(to: url, options: .atomic)
-            changed.append(name)
+                  let (before, after) = split(text) else { continue }
+            let updated = before + start + "\n" + block(name, in: root, layout: layout) + "\n" + end + after
+            guard updated != text else { continue }
+            var written = false
+            var coordinationError: NSError?
+            NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
+                // Unchanged since it was read? Otherwise an edit or a sync
+                // landed in between: theirs wins, try again next time.
+                guard (try? String(contentsOf: target, encoding: .utf8)) == text else { return }
+                written = (try? Data(updated.utf8).write(to: target, options: .atomic)) != nil
+            }
+            if written { changed.append(name) }
         }
         return changed
     }
+
+    private static let lock = NSLock()
+
+    /// The text before the start marker and after the end marker — when the
+    /// file has exactly one of each, each alone on its line, outside code
+    /// fences, start before end. Anything else (a quoted marker, two blocks,
+    /// markers in an example) is ambiguous: nil, and the file is left alone.
+    static func split(_ text: String) -> (String, String)? {
+        var starts: [Range<String.Index>] = [], ends: [Range<String.Index>] = []
+        var inFence = false
+        var lineStart = text.startIndex
+        while lineStart < text.endIndex {
+            let lineEnd = text[lineStart...].firstIndex(of: "\n") ?? text.endIndex
+            let line = text[lineStart..<lineEnd].trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") || line.hasPrefix("~~~") { inFence.toggle() }
+            else if !inFence && line == start { starts.append(lineStart..<lineEnd) }
+            else if !inFence && line == end { ends.append(lineStart..<lineEnd) }
+            lineStart = lineEnd < text.endIndex ? text.index(after: lineEnd) : text.endIndex
+        }
+        guard starts.count == 1, ends.count == 1, starts[0].upperBound <= ends[0].lowerBound else { return nil }
+        return (String(text[..<starts[0].lowerBound]), String(text[ends[0].upperBound...]))
+    }
+
+    /// A name as inline code that no folder name can break: pipes escaped for
+    /// tables, a fence longer than any run of backticks inside, and the
+    /// marker text defused.
+    static func code(_ name: String) -> String {
+        let safe = name.replacingOccurrences(of: "inkstone:auto", with: "inkstone∶auto")
+            .replacingOccurrences(of: "|", with: "\\|")
+        var longest = 0, run = 0
+        for ch in safe { if ch == "`" { run += 1; longest = max(longest, run) } else { run = 0 } }
+        let fence = String(repeating: "`", count: longest + 1)
+        return longest == 0 ? "`\(safe)`" : "\(fence) \(safe) \(fence)"
+    }
+    static let listCap = 20
 
     /// A whole new entry file: heading, automatic block, and a line inviting
     /// the person's own additions below it.
@@ -46,6 +87,11 @@ public enum EntryFiles {
         let l = Words(layout.language)
         let heading = name == "README.md" ? "# \(root.lastPathComponent)" : "# \(name.replacingOccurrences(of: ".md", with: ""))"
         return "\(heading)\n\n\(start)\n\(block(name, in: root, layout: layout))\n\(end)\n\n\(l.yours)\n"
+    }
+
+    /// Plain text in a table cell: pipes escaped, marker text defused.
+    static func cell(_ text: String) -> String {
+        text.replacingOccurrences(of: "inkstone:auto", with: "inkstone∶auto").replacingOccurrences(of: "|", with: "\\|")
     }
 
     static func block(_ name: String, in root: URL, layout: KnowledgeBaseLayout) -> String {
@@ -56,15 +102,16 @@ public enum EntryFiles {
             var out = "\(l.managed)\n\n## \(l.whatTitle)\n\n\(l.what)\n\n## \(l.agentRulesTitle)\n\n"
             out += l.agentRules(layout).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
             out += "\n\n## \(l.whereTitle)\n\n| \(l.colFolder) | \(l.colHolds) |\n| --- | --- |\n"
-            out += tree.top.map { "| `\($0)/` | \(l.purpose(of: $0, layout) ?? tree.childList($0, l)) |" }.joined(separator: "\n")
+            out += tree.top.map { "| \(code($0 + "/")) | \(l.purpose(of: $0, layout) ?? tree.childList($0, l)) |" }.joined(separator: "\n")
             out += "\n\n## \(l.authorityTitle)\n\n- `SOURCE_OF_TRUTH.md` — \(l.sotLine)\n- `\(layout.rulesFile)` — \(l.rulesLine)\n- `\(layout.logFile)` — \(l.logLine)"
             return out
         case "README.md":
             var out = "\(l.managed)\n\n\(l.readmeIntro)\n\n## \(l.startTitle)\n\n1. `SOURCE_OF_TRUTH.md` — \(l.sotLine)\n2. `AGENTS.md` — \(l.agentsLine)\n3. `\(layout.inbox)/` — \(l.inboxLine)\n\n## \(l.mapTitle)\n\n"
             out += tree.top.map { top in
                 let kids = tree.children[top] ?? []
-                return "- `\(top)/`" + (l.purpose(of: top, layout).map { " — \($0)" } ?? "")
-                    + kids.map { "\n  - `\($0)/`" }.joined()
+                return "- \(code(top + "/"))" + (l.purpose(of: top, layout).map { " — \($0)" } ?? "")
+                    + kids.prefix(listCap).map { "\n  - \(code($0 + "/"))" }.joined()
+                    + (kids.count > listCap ? "\n  - \(l.more(kids.count - listCap))" : "")
             }.joined(separator: "\n")
             out += "\n\n## \(l.howTitle)\n\n\(l.how(layout))"
             return out
@@ -81,11 +128,13 @@ public enum EntryFiles {
             for top in tree.top where !layout.systemFolders.contains(top) && top != layout.inbox {
                 let label = l.label(of: top, layout) ?? top
                 rows.append((label, top + "/", l.purpose(of: top, layout) ?? ""))
-                for kid in tree.children[top] ?? [] { rows.append((l.labelled(label, kid), "\(top)/\(kid)/", "")) }
+                let kids = tree.children[top] ?? []
+                for kid in kids.prefix(listCap) { rows.append((l.labelled(label, kid), "\(top)/\(kid)/", "")) }
+                if kids.count > listCap { rows.append((l.more(kids.count - listCap), top + "/", "")) }
             }
-            for readme in tree.readmes { rows.append((l.readmeOf(readme), readme, "")) }
+            for readme in tree.readmes.prefix(listCap) { rows.append((l.readmeOf(readme), readme, "")) }
             var out = "\(l.managed)\n\n\(l.sotIntro)\n\n| \(l.colFind) | \(l.colWhere) | \(l.colNote) |\n| --- | --- | --- |\n"
-            out += rows.map { "| \($0.0) | `\($0.1)` | \($0.2) |" }.joined(separator: "\n")
+            out += rows.map { "| \(cell($0.0)) | \(code($0.1)) | \($0.2) |" }.joined(separator: "\n")
             return out
         default:
             return ""
@@ -129,7 +178,7 @@ private struct Tree {
 
     func childList(_ top: String, _ l: Words) -> String {
         let k = children[top] ?? []
-        return k.isEmpty ? "—" : k.prefix(8).joined(separator: l.listSeparator) + (k.count > 8 ? l.andMore : "")
+        return k.isEmpty ? "—" : k.prefix(8).map(EntryFiles.cell).joined(separator: l.listSeparator) + (k.count > 8 ? l.andMore : "")
     }
 }
 
@@ -191,10 +240,11 @@ private struct Words {
     var findReview: String { t("待确认的文件", "待確認的檔案", "Files waiting for your decision") }
     var findTrash: String { t("待删除的文件", "待刪除的檔案", "Files to delete") }
     func readmeOf(_ path: String) -> String {
-        let folder = path.replacingOccurrences(of: "/README.md", with: "")
+        let folder = EntryFiles.cell(path.replacingOccurrences(of: "/README.md", with: ""))
         return t("「\(folder)」的说明", "「\(folder)」的說明", "About \(folder)")
     }
     var listSeparator: String { t("、", "、", ", ") }
+    func more(_ n: Int) -> String { t("……另有 \(n) 个", "……另有 \(n) 個", "… and \(n) more") }
     var andMore: String { t(" 等", " 等", " …") }
 
     /// A short noun for a skeleton folder, for "what you are looking for".

@@ -88,18 +88,22 @@ public struct KnowledgeBaseLayout: Equatable, Sendable {
     /// organizer never files anything into these by itself.
     public var systemFolders: [String] { [system, archive, review] }
 
-    /// The layout a folder already uses, from the inbox or system folder it
-    /// has; nil for a folder that has neither (a plain or hand-made vault).
+    /// The layout a folder already uses: its rules file, or at least two of
+    /// its skeleton folders. One folder that merely shares a name (a vault of
+    /// someone's own with a `_System` folder) is not enough. Nil for a plain or
+    /// hand-made vault.
     public static func detect(in root: URL) -> KnowledgeBaseLayout? {
         let fm = FileManager.default
+        func isDirectory(_ path: String) -> Bool {
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: root.appending(path: path).path(percentEncoded: false), isDirectory: &isDir) && isDir.boolValue
+        }
         for language in KnowledgeBaseLanguage.allCases {
             let layout = KnowledgeBaseLayout(language: language)
-            for folder in [layout.inbox, layout.system] {
-                var isDir: ObjCBool = false
-                if fm.fileExists(atPath: root.appending(path: folder).path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue {
-                    return layout
-                }
-            }
+            if fm.fileExists(atPath: root.appending(path: layout.rulesFile).path(percentEncoded: false)) { return layout }
+            let present = [layout.inbox, layout.projects, layout.areas, layout.resources, layout.media,
+                           layout.outputs, layout.review, layout.archive, layout.system].filter(isDirectory).count
+            if present >= 2 { return layout }
         }
         return nil
     }
