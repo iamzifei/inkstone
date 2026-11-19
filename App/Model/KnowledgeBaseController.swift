@@ -70,6 +70,53 @@ final class KnowledgeBaseController {
     func clearFailure() { failure = nil }
     func clearBanner() { lastResult = nil }
 
+    /// Files dropped or picked, waiting for "copy or move?" (asked until the
+    /// person ticks "always do this").
+    var pendingDrop: [URL]?
+    /// The "Add Files…" picker (iPhone has no drag and drop between apps).
+    var isPickingFiles = false
+
+    /// Something dropped on the window or picked with "Add Files…".
+    func receive(_ urls: [URL]) {
+        guard isKnowledgeBase, !urls.isEmpty else { return }
+        switch settings.data.knowledgeBase.dropAction {
+        case .ask: pendingDrop = urls
+        case .copy: bringIn(urls, action: .copy)
+        case .move: bringIn(urls, action: .move)
+        }
+    }
+
+    /// Copies or moves the files into the inbox (a move removes the
+    /// original only after a complete, identical copy); the organizer picks
+    /// them up from there.
+    func bringIn(_ urls: [URL], action: DropImporter.Action, remember: Bool = false) {
+        pendingDrop = nil
+        guard let root, let layout else { return }
+        if remember {
+            settings.data.knowledgeBase.dropAction = action == .copy ? .copy : .move
+        }
+        let token = generation
+        Task {
+            let results = await Task.detached(priority: .userInitiated) { () -> [DropImporter.Result] in
+                let scoped = urls.map { ($0, $0.startAccessingSecurityScopedResource()) }
+                defer { for (url, ok) in scoped where ok { url.stopAccessingSecurityScopedResource() } }
+                return DropImporter.importItems(urls, into: root, layout: layout, action: action)
+            }.value
+            guard generation == token else { return }
+            let failed = results.filter { $0.destination == nil }
+            let kept = results.filter { $0.destination != nil && action == .move && $0.originalKept }
+            var lines: [String] = []
+            if !failed.isEmpty {
+                lines.append(localized("\(failed.count) couldn't be added: \(failed.map(\.source.lastPathComponent).joined(separator: ", "))"))
+            }
+            if !kept.isEmpty {
+                lines.append(localized("\(kept.count) copied, but the originals couldn't be removed, so they are still where they were."))
+            }
+            if !lines.isEmpty { failure = lines.joined(separator: "\n") }
+            inboxMayHaveChanged(delay: .milliseconds(500))
+        }
+    }
+
     /// The vault changed on disk. Re-detects (a knowledge base may just have
     /// been made here) and, after things settle, looks at the inbox.
     func inboxMayHaveChanged(delay: Duration = .seconds(2)) {

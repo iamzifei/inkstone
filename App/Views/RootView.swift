@@ -14,6 +14,7 @@ struct RootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
 
+    @State private var isDropTargeted = false
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
@@ -68,6 +69,42 @@ struct RootView: View {
         }
         .tint(style.accent)
         .background(style.background)
+        // Files dragged onto the window go to the knowledge base's inbox
+        // (views that take drops themselves — the editor — come first).
+        .dropDestination(for: URL.self) { urls, _ in
+            let files = urls.filter(\.isFileURL)
+            guard workspace.knowledgeBase.isKnowledgeBase, !files.isEmpty else { return false }
+            workspace.knowledgeBase.receive(files)
+            return true
+        } isTargeted: { isDropTargeted = $0 && workspace.knowledgeBase.isKnowledgeBase }
+        .overlay {
+            if isDropTargeted, let layout = workspace.knowledgeBase.layout {
+                DropTargetOverlay(inbox: layout.inbox)
+            }
+        }
+        .background {
+            Color.clear.fileImporter(
+                isPresented: Binding(get: { workspace.knowledgeBase.isPickingFiles },
+                                     set: { workspace.knowledgeBase.isPickingFiles = $0 }),
+                allowedContentTypes: [.item, .folder], allowsMultipleSelection: true
+            ) { result in
+                if case .success(let urls) = result { workspace.knowledgeBase.receive(urls) }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { workspace.knowledgeBase.pendingDrop != nil },
+            set: { if !$0 { workspace.knowledgeBase.pendingDrop = nil } }
+        )) {
+            if let urls = workspace.knowledgeBase.pendingDrop { DropChoiceSheet(urls: urls) }
+        }
+        .alert("Knowledge base", isPresented: Binding(
+            get: { workspace.knowledgeBase.failure != nil },
+            set: { if !$0 { workspace.knowledgeBase.clearFailure() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(workspace.knowledgeBase.failure ?? "")
+        }
         .overlay(alignment: .bottom) {
             if let result = workspace.knowledgeBase.lastResult {
                 OrganizeBanner(result: result)
