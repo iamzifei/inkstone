@@ -100,9 +100,13 @@ final class KnowledgeBaseController {
         defer { if generation == token { isOrganizing = false } }
         let inbox = await Task.detached(priority: .utility) { Self.inboxSignature(root: root, layout: layout) }.value
         guard generation == token else { return }
-        if automatic {
-            guard !inbox.isEmpty, inbox != lastSeenInbox else { return }
+        if inbox.isEmpty {
+            // Emptied: whatever lands next — even the same file again, with
+            // its old date — is new.
+            lastSeenInbox = nil
+            return
         }
+        if automatic, inbox == lastSeenInbox { return }
         // The inbox as planned. Not overwritten after the round: what is left
         // (a file that could not move) is tried once more, then left alone;
         // anything that arrived meanwhile makes it different, so it is seen.
@@ -122,7 +126,10 @@ final class KnowledgeBaseController {
         } catch {
             guard generation == token else { return }
             failure = error.localizedDescription
-            lastSeenInbox = nil          // a passing problem (busy): try again next time
+            // Busy is passing: try again next time. Anything else (a
+            // read-only vault …) waits for the inbox to change, rather than
+            // raising the same alert on every save.
+            if case OrganizeError.busy = error { lastSeenInbox = nil }
         }
     }
 
