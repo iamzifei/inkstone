@@ -1,0 +1,40 @@
+title: Base de conocimiento con IA que se organiza — Inkstone
+description: 'Una base de conocimiento con IA en una carpeta normal: Inkstone archiva notas, PDF y fotos según tus reglas y escribe AGENTS.md. Gratis.'
+crumb: Base de conocimiento con IA
+h1: Una base de conocimiento con IA que se organiza sola
+lede: Arrastra notas, PDF, fotos y grabaciones a una carpeta. Inkstone archiva cada archivo con reglas escritas en palabras sencillas, con el modelo de Apple en el dispositivo, y mantiene la carpeta legible para cualquier asistente de IA.
+hero_shot: mac-k1-plan
+hero_alt: 'Inkstone en un Mac: el plan para cinco archivos arrastrados.'
+sections:
+- h2: ¿Qué es una base de conocimiento con IA?
+  paras:
+  - 'Una colección de tus propias notas y archivos, organizada para que tanto tú como un asistente de IA encontréis lo que hay, y con indicaciones escritas de dónde está cada cosa y en qué archivo confiar. Esa segunda parte es la diferencia con una carpeta de notas normal: una IA no puede preguntarte dónde están las facturas.'
+  - Inkstone la mantiene como una carpeta normal de Markdown y archivos. Nada queda encerrado en una base de datos; cualquier app y cualquier agente de IA pueden leerla.
+- h2: Cómo la construye Inkstone
+  list:
+  - 'Una estructura para personas e IA: bandeja de entrada, proyectos, áreas, recursos, medios, resultados y privado, además de una carpeta de revisión para lo dudoso y un archivo donde esperan los duplicados.'
+  - 'Primero la privacidad: documentos de identidad, banco y salud van a la carpeta privada. Luego tus reglas, luego un proyecto que el archivo mencione, luego los medios por tipo y mes.'
+  - El modelo del dispositivo para el resto. Lee el inicio de un archivo y sugiere carpeta y título; si no está seguro, el archivo te espera.
+  - 'Nombres fáciles de leer: 20261119-presupuesto-reforma.md, primero la fecha y luego el tema.'
+  - 'Archivos de entrada para la IA: AGENTS.md, README.md y SOURCE_OF_TRUTH.md, reescritos cuando cambian las carpetas.'
+  shot: mac-k2-organized
+  alt: La base de conocimiento tras una ronda, con el aviso de Deshacer.
+- h2: Seguro dejar que organice
+  paras:
+  - No se borra nada. Cada movimiento se registra antes de hacerse y una ronda entera se puede deshacer. El texto de una nota nunca se reescribe. Las rondas grandes y los duplicados esperan tu sí.
+- h2: También en iPhone y iPad
+  paras:
+  - 'Añade archivos desde la app Archivos: llegan a la bandeja de entrada y se archivan igual. La base de conocimiento vive en iCloud Drive, así que el Mac y el iPhone ven la misma carpeta.'
+  shot: iphone-k4-drop
+  alt: 'En el iPhone: ¿copiar o mover?'
+faq:
+  title: Preguntas
+  items:
+  - q: ¿La IA lee todos mis archivos?
+    a: El modelo del dispositivo lee solo el inicio de un archivo que tus reglas no pudieron colocar, en tu dispositivo. Un modelo en la nube solo se usa con tu propia clave y activado; recibe el nombre y el inicio de ese archivo, los nombres de tus carpetas y tus reglas, y los archivos que parecen privados nunca se envían.
+  - q: ¿Funciona con Obsidian?
+    a: Una bóveda de Obsidian se abre tal cual y nunca se reorganiza. Una base de conocimiento creada por Inkstone es Markdown normal que Obsidian también abre.
+  - q: ¿Qué dispositivos?
+    a: Mac (macOS 26), iPhone y iPad (iOS 26). El modelo del dispositivo necesita Apple Intelligence; sin él, se organiza con tus reglas.
+  - q: ¿Cuánto cuesta?
+    a: Nada. Inkstone es gratis en el Mac y en el App Store, sin cuenta.

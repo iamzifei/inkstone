@@ -1,0 +1,36 @@
+title: AI Context Management with AGENTS.md — Inkstone
+description: Inkstone keeps AGENTS.md, README.md and SOURCE_OF_TRUTH.md current in your knowledge base, so any AI agent knows what is where.
+crumb: AI context management
+h1: AI context management, kept up to date for you
+lede: An AI assistant is only as good as the files it is handed and what it is told about them. Inkstone writes that context into your knowledge base — and rewrites it every time the folders change.
+hero_shot: mac-k3-agents
+hero_alt: 'AGENTS.md open in Inkstone on a Mac: what this is, rules for AI agents, where everything lives.'
+sections:
+- h2: What is AI context management?
+  paras:
+  - 'Context is what an AI model sees before it answers: the files, and the instructions about them. Managing it means deciding which files an assistant reads, telling it how the folder is laid out, and saying which file wins when two disagree.'
+  - Done by hand, that context goes stale the week after it is written. A note moves, a folder is renamed, and the assistant is confidently wrong.
+- h2: Three entry files, written by Inkstone
+  list:
+  - 'AGENTS.md — what this knowledge base is, and the rules an agent follows here: where new files go, that nothing is deleted, that the private folder stays private.'
+  - README.md — the folder map, for people and machines.
+  - SOURCE_OF_TRUTH.md — which file is authoritative for what, so an agent stops guessing between two versions.
+  paras:
+  - AGENTS.md is the convention coding agents and AI assistants already look for at the top of a folder. Inkstone rewrites only the part between its own markers; anything you add around it stays.
+- h2: Context that follows the folder
+  paras:
+  - Each time Inkstone organizes, it updates the entry files to match the folders that now exist. Hand the folder to an assistant on Monday or in March, and the map is current.
+  shot: iphone-k3-agents
+  alt: AGENTS.md on iPhone.
+- h2: Private by default
+  paras:
+  - The organizing model runs on your device. The private folder is named in AGENTS.md as off-limits, and files that look private are never sent to a cloud model, even when you have turned one on.
+faq:
+  title: Questions
+  items:
+  - q: Which AI tools read AGENTS.md?
+    a: It is a plain Markdown file at the top of the folder, so any assistant or agent that is given the folder can read it; many coding agents look for it by name.
+  - q: Can I edit AGENTS.md myself?
+    a: Yes. Inkstone only rewrites the section between its markers. Your own instructions above or below it are kept.
+  - q: Do I need the AI organizing to use this?
+    a: No. The entry files are written when the knowledge base is created and kept current whether files are filed by your rules or by the model.

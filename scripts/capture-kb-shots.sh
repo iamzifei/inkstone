@@ -19,7 +19,8 @@ case "$LANG_CODE" in
   *) echo "unknown language $LANG_CODE" >&2; exit 1 ;;
 esac
 [ -d "$APP" ] || { echo "Build the simulator app first (.build-sim)." >&2; exit 1; }
-OUT="$ROOT/assets/ios-shots/$LANG_CODE"
+# INKSTONE_SHOTS_OUT: somewhere else (the website's captures); INKSTONE_ONLY_PHONE=1 skips the iPad.
+OUT="${INKSTONE_SHOTS_OUT:-$ROOT/assets/ios-shots}/$LANG_CODE"
 CMD="$(mktemp -t inkstone-kb-cmd)"
 mkdir -p "$OUT/iphone" "$OUT/ipad"
 
@@ -44,12 +45,14 @@ launch() {  # launch <device> [extra env assignments…]
 say() { echo "$1" >> "$CMD"; sleep "${2:-3}"; }
 snap() { xcrun simctl io "$1" screenshot "$2" >/dev/null 2>&1 || { echo "screenshot failed: $2" >&2; exit 1; }; echo "    $(basename "$2")"; }
 
-for DEV in "$PHONE" "$PAD"; do
+DEVICES=("$PHONE"); [ -n "${INKSTONE_ONLY_PHONE:-}" ] || DEVICES+=("$PAD")
+for DEV in "${DEVICES[@]}"; do
   prepare "$DEV"
   if [ "$DEV" = "$PHONE" ]; then D=iphone; else D=ipad; fi
   echo "==> $D ($LANG_CODE)"
-  launch "$DEV"; say kb-card-off 4;            snap "$DEV" "$OUT/$D/k1-plan.png"
-                 say kb-confirm 3;             snap "$DEV" "$OUT/$D/k2-organized.png"
+  # The first round can take a while (the on-device model's first call).
+  launch "$DEV"; say kb-card-off 12;           snap "$DEV" "$OUT/$D/k1-plan.png"
+                 say kb-confirm 4;             snap "$DEV" "$OUT/$D/k2-organized.png"
   launch "$DEV"; say kb-card-off 3; say kb-confirm 3; say "open AGENTS.md" 4; snap "$DEV" "$OUT/$D/k3-agents.png"
   launch "$DEV"; say kb-card-off 2; say kb-drop 3; snap "$DEV" "$OUT/$D/k4-drop.png"
   launch "$DEV" SIMCTL_CHILD_INKSTONE_OPEN_SETTINGS=knowledgeBase; say kb-card-off 3; snap "$DEV" "$OUT/$D/k5-settings.png"

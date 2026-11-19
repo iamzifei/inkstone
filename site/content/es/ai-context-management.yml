@@ -1,0 +1,36 @@
+title: Gestión de contexto para IA con AGENTS.md — Inkstone
+description: Inkstone mantiene al día AGENTS.md, README.md y SOURCE_OF_TRUTH.md para que cualquier agente de IA sepa dónde está cada cosa.
+crumb: Gestión de contexto para IA
+h1: Gestión de contexto para IA, siempre al día
+lede: Un asistente de IA es tan bueno como los archivos que recibe y lo que se le dice de ellos. Inkstone escribe ese contexto en tu base de conocimiento, y lo reescribe cada vez que cambian las carpetas.
+hero_shot: mac-k3-agents
+hero_alt: AGENTS.md abierto en Inkstone en un Mac.
+sections:
+- h2: ¿Qué es la gestión de contexto para IA?
+  paras:
+  - 'El contexto es lo que ve un modelo de IA antes de responder: los archivos y las instrucciones sobre ellos. Gestionarlo es decidir qué archivos lee un asistente, explicarle cómo está organizada la carpeta y decir qué archivo manda cuando dos no coinciden.'
+  - Escrito a mano, ese contexto queda viejo una semana después. Una nota cambia de sitio, una carpeta cambia de nombre y el asistente se equivoca con total seguridad.
+- h2: Tres archivos de entrada, escritos por Inkstone
+  list:
+  - 'AGENTS.md: qué es esta base de conocimiento y las reglas que sigue un agente aquí: dónde van los archivos nuevos, que no se borra nada, que la carpeta privada sigue siendo privada.'
+  - 'README.md: el mapa de carpetas, para personas y máquinas.'
+  - 'SOURCE_OF_TRUTH.md: qué archivo manda para cada cosa, para que un agente no adivine entre dos versiones.'
+  paras:
+  - AGENTS.md es la convención que los agentes de programación y los asistentes de IA ya buscan en la raíz de una carpeta. Inkstone reescribe solo la parte entre sus marcas; lo que añadas alrededor se queda.
+- h2: Un contexto que sigue a la carpeta
+  paras:
+  - Cada vez que Inkstone organiza, actualiza los archivos de entrada según las carpetas que existen ahora. Entregues la carpeta el lunes o en marzo, el mapa está al día.
+  shot: iphone-k3-agents
+  alt: AGENTS.md en el iPhone.
+- h2: Privado por defecto
+  paras:
+  - El modelo que organiza funciona en tu dispositivo. AGENTS.md declara la carpeta privada como intocable, y los archivos que parecen privados nunca se envían a un modelo en la nube, aunque hayas activado uno.
+faq:
+  title: Preguntas
+  items:
+  - q: ¿Qué herramientas de IA leen AGENTS.md?
+    a: Es un archivo Markdown normal en la raíz de la carpeta, así que cualquier asistente o agente que reciba la carpeta puede leerlo; muchos agentes de programación lo buscan por su nombre.
+  - q: ¿Puedo editar AGENTS.md yo mismo?
+    a: Sí. Inkstone solo reescribe la sección entre sus marcas. Tus instrucciones por encima o por debajo se conservan.
+  - q: ¿Necesito la organización con IA para usarlo?
+    a: No. Los archivos de entrada se escriben al crear la base de conocimiento y se mantienen al día tanto si archivan tus reglas como el modelo.

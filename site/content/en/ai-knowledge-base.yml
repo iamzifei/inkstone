@@ -1,0 +1,40 @@
+title: AI Knowledge Base That Organizes Itself — Inkstone
+description: A personal AI knowledge base in a plain folder. Inkstone files notes, PDFs and photos by your rules with on-device AI, and writes AGENTS.md. Free.
+crumb: AI knowledge base
+h1: An AI knowledge base that organizes itself
+lede: Drop notes, PDFs, photos and recordings into one folder. Inkstone files each one by rules you write in plain words, with Apple's on-device model — and keeps the folder readable by any AI assistant.
+hero_shot: mac-k1-plan
+hero_alt: 'Inkstone on a Mac: the plan for five dropped files — filed, private, duplicates put aside.'
+sections:
+- h2: What is an AI knowledge base?
+  paras:
+  - 'An AI knowledge base is a collection of your own notes and files, organized so that both you and an AI assistant can find what is in it — and told, in writing, where things live and which file to trust. The difference from an ordinary notes folder is that second part: an AI can''t ask you where the invoices are.'
+  - Inkstone keeps it a plain folder of Markdown and files. Nothing is locked in a database; any app, and any AI agent, can read it.
+- h2: How Inkstone builds one
+  list:
+  - 'A layout that works for people and AI: inbox, projects, areas, resources, media, outputs and private — plus a review folder for what isn''t certain and an archive where duplicates wait.'
+  - 'Privacy first: ID documents, bank and medical files go to the private folder. Then your own rules, then a project the file names, then media by type and month.'
+  - The on-device model for the rest. It reads the start of a file and suggests a folder and a title; when it isn't sure, the file waits for you.
+  - 'Names you can scan: 20261119-renovation-quote.md — date, then topic.'
+  - 'Entry files for AI: AGENTS.md, README.md and SOURCE_OF_TRUTH.md, rewritten as the folders change.'
+  shot: mac-k2-organized
+  alt: The knowledge base after a round, with its folders in the sidebar and an Undo banner.
+- h2: Safe to let it organize
+  paras:
+  - Nothing is deleted. Every move is logged before it happens, and a whole round can be undone. A note's text is never rewritten. Large rounds and duplicates wait for your yes.
+- h2: On your iPhone and iPad too
+  paras:
+  - Add files from the Files app and they land in the inbox, then are filed the same way. The knowledge base lives in iCloud Drive, so the Mac and the iPhone see one folder.
+  shot: iphone-k4-drop
+  alt: 'On iPhone: copy or move three items into your knowledge base?'
+faq:
+  title: Questions
+  items:
+  - q: Does the AI read all my files?
+    a: The on-device model reads the start of a file that your rules couldn't place, on your device. A cloud model is only used if you add your own key and turn it on; it gets that file's name and start with your folder names and rules, and files that look private are never sent.
+  - q: Can I use it with Obsidian?
+    a: An Obsidian vault opens as it is and is never reorganized. A knowledge base Inkstone makes is ordinary Markdown that Obsidian opens too.
+  - q: Which devices?
+    a: Mac (macOS 26), iPhone and iPad (iOS 26). The on-device model needs a device that supports Apple Intelligence; without it, organizing uses your rules.
+  - q: What does it cost?
+    a: Nothing. Inkstone is free on the Mac and on the App Store, with no account.

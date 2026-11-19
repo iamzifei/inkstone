@@ -1,47 +1,93 @@
-title: "Inkstone — kostenlose Markdown-Notizen-App für Mac und iOS"
-description: "Kostenlose Markdown-Notizen-App für den Mac: reine Dateien in Ihrem Ordner, Wikilinks, Backlinks, Graph und Canvas. Öffnet Obsidian-Vaults unverändert."
+title: Inkstone — KI-Wissensdatenbank für Mac, iPhone und iPad
+description: 'Eine KI-Wissensdatenbank, die sich selbst ordnet: Notizen, PDFs und Fotos hineinziehen – Inkstone legt sie nach deinen Regeln ab. Kostenlos.'
 nav:
   label: Abschnitte
   skip: Zum Inhalt springen
-  features: Funktionen
-  typography: Typografie
-  specs: Technische Daten
+  features: Editor
+  how: So geht's
+  ai: Für KI
+  faq: Fragen
 cta:
   download: Für macOS laden
-  appstore: "iPhone & iPad: im App Store laden"
+  appstore: 'iPhone & iPad: im App Store laden'
   source: Quelltext lesen
-  tour: Ansehen, was sie kann
   kofi: Auf Ko-fi unterstützen
 brew:
-  label: "Oder mit Homebrew installieren"
-  copy: "Kopieren"
-  copied: "Kopiert"
-  copy_aria: "Homebrew-Befehl kopieren"
+  label: Oder mit Homebrew installieren
+  copy: Kopieren
+  copied: Kopiert
+  copy_aria: Homebrew-Befehl kopieren
 hero:
-  eyebrow: macOS 26 · iOS 26 · Natives SwiftUI
-  title: Ihre Notizen sind Dateien. Das sollen sie bleiben.
-  lede: Inkstone arbeitet direkt mit reinem Markdown in einem Ordner Ihrer Wahl. Es liest den Tresor, den Sie schon haben, schreibt nichts, was sich nicht in jedem anderen Editor öffnen ließe, und legt seinen eigenen Zustand in einem versteckten Ordner ab, den Sie jederzeit löschen dürfen.
-  note: "Kostenlos · Apple Silicon und Intel · English · 简体中文 · 繁體中文"
-  video_alt: 'Eine Bildschirmaufnahme von Inkstone unter macOS: ein Tresor wird geöffnet, eine Zeile aus chinesischer und lateinischer Schrift getippt, einem Wikilink gefolgt und der Graph geöffnet.'
-  video_caption: Aufgenommen unter macOS 26. Ungeschnitten, bis auf die Blenden zwischen den Abschnitten.
-creed:
-  title: Drei Entscheidungen, aus denen alles Übrige folgt
-  sub: Sie sind tragend, und sie erklären, warum sich die App so verhält.
-  columns:
-  - title: Die Dateien sind die Wahrheit
-    body: Keine Datenbank, kein Importschritt, kein proprietäres Format. Ein von Obsidian angelegter Tresor öffnet sich hier, einer von hier dort. Wäre Inkstone morgen verschwunden, hätten Sie immer noch einen Ordner voller Markdown.
-  - title: Ein toter Link bleibt tot
-    body: Weil es keine Datenbank gibt, die ihn reparieren könnte, schreibt das Umbenennen einer Notiz jeden Wikilink, der auf sie zeigte, im selben Zug im ganzen Tresor um. Das ist die direkte Folge der Entscheidung darüber, keine nachträglich angebaute Funktion.
-  - title: Die Engine weiß nichts von Bildschirmen
-    body: Parsen, Indizieren, Suche und Graph liegen in einem Paket, das überhaupt kein UI-Framework importiert. Deshalb sind sie von echten Tests gedeckt statt von einem Simulator, und deshalb könnte dieselbe Engine später auch ein Kommandozeilenwerkzeug tragen.
+  eyebrow: KI-Wissensdatenbank · Mac · iPhone · iPad
+  title: Einfach hineinziehen. Es ordnet sich selbst.
+  lede: Inkstone macht aus einem Ordner eine KI-Wissensdatenbank. Notizen, PDFs, Fotos, Aufnahmen – jede Datei wird nach Regeln abgelegt, die du lesen und ändern kannst, mit einer KI, die auf deinem Gerät läuft. Nichts wird je gelöscht, und jede Runde lässt sich rückgängig machen.
+  note: Kostenlos · Kein Konto · English · 简体中文 · 繁體中文
+  mac_alt: 'Inkstone auf dem Mac: Bevor fünf hineingezogene Dateien abgelegt werden, zeigt es den Plan – abgelegt, privat, Duplikate beiseite – und wartet auf „Organize“.'
+  phone_alt: Derselbe Plan auf dem iPhone.
+how:
+  title: Eine Wissensdatenbank in drei Schritten
+  sub: Nichts einzurichten. Ein Name, ein Ort und etwas zum Hineinziehen.
+  steps:
+  - title: Benennen, Ort wählen
+    body: iCloud Drive, ein beliebiger Ordner oder ein Ordner, den du schon hast. Inkstone legt die Ordner an – Eingang, Projekte, Bereiche, Ressourcen, Medien, Ergebnisse, Privat – und schreibt die Ordnungsregeln.
+  - title: Alles hineinziehen
+    body: Dateien aufs Fenster ziehen oder aus der App „Dateien“ hinzufügen. Beim ersten Mal wählst du Kopieren oder Verschieben – Kopieren ist voreingestellt.
+  - title: Es wird für dich abgelegt
+    body: Privat wirkende Dateien kommen zuerst in den privaten Ordner, dann gelten deine Regeln, dann das Modell auf dem Gerät. Umbenannt nach Datum und Thema. Unsicheres wartet in einem Prüfordner auf dich.
+  alts:
+  - 'Schritt 1: Deine KI-Wissensdatenbank anlegen'
+  - 'Schritt 2: Kopieren oder verschieben?'
+  - 'Schritt 3: der Plan – abgelegt, privat, Duplikate beiseite'
+safe:
+  title: Nichts geht verloren. Nie.
+  points:
+  - Nichts wird je gelöscht. Duplikate landen in einem Ordner zum Löschen, den du selbst leerst.
+  - Jede Verschiebung wird vorher protokolliert – eine Markdown-Tabelle, die du lesen kannst.
+  - Rückgängig stellt eine ganze Runde wieder her, ohne deine späteren Änderungen zu überschreiben.
+  - Mehr als 20 Dateien oder Duplikate? Du siehst erst den ganzen Plan, und nichts bewegt sich ohne dein Ja.
+  - 'Der Text einer Notiz wird nie umgeschrieben: oben kommen nur Eigenschaften wie Quelle und Datum dazu.'
+  alt: 'Die Wissensdatenbank nach einer Runde: Ordner in der Seitenleiste und ein Banner – 5 Dateien geordnet, Rückgängig.'
+ai:
+  kicker: KI-Kontextverwaltung
+  title: Bereit für KI, ab der ersten Datei
+  body: Jede Wissensdatenbank hat drei Einstiegsdateien, die Inkstone schreibt und aktuell hält. Gib den Ordner einem beliebigen KI-Assistenten oder Agenten, und er weiß, was das ist, wo was liegt und welcher Datei er trauen kann.
+  files:
+  - name: AGENTS.md
+    desc: was das ist, und die Regeln, die ein Agent hier befolgt
+  - name: README.md
+    desc: die Ordnerkarte, für Menschen und Maschinen
+  - name: SOURCE_OF_TRUTH.md
+    desc: welche Datei wofür maßgeblich ist
+  foot: Nur der Teil zwischen den Markierungen von Inkstone wird neu geschrieben. Was du drumherum ergänzt, bleibt.
+  alt: AGENTS.md in Inkstone auf dem Mac geöffnet.
+rules:
+  title: Deine Regeln, in einfachen Worten
+  body: Die Ordnungsregeln sind eine Datei in deiner Wissensdatenbank. Bearbeite sie in den Einstellungen wie eine Notiz – eine Zeile pro Regel. Sie kommen direkt nach der Privatsphäre-Prüfung, vor allem anderen.
+  example: '## My rules
+
+
+    - Rechnungen → 20-Areas/Finance/Invoices
+
+    - Renovierung → 10-Projects/Renovation'
+  foot: Darunter steht die Standardrichtlinie, in denselben einfachen Worten – änderbar, oder mit einem Klick wiederhergestellt.
+  alt: Einstellungen › Wissensdatenbank auf dem Mac.
+private:
+  title: Privat von Grund auf
+  cols:
+  - title: KI auf deinem Gerät
+    body: Apples Modell auf dem Gerät entscheidet, wohin eine Datei gehört – auf Geräten, die es unterstützen. Nichts verlässt das Gerät.
+  - title: Oder dein eigenes Modell
+    body: Standardmäßig aus. Mit deinem eigenen Schlüssel werden Name und Anfang einer Datei gesendet, die die Regeln nicht einordnen, dazu deine Ordnernamen und Regeln – nie eine Datei, die privat aussieht.
+  - title: Nur Dateien
+    body: Kein Konto, keine Analyse, kein Server von uns. Deine Wissensdatenbank ist ein Ordner gewöhnlicher Dateien.
 features:
-  title: Was drin ist
-  sub: Alles Folgende ist gebaut und läuft. Es ist keine Roadmap.
+  title: Auch ein vollständiger Markdown-Editor
+  sub: Alles bleibt einfaches Markdown. Ein Tresor aus einer anderen Markdown-App öffnet sich unverändert – und wird nie umsortiert.
   items:
     live_preview:
       kicker: Schreiben
       title: Live-Vorschau statt geteiltem Fenster
-      body: "Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt. Im Lesemodus sind die Syntaxzeichen entfernt statt versteckt — ein kopierter Absatz enthält nur den Text."
+      body: Überschriften, Fettung, Zitate, Callouts, Checkboxen, Tabellen und Code werden beim Tippen an Ort und Stelle gesetzt; die Syntax zeigt sich nur in der Zeile, in der die Einfügemarke steht. Der Lesemodus ist eine eigene, schreibgeschützte Ansicht. Textschrift, Codeschrift und ihre Größen werden unabhängig voneinander eingestellt. Im Lesemodus sind die Syntaxzeichen entfernt statt versteckt — ein kopierter Absatz enthält nur den Text.
       alt: 'Der Editor von Inkstone mit Live-Vorschau: Überschrift, ein Absatz aus gemischt chinesischer und lateinischer Schrift, eine Checkliste, ein Zitat, ein Callout, eine ausgerichtete Tabelle und ein Codeblock.'
     links:
       kicker: Verknüpfen
@@ -61,7 +107,7 @@ features:
     search:
       kicker: Finden
       title: Unscharfer Umschalter, und Suche mit Operatoren
-      body: "Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #项目/进行中 wird genau wie #project/active indiziert. Auch bei zehntausend Notizen wartet nichts: Die Suche läuft außerhalb des Hauptthreads."
+      body: 'Ein Tastendruck öffnet eine unscharfe Suche über alle Notizen. Die Volltextsuche versteht tag: und path:, und Schlagwörter funktionieren im Text wie im Frontmatter, verschachtelt, in jeder Schrift — #项目/进行中 wird genau wie #project/active indiziert. Auch bei zehntausend Notizen wartet nichts: Die Suche läuft außerhalb des Hauptthreads.'
       alt: Der Schnellumschalter über einer Notiz, der den Tresor beim Tippen Zeichen für Zeichen filtert.
     sync:
       kicker: Zwei Geräte
@@ -69,34 +115,33 @@ features:
       body: 'Synchronisieren Sie über iCloud, oder schieben Sie den Tresor in ein GitHub-Repository. Sobald ein Tresor synchronisiert wird, überschreibt ein Konflikt nie etwas: Haben beide Seiten eine Notiz geändert, bleibt die andere Fassung als Konfliktkopie neben Ihrer liegen. Filter je Dateityp entscheiden, ob Anhänge und Medien mitkommen, und die .gitignore des Tresors wird respektiert.'
       alt: 'Die Einstellungen der GitHub-Synchronisierung: Auswahl von Repository und Branch sowie Schalter je Dateityp.'
 duo:
-  title: "iPhone Duo: eine Notiz, vier Formen"
-  sub: "Zugeklappt ist es die iPhone-App. Aufgeklappt stehen Seitenleiste und Notiz nebeneinander. Halb geöffnet liegt die Notiz auf der einen Seite des Falzes, Rückverweise, Gliederung und Eigenschaften auf der anderen – nichts wird über den Falz gezeichnet."
-  video_alt: "Eine Aufnahme von Inkstone auf dem iPhone Duo: die Notizliste auf dem zugeklappten Außendisplay, dieselbe Notiz aufgeklappt neben der Seitenleiste, dann halb geöffnet wie ein Buch mit dem Inspektor auf der rechten Seite, dann hochkant mit dem Inspektor unter dem Falz."
-  caption: 'Aufgenommen im iPhone-Duo-Simulator, iOS 27.2, gezeigt in Apples iPhone-Duo-Produktrahmen in der Haltung der jeweiligen Aufnahme; der Bildschirm ist die Aufnahme, bis auf die Überblendungen ungeschnitten.'
-typography:
-  title: Chinesisch und Lateinisch auf einer Zeile
-  sub: Der schwierige Fall ist ein lateinisches Wort mitten im chinesischen Satz. Fast jede App macht das falsch, und zwar auf eine Weise, die man nach dem ersten Mal nicht mehr übersehen kann.
-  folio: Schriftprobe · Source Serif 4 mit Source Han Serif
-  specimen_title: 中英文混排 und das Viertelgeviert
-  specimen_lead: Chinesisch wird kompress gesetzt. Es gibt keine Wortzwischenräume, also liest das Auge die Gleichmäßigkeit der Zeile. Fällt typography hinein, stoßen die beiden Schriften aneinander.
-  specimen_body: 正文里出现Latin单词时，汉字与拉丁字母之间应当有一段约四分之一字宽的间隙——W3C的中文排版需求称之为文字间隙。这一段文字本身就在演示它：每一处汉字与Latin的交界都由构建时插入的空元素撑开，在支持text-autospace的浏览器上则交还给浏览器处理，两者永远只生效一个。全角标点（，。；：）自带二分空，因此一律不加。
-  specimen_quote: Typografie ist dazu da, dem Inhalt Ehre zu erweisen. Sie ist eine Dienerin, und ihre Manieren sollten unsichtbar sein.
-  specimen_cite: Robert Bringhurst, The Elements of Typographic Style
-  notes:
-  - term: Das Satzmaß
-    def: Der Fließtext bleibt bei rund 66 Zeichen je Zeile, der Breite, die Bringhurst als einspaltiges Ideal nennt. Jenseits von etwa 75 verliert das Auge den Rücksprung.
-  - term: Eine Schriftfamilie
-    def: Lateinisch ist Source Serif 4, Chinesisch ist Source Han Serif, dessen lateinischer Begleiter wiederum Source Serif ist. Die gemischte Zeile ist die Antiqua eines Gestalters, nicht der Streit zweier.
-  - term: Farbe bedeutet etwas
-    def: Ein einziges Zinnoberrot — die Farbe eines in Papier gedrückten Siegels — kennzeichnet Links, Schlagwörter und die aktuelle Aktion. Sonst ist nichts farbig.
-  - term: Bewegung ist Interpunktion
-    def: Elemente steigen bei ihrem Erscheinen um acht Pixel, sonst bewegt sich nichts. Wer „Bewegung reduzieren“ aktiviert hat, bekommt auch das nicht.
+  title: 'iPhone Duo: eine Notiz, vier Formen'
+  sub: Zugeklappt ist es die iPhone-App. Aufgeklappt stehen Seitenleiste und Notiz nebeneinander. Halb geöffnet liegt die Notiz auf der einen Seite des Falzes, Rückverweise, Gliederung und Eigenschaften auf der anderen – nichts wird über den Falz gezeichnet.
+  video_alt: 'Eine Aufnahme von Inkstone auf dem iPhone Duo: die Notizliste auf dem zugeklappten Außendisplay, dieselbe Notiz aufgeklappt neben der Seitenleiste, dann halb geöffnet wie ein Buch mit dem Inspektor auf der rechten Seite, dann hochkant mit dem Inspektor unter dem Falz.'
+  caption: Aufgenommen im iPhone-Duo-Simulator, iOS 27.2, gezeigt in Apples iPhone-Duo-Produktrahmen in der Haltung der jeweiligen Aufnahme; der Bildschirm ist die Aufnahme, bis auf die Überblendungen ungeschnitten.
+faq:
+  title: Fragen
+  items:
+  - q: Was ist eine KI-Wissensdatenbank?
+    a: Ein Ordner mit deinen Notizen und Dateien, so geordnet, dass du und eine KI Dinge finden – mit Einstiegsdateien, die der KI sagen, was wo liegt. In Inkstone bleibt er ein einfacher Ordner.
+  - q: Was ist KI-Kontextverwaltung?
+    a: Einem KI-Assistenten die richtigen Dateien und die Regeln dazu geben. AGENTS.md und SOURCE_OF_TRUTH.md tun das für jeden Agenten.
+  - q: Funktioniert es mit meinem Obsidian-Tresor?
+    a: Ja. Als Tresor geöffnet bleibt er, wie er ist. Geordnet wird nur in einer Wissensdatenbank, die Inkstone angelegt oder übernommen hat.
+  - q: Welche Geräte?
+    a: Mac mit macOS 26, iPhone und iPad mit iOS 26. Das Modell auf dem Gerät braucht ein Gerät mit Apple Intelligence; ohne wird nach deinen Regeln geordnet.
+  - q: Was kostet es?
+    a: Inkstone ist kostenlos, auf dem Mac und im App Store.
 specs:
   title: Technische Daten
   sub: Was zu wissen sich lohnt, bevor Sie irgendetwas herunterladen.
   rows:
+  - k: Wissensdatenbank
+    v: Eingang, Projekte, Bereiche, Ressourcen, Medien, Ergebnisse, Privat, Prüfen, Archiv – mit stets aktuellen AGENTS.md, README.md und SOURCE_OF_TRUTH.md
+  - k: Ordnen
+    v: Erst Privatsphäre, dann deine Regeln, dann Apples Modell auf dem Gerät (oder dein eigenes, standardmäßig aus). Protokolliert, rückgängig machbar, nichts gelöscht
   - k: Plattformen
-    v: "macOS 26 und iOS 26, eine SwiftUI-Codebasis. Die Mac-App ist universell: Apple Silicon und Intel"
+    v: 'macOS 26 und iOS 26, eine SwiftUI-Codebasis. Die Mac-App ist universell: Apple Silicon und Intel'
   - k: Speicherung
     v: Reine Markdown-Dateien in einem Ordner Ihrer Wahl. Keine Datenbank, kein Import
   - k: Kompatibilität
@@ -106,27 +151,27 @@ specs:
   - k: Synchronisierung
     v: iCloud oder ein GitHub-Repository, mit Filtern je Dateityp
   - k: Arbeitsweise
-    v: "Vorlagen mit den Platzhaltern von Obsidian, Export als PDF oder HTML, Befehlspalette, Notizen in Spotlight, Kurzbefehle"
+    v: Vorlagen mit den Platzhaltern von Obsidian, Export als PDF oder HTML, Befehlspalette, Notizen in Spotlight, Kurzbefehle
   - k: Oberflächensprachen
     v: English, 简体中文, 繁體中文
   - k: Quelltext
     v: Öffentlich auf GitHub. Eine Lizenz ist noch nicht gewählt.
   - k: Datenschutz
     v: Kein Konto, keine Telemetrie, kein Netzaufruf, um den Sie nicht gebeten haben
-  closer: Sie ist kostenlos, sie hält Ihnen nichts vor, und die Dateien, die sie schreibt, sind die Dateien, die Sie ohnehin schon hatten.
+  closer: Es ist kostenlos, verbirgt nichts vor dir, und die Wissensdatenbank ist ein Ordner, der dir schon gehört.
 siblings:
   audioswitch: Audiogeräte aus der Menüleiste umschalten
   candela: Die Helligkeit externer Displays steuern
   clipstack: Zwischenablage-Verlauf, der nicht im Weg steht
-  veil: "Hält das Fenster, in dem du arbeitest, scharf und zeichnet alles dahinter weich. Kostenlos, MIT."
-  tapper: "Macht deinen Mauszeiger zu einem Comic-Handschuh an einem langen Stab – für Demos und Bildschirmaufnahmen. Kostenlos, MIT."
+  veil: Hält das Fenster, in dem du arbeitest, scharf und zeichnet alles dahinter weich. Kostenlos, MIT.
+  tapper: Macht deinen Mauszeiger zu einem Comic-Handschuh an einem langen Stab – für Demos und Bildschirmaufnahmen. Kostenlos, MIT.
 footer:
-  tagline: Eine Notizapp, die Ihre Dateien in Ruhe lässt.
-  guides: "Anleitungen"
-  sync_guide: "Sync-Anleitung"
-  compare: "Im Vergleich zu Obsidian"
-  sync_free: "Einen Vault kostenlos synchronisieren"
-  privacy: "Datenschutz"
+  tagline: Eine KI-Wissensdatenbank, deren Dateien dir gehören.
+  guides: Anleitungen
+  sync_guide: Sync-Anleitung
+  compare: Im Vergleich zu Obsidian
+  sync_free: Einen Vault kostenlos synchronisieren
+  privacy: Datenschutz
   project: Projekt
   issues: Issues
   also: Ebenfalls von derselben Hand

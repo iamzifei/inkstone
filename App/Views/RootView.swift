@@ -9,6 +9,9 @@ import InkstoneCore
 /// code here is toolbar placement.
 struct RootView: View {
     @Environment(Workspace.self) private var workspace
+    #if os(macOS) && DEBUG
+    @Environment(\.openSettings) private var openSettings
+    #endif
     @Environment(\.style) private var style
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -121,6 +124,9 @@ struct RootView: View {
         }
 
         .onAppear { LaunchTiming.mark("first window") }
+        #if os(macOS) && DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: .inkstoneDemoOpenSettings)) { _ in openSettings() }
+        #endif
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
         }

@@ -1,0 +1,36 @@
+title: Gestion du contexte IA avec AGENTS.md — Inkstone
+description: Inkstone tient à jour AGENTS.md, README.md et SOURCE_OF_TRUTH.md pour que tout agent IA sache où sont les choses.
+crumb: Gestion du contexte IA
+h1: La gestion du contexte IA, tenue à jour pour vous
+lede: Un assistant IA ne vaut que les fichiers qu'on lui confie et ce qu'on lui en dit. Inkstone écrit ce contexte dans votre base de connaissances — et le réécrit à chaque changement de dossiers.
+hero_shot: mac-k3-agents
+hero_alt: AGENTS.md ouvert dans Inkstone sur Mac.
+sections:
+- h2: Qu'est-ce que la gestion du contexte IA ?
+  paras:
+  - 'Le contexte, c''est ce qu''un modèle IA voit avant de répondre : les fichiers et les consignes qui les accompagnent. Le gérer, c''est choisir les fichiers qu''un assistant lit, lui expliquer l''organisation du dossier et dire quel fichier l''emporte quand deux divergent.'
+  - Écrit à la main, ce contexte est périmé une semaine plus tard. Une note bouge, un dossier est renommé, et l'assistant se trompe avec aplomb.
+- h2: Trois fichiers d'entrée, écrits par Inkstone
+  list:
+  - 'AGENTS.md — ce qu''est cette base de connaissances et les règles qu''un agent y suit : où vont les nouveaux fichiers, que rien n''est supprimé, que le dossier privé reste privé.'
+  - README.md — la carte des dossiers, pour les humains et les machines.
+  - SOURCE_OF_TRUTH.md — quel fichier fait foi pour quoi, pour qu'un agent cesse de deviner entre deux versions.
+  paras:
+  - AGENTS.md est la convention que les agents de code et les assistants IA cherchent déjà à la racine d'un dossier. Inkstone ne réécrit que la partie entre ses marqueurs ; ce que vous ajoutez autour reste.
+- h2: Un contexte qui suit le dossier
+  paras:
+  - À chaque rangement, Inkstone met les fichiers d'entrée à jour d'après les dossiers qui existent maintenant. Que vous confiiez le dossier lundi ou en mars, la carte est juste.
+  shot: iphone-k3-agents
+  alt: AGENTS.md sur iPhone.
+- h2: Privé par défaut
+  paras:
+  - Le modèle de rangement tourne sur votre appareil. AGENTS.md déclare le dossier privé hors limites, et les fichiers qui semblent privés ne sont jamais envoyés à un modèle cloud, même si vous en avez activé un.
+faq:
+  title: Questions
+  items:
+  - q: Quels outils IA lisent AGENTS.md ?
+    a: 'C''est un simple fichier Markdown à la racine du dossier : tout assistant ou agent à qui l''on confie le dossier peut le lire, et beaucoup d''agents de code le cherchent par son nom.'
+  - q: Puis-je modifier AGENTS.md moi-même ?
+    a: Oui. Inkstone ne réécrit que la section entre ses marqueurs. Vos propres consignes au-dessus ou en dessous sont conservées.
+  - q: Faut-il le rangement par IA pour s'en servir ?
+    a: Non. Les fichiers d'entrée sont écrits à la création de la base de connaissances et restent à jour, que le classement vienne de vos règles ou du modèle.

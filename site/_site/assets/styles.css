@@ -873,3 +873,124 @@ p, li, h1, h2, h3, dd, dt, blockquote, figcaption, td, th {
   .nav, .hero-actions, .brew, .film, .site-footer, .skip { display: none; }
   body { background: #fff; color: #000; font-size: 11pt; }
 }
+
+/* ------------------------------------------------- knowledge base (0.5)
+ *
+ * The pictures carry their own frames: iPhones are in Apple's iPhone 18 Pro
+ * bezel, Mac windows are the system's own window with its shadow — so these
+ * rules only place them, never draw a frame of their own.
+ */
+.hero-kb { text-align: center; }
+.hero-copy { max-width: 52rem; margin-inline: auto; }
+.hero-devices {
+  position: relative;
+  margin: clamp(2.5rem, 6vw, 4rem) auto 0;
+  max-width: 64rem;
+  padding-right: clamp(2rem, 8vw, 6rem);
+}
+.hero-mac { width: 100%; }
+.hero-phone {
+  position: absolute;
+  right: 0;
+  bottom: -2%;
+  width: clamp(7rem, 24%, 15.5rem);
+  filter: drop-shadow(0 18px 30px rgb(0 0 0 / .18));
+}
+
+.band, .split, .faq, .dark .split { padding-block: var(--section-gap); }
+.band { border-top: 1px solid var(--rule); }
+
+.steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+.step h3 { font-size: var(--t-h3); font-weight: 600; letter-spacing: -.014em; margin: .5rem 0 .5rem; }
+.step p { color: var(--ink-2); max-width: 34ch; }
+.step-n { font-family: var(--serif); font-size: 2.6rem; line-height: 1; color: var(--cinnabar); }
+
+.phones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+.phone { margin: 0; width: clamp(9rem, 26vw, 15.5rem); }
+.phone img { width: 100%; filter: drop-shadow(0 16px 26px rgb(0 0 0 / .14)); }
+
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+  border-top: 1px solid var(--rule);
+}
+.split-text { flex: 1 1 26rem; min-width: 0; }
+.split-text h2 { font-size: var(--t-h2); font-weight: 400; line-height: 1.14; letter-spacing: -.02em; margin-bottom: 1.2rem; text-wrap: balance; }
+.split-text > p { color: var(--ink-2); margin-bottom: 1.1rem; max-width: 36rem; }
+.split-shot { flex: 1 1 22rem; min-width: 0; margin: 0; display: flex; justify-content: center; }
+.split-shot.phone { flex: 0 1 17.5rem; }
+.split-wide .split-shot { flex: 1.4 1 26rem; }
+
+.dash { list-style: none; display: grid; gap: .9rem; }
+.dash li { position: relative; padding-inline-start: 1.6rem; color: var(--ink-2); }
+.dash li::before { content: "—"; position: absolute; inset-inline-start: 0; color: var(--cinnabar); }
+
+/* The one dark band, for the AI section. The same in both appearances: in dark
+ * mode it sits a step below the page so it still reads as a band. */
+.dark {
+  --band-ink: #FCFBF8; --band-ink-2: #D6D1C6; --band-faint: #A9A397;
+  background: #1F1D1A;
+  color: var(--band-ink);
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(1rem, calc(50vw - var(--page) / 2));
+}
+@media (prefers-color-scheme: dark) { .dark { background: #0E0E11; } }
+.dark .split { border-top: 0; }
+.dark .split-text > p { color: var(--band-ink-2); }
+.dark .kicker { color: #E8968E; }
+.files { list-style: none; display: grid; gap: .55rem; margin-bottom: 1.1rem; color: var(--band-ink-2); }
+.files code { font-family: var(--mono); color: #F6E7A8; font-size: .95em; }
+.dark .split-text > p.fine { color: var(--band-faint); }
+.fine { font-size: var(--t-small, .92rem); color: var(--ink-faint); }
+
+.rules-example {
+  font-family: var(--mono);
+  font-size: .95rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 1.1rem 1.3rem;
+  margin: 0 0 1.1rem;
+  max-width: 36rem;
+}
+
+.faq { border-top: 1px solid var(--rule); max-width: 52rem; }
+.qa { margin-bottom: 1.6rem; }
+.qa h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: .35rem; }
+.qa p { color: var(--ink-2); max-width: 46rem; }
+
+/* Landing articles (ai-knowledge-base, ai-context-management) */
+.article { max-width: 48rem; margin-inline: auto; padding-block: clamp(3rem, 7vw, 5.5rem); }
+.article h1 { font-size: clamp(2.4rem, 5.2vw, 4rem); font-weight: 400; line-height: 1.06; letter-spacing: -.026em; margin: .6rem 0 1.2rem; text-wrap: balance; }
+.article h2 { font-size: var(--t-h2); font-weight: 400; line-height: 1.15; letter-spacing: -.02em; margin: 3rem 0 1rem; }
+.article p, .article li { color: var(--ink-2); margin-bottom: 1rem; }
+.article ol { padding-inline-start: 1.4rem; }
+.article .hero-actions { justify-content: flex-start; }
+.crumbs { font-size: var(--t-micro, .85rem); color: var(--ink-faint); }
+.article-lede { font-size: var(--t-lede); line-height: 1.6; }
+.article-hero, .article-shot { margin: 2.5rem calc(50% - min(50vw, 32rem)) 1rem; }
+.article-hero img, .article-shot img { width: 100%; }
+.article-phone { margin: 2rem auto; width: min(17.5rem, 70vw); }
+.article-phone img { width: 100%; filter: drop-shadow(0 16px 26px rgb(0 0 0 / .14)); }
+/* The dark band breaks out to the full viewport width; 100vw counts a visible
+ * scrollbar, so clip the few pixels it would otherwise scroll by. */
+html, body { overflow-x: clip; }
+
+@media (prefers-reduced-motion: reduce) {
+  .phone img, .hero-phone { filter: none; }
+}
