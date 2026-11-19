@@ -139,7 +139,7 @@ specs:
   - k: Knowledge base
     v: Inbox, projects, areas, resources, media, outputs, private, review, archive — with AGENTS.md, README.md and SOURCE_OF_TRUTH.md kept up to date
   - k: Organizing
-    v: Your rules, then Apple's on-device model (or your own, off by default). Logged, undoable, nothing deleted
+    v: Privacy first, then your rules, then Apple's on-device model (or your own, off by default). Logged, undoable, nothing deleted
   - k: Platforms
     v: 'macOS 26 and iOS 26, one SwiftUI codebase. The Mac app is universal: Apple silicon and Intel'
   - k: Storage

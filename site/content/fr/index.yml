@@ -139,7 +139,7 @@ specs:
   - k: Base de connaissances
     v: Boîte de réception, projets, domaines, ressources, médias, productions, privé, à vérifier, archives — avec AGENTS.md, README.md et SOURCE_OF_TRUTH.md à jour
   - k: Rangement
-    v: Vos règles, puis le modèle d'Apple sur l'appareil (ou le vôtre, désactivé par défaut). Journalisé, réversible, rien supprimé
+    v: D'abord la confidentialité, puis vos règles, puis le modèle d'Apple sur l'appareil (ou le vôtre, désactivé par défaut). Journalisé, réversible, rien supprimé
   - k: Plateformes
     v: 'macOS 26 et iOS 26, une seule base de code SwiftUI. L’app Mac est universelle : Apple silicon et Intel'
   - k: Stockage

@@ -139,7 +139,7 @@ specs:
   - k: Wissensdatenbank
     v: Eingang, Projekte, Bereiche, Ressourcen, Medien, Ergebnisse, Privat, Prüfen, Archiv – mit stets aktuellen AGENTS.md, README.md und SOURCE_OF_TRUTH.md
   - k: Ordnen
-    v: Deine Regeln, dann Apples Modell auf dem Gerät (oder dein eigenes, standardmäßig aus). Protokolliert, rückgängig machbar, nichts gelöscht
+    v: Erst Privatsphäre, dann deine Regeln, dann Apples Modell auf dem Gerät (oder dein eigenes, standardmäßig aus). Protokolliert, rückgängig machbar, nichts gelöscht
   - k: Plattformen
     v: 'macOS 26 und iOS 26, eine SwiftUI-Codebasis. Die Mac-App ist universell: Apple Silicon und Intel'
   - k: Speicherung

@@ -139,7 +139,7 @@ specs:
   - k: Base de conocimiento
     v: Bandeja de entrada, proyectos, áreas, recursos, medios, resultados, privado, revisión, archivo, con AGENTS.md, README.md y SOURCE_OF_TRUTH.md al día
   - k: Organización
-    v: Tus reglas, luego el modelo de Apple en el dispositivo (o el tuyo, desactivado por defecto). Registrada, reversible, sin borrar nada
+    v: Primero la privacidad, luego tus reglas, luego el modelo de Apple en el dispositivo (o el tuyo, desactivado por defecto). Registrada, reversible, sin borrar nada
   - k: Plataformas
     v: 'macOS 26 e iOS 26, una sola base de código SwiftUI. La app de Mac es universal: Apple silicon e Intel'
   - k: Almacenamiento

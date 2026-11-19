@@ -29,8 +29,8 @@ the word "vault". Plan and reasoning: `docs/plans/20261119-ai-knowledge-base-0.5
   go to to-delete; look-alikes and anything unsure wait for you. Rounds of
   more than 20 files or with duplicates wait for your yes.
 - **Nothing is lost.** Nothing is ever deleted. Every step is logged before
-  it is taken, and every round can be undone byte for byte — without
-  overwriting anything changed since.
+  it is taken, and every round can be undone — without overwriting
+  anything changed since.
 - **AGENTS.md, README.md and SOURCE_OF_TRUTH.md**, written and kept up to
   date, so any AI assistant knows what is where. Only the part between
   Inkstone's markers is rewritten.
