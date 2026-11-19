@@ -598,7 +598,7 @@ def duo(page: Page) -> str:
     <div class="film-mat">
       <video class="film-frame film-frame-duo" poster="{up}assets/video/duo-poster.webp" autoplay muted loop playsinline
              preload="none" aria-label="{e(get(d, 'duo.video_alt'))}">
-        <source src="{up}assets/video/duo.webm" type="video/webm">
+        <source src="{up}assets/video/duo.webm" type='video/webm; codecs="vp09.00.10.08"'>
         <source src="{up}assets/video/duo.mp4" type="video/mp4">
       </video>
     </div>

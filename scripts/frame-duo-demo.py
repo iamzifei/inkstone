@@ -211,7 +211,7 @@ def main() -> int:
             "-c:v", "libx264", "-crf", "12", "-preset", "veryfast", str(joined))
         run("-i", str(joined), "-an", "-c:v", "libx264", "-profile:v", "high", "-crf", "24", "-preset", "slow",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(OUT / "duo.mp4"))
-        run("-i", str(joined), "-an", "-c:v", "libvpx-vp9", "-crf", "40", "-b:v", "0", "-row-mt", "1",
+        run("-i", str(joined), "-an", "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-crf", "40", "-b:v", "0", "-row-mt", "1",
             "-deadline", "good", "-cpu-used", "2", str(OUT / "duo.webm"))
         poster = work / "poster.png"
         run("-ss", "1.0", "-i", str(joined), "-vframes", "1", str(poster))

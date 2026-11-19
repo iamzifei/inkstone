@@ -533,3 +533,43 @@ class NoLegalEntityName(BuiltSite):
             if path.is_file() and path.suffix in {".html", ".txt", ".xml", ".js", ".css"}:
                 with self.subTest(path=str(path.relative_to(self.out))):
                     self.assertNotIn(needle, path.read_bytes().lower())
+
+
+class WebmPlaysInWebKit(unittest.TestCase):
+    """Every published WebM is VP9 profile 0 (8-bit 4:2:0).
+
+    2026-11-20: duo.webm had been encoded 4:4:4 (VP9 profile 1). Chrome plays
+    that; WebKit (Safari and every iOS browser) reports it can't
+    (`canPlayType` is empty for vp09.01) yet still picks the WebM source,
+    because the <source> type names no codec — and the video sat blank at 0:00.
+    Read straight from the first frame header, so no ffprobe is needed.
+    """
+
+    @staticmethod
+    def vp9_profile(data: bytes) -> int:
+        def vint_len(byte: int) -> int:
+            return 8 - byte.bit_length() + 1
+        cluster = data.find(b"\x1f\x43\xb6\x75")       # first Cluster
+        assert cluster != -1, "no Cluster"
+        p = cluster + 4
+        p += vint_len(data[p])                           # cluster size
+        assert data[p] == 0xE7, "Cluster does not open with its Timecode"
+        p += 1
+        size_len = vint_len(data[p])
+        size = int.from_bytes(data[p:p + size_len], "big") & ((1 << (7 * size_len)) - 1)
+        p += size_len + size                             # Timecode value
+        assert data[p] == 0xA3, "first element after Timecode is not a SimpleBlock"
+        p += 1
+        p += vint_len(data[p])                           # block size
+        assert data[p] == 0x81, "expected track 1"
+        p += 1 + 2 + 1                                   # track number, timecode, flags
+        header = data[p]
+        assert header >> 6 == 0b10, f"not a VP9 frame marker: {header:#x}"
+        return ((header >> 5) & 1) | (((header >> 4) & 1) << 1)
+
+    def test_every_webm_is_vp9_profile_0(self) -> None:
+        videos = sorted((Path(__file__).resolve().parents[1] / "assets" / "video").glob("*.webm"))
+        self.assertTrue(videos)
+        for video in videos:
+            with self.subTest(video=video.name):
+                self.assertEqual(self.vp9_profile(video.read_bytes()), 0)
