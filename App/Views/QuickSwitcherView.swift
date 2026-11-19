@@ -136,51 +136,28 @@ struct WelcomeView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(\.style) private var style
     @State private var isPickingFolder = false
-    @State private var iCloudProblem: ICloudAvailability?
-    @State private var isCreatingICloudVault = false
 
     var body: some View {
+        ScrollView {
         VStack(spacing: 24) {
-            VStack(spacing: 8) {
-                Image(systemName: "book.closed")
-                    .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(style.accent)
-                Text("Inkstone")
-                    .font(.system(size: 30, weight: .medium, design: .serif))
-                Text("Your notes, as plain files you own.")
-                    .font(style.uiFont)
-                    .foregroundStyle(style.secondaryText)
-            }
+            // A new person starts here: a knowledge base made for them.
+            CreateKnowledgeBaseView()
 
+            Divider().frame(maxWidth: 320)
+
+            // Someone who already has notes (an Obsidian vault) opens them
+            // as they are: nothing is added, nothing reorganized.
             VStack(spacing: 10) {
+                Text("Already have notes?")
+                    .font(.caption)
+                    .foregroundStyle(style.faintText)
                 Button {
                     isPickingFolder = true
                 } label: {
                     Label("Open Folder as Vault", systemImage: "folder")
                         .frame(maxWidth: 260)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
 
-                Button {
-                    createICloudVault()
-                } label: {
-                    // The lookup can wait on the ubiquity daemon, so the button
-                    // has to be able to say it is working rather than looking
-                    // like a click that did nothing.
-                    Label {
-                        Text("Create Vault in iCloud Drive")
-                    } icon: {
-                        if isCreatingICloudVault {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "icloud")
-                        }
-                    }
-                    .frame(maxWidth: 260)
-                }
-                .controlSize(.large)
-                .disabled(isCreatingICloudVault)
             }
 
             if !workspace.registry.vaults.isEmpty {
@@ -207,6 +184,8 @@ struct WelcomeView: View {
             }
         }
         .padding(40)
+        .frame(maxWidth: .infinity)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(style.background)
         .fileImporter(isPresented: $isPickingFolder, allowedContentTypes: [.folder]) { result in
@@ -217,39 +196,6 @@ struct WelcomeView: View {
                 workspace.open(vault)
             }
         }
-        .alert(
-            iCloudProblem?.title ?? "",
-            isPresented: Binding(get: { iCloudProblem != nil }, set: { if !$0 { iCloudProblem = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(iCloudProblem?.explanation ?? "")
-        }
     }
 
-    /// Creates a vault inside the app's iCloud container, which is the
-    /// zero-configuration path to cross-device sync.
-    ///
-    /// Async because resolving the container can wait on the ubiquity daemon,
-    /// and this used to run on the main thread from a button action.
-    private func createICloudVault() {
-        isCreatingICloudVault = true
-        Task {
-            defer { isCreatingICloudVault = false }
-            let availability = await ICloudContainer.resolve()
-            guard case .available(let container) = availability else {
-                // Three different reasons land here and they need three
-                // different answers — see ICloudAvailability.
-                iCloudProblem = availability
-                return
-            }
-            guard let vaultURL = try? ICloudContainer.createVaultFolder(in: container),
-                  let vault = try? workspace.registry.register(folder: vaultURL, name: "Inkstone (iCloud)")
-            else {
-                iCloudProblem = .unreachable
-                return
-            }
-            workspace.open(vault)
-        }
-    }
 }

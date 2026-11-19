@@ -21,6 +21,10 @@ final class KnowledgeBaseController {
     /// The last round done, for the "organized N files · Undo" banner.
     private(set) var lastResult: OrganizeResult?
     private(set) var isOrganizing = false
+    /// The "your knowledge base is ready" card, shown once after creating.
+    var isShowingReadyCard = false
+
+    func showReadyCard() { isShowingReadyCard = true }
     private(set) var failure: String?
 
     private let settings: AppSettings

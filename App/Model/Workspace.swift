@@ -345,6 +345,13 @@ final class Workspace {
     private var watcher: VaultWatcher?
     /// Files what lands in a knowledge base's inbox; idle for other vaults.
     let knowledgeBase: KnowledgeBaseController
+
+    /// The language a new knowledge base's folders are named in: the
+    /// interface language chosen in Settings, else the system's.
+    var knowledgeBaseLanguage: KnowledgeBaseLanguage {
+        let chosen = settings.data.language
+        return KnowledgeBaseLanguage.forInterface(chosen == .system ? (Locale.preferredLanguages.first ?? "en") : chosen.rawValue)
+    }
     private let indexBuilder = IndexBuilder()
     private var reindexTask: Task<Void, Never>?
     private var treeTask: Task<Void, Never>?

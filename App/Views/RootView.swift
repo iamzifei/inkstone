@@ -81,6 +81,12 @@ struct RootView: View {
         )) {
             if let plan = workspace.knowledgeBase.pendingPlan { ChangePlanSheet(plan: plan) }
         }
+        .sheet(isPresented: Binding(
+            get: { workspace.knowledgeBase.isShowingReadyCard },
+            set: { workspace.knowledgeBase.isShowingReadyCard = $0 }
+        )) {
+            KnowledgeBaseReadyCard()
+        }
         .onAppear { LaunchTiming.mark("first window") }
         .sheet(isPresented: $workspace.isQuickSwitcherPresented) {
             QuickSwitcherView()
