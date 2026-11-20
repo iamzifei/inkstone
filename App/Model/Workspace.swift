@@ -119,6 +119,11 @@ final class Workspace {
     struct ExportedFile: Identifiable { let url: URL; var id: URL { url } }
     var exportedFile: ExportedFile?
     var exportFailure: String?
+    /// Something to say about an export that worked: an image cut short.
+    var exportNotice: String?
+    /// The same, held until the iOS share sheet closes: two presentations at
+    /// once and SwiftUI may drop one.
+    var pendingExportNotice: String?
     private(set) var isExporting = false
 
     /// Exports the open note. On Mac asks where to save it; on iOS hands the
@@ -131,11 +136,14 @@ final class Workspace {
             defer { isExporting = false }
             do {
                 let file = try await NoteExporter.export(note, as: format, in: self)
+                let notice = format == .png && NoteExporter.lastImageWasCut
+                    ? localized("This note is too long for one image, so the image stops partway. Export as PDF for the whole note.")
+                    : nil
                 #if os(macOS)
                 defer { NoteExporter.discard(file) }
                 let panel = NSSavePanel()
                 panel.nameFieldStringValue = file.lastPathComponent
-                panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
+                panel.allowedContentTypes = [format == .pdf ? .pdf : format == .png ? .png : .html]
                 guard panel.runModal() == .OK, let destination = panel.url else { return }
                 if FileManager.default.fileExists(atPath: destination.path) {
                     // Atomic: the old file is only gone once the new one is in
@@ -150,7 +158,10 @@ final class Workspace {
                 } else {
                     try FileManager.default.copyItem(at: file, to: destination)
                 }
+                // After it is saved (and not at all if the save was cancelled).
+                exportNotice = notice
                 #else
+                pendingExportNotice = notice
                 exportedFile = ExportedFile(url: file)   // discarded when the share sheet closes
                 #endif
             } catch {

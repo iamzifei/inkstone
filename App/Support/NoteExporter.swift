@@ -7,23 +7,31 @@ import AppKit
 import UIKit
 #endif
 
-/// Export the open note as a self-contained HTML file or a paginated PDF.
+/// Export the open note as a self-contained HTML file, a paginated PDF, or one
+/// long PNG image (for sharing where a document will not go — a chat, a post).
 ///
-/// The HTML comes from `HTMLExporter` (core). The PDF is that same HTML
-/// printed by WebKit onto A4 pages — not `WKWebView.createPDF`, which makes
-/// one very long page.
+/// The HTML comes from `HTMLExporter` (core), with code coloured by language.
+/// The PDF is that same HTML printed by WebKit onto A4 pages — not
+/// `WKWebView.createPDF`, which makes one very long page. The image is that
+/// same HTML laid out at reading width and snapshotted whole.
 @MainActor
 enum NoteExporter {
-    enum Format { case html, pdf
-        var fileExtension: String { self == .html ? "html" : "pdf" }
+    enum Format { case html, pdf, png
+        var fileExtension: String {
+            switch self { case .html: "html"; case .pdf: "pdf"; case .png: "png" }
+        }
     }
+
+    /// Whether the last image export was cut short to fit (a very long note).
+    static var lastImageWasCut = false
 
     /// The note's HTML, with its embedded images inlined.
     static func html(for url: URL, in workspace: Workspace) -> String? {
         guard let text = workspace.documents[url]?.text ?? (try? workspace.store?.read(url)) else { return nil }
         return HTMLExporter.document(
             text, title: url.deletingPathExtension().lastPathComponent,
-            resolveAttachment: { workspace.resolveEmbed($0, from: url) })
+            resolveAttachment: { workspace.resolveEmbed($0, from: url) },
+            highlight: { CodeHighlighter.shared.spansNow(code: $0, language: $1) })
     }
 
     /// Prints HTML to a paginated PDF file (also used by the smoke test).
@@ -61,12 +69,153 @@ enum NoteExporter {
             switch format {
             case .html: try Data(html.utf8).write(to: out)
             case .pdf: try await PDFPrinter().print(html, to: out)
+            case .png: lastImageWasCut = try await ImageRenderer().render(html, to: out)
             }
         } catch {
             try? FileManager.default.removeItem(at: dir)
             throw error
         }
         return out
+    }
+}
+
+/// Lays HTML out in an off-screen web view at reading width and writes the
+/// whole page as one PNG.
+@MainActor
+private final class ImageRenderer: NSObject, WKNavigationDelegate {
+    private var loaded: CheckedContinuation<Void, Error>?
+    /// The article's own width (the stylesheet caps it) plus its margins.
+    private let width: CGFloat = 760
+    /// The most pixels one image may hold — about 100 MB as RGBA while it is
+    /// made. A taller note is cut there; the user is told, and the PDF has it
+    /// all. In pixels, not points: a 3x phone holds 2.25 times a 2x Mac's.
+    private let maximumPixels: CGFloat = 25_000_000
+
+    /// - Returns: whether the note was cut short to fit.
+    func render(_ html: String, to url: URL) async throws -> Bool {
+        let config = WKWebViewConfiguration()
+        // As for PDF: notes can hold raw HTML, so no scripts; the document's
+        // CSP blocks every network load.
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: 800), configuration: config)
+        webView.navigationDelegate = self
+        #if os(macOS)
+        let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: width, height: 800),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        // The window's own scale is the one the snapshot is taken at.
+        let scale = window.backingScaleFactor
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        defer { window.close() }
+        #else
+        // A web view outside a window does not lay out (or snapshot).
+        guard let host = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .flatMap(\.windows).first(where: { $0.isKeyWindow }) else { throw CocoaError(.fileWriteUnknown) }
+        let scale = host.traitCollection.displayScale > 0 ? host.traitCollection.displayScale : 3
+        webView.frame.origin = CGPoint(x: -20_000, y: -20_000)
+        host.addSubview(webView)
+        defer { webView.removeFromSuperview() }
+        #endif
+
+        // One deadline for the whole of it: a load, a measurement or a
+        // snapshot that never answers must not leave export stuck for good.
+        // Whichever of the work and the deadline settles first wins.
+        let once = Once<Bool>()
+        return try await withCheckedThrowingContinuation { (done: CheckedContinuation<Bool, Error>) in
+            once.continuation = done
+            // The deadline first, so the work can call it off when it is done
+            // (otherwise it holds the renderer for its full 30 seconds).
+            let deadline = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                self.finishLoad(.failure(CocoaError(.fileWriteUnknown)))
+                once.finish(.failure(CocoaError(.fileWriteUnknown)))
+            }
+            Task { @MainActor in
+                do {
+                    #if os(macOS)
+                    let cut = try await self.produce(webView, html: html, scale: scale, to: url) { window.setContentSize($0) }
+                    #else
+                    let cut = try await self.produce(webView, html: html, scale: scale, to: url) { _ in }
+                    #endif
+                    once.finish(.success(cut))
+                } catch {
+                    once.finish(.failure(error))
+                }
+                deadline.cancel()
+            }
+        }
+    }
+
+    /// Loads, measures, resizes, snapshots and writes. Returns whether the
+    /// note was cut short to fit.
+    private func produce(_ webView: WKWebView, html: String, scale: CGFloat, to url: URL,
+                         resize: (CGSize) -> Void) async throws -> Bool {
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            loaded = c
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+        // Scripts are off for the page, not for the app asking its height.
+        // The article's bottom edge plus the page's own margin, not the page's
+        // scroll height: that is never less than the viewport, so a short note
+        // came out padded to the viewport's height. (A tiny viewport to avoid
+        // that measured before layout and produced an empty strip.)
+        let measured = try await webView.evaluateJavaScript("""
+            (function () {
+              var article = document.querySelector("article") || document.body;
+              var bottom = article.getBoundingClientRect().bottom + window.scrollY;
+              var margin = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
+              // A little air below the last line, as the top has.
+              return Math.ceil(bottom + margin + 32);
+            })()
+            """) as? Double
+        guard let measured, measured > 0 else { throw CocoaError(.fileWriteUnknown) }
+        let limit = maximumPixels / (width * scale * scale)
+        let size = CGSize(width: width, height: min(CGFloat(measured), limit))
+        webView.frame.size = size
+        resize(size)
+        try await Task.sleep(for: .milliseconds(150))   // one layout after the resize
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(origin: .zero, size: size)
+        let image = try await webView.takeSnapshot(configuration: configuration)
+        #if os(macOS)
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        else { throw CocoaError(.fileWriteUnknown) }
+        #else
+        guard let data = image.pngData() else { throw CocoaError(.fileWriteUnknown) }
+        #endif
+        try data.write(to: url)
+        return CGFloat(measured) > limit
+    }
+
+    private func finishLoad(_ result: Result<Void, Error>) {
+        guard let loaded else { return }
+        self.loaded = nil
+        loaded.resume(with: result)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finishLoad(.success(())) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finishLoad(.failure(error)) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finishLoad(.failure(error))
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finishLoad(.failure(CocoaError(.fileReadUnknown))) }
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        // The document itself and nothing else, as for PDF: a raw
+        // `<meta http-equiv=refresh>` in a note must not take the export away.
+        action.request.url?.absoluteString == "about:blank" ? .allow : .cancel
+    }
+}
+
+/// Resumes a continuation once, however many parties try.
+@MainActor
+private final class Once<Value: Sendable> {
+    var continuation: CheckedContinuation<Value, Error>?
+    func finish(_ result: Result<Value, Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(with: result)
     }
 }
 

@@ -9,7 +9,12 @@ import Markdown
 /// which is also what PDF export (printing this HTML) needs.
 public enum HTMLExporter {
     /// The body of the note as HTML, without the frontmatter.
-    public static func bodyHTML(_ markdown: String, resolveAttachment: (String) -> URL?) -> String {
+    /// - Parameter highlight: colours fenced code by language (the app passes
+    ///   `CodeHighlighter`); nil leaves code plain.
+    public static func bodyHTML(
+        _ markdown: String, resolveAttachment: (String) -> URL?,
+        highlight: ((_ code: String, _ language: String?) -> [CodeHighlighting.Span]?)? = nil
+    ) -> String {
         let body = String(FrontmatterParser.parse(markdown).body)
         let source = body as NSString
         var edits: [(range: NSRange, text: String)] = []
@@ -55,11 +60,48 @@ public enum HTMLExporter {
             rewritten.replaceCharacters(in: edit.range, with: edit.text)
             floor = edit.range.location
         }
-        return HTMLFormatter.format(rewritten as String)
+        let html = HTMLFormatter.format(rewritten as String)
+        return highlight.map { colourCodeBlocks(in: html, with: $0) } ?? html
+    }
+
+    /// cmark writes a fenced block as `<pre><code class="language-x">…</code></pre>`
+    /// with the code HTML-escaped. Each such block is re-emitted with its
+    /// coloured runs in styled spans; anything else is left as it was.
+    static func colourCodeBlocks(
+        in html: String, with highlight: (_ code: String, _ language: String?) -> [CodeHighlighting.Span]?
+    ) -> String {
+        guard let pattern = try? NSRegularExpression(
+            pattern: #"<pre><code class="language-([^"]+)">(.*?)</code></pre>"#,
+            options: [.dotMatchesLineSeparators]) else { return html }
+        let ns = html as NSString
+        var out = ""
+        var cursor = 0
+        for match in pattern.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            let language = ns.substring(with: match.range(at: 1))
+            let code = unescapeHTML(ns.substring(with: match.range(at: 2)))
+            guard let spans = highlight(code, language), !spans.isEmpty else { continue }
+            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            // The info string goes into an attribute: escaped, quotes included.
+            let attribute = CodeHighlighting.escapeHTML(language).replacingOccurrences(of: "\"", with: "&quot;")
+            out += #"<pre><code class="language-\#(attribute)">"# + CodeHighlighting.colouredHTML(code: code, spans: spans) + "</code></pre>"
+            cursor = NSMaxRange(match.range)
+        }
+        out += ns.substring(from: cursor)
+        return out
+    }
+
+    private static func unescapeHTML(_ s: String) -> String {
+        // cmark escapes only these three in code; `&amp;` last, so `&amp;lt;`
+        // comes back as the `&lt;` that was typed.
+        s.replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&amp;", with: "&")
     }
 
     /// A complete HTML document for the note.
-    public static func document(_ markdown: String, title: String, resolveAttachment: (String) -> URL?) -> String {
+    public static func document(
+        _ markdown: String, title: String, resolveAttachment: (String) -> URL?,
+        highlight: ((_ code: String, _ language: String?) -> [CodeHighlighting.Span]?)? = nil
+    ) -> String {
         """
         <!doctype html>
         <html>
@@ -68,11 +110,11 @@ public enum HTMLExporter {
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>\(escape(title))</title>
-        <style>\(stylesheet)</style>
+        <style>\(stylesheet)\(CodeHighlighting.stylesheet)</style>
         </head>
         <body>
         <article>
-        \(bodyHTML(markdown, resolveAttachment: resolveAttachment))
+        \(bodyHTML(markdown, resolveAttachment: resolveAttachment, highlight: highlight))
         </article>
         </body>
         </html>

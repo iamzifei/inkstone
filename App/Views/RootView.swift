@@ -141,7 +141,12 @@ struct RootView: View {
         #if os(iOS)
         // The exported file is left for the share target to finish reading;
         // the next export sweeps folders over an hour old.
-        .sheet(item: $workspace.exportedFile) { file in
+        .sheet(item: $workspace.exportedFile, onDismiss: {
+            if let notice = workspace.pendingExportNotice {
+                workspace.pendingExportNotice = nil
+                workspace.exportNotice = notice
+            }
+        }) { file in
             ShareSheet(items: [file.url]).ignoresSafeArea()
         }
         #endif
@@ -151,6 +156,13 @@ struct RootView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(workspace.exportFailure ?? "")
+        }
+        .alert("Image cut short", isPresented: Binding(
+            get: { workspace.exportNotice != nil }, set: { if !$0 { workspace.exportNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(workspace.exportNotice ?? "")
         }
         .sheet(isPresented: $workspace.isCommandPalettePresented, onDismiss: {
             // Run the chosen command once the palette is fully gone: several
@@ -362,6 +374,9 @@ struct RootView: View {
                     }
                     Button("Export as HTML…", systemImage: "chevron.left.forwardslash.chevron.right") {
                         workspace.exportActiveNote(as: .html)
+                    }
+                    Button("Export as Image…", systemImage: "photo") {
+                        workspace.exportActiveNote(as: .png)
                     }
                     Divider()
                 }
