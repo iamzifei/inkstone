@@ -1,7 +1,7 @@
-Code in colour, smoother diagrams, and safer sync.
+Code in colour, diagrams that no longer hold the app up, and safer sync.
 
 • Code blocks are coloured by language — Swift, Python, JavaScript, Go, Rust, SQL and 30 more — in the editor, in reading mode and in exports.
-• Opening a note with Mermaid diagrams no longer stalls the app, and diagrams keep their own proportions; one drawn once appears without redrawing next time.
+• Opening a note with Mermaid diagrams stalls the app far less, and diagrams keep their own proportions; one drawn once appears without redrawing next time.
 • Export as Image: the note as one picture, ready to share. Very long notes are cut; Export as PDF has everything.
 • Reading mode spaces Chinese and Japanese from Latin letters and digits, like the editor.
 • Share files from any app — Files, Mail, Photos and more — straight into your knowledge base.
