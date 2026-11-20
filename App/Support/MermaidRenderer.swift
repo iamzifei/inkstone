@@ -1,5 +1,5 @@
-import CryptoKit
 import Foundation
+import InkstoneCore
 import WebKit
 
 #if os(macOS)
@@ -11,21 +11,21 @@ import UIKit
 /// Renders Mermaid diagrams to images for the editor to draw inline.
 ///
 /// Mermaid is a JavaScript library with no native equivalent, so this is the one
-/// place the app runs a web view. It is deliberately quarantined: an offscreen
-/// view, loaded from a vendored copy of the library with no network access,
-/// that produces bitmaps. Nothing of the web stack reaches the editor, which
+/// place the app runs a web view. It is deliberately quarantined: offscreen
+/// pages, loaded from a vendored copy of the library with no network access,
+/// that produce bitmaps. Nothing of the web stack reaches the editor, which
 /// receives an image like any other.
 ///
-/// Two engines for the whole app (2026-11-21). It used to be one web view per
-/// diagram, each parsing the 3.4 MB library from scratch, all at the same time:
-/// a note with ten diagrams parsed it ten times in parallel, and the main
-/// thread stalled for 300–420 ms opening it. Now the library loads once into
-/// each of two long-lived pages and diagrams render through them in turn
-/// (MiaoYan keeps one page per preview the same way). One page halved the
-/// stall but drew ten diagrams a third slower on iPhone than ten pages did;
-/// two pages keep the stall down and the drawing time where it was.
-/// Results are kept on disk too, so a diagram drawn once is not drawn again
-/// after a relaunch.
+/// Long-lived engines (2026-11-21). It used to be one web view per diagram,
+/// each parsing the 3.4 MB library from scratch, all at the same time: a note
+/// with ten diagrams parsed it ten times in parallel, and the main thread
+/// stalled for 300–420 ms opening it. Now the library loads once into a page
+/// and diagrams render through it in turn (MiaoYan keeps one page per preview
+/// the same way). A second page starts only when diagrams are waiting — one
+/// page alone drew ten diagrams a third slower on iPhone than ten pages did —
+/// and both are torn down when idle or when memory runs short. Results are
+/// kept on disk too, so a diagram drawn once is not drawn again after a
+/// relaunch.
 ///
 /// Rendering is asynchronous while highlighting is synchronous, so `image(for:)`
 /// returns nil the first time it sees a diagram, queues the work, and calls
@@ -46,14 +46,20 @@ final class MermaidRenderer {
     private var cache: [Key: PlatformImage] = [:]
     private var order: [Key] = []
     private let limit = 64
-    /// Diagrams that failed, with Mermaid's message; kept so a broken diagram is
-    /// not retried on every keystroke, and so the editor can say what is wrong.
+    /// Diagrams Mermaid itself refused, with its message. Kept for good: the
+    /// same source fails the same way, and retrying it on every keystroke
+    /// would only cost time.
     private var failures: [Key: String] = [:]
+    /// Failures that may not recur (a timeout, a page that died, a snapshot
+    /// that came back empty), counted: the diagram is tried again on the next
+    /// pass, and only after this many is it given up on.
+    private var transientFailures: [Key: Int] = [:]
+    private let transientLimit = 3
     /// Waiting to render, in the order they were asked for.
     private var queue: [Key] = []
     private var nextID = 0
 
-    // MARK: - Engine state
+    // MARK: - Engines
 
     /// One long-lived page with the library loaded, and what it is drawing.
     private final class Engine {
@@ -69,8 +75,15 @@ final class MermaidRenderer {
 
     private static let engineCount = 2
     private let engines = (0..<MermaidRenderer.engineCount).map { Engine(index: $0) }
-    /// Restarts after a crash, so a page that cannot stay up does not loop.
+    /// Restarts after a page died, so one that cannot stay up does not loop.
     private var restarts = 0
+    /// When the last diagram finished; the engines go after a quiet minute.
+    private var lastActivity = Date.now
+    private var idleCheck: Task<Void, Never>?
+    private var retryScheduled = false
+    #if !os(macOS)
+    private var memoryObserver: (any NSObjectProtocol)?
+    #endif
 
     #if os(macOS)
     /// A borderless window parked far offscreen.
@@ -97,18 +110,36 @@ final class MermaidRenderer {
 
     private lazy var libraryURL: URL? = Bundle.main.url(forResource: "mermaid.min", withExtension: "js")
 
-    /// Part of every disk-cache key: a new copy of the library may draw a
-    /// diagram differently, and its cached images must not outlive it.
-    private lazy var libraryStamp: String = {
-        guard let url = libraryURL,
-              let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else { return "none" }
-        return String(size)
+    /// What drew a cached picture: the app build and the library. An update to
+    /// either draws again rather than showing what an older one drew.
+    private lazy var stamp: String = {
+        let info = Bundle.main.infoDictionary
+        let version = "\(info?["CFBundleShortVersionString"] ?? "?") (\(info?["CFBundleVersion"] ?? "?"))"
+        let size = libraryURL.flatMap { (try? $0.resourceValues(forKeys: [.fileSizeKey]))?.fileSize } ?? 0
+        return "\(version)|\(size)"
     }()
 
-    private init() {}
+    private lazy var diskCache: RenderedImageCache? = FileManager.default
+        .urls(for: .cachesDirectory, in: .userDomainMask).first
+        // Under the bundle id: outside the sandbox (an unsigned debug build),
+        // the caches directory is the user's own ~/Library/Caches.
+        .map { $0.appending(path: Bundle.main.bundleIdentifier ?? "com.orris.inkstone", directoryHint: .isDirectory)
+            .appending(path: "Mermaid", directoryHint: .isDirectory) }
+        .map { RenderedImageCache(folder: $0) }
+
+    private init() {
+        #if !os(macOS)
+        memoryObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tearDownIdleEngines() }
+        }
+        #endif
+    }
 
     #if !os(macOS)
-    /// A view to park the offscreen engine in.
+    /// A view to park offscreen engines in: the key window, or nil before
+    /// there is one (at launch), in which case no engine is started yet.
     private static func hostView() -> UIView? {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -151,7 +182,7 @@ final class MermaidRenderer {
         return nil
     }
 
-    /// Mermaid's message for a diagram that could not be drawn, or nil.
+    /// Mermaid's message for a diagram it could not draw, or nil.
     func error(for source: String, isDark: Bool) -> String? {
         failures[Key(source: source.trimmingCharacters(in: .whitespacesAndNewlines), isDark: isDark)]
     }
@@ -159,47 +190,86 @@ final class MermaidRenderer {
     func removeAll() {
         cache.removeAll()
         failures.removeAll()
+        transientFailures.removeAll()
         order.removeAll()
     }
 
     // MARK: - Queue
 
-    /// Starts the next diagrams on whichever pages are free.
+    /// Starts the next diagrams on whichever pages are free. The first page is
+    /// used for one waiting diagram; the second only while more are waiting.
     private func pump() {
         for engine in engines where engine.current == nil {
             guard !queue.isEmpty else { return }
-            guard let webView = webView(for: engine) else { return }
-            guard engine.ready else { continue }       // `ready(_:)` pumps again
+            let busy = engines.filter { $0.current != nil }.count
+            if engine.index > 0, engine.webView == nil, queue.count <= busy { return }
+            guard let webView = webView(for: engine) else {
+                // No window to host a page in yet (iOS, at launch): try again
+                // shortly rather than fail what is waiting.
+                retrySoon()
+                return
+            }
+            guard engine.ready else { continue }       // `ready(_:webView:)` pumps again
 
             let key = queue.removeFirst()
             nextID += 1
             let id = nextID
             engine.current = (key, id)
+            lastActivity = .now
             // JSON-encode the source so backticks, backslashes and newlines
             // survive the trip into JavaScript intact.
             let encoded = (try? JSONEncoder().encode(key.source)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
             let theme = key.isDark ? "dark" : "default"
+            let index = engine.index
             webView.evaluateJavaScript("renderDiagram(\(id), \(encoded), \"\(theme)\")") { [weak self] _, error in
-                if let error { self?.trace("evaluate failed: \(error)") }
+                guard let error, let self else { return }
+                self.trace("evaluate failed: \(error)")
+                self.failTransiently(index, id: id, restart: false)
             }
 
-            // A diagram that never calls back must not hold up the rest.
-            Task { [weak self, weak engine] in
+            // A diagram that never calls back must not hold up the rest: the
+            // page is restarted (Mermaid renders one diagram at a time, so a
+            // stuck one blocks everything behind it).
+            Task { [weak self] in
                 try? await Task.sleep(for: .seconds(10))
-                guard let self, let engine, engine.current?.id == id else { return }
+                guard let self, self.engines[index].current?.id == id else { return }
                 self.trace("timed out")
-                self.fail(engine.index, id: id, message: "Timed out")
+                self.failTransiently(index, id: id, restart: true)
             }
         }
     }
 
+    private func retrySoon() {
+        guard !retryScheduled else { return }
+        retryScheduled = true
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            self?.retryScheduled = false
+            self?.pump()
+        }
+    }
+
+    /// Mermaid refused the diagram: remembered for good.
     fileprivate func fail(_ index: Int, id: Int, message: String) {
         let engine = engines[index]
         guard let current = engine.current, current.id == id else { return }
         trace("failed: \(message)")
         failures[current.key] = message
         engine.current = nil
-        pump()
+        finished()
+    }
+
+    /// Something went wrong that may not happen again: the diagram is tried on
+    /// a later pass, up to `transientLimit` times.
+    private func failTransiently(_ index: Int, id: Int, restart: Bool) {
+        let engine = engines[index]
+        guard let current = engine.current, current.id == id else { return }
+        let count = (transientFailures[current.key] ?? 0) + 1
+        transientFailures[current.key] = count
+        if count >= transientLimit { failures[current.key] = "Could not draw the diagram" }
+        engine.current = nil
+        if restart { stop(engine) }
+        finished()
     }
 
     /// A page reported a diagram drawn and measured: snapshot it.
@@ -208,23 +278,30 @@ final class MermaidRenderer {
         guard let current = engine.current, current.id == id, let webView = engine.webView else { return }
         let configuration = WKSnapshotConfiguration()
         configuration.rect = CGRect(origin: .zero, size: size)
-        webView.takeSnapshot(with: configuration) { [weak self, weak engine] image, _ in
-            guard let self, let engine, engine.current?.id == id else { return }
-            engine.current = nil
-            if let image {
-                self.trace("rendered \(image.size)")
-                self.remember(image, for: current.key)
-                self.saveToDisk(image, for: current.key)
-                #if DEBUG
-                MainStallMonitor.shared.event()
-                #endif
-                self.onRendered?()
-            } else {
+        webView.takeSnapshot(with: configuration) { [weak self] image, _ in
+            guard let self, self.engines[index].current?.id == id else { return }
+            guard let image else {
                 self.trace("snapshot returned no image")
-                self.failures[current.key] = "Could not draw the diagram"
+                self.failTransiently(index, id: id, restart: false)
+                return
             }
-            self.pump()
+            self.engines[index].current = nil
+            self.trace("rendered \(image.size)")
+            self.transientFailures[current.key] = nil
+            self.remember(image, for: current.key)
+            self.saveToDisk(image, for: current.key)
+            #if DEBUG
+            MainStallMonitor.shared.event()
+            #endif
+            self.onRendered?()
+            self.finished()
         }
+    }
+
+    private func finished() {
+        lastActivity = .now
+        scheduleIdleCheck()
+        pump()
     }
 
     private func remember(_ image: PlatformImage, for key: Key) {
@@ -235,31 +312,30 @@ final class MermaidRenderer {
 
     // MARK: - Engine lifecycle
 
-    /// The folder the engine page and its copy of the library live in. The web
-    /// views may read this folder and nothing else.
+    /// The folder the engine page, its script and its copy of the library live
+    /// in. The web views may read this folder and nothing else.
     private static var engineFolder: URL {
         FileManager.default.temporaryDirectory.appending(path: "inkstone-mermaid", directoryHint: .isDirectory)
     }
 
-    /// The page in the folder, written (with its copy of the library) once.
+    /// The page in the folder, written once per launch with a fresh copy of
+    /// the library (a copy left by another build may be another version).
     private lazy var enginePage: URL? = {
         guard let libraryURL else {
             trace("library missing from bundle")
             return nil
         }
-        // The library is read by WebKit from a file, not copied into a Swift
-        // string and marshalled across as 3.4 MB of inline script. Copied next
-        // to the page so the web views' read access can be that one folder.
+        // Read by WebKit from a file, not copied into a Swift string and
+        // marshalled across as 3.4 MB of inline script.
         let folder = Self.engineFolder
         let page = folder.appending(path: "engine.html")
-        let library = folder.appending(path: "mermaid.min.js")
         do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let size = { (url: URL) in (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize }
-            if size(library) != size(libraryURL) {
-                try? FileManager.default.removeItem(at: library)
-                try FileManager.default.copyItem(at: libraryURL, to: library)
-            }
+            let fm = FileManager.default
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            let library = folder.appending(path: "mermaid.min.js")
+            try? fm.removeItem(at: library)
+            try fm.copyItem(at: libraryURL, to: library)
+            try Data(Self.script.utf8).write(to: folder.appending(path: "engine.js"), options: .atomic)
             try Data(Self.page.utf8).write(to: page, options: .atomic)
             return page
         } catch {
@@ -268,9 +344,20 @@ final class MermaidRenderer {
         }
     }()
 
-    /// The engine's web view, started if it is not running.
+    /// The engine's web view, started (or re-hosted) as needed. nil when there
+    /// is nowhere to host it yet, or the page could not be written.
     private func webView(for engine: Engine) -> WKWebView? {
+        #if os(macOS)
         if let webView = engine.webView { return webView }
+        #else
+        guard let host = Self.hostView() else { return nil }
+        if let webView = engine.webView {
+            // Its window went (a scene closed): a page outside a window never
+            // lays out, so it moves to the current one.
+            if webView.window == nil { host.addSubview(webView) }
+            return webView
+        }
+        #endif
         guard let page = enginePage else {
             // Nothing will ever render: fail what is waiting rather than hold it.
             for key in queue { failures[key] = "Could not start the diagram renderer" }
@@ -294,13 +381,12 @@ final class MermaidRenderer {
         webView.scrollView.backgroundColor = .clear
         // Same reason as the offscreen window on macOS: a WKWebView outside a
         // hierarchy never lays out. Parked off the edge of the key window.
-        if let host = Self.hostView() {
-            webView.frame.origin = CGPoint(x: -20_000, y: -20_000 - CGFloat(engine.index) * 1_500)
-            webView.isUserInteractionEnabled = false
-            host.addSubview(webView)
-        }
+        webView.frame.origin = CGPoint(x: -20_000, y: -20_000 - CGFloat(engine.index) * 1_500)
+        webView.isUserInteractionEnabled = false
+        host.addSubview(webView)
         #endif
         webView.navigationDelegate = handler
+        handler.webView = webView
         engine.handler = handler
         engine.webView = webView
         engine.ready = false
@@ -309,17 +395,28 @@ final class MermaidRenderer {
         return webView
     }
 
-    /// A page died (WebKit's content process is killed under memory pressure,
-    /// or crashed): start a fresh one, retrying the diagram it had in hand.
-    fileprivate func engineDied(_ index: Int) {
-        trace("engine \(index) terminated")
-        let engine = engines[index]
+    /// Takes a page down; whatever it was drawing is the caller's to settle.
+    private func stop(_ engine: Engine) {
+        engine.webView?.configuration.userContentController.removeScriptMessageHandler(forName: "engine")
         engine.webView?.removeFromSuperview()
         engine.webView = nil
+        engine.handler = nil
         engine.ready = false
-        if let current = engine.current { queue.insert(current.key, at: 0) }
-        engine.current = nil
+    }
+
+    /// A page died (WebKit's content process is killed under memory pressure,
+    /// or crashed): its diagram counts as a transient failure, and a fresh page
+    /// starts if there is more to draw.
+    fileprivate func engineDied(_ index: Int, webView: WKWebView?) {
+        let engine = engines[index]
+        guard webView == nil || webView === engine.webView else { return }   // an old page's last word
+        trace("engine \(index) terminated")
         restarts += 1
+        if let current = engine.current {
+            failTransiently(index, id: current.id, restart: true)
+        } else {
+            stop(engine)
+        }
         guard restarts <= 3 * Self.engineCount else {
             for key in queue { failures[key] = "The diagram renderer stopped" }
             queue.removeAll()
@@ -328,37 +425,52 @@ final class MermaidRenderer {
         pump()
     }
 
-    fileprivate func ready(_ index: Int) {
+    fileprivate func ready(_ index: Int, webView: WKWebView?) {
+        let engine = engines[index]
+        guard webView === engine.webView else { return }
         trace("engine \(index) ready")
-        engines[index].ready = true
+        engine.ready = true
         pump()
+    }
+
+    /// The pages go after a quiet minute: each holds a WebKit process with the
+    /// library loaded, which is wasted on a note with no diagrams.
+    private func scheduleIdleCheck() {
+        idleCheck?.cancel()
+        idleCheck = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard let self, !Task.isCancelled, Date.now.timeIntervalSince(self.lastActivity) >= 59 else { return }
+            self.tearDownIdleEngines()
+        }
+    }
+
+    private func tearDownIdleEngines() {
+        guard queue.isEmpty else { return }
+        for engine in engines where engine.current == nil && engine.webView != nil {
+            trace("engine \(engine.index) idle, stopped")
+            stop(engine)
+        }
     }
 
     // MARK: - Disk cache
 
-    private func diskURL(for key: Key) -> URL? {
-        // Under the bundle id: outside the sandbox (an unsigned debug build),
-        // the caches directory is the user's own ~/Library/Caches.
-        guard let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
-            .appending(path: Bundle.main.bundleIdentifier ?? "com.orris.inkstone", directoryHint: .isDirectory)
-            .appending(path: "Mermaid", directoryHint: .isDirectory) else { return nil }
-        let scale = Self.screenScale
-        let digest = SHA256.hash(data: Data("\(libraryStamp)|\(key.isDark)|\(scale)|\(key.source)".utf8))
-        let name = digest.map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(name)@\(Int(scale))x.png")
-    }
-
-    private static var screenScale: CGFloat {
+    private var screenScale: CGFloat {
         #if os(macOS)
-        NSScreen.main?.backingScaleFactor ?? 2
+        // The host window's screen: the backing scale the snapshot is taken at.
+        host.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
         #else
-        UITraitCollection.current.displayScale > 0 ? UITraitCollection.current.displayScale : 3
+        // A window's traits, not `UITraitCollection.current`, which is only
+        // meaningful while drawing and reads 0 elsewhere.
+        let scale = Self.hostView()?.traitCollection.displayScale ?? 0
+        return scale > 0 ? scale : 3
         #endif
     }
 
     private func loadFromDisk(_ key: Key) -> PlatformImage? {
-        guard let url = diskURL(for: key), let data = try? Data(contentsOf: url) else { return nil }
-        let scale = Self.screenScale
+        guard let diskCache else { return nil }
+        let scale = screenScale
+        let file = diskCache.file(source: key.source, isDark: key.isDark, scale: scale, stamp: stamp)
+        guard let data = diskCache.load(file) else { return nil }
         #if os(macOS)
         guard let rep = NSBitmapImageRep(data: data) else { return nil }
         let image = NSImage(size: CGSize(width: CGFloat(rep.pixelsWide) / scale,
@@ -370,33 +482,51 @@ final class MermaidRenderer {
         #endif
     }
 
+    /// Encoded and written off the main thread: PNG encoding a large diagram is
+    /// the kind of work this renderer exists to keep away from it.
     private func saveToDisk(_ image: PlatformImage, for key: Key) {
-        guard let url = diskURL(for: key) else { return }
+        guard let diskCache else { return }
         #if os(macOS)
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
-        #else
-        let data = image.pngData()
-        #endif
-        guard let data else { return }
+        // The scale it was actually drawn at, so it reads back at its size.
+        let scale = (CGFloat(cg.width) / max(image.size.width, 1)).rounded()
+        let file = diskCache.file(source: key.source, isDark: key.isDark, scale: scale, stamp: stamp)
         Task.detached(priority: .utility) {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: url, options: .atomic)
+            guard let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
+            diskCache.store(data, at: file)
         }
+        #else
+        let file = diskCache.file(source: key.source, isDark: key.isDark, scale: image.scale, stamp: stamp)
+        let sendable = SendableImage(image: image)
+        Task.detached(priority: .utility) {
+            guard let data = sendable.image.pngData() else { return }
+            diskCache.store(data, at: file)
+        }
+        #endif
     }
+
+    #if !os(macOS)
+    /// UIImage is immutable; handing one to a background encode is safe.
+    private struct SendableImage: @unchecked Sendable { let image: UIImage }
+    #endif
 
     // MARK: - Page
 
-    /// The engine page: the library, and one function that draws a diagram
-    /// into `#out`, measures it, and reports back. Nothing on it may load from
-    /// the network.
+    /// The engine page. Its one script is a file of its own (`engine.js`), so
+    /// the policy can refuse inline script entirely; nothing may load from the
+    /// network, navigate, or submit anywhere. Mermaid styles its SVG inline,
+    /// hence inline styles.
     private static let page = """
     <!doctype html><html><head><meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">
     <style>html,body{margin:0;padding:0;background:transparent}
     #out{display:inline-block;padding:8px}</style>
-    <script src="mermaid.min.js"></script></head>
-    <body><div id="out"></div><script>
+    <script src="mermaid.min.js"></script><script src="engine.js"></script></head>
+    <body><div id="out"></div></body></html>
+    """
+
+    /// Draws a diagram into `#out`, measures it, and reports back.
+    private static let script = """
     (function () {
       function post(payload) { window.webkit.messageHandlers.engine.postMessage(payload); }
       window.renderDiagram = function (id, source, theme) {
@@ -410,25 +540,40 @@ final class MermaidRenderer {
           mermaid.render("d" + id, source).then(function (result) {
             out.innerHTML = result.svg;
             var svg = out.querySelector("svg");
+            // Mermaid gives the SVG width="100%" and its real width as a
+            // max-width. In a shrink-to-fit box 100% of nothing falls back to
+            // 300 px, so every diagram came out 300 wide: wide ones (a Gantt
+            // chart, a sequence) shrunk to unreadable, tall narrow ones blown
+            // up. Its own size, from max-width or else the viewBox, instead.
+            var box = svg.viewBox && svg.viewBox.baseVal;
+            var natural = parseFloat(svg.style.maxWidth) || (box && box.width) || 600;
+            svg.setAttribute("width", String(Math.min(natural, 1360)));
             svg.removeAttribute("height");
             svg.style.maxWidth = "none";
             // setTimeout, not requestAnimationFrame: the host is parked
             // offscreen and rAF does not fire when it is not visible.
             setTimeout(function () {
-              var box = out.getBoundingClientRect();
-              post({ kind: "done", id: id, width: box.width, height: box.height });
+              var rect = out.getBoundingClientRect();
+              post({ kind: "done", id: id, width: rect.width, height: rect.height });
             }, 0);
-          }).catch(function (e) { post({ kind: "error", id: id, message: String((e && e.message) || e) }); });
+          }).catch(function (e) {
+            // Mermaid can leave its scratch element behind on a failed render.
+            var stray = document.getElementById("d" + id);
+            if (stray && stray.parentNode) { stray.parentNode.removeChild(stray); }
+            post({ kind: "error", id: id, message: String((e && e.message) || e) });
+          });
         } catch (e) { post({ kind: "error", id: id, message: String((e && e.message) || e) }); }
       };
       post({ kind: typeof mermaid === "undefined" ? "missing" : "ready" });
     })();
-    </script></body></html>
     """
 
-    /// Bridges the page's messages back into Swift.
+    /// Bridges a page's messages back into Swift.
     private final class EngineHandler: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         weak var owner: MermaidRenderer?
+        /// The page this handler serves, to tell its messages from a previous
+        /// page's last ones.
+        weak var webView: WKWebView?
         let index: Int
         init(owner: MermaidRenderer, index: Int) { self.owner = owner; self.index = index }
 
@@ -445,7 +590,7 @@ final class MermaidRenderer {
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             let index = index
-            MainActor.assumeIsolated { owner?.engineDied(index) }
+            MainActor.assumeIsolated { owner?.engineDied(index, webView: webView) }
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -457,12 +602,12 @@ final class MermaidRenderer {
             let text = body["message"] as? String
             let index = index
             MainActor.assumeIsolated {
-                guard let owner else { return }
+                guard let owner, message.webView === webView else { return }
                 switch kind {
-                case "ready": owner.ready(index)
+                case "ready": owner.ready(index, webView: message.webView)
                 case "missing":
                     owner.trace("library failed to load")
-                    owner.engineDied(index)
+                    owner.engineDied(index, webView: message.webView)
                 case "done":
                     if width > 1, height > 1 {
                         owner.drawn(index, id: id, size: CGSize(width: width, height: height))
