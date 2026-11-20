@@ -438,6 +438,13 @@ final class MermaidRenderer {
             suspendedUntil = Date.now.addingTimeInterval(60)
             restarts = 0
             queue.removeAll()
+            // When the pause ends, have the editor draw again: that asks for
+            // the diagrams on screen afresh. Without it they stayed as source
+            // until the note was edited or reopened.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(61))
+                self?.onRendered?()
+            }
         }
         if let current = engine.current {
             failTransiently(index, id: current.id, restart: true)
