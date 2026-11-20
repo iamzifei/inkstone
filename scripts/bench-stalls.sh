@@ -15,7 +15,8 @@ set -euo pipefail
 # The vault is scripts/make-bench-vault.py's, regenerated on every run.
 #
 # Each segment line in <out.tsv>: label, frames over 16.7 ms, longest stall
-# (ms), main-thread time blocked beyond one frame (ms). Lower is better.
+# (ms), main-thread time blocked beyond one frame (ms), and when the segment's
+# last asynchronous result landed (ms; diagrams). Lower is better.
 # On the Mac the window should be on screen: an occluded window skips drawing,
 # which hides part of the cost. The simulator renders regardless.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,6 +41,9 @@ start() {
       # The simulator app may read host paths but not write them: it writes
       # inside its own container, copied out after each run (collect).
       SIMOUT="$(xcrun simctl get_app_container "$dev" com.orris.inkstone data)/tmp/stalls.tsv"
+      # Cold every run: diagrams cached on disk by a previous run would make
+      # the mermaid segment measure the cache, not the renderer.
+      rm -rf "$(xcrun simctl get_app_container "$dev" com.orris.inkstone data)/Library/Caches/com.orris.inkstone/Mermaid"
       rm -f "$SIMOUT"
       env SIMCTL_CHILD_INKSTONE_OPEN_VAULT="$VAULT" SIMCTL_CHILD_INKSTONE_DEMO_COMMANDS="$CMD" \
           SIMCTL_CHILD_INKSTONE_STALL_OUT="$SIMOUT" \
@@ -47,6 +51,7 @@ start() {
     mac)
       local app="$ROOT/.build-mac-opt/Build/Products/Debug/Inkstone.app"
       pkill -f "$app/Contents/MacOS/Inkstone" 2>/dev/null || true; sleep 1
+      rm -rf "$HOME/Library/Caches/com.orris.inkstone/Mermaid"   # cold every run
       # -g: launched in the background, so it never takes focus from what
       # the person at the Mac is doing.
       open -g -n --env INKSTONE_OPEN_VAULT="$VAULT" --env INKSTONE_DEMO_COMMANDS="$CMD" \
@@ -72,6 +77,18 @@ for run in $(seq 1 "$RUNS"); do
   for i in $(seq 1 30); do say "type x" 0.15; done
   sleep 4; say "stall-report" 1          # autosave and the reindex it wakes
 
+  say "stall-mark mermaid"
+  say "open Diagrams/Mermaid.md" 15
+  say "stall-report" 1
+
+  say "stall-mark code"
+  say "open Code/Code.md" 6
+  say "stall-report" 1
+
+  say "stall-mark oneline"
+  say "open Code/OneLine.md" 6
+  say "stall-report" 1
+
   say "stall-mark gallery"
   say "open Images/Gallery.md" 6
   say "stall-report" 1
@@ -89,8 +106,8 @@ import sys, statistics as st, collections
 rows = collections.defaultdict(list)
 for line in open(sys.argv[1]):
     p = line.split("\t")
-    if len(p) == 4: rows[p[0]].append([float(x) for x in p[1:]])
-print(f"{'segment':<12}{'frames>16.7ms':>15}{'longest ms':>12}{'blocked ms':>12}   (median of {max(len(v) for v in rows.values())} runs)")
+    if len(p) >= 4: rows[p[0]].append([float(x) for x in p[1:5]] + ([0.0] if len(p) == 4 else []))
+print(f"{'segment':<12}{'frames>16.7ms':>15}{'longest ms':>12}{'blocked ms':>12}{'done at ms':>12}   (median of {max(len(v) for v in rows.values())} runs)")
 for k, v in rows.items():
-    print(f"{k:<12}{st.median(r[0] for r in v):>15.0f}{st.median(r[1] for r in v):>12.1f}{st.median(r[2] for r in v):>12.1f}")
+    print(f"{k:<12}{st.median(r[0] for r in v):>15.0f}{st.median(r[1] for r in v):>12.1f}{st.median(r[2] for r in v):>12.1f}{st.median(r[3] for r in v):>12.0f}")
 PY
