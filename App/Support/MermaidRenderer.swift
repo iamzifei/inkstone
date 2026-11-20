@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import InkstoneCore
 import WebKit
@@ -75,8 +76,11 @@ final class MermaidRenderer {
 
     private static let engineCount = 2
     private let engines = (0..<MermaidRenderer.engineCount).map { Engine(index: $0) }
-    /// Restarts after a page died, so one that cannot stay up does not loop.
+    /// Restarts after a page died since the last diagram drawn, so one that
+    /// cannot stay up does not loop. Past the limit, no page starts for a
+    /// while; what was waiting is asked for again on a later pass.
     private var restarts = 0
+    private var suspendedUntil = Date.distantPast
     /// When the last diagram finished; the engines go after a quiet minute.
     private var lastActivity = Date.now
     private var idleCheck: Task<Void, Never>?
@@ -116,7 +120,11 @@ final class MermaidRenderer {
         let info = Bundle.main.infoDictionary
         let version = "\(info?["CFBundleShortVersionString"] ?? "?") (\(info?["CFBundleVersion"] ?? "?"))"
         let size = libraryURL.flatMap { (try? $0.resourceValues(forKeys: [.fileSizeKey]))?.fileSize } ?? 0
-        return "\(version)|\(size)"
+        // And the page and its script: they decide how a diagram is drawn
+        // (its width, for one), and a debug build keeps one version number.
+        let drawing = SHA256.hash(data: Data((Self.page + Self.script).utf8)).prefix(8)
+            .map { String(format: "%02x", $0) }.joined()
+        return "\(version)|\(size)|\(drawing)"
     }()
 
     private lazy var diskCache: RenderedImageCache? = FileManager.default
@@ -201,8 +209,11 @@ final class MermaidRenderer {
     private func pump() {
         for engine in engines where engine.current == nil {
             guard !queue.isEmpty else { return }
-            let busy = engines.filter { $0.current != nil }.count
-            if engine.index > 0, engine.webView == nil, queue.count <= busy { return }
+            guard Date.now >= suspendedUntil else { return }
+            // A further page only for diagrams the pages already there (ready
+            // or still loading) cannot take: one diagram never starts two.
+            let free = engines.filter { $0 !== engine && $0.webView != nil && $0.current == nil }.count
+            if engine.index > 0, engine.webView == nil, queue.count <= free { return }
             guard let webView = webView(for: engine) else {
                 // No window to host a page in yet (iOS, at launch): try again
                 // shortly rather than fail what is waiting.
@@ -288,6 +299,7 @@ final class MermaidRenderer {
             self.engines[index].current = nil
             self.trace("rendered \(image.size)")
             self.transientFailures[current.key] = nil
+            self.restarts = 0
             self.remember(image, for: current.key)
             self.saveToDisk(image, for: current.key)
             #if DEBUG
@@ -392,6 +404,14 @@ final class MermaidRenderer {
         engine.ready = false
         webView.loadFileURL(page, allowingReadAccessTo: Self.engineFolder)
         trace("engine \(engine.index) starting")
+        // A page that never says it is ready (its script failed to load) would
+        // otherwise hold the queue, which only times out what was sent.
+        let index = engine.index
+        Task { [weak self, weak webView] in
+            try? await Task.sleep(for: .seconds(15))
+            guard let self, let webView, self.engines[index].webView === webView, !self.engines[index].ready else { return }
+            self.engineDied(index, webView: webView)
+        }
         return webView
     }
 
@@ -412,17 +432,19 @@ final class MermaidRenderer {
         guard webView == nil || webView === engine.webView else { return }   // an old page's last word
         trace("engine \(index) terminated")
         restarts += 1
+        if restarts > 3 * Self.engineCount {
+            // Checked before anything pumps again, so no page starts now.
+            trace("too many restarts; pausing")
+            suspendedUntil = Date.now.addingTimeInterval(60)
+            restarts = 0
+            queue.removeAll()
+        }
         if let current = engine.current {
             failTransiently(index, id: current.id, restart: true)
         } else {
             stop(engine)
+            pump()
         }
-        guard restarts <= 3 * Self.engineCount else {
-            for key in queue { failures[key] = "The diagram renderer stopped" }
-            queue.removeAll()
-            return
-        }
-        pump()
     }
 
     fileprivate func ready(_ index: Int, webView: WKWebView?) {
@@ -547,7 +569,12 @@ final class MermaidRenderer {
             // up. Its own size, from max-width or else the viewBox, instead.
             var box = svg.viewBox && svg.viewBox.baseVal;
             var natural = parseFloat(svg.style.maxWidth) || (box && box.width) || 600;
-            svg.setAttribute("width", String(Math.min(natural, 1360)));
+            // Within the 1400-point page both ways: a tall diagram at its own
+            // width would run off the bottom and be cut. Scaled down to fit
+            // instead (the editor draws it at text width anyway).
+            var aspect = box && box.width > 0 ? box.height / box.width : 0;
+            var fit = Math.min(natural, 1360, aspect > 0 ? 1360 / aspect : 1360);
+            svg.setAttribute("width", String(fit));
             svg.removeAttribute("height");
             svg.style.maxWidth = "none";
             // setTimeout, not requestAnimationFrame: the host is parked
