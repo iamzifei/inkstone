@@ -258,10 +258,10 @@ enum DemoDirector {
                 workspace.insertTemplate(url)
             }
         case "export":
-            // export pdf|html — writes the open note's export and logs where,
+            // export pdf|html|png — writes the open note's export and logs where,
             // how big, and (PDF) how many pages.
             guard let note = workspace.activeTab?.url else { break }
-            let format: NoteExporter.Format = arg == "html" ? .html : .pdf
+            let format: NoteExporter.Format = arg == "html" ? .html : arg == "png" ? .png : .pdf
             let log = Logger(subsystem: "com.orris.inkstone", category: "Demo")
             Task { @MainActor in
                 do {
@@ -270,8 +270,10 @@ enum DemoDirector {
                     var pages = -1
                     if format == .pdf, let doc = CGPDFDocument(file as CFURL) { pages = doc.numberOfPages }
                     log.info("demo export \(file.path, privacy: .public) bytes \(size) pages \(pages)")
+                    result("export \(file.path) bytes \(size) pages \(pages)")
                 } catch {
                     log.error("demo export failed \(error.localizedDescription, privacy: .public)")
+                    result("export failed \(error.localizedDescription)")
                 }
             }
         case "mode":

@@ -35,6 +35,8 @@ extension AppCommand {
                        isAvailable: noteOpen) { $0.exportActiveNote(as: .pdf) },
             AppCommand(id: "export-html", title: "Export as HTML…", shortcut: nil, systemImage: "chevron.left.forwardslash.chevron.right",
                        isAvailable: noteOpen) { $0.exportActiveNote(as: .html) },
+            AppCommand(id: "export-png", title: "Export as Image…", shortcut: nil, systemImage: "photo",
+                       isAvailable: noteOpen) { $0.exportActiveNote(as: .png) },
             AppCommand(id: "sync", title: "Sync with GitHub", shortcut: "⇧⌘Y", systemImage: "arrow.triangle.2.circlepath",
                        isAvailable: { $0.canSync }) { w in Task { await w.sync() } },
             // Edit

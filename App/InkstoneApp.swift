@@ -1026,6 +1026,8 @@ struct InkstoneApp: App {
                 .disabled(workspace.presentEditorFind == nil)
             Button(localized("Export as HTML…")) { workspace.exportActiveNote(as: .html) }
                 .disabled(workspace.presentEditorFind == nil)
+            Button(localized("Export as Image…")) { workspace.exportActiveNote(as: .png) }
+                .disabled(workspace.presentEditorFind == nil)
             Divider()
             Button(workspace.isSyncing ? localized("Syncing…") : localized("Sync with GitHub")) {
                 Task { await workspace.sync() }

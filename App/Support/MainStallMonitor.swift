@@ -14,7 +14,11 @@ import Foundation
 /// so a scripted run of note switches, typing or organizing produces one line
 /// per segment in the output file:
 ///
-///     label  frames-over-16.7ms  longest-ms  blocked-ms-beyond-a-frame
+///     label  frames-over-16.7ms  longest-ms  blocked-ms-beyond-a-frame  last-event-ms
+///
+/// `last-event-ms` is when, after the segment started, the last `event()` was
+/// recorded (0 if none): for work that finishes off the main thread, such as
+/// diagrams rendering, the time until it was all on screen.
 final class MainStallMonitor: @unchecked Sendable {
     static let shared = MainStallMonitor()
 
@@ -25,6 +29,8 @@ final class MainStallMonitor: @unchecked Sendable {
     private var over = 0          // probes that waited longer than one frame
     private var longest = 0.0     // longest single wait, seconds
     private var blocked = 0.0     // sum of (wait - frame) over the long waits
+    private var segmentStart = DispatchTime.now().uptimeNanoseconds
+    private var lastEvent: Double = 0  // seconds after segmentStart
     private var outURL: URL?
     private var thread: Thread?
     /// Held for the life of the process: without it a Mac app launched in the
@@ -69,13 +75,21 @@ final class MainStallMonitor: @unchecked Sendable {
         lock.lock()
         self.label = label
         over = 0; longest = 0; blocked = 0
+        segmentStart = DispatchTime.now().uptimeNanoseconds; lastEvent = 0
+        lock.unlock()
+    }
+
+    /// Records that a piece of asynchronous work finished now.
+    func event() {
+        lock.lock()
+        lastEvent = Double(DispatchTime.now().uptimeNanoseconds - segmentStart) / 1e9
         lock.unlock()
     }
 
     /// Appends the current segment's numbers to the output file.
     func report() {
         lock.lock()
-        let line = String(format: "%@\t%d\t%.1f\t%.1f\n", label, over, longest * 1000, blocked * 1000)
+        let line = String(format: "%@\t%d\t%.1f\t%.1f\t%.0f\n", label, over, longest * 1000, blocked * 1000, lastEvent * 1000)
         lock.unlock()
         guard let outURL else { return }
         if let handle = try? FileHandle(forWritingTo: outURL) {
