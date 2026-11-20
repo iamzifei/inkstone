@@ -12,13 +12,15 @@ work. This file is the summary; those are the reasoning.
 ### Code, diagrams and Chinese text
 - Code blocks are coloured by language — Swift, Python, JavaScript/TypeScript, Go, Rust, SQL,
   YAML, shell and 27 more — in the editor, in reading mode and in exports, in light and dark.
-- Mermaid diagrams draw with far less waiting: opening a note with ten diagrams stalls the app
-  about 60% less (measured: 424 → 184 ms on Mac, 303 → 144 ms on iPhone), and a diagram drawn
-  once comes back instantly after a relaunch. Diagrams now keep their own proportions — wide
-  charts are no longer shrunk and tall ones no longer blown up.
+- Opening a note with Mermaid diagrams no longer stalls the app: with ten diagrams the
+  longest freeze went from 424 to 184 ms on a Mac and from 303 to 144 ms in the iPhone
+  simulator (optimised debug builds, median of three runs). A diagram drawn once comes back
+  without drawing after a relaunch. Diagrams keep their own proportions — wide charts are no
+  longer shrunk and tall ones no longer blown up.
 - Reading mode spaces Chinese and Japanese from Latin letters and digits the way the editor
-  does (display only; the file is unchanged), and code is never spaced.
-- Export as Image…: the whole note as one PNG, for sharing where a document will not go.
+  does (display only; the file is unchanged); code is never spaced.
+- Export as Image…: the note as one PNG, for sharing where a document will not go. A very long
+  note is cut at about 8,000 points, and the app says so; Export as PDF has all of it.
 
 Ideas borrowed, with thanks, from MiaoYan. Full numbers: `docs/perf/2026-11-21-0.5.3-rendering.md`.
 
