@@ -55,6 +55,7 @@ public enum VaultBlueprint {
         }
 
         for path in skeleton ? layout.allFolders : [layout.system] { folder(path) }
+        keepEmptyFolders(in: root, layout: layout)
         let s = SystemFileText(layout: layout, date: date)
         try file(layout.rulesFile, s.rules(rules ?? OrganizingPolicy.defaultText(layout.language)))
         try file(layout.logFile, s.log)
@@ -64,6 +65,32 @@ public enum VaultBlueprint {
             try file(name, EntryFiles.newFile(name, in: root, layout: layout))
         }
         return created
+    }
+
+    /// Puts an empty `.gitkeep` in each of the layout's folders that exists
+    /// and holds nothing visible, so it reaches the other devices (git carries
+    /// no empty folders) and every device lists the same folders in its entry
+    /// files. Only the layout's own folders: an empty folder of the person's
+    /// is theirs to fill or delete. Never touches a folder with anything in it.
+    /// Returns the keep-files written.
+    @discardableResult
+    public static func keepEmptyFolders(in root: URL, layout: KnowledgeBaseLayout) -> [String] {
+        let fm = FileManager.default
+        var written: [String] = []
+        for path in layout.allFolders {
+            let folder = root.appending(path: path, directoryHint: .isDirectory)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: folder.path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue,
+                  let entries = try? fm.contentsOfDirectory(atPath: folder.path(percentEncoded: false)),
+                  !entries.contains(where: { !$0.hasPrefix(".") }),
+                  !entries.contains(SyncFilePolicy.keepFileName)
+            else { continue }
+            let keep = folder.appending(path: SyncFilePolicy.keepFileName)
+            if (try? Data().write(to: keep, options: .withoutOverwriting)) != nil {
+                written.append("\(path)/\(SyncFilePolicy.keepFileName)")
+            }
+        }
+        return written
     }
 }
 

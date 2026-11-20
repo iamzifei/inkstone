@@ -591,6 +591,38 @@ public struct SyncEngine: Sendable {
                         break
                     }
                     let data = try await client.download(sha: file.sha, path: path)
+                    // Deleted here, edited there: the mirror of the case above,
+                    // and the edit survives the same way — under its own name.
+                    // Written as a conflict copy, the note was renamed to
+                    // "Note (conflict …).md" on every device and its real name
+                    // deleted from GitHub on the next run (2026-11-20, found by
+                    // the conflict simulation: 50 of 50 such notes).
+                    // Re-checked on disk, not only in the scan: a file that
+                    // appeared since (autosave) still gets the copy below.
+                    if local[path] == nil, !FileManager.default.fileExists(atPath: fileURL(path).path) {
+                        try write(data, to: path)
+                        writtenFolded.insert(path.lowercased())
+                        state.blobs[path] = file.sha
+                        report.downloaded.append(path)
+                        break
+                    }
+                    // Inkstone's own entry files, where the two sides differ only
+                    // inside the block Inkstone rewrites from the folders: that
+                    // block is derived, not written by anyone, so there is no
+                    // disagreement to keep. Take theirs; the next refresh
+                    // rewrites the block from the folders both sides now have.
+                    // Text outside the block differing is a person's words, and
+                    // keeps the copy below like any other note.
+                    if EntryFiles.names.contains(path),
+                       let mine = try? String(contentsOf: fileURL(path), encoding: .utf8),
+                       let theirs = String(data: data, encoding: .utf8),
+                       EntryFiles.sameOutsideAutoBlock(mine, theirs) {
+                        try write(data, to: path)
+                        writtenFolded.insert(path.lowercased())
+                        state.blobs[path] = file.sha
+                        report.downloaded.append(path)
+                        break
+                    }
                     let copy = uniqueConflictPath(SyncPlanner.conflictFilename(for: path, timestamp: stamp))
                     try write(data, to: copy)
                     writtenFolded.insert(copy.lowercased())
@@ -703,11 +735,16 @@ public struct SyncEngine: Sendable {
             options: [.skipsHiddenFiles]
         ) else { return (result, excluded, stamps) }
 
+        var keepFiles: [URL] = []
         for case let url as URL in walker {
             let values = try? url.resourceValues(forKeys: Set(keys))
             if values?.isDirectory == true {
                 if Self.excludedComponents.contains(url.lastPathComponent) {
                     walker.skipDescendants()
+                } else {
+                    // Hidden, so the walk never offers it: looked for here.
+                    let keep = url.appending(path: SyncFilePolicy.keepFileName)
+                    if FileManager.default.fileExists(atPath: keep.path) { keepFiles.append(keep) }
                 }
                 continue
             }
@@ -783,6 +820,26 @@ public struct SyncEngine: Sendable {
             if !isLink, !modified.isNaN, !changed.isNaN {
                 stamps[relative] = HashStamp(size: size, modified: modified, changed: changed, sha: sha)
             }
+        }
+
+        // Folder keep-files, found during the walk. Empty by convention, so
+        // hashed directly; the ignore rules still apply to them.
+        for url in keepFiles {
+            let relative: String
+            if url.path.hasPrefix(rawPrefix) {
+                relative = String(url.path.dropFirst(rawPrefix.count))
+            } else {
+                let canonical = (url.path as NSString).resolvingSymlinksInPath
+                guard canonical.hasPrefix(canonicalPrefix) else { continue }
+                relative = String(canonical.dropFirst(canonicalPrefix.count))
+            }
+            guard Self.isSyncablePath(relative) else { continue }
+            if ignore.ignores(relative) || (!excluder.isEmpty && excluder.ignores(relative)) {
+                excluded.insert(relative)
+                continue
+            }
+            guard let data = try? Data(contentsOf: url) else { excluded.insert(relative); continue }
+            result[relative] = gitBlobSHA(data)
         }
 
         // `.gitignore` again, by hand, because `.skipsHiddenFiles` above means
@@ -861,7 +918,10 @@ public struct SyncEngine: Sendable {
     /// none of the folders the local scan never enters.
     static func isSyncablePath(_ path: String) -> Bool {
         if path == SyncFilePolicy.ignoreFileName { return true }
-        return !path.split(separator: "/").contains { part in
+        var parts = path.split(separator: "/")
+        // A folder's `.gitkeep` travels; everything else hidden does not.
+        if parts.count > 1, parts.last == Substring(SyncFilePolicy.keepFileName) { parts.removeLast() }
+        return !parts.contains { part in
             part.hasPrefix(".") || excludedComponents.contains(String(part))
         }
     }

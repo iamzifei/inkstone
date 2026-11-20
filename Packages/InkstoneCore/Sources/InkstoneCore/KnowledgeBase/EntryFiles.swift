@@ -26,6 +26,10 @@ public enum EntryFiles {
     public static func refresh(in root: URL) throws -> [String] {
         lock.lock(); defer { lock.unlock() }    // one refresh at a time
         guard let layout = KnowledgeBaseLayout.detect(in: root) else { return [] }
+        // Knowledge bases made before keep-files existed: their empty skeleton
+        // folders get one now, so the folders below are the ones every device
+        // will have.
+        VaultBlueprint.keepEmptyFolders(in: root, layout: layout)
         var changed: [String] = []
         for name in names {
             let url = root.appending(path: name)
@@ -47,6 +51,17 @@ public enum EntryFiles {
     }
 
     private static let lock = NSLock()
+
+    /// Whether two versions of an entry file differ at most inside the
+    /// automatic block: same text before the start marker, same after the end
+    /// marker. Sync uses it to tell "two devices regenerated the block" (no
+    /// one's words at stake) from a real edit. A file without exactly one
+    /// well-formed block on both sides is never "the same": it is treated as
+    /// a person's file.
+    public static func sameOutsideAutoBlock(_ a: String, _ b: String) -> Bool {
+        guard let (beforeA, afterA) = split(a), let (beforeB, afterB) = split(b) else { return false }
+        return beforeA == beforeB && afterA == afterB
+    }
 
     /// The text before the start marker and after the end marker — when the
     /// file has exactly one of each, each alone on its line, outside code
@@ -150,9 +165,27 @@ private struct Tree {
 
     init(root: URL, layout: KnowledgeBaseLayout) {
         let fm = FileManager.default
+        // A folder counts only when it holds something that syncs: a visible
+        // file somewhere inside, or a `.gitkeep`. An empty folder exists on
+        // the device that made it and nowhere else (git has no empty
+        // folders), so listing it made each device's block different and the
+        // devices rewrote these files at each other on every sync.
+        func hasContent(_ url: URL) -> Bool {
+            if fm.fileExists(atPath: url.appending(path: SyncFilePolicy.keepFileName).path(percentEncoded: false)) { return true }
+            guard let walker = fm.enumerator(at: url, includingPropertiesForKeys: [.isDirectoryKey],
+                                             options: [.skipsHiddenFiles]) else { return false }
+            for case let item as URL in walker {
+                if (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                    if fm.fileExists(atPath: item.appending(path: SyncFilePolicy.keepFileName).path(percentEncoded: false)) { return true }
+                } else {
+                    return true
+                }
+            }
+            return false
+        }
         func dirs(_ url: URL) -> [String] {
             ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
-                .filter { !$0.lastPathComponent.hasPrefix(".") && ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) }
+                .filter { !$0.lastPathComponent.hasPrefix(".") && ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) && hasContent($0) }
                 .map(\.lastPathComponent)
                 .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         }
