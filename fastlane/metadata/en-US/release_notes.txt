@@ -1,7 +1,11 @@
-Files from anywhere, a faster editor, and safer sync.
+Code in colour, diagrams that no longer hold the app up, and safer sync.
 
-• Share files from any app — Files, Mail, Photos and more — straight into your knowledge base. They land in the inbox and are filed like anything you drop in.
-• Notes with pictures open without freezing: photos load in the background while their space is kept, so the text doesn't jump. Long notes open faster, and switching between notes does less work.
-• Safer sync across your devices: a note deleted on one device and edited on another comes back under its own name; AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies; Inkstone's own knowledge-base folders reach your other devices even while empty; a repository emptied of every file no longer stops sync with "branch not found".
-• The assistant now remembers your API key and model when you reopen Inkstone. If it asks for the key once more, enter it again; after that it stays.
-• Settings › Knowledge Base now opens at the top.
+• Code blocks are coloured by language — Swift, Python, JavaScript, Go, Rust, SQL and 30 more — in the editor, in reading mode and in exports.
+• Opening a note with Mermaid diagrams stalls the app far less, and diagrams keep their own proportions; one drawn once appears without redrawing next time.
+• Export as Image: the note as one picture, ready to share. Very long notes are cut; Export as PDF has everything.
+• Reading mode spaces Chinese and Japanese from Latin letters and digits, like the editor.
+• Share files from any app — Files, Mail, Photos and more — straight into your knowledge base.
+• Notes with pictures open without freezing; long notes open faster.
+• Safer sync across your devices: a note deleted on one and edited on another comes back under its own name; AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies; Inkstone's own folders reach your other devices even while empty; an emptied repository no longer stops sync with "branch not found".
+• The assistant now remembers your API key and model when you reopen Inkstone. If it asks once more, enter it again; after that it stays.
+• Settings › Knowledge Base opens at the top.
