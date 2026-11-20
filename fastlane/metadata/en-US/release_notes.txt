@@ -1,6 +1,6 @@
-Faster, and files from anywhere.
+Safer sync across your devices.
 
-• Share files from any app — Files, Mail, Photos and more — straight into your knowledge base. They land in the inbox and are filed like anything you drop in.
-• Notes with pictures open without freezing: photos load in the background while their space is kept, so the text doesn't jump.
-• Long notes open faster, and switching between notes does less work.
-• Settings › Knowledge Base now opens at the top.
+• A note deleted on one device and edited on another comes back under its own name.
+• AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies when two devices refresh them.
+• Your knowledge base's empty folders now reach your other devices, so its entry files stop being rewritten back and forth.
+• A repository emptied of every file no longer stops sync with "branch not found".
