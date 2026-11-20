@@ -151,19 +151,34 @@ enum DemoDirector {
             return
         default: break
         }
+        // Everything below changes files or settings, so it runs only on a
+        // launch isolated on a throwaway settings suite: a stray Debug launch
+        // with INKSTONE_DEMO_COMMANDS set cannot touch a real vault.
+        let isolated = ProcessInfo.processInfo.environment["INKSTONE_DEMO_DEFAULTS"] != nil
+        let changes = ["real-sync-off", "sync-bind", "sync-now", "write", "rm", "refresh", "forget-vault"]
+        if changes.contains(where: { line == $0 || line.hasPrefix($0 + " ") }), !isolated {
+            result("refused: \(line.split(separator: " ").first ?? "") needs INKSTONE_DEMO_DEFAULTS")
+            return
+        }
         // Commands that need no open vault.
         if line.hasPrefix("real-sync-off ") {
             // The person's own settings, not the throwaway suite this launch
-            // runs on: one vault's sync switch, and nothing else.
+            // runs on. Only the one key in the stored JSON is changed — not via
+            // AppSettings, whose load-and-save would rewrite the whole blob
+            // (defaults filled in, seeded values) and switch the language.
             let id = String(line.dropFirst("real-sync-off ".count)).trimmingCharacters(in: .whitespaces)
-            let real = AppSettings()
-            if var binding = real.data.vaultSync[id] {
-                binding.isEnabled = false
-                real.data.vaultSync[id] = binding
-                result("real-sync-off \(id) ok repository=\(binding.repository) enabled=\(real.data.vaultSync[id]?.isEnabled ?? true)")
-            } else {
-                result("real-sync-off \(id) no-such-vault")
-            }
+            let key = "com.orris.inkstone.settings"
+            guard let stored = UserDefaults.standard.data(forKey: key),
+                  var json = (try? JSONSerialization.jsonObject(with: stored)) as? [String: Any],
+                  var bindings = json["vaultSync"] as? [String: Any],
+                  var binding = bindings[id] as? [String: Any]
+            else { result("real-sync-off \(id) no-such-vault"); return }
+            binding["isEnabled"] = false
+            bindings[id] = binding
+            json["vaultSync"] = bindings
+            guard let data = try? JSONSerialization.data(withJSONObject: json) else { result("real-sync-off \(id) failed"); return }
+            UserDefaults.standard.set(data, forKey: key)
+            result("real-sync-off \(id) ok repository=\(binding["repository"] ?? "?")")
             return
         }
         guard !line.isEmpty, let root = workspace.root else { return }

@@ -8,7 +8,12 @@ import XCTest
 /// throwaway settings suite and the test vault (`qaLaunch`): a shared item must
 /// never reach the person's own vault.
 final class ShareFromOtherAppsTests: XCTestCase {
-    override func setUp() { continueAfterFailure = false }
+    override func setUp() {
+        continueAfterFailure = false
+        // Even when a step fails after the item was queued, Inkstone opens on
+        // the QA suite before anything else can drain the queue.
+        addTeardownBlock { [weak self] in self?.qaLaunch() }
+    }
 
     /// Inkstone on the QA settings suite with the test vault open, which
     /// drains the shared items into that vault.
@@ -93,7 +98,6 @@ final class ShareFromOtherAppsTests: XCTestCase {
         tap("Share", in: safari)
         pickInkstone(in: safari)
         saveInExtension(host: safari)
-        qaLaunch()
     }
 
     func testShareLivePhotoFromPhotos() throws { try sharePhoto(kind: "Live Photo,") }
@@ -117,6 +121,5 @@ final class ShareFromOtherAppsTests: XCTestCase {
         share.tap()
         pickInkstone(in: photos)
         saveInExtension(host: photos)
-        qaLaunch()
     }
 }
