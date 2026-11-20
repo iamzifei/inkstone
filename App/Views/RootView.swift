@@ -152,6 +152,13 @@ struct RootView: View {
         } message: {
             Text(workspace.exportFailure ?? "")
         }
+        .alert("Image cut short", isPresented: Binding(
+            get: { workspace.exportNotice != nil }, set: { if !$0 { workspace.exportNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(workspace.exportNotice ?? "")
+        }
         .sheet(isPresented: $workspace.isCommandPalettePresented, onDismiss: {
             // Run the chosen command once the palette is fully gone: several
             // open a sheet of their own, which cannot present over one that is

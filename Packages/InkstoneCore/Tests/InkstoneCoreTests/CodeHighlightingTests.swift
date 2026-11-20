@@ -106,8 +106,18 @@ struct CodeHighlightingTests {
         #expect(css.contains(".hl-string{color:#0A3069}"))
         #expect(css.contains("@media (prefers-color-scheme:dark){"))
         #expect(css.contains(".hl-string{color:#A5D6FF}"))
+        #expect(css.hasSuffix("@media print{" + css.components(separatedBy: "@media").first! + "}"))
         let document = HTMLExporter.document("x", title: "t", resolveAttachment: { _ in nil })
         #expect(document.contains(".hl-keyword{color:#CF222E}"))
+    }
+
+    @Test("A fence's info string cannot break out of the class attribute")
+    func infoStringEscaped() {
+        let html = HTMLExporter.colourCodeBlocks(
+            in: #"<pre><code class="language-x&quot;onmouseover=&quot;y">a</code></pre>"#,
+            with: { _, _ in [CodeHighlighting.Span(range: NSRange(location: 0, length: 1), scope: "keyword")] })
+        #expect(!html.contains(#"class="language-x"onmouseover"#))
+        #expect(html.contains(#"class="language-x&amp;quot;onmouseover=&amp;quot;y""#))
     }
 
     /// Not a gate, a number for the record: how long a long block takes.

@@ -1197,7 +1197,7 @@ struct MarkdownHighlighter {
         let end = lines.count > 1 ? lines[1].location : NSMaxRange(block)
         guard end > start else { return }
         let code = fullText.substring(with: NSRange(location: start, length: end - start))
-        guard let spans = CodeHighlighter.shared.spans(code: code, language: language) else { return }
+        guard let spans = CodeHighlighter.shared.spans(code: code, language: language, block: block.location) else { return }
         for span in spans {
             guard let color = CodeHighlighter.color(for: span.scope, isDark: style.isDark) else { continue }
             let range = NSRange(location: start + span.range.location, length: span.range.length)
@@ -2269,12 +2269,14 @@ struct MarkdownHighlighter {
         // the walk visits every character, so restricting it matters as much as
         // skipping the tokens does.
         let spacing = style.typography.editorFontSize * 0.14
-        for position in CJKSpacing.positions(in: text, range: scope) where position < text.length {
+        for character in CJKSpacing.positions(in: text, range: scope) where NSMaxRange(character) <= text.length {
             // Not inside code: monospaced text keeps its columns, and a Chinese
             // comment in a code block must not push the code beside it along.
-            let attributes = storage.attributes(at: position, effectiveRange: nil)
-            if attributes[.inkstoneBlockFill] != nil || attributes[.inkstoneInlineFill] != nil { continue }
-            storage.addAttribute(.kern, value: spacing, range: NSRange(location: position, length: 1))
+            // Tables carry the block fill too, and their cells are prose.
+            let attributes = storage.attributes(at: character.location, effectiveRange: nil)
+            let inCodeBlock = attributes[.inkstoneBlockFill] != nil && attributes[.inkstoneTableBlock] == nil
+            if inCodeBlock || attributes[.inkstoneInlineFill] != nil { continue }
+            storage.addAttribute(.kern, value: spacing, range: character)
         }
     }
 }

@@ -134,7 +134,9 @@ public enum CodeHighlighting {
         let groups = palette.keys.sorted()
         let light = groups.map { ".hl-\($0){color:#\(palette[$0]!.light)}" }.joined()
         let dark = groups.map { ".hl-\($0){color:#\(palette[$0]!.dark)}" }.joined()
-        return light + "@media (prefers-color-scheme:dark){" + dark + "}"
+        // Printed (PDF) on white whatever the app's appearance: the light
+        // colours again under print, as the page's own variables do.
+        return light + "@media (prefers-color-scheme:dark){" + dark + "}" + "@media print{" + light + "}"
     }
 
     /// Colours a code block in finished HTML: the code (escaped, as cmark wrote
@@ -190,14 +192,19 @@ public enum CodeHighlighting {
             self.function = function
         }
 
-        /// The scoped runs of `code`, or nil when highlight.js does not know the
-        /// language. `language` must already be normalised.
+        /// The scoped runs of `code`; nil only when highlight.js does not know
+        /// the language (worth remembering). A failure on this one block — an
+        /// exception inside the library — is no colours for it, not a verdict
+        /// on the language. `language` must already be normalised.
         public func spans(code: String, language: String) -> [Span]? {
-            guard let result = function.call(withArguments: [code, language]),
-                  !result.isNull, !result.isUndefined, let html = result.toString() else {
+            let result = function.call(withArguments: [code, language])
+            if context.exception != nil {
                 context.exception = nil
-                return nil
+                return []
             }
+            guard let result, !result.isUndefined else { return [] }
+            if result.isNull { return nil }
+            guard let html = result.toString() else { return [] }
             return parse(html)
         }
     }

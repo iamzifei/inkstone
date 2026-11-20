@@ -18,3 +18,6 @@ Runs in JavaScriptCore (no web view) to colour fenced code blocks; see
 `CodeHighlighter`. It makes no network requests (checked: no fetch or
 XMLHttpRequest in the file). To update: replace the file and run the
 CodeHighlighter tests.
+
+`ThirdPartyLicenses.txt` — the full licence texts of both, shipped in the app
+bundle as the BSD and MIT licences ask of a binary distribution.

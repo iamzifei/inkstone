@@ -160,7 +160,7 @@ enum ReadingTypesetter {
                 // Coloured by language once CodeHighlighter has it (the same
                 // colours as live preview); plain until then.
                 let codeText = (result.string as NSString).substring(with: span.range)
-                for run in CodeHighlighter.shared.spans(code: codeText, language: language) ?? [] {
+                for run in CodeHighlighter.shared.spans(code: codeText, language: language, block: span.range.location) ?? [] {
                     guard let colour = CodeHighlighter.color(for: run.scope, isDark: style.isDark),
                           NSMaxRange(run.range) <= span.range.length else { continue }
                     result.addAttribute(.foregroundColor, value: colour,
@@ -245,11 +245,14 @@ enum ReadingTypesetter {
                 case .codeBlock, .inlineCode: return span.range
                 default: return nil
                 }
-            }
+            }.sorted { $0.location < $1.location }
             let spacing = typography.editorFontSize * 0.14
-            for position in CJKSpacing.positions(in: text, range: NSRange(location: 0, length: text.length))
-            where !code.contains(where: { NSLocationInRange(position, $0) }) {
-                result.addAttribute(.kern, value: spacing, range: NSRange(location: position, length: 1))
+            // Both in document order, so one walk through the code ranges.
+            var next = 0
+            for character in CJKSpacing.positions(in: text, range: NSRange(location: 0, length: text.length)) {
+                while next < code.count, NSMaxRange(code[next]) <= character.location { next += 1 }
+                if next < code.count, NSLocationInRange(character.location, code[next]) { continue }
+                result.addAttribute(.kern, value: spacing, range: character)
             }
         }
         drawTables(into: result, document: document, style: style)

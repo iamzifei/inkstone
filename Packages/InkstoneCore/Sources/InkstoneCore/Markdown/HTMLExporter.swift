@@ -81,7 +81,9 @@ public enum HTMLExporter {
             let code = unescapeHTML(ns.substring(with: match.range(at: 2)))
             guard let spans = highlight(code, language), !spans.isEmpty else { continue }
             out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
-            out += #"<pre><code class="language-\#(language)">"# + CodeHighlighting.colouredHTML(code: code, spans: spans) + "</code></pre>"
+            // The info string goes into an attribute: escaped, quotes included.
+            let attribute = CodeHighlighting.escapeHTML(language).replacingOccurrences(of: "\"", with: "&quot;")
+            out += #"<pre><code class="language-\#(attribute)">"# + CodeHighlighting.colouredHTML(code: code, spans: spans) + "</code></pre>"
             cursor = NSMaxRange(match.range)
         }
         out += ns.substring(from: cursor)
@@ -89,8 +91,9 @@ public enum HTMLExporter {
     }
 
     private static func unescapeHTML(_ s: String) -> String {
+        // cmark escapes only these three in code; `&amp;` last, so `&amp;lt;`
+        // comes back as the `&lt;` that was typed.
         s.replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&#39;", with: "'")
             .replacingOccurrences(of: "&amp;", with: "&")
     }
 

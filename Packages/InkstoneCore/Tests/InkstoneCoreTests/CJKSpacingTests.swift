@@ -6,7 +6,7 @@ import Testing
 struct CJKSpacingTests {
     private func marked(_ s: String) -> String {
         let ns = s as NSString
-        let positions = Set(CJKSpacing.positions(in: ns, range: NSRange(location: 0, length: ns.length)))
+        let positions = Set(CJKSpacing.positions(in: ns, range: NSRange(location: 0, length: ns.length)).map(\.location))
         var out = ""
         var i = 0
         while i < ns.length {
@@ -43,6 +43,9 @@ struct CJKSpacingTests {
     @Test("Positions respect the range they are asked about")
     func scoped() {
         let ns = "用A。用B" as NSString
-        #expect(CJKSpacing.positions(in: ns, range: NSRange(location: 3, length: 2)) == [3])
+        #expect(CJKSpacing.positions(in: ns, range: NSRange(location: 3, length: 2)) == [NSRange(location: 3, length: 1)])
+        // A two-unit ideograph is kerned whole.
+        let wide = "𠀀A" as NSString
+        #expect(CJKSpacing.positions(in: wide, range: NSRange(location: 0, length: wide.length)) == [NSRange(location: 0, length: 2)])
     }
 }

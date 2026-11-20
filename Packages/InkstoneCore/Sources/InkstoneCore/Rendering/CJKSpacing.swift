@@ -6,25 +6,26 @@ import Foundation
 /// what was typed). The editor and the reading view share this.
 public enum CJKSpacing {
 
-    /// The UTF-16 offsets of the characters that should carry the extra space
-    /// after them: each one that is directly followed by text of the other
-    /// kind (ideograph or kana ↔ ASCII letter or digit), within `range`.
-    public static func positions(in text: NSString, range: NSRange) -> [Int] {
+    /// The characters (UTF-16 ranges) that should carry the extra space
+    /// after them: each one directly followed by text of the other kind
+    /// (ideograph or kana ↔ ASCII letter or digit), within `range`. A
+    /// character outside the BMP is two units, and the kerning goes on both.
+    public static func positions(in text: NSString, range: NSRange) -> [NSRange] {
         guard range.length > 1 else { return [] }
         let string = text.substring(with: range)
-        var positions: [Int] = []
+        var positions: [NSRange] = []
         var offset = range.location
-        var previous: (scalar: Unicode.Scalar, start: Int)?
+        var previous: (scalar: Unicode.Scalar, range: NSRange)?
         for scalar in string.unicodeScalars {
+            let width = UTF16.width(scalar)
             if let previous {
                 let boundary = (isIdeographOrKana(previous.scalar) && isLatinOrDigit(scalar))
                     || (isLatinOrDigit(previous.scalar) && isIdeographOrKana(scalar))
-                // The previous character's first unit: kerning on a character
-                // widens the gap after it, and a surrogate pair is one character.
-                if boundary { positions.append(previous.start) }
+                // Kerning on a character widens the gap after it.
+                if boundary { positions.append(previous.range) }
             }
-            previous = (scalar, offset)
-            offset += UTF16.width(scalar)
+            previous = (scalar, NSRange(location: offset, length: width))
+            offset += width
         }
         return positions
     }

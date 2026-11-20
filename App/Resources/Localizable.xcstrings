@@ -5401,6 +5401,28 @@
         }
       }
     },
+    "Image cut short": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image cut short"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片已截断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圖片已截斷"
+          }
+        }
+      }
+    },
     "Images": {
       "extractionState": "manual",
       "localizations": {
@@ -12964,6 +12986,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "目前筆記"
+          }
+        }
+      }
+    },
+    "This note is too long for one image, so the image stops partway. Export as PDF for the whole note.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This note is too long for one image, so the image stops partway. Export as PDF for the whole note."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这篇笔记太长，一张图放不下，图片只到中间为止。要完整内容，请导出为 PDF。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這篇筆記太長，一張圖放不下，圖片只到中間為止。要完整內容，請匯出為 PDF。"
           }
         }
       }
