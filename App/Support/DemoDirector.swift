@@ -30,6 +30,23 @@ import InkstoneCore
 ///     stall-mark <label>        start a main-thread stall segment
 ///     stall-report              append the segment's numbers to INKSTONE_STALL_OUT
 ///
+/// Device QA (a real iPhone, run with INKSTONE_DEMO_DEFAULTS so the vault list
+/// and settings are a throwaway suite; results go to INKSTONE_DEMO_RESULT):
+///     sync-bind <owner/repo> <branch>   bind the open vault and switch sync on
+///     sync-now [local|remote|both]      run one sync; one result line
+///     write <path>|<text>               write a file in the open vault
+///     rm <path>                         delete a file in the open vault
+///     refresh                           rewrite the entry files' automatic blocks
+///     ls                                list the open vault's files (result)
+///     real-sync-off <vault-uuid>        switch sync off for one vault in the
+///                                       person's REAL settings (nothing else
+///                                       is changed: not files, not GitHub)
+///     forget-vault                      remove the open vault from the list
+///
+/// Relative paths in INKSTONE_DEMO_COMMANDS, INKSTONE_DEMO_RESULT and
+/// INKSTONE_OPEN_VAULT are taken from the app's Documents folder, which is all
+/// `devicectl device copy` can reach on a device.
+///
 /// Debug builds only. It reads one file and calls the same methods the UI does.
 @MainActor
 enum DemoDirector {
@@ -39,7 +56,8 @@ enum DemoDirector {
     private static var started = false
 
     static func startIfRequested(workspace: Workspace) {
-        guard let path = ProcessInfo.processInfo.environment["INKSTONE_DEMO_COMMANDS"], !started else { return }
+        guard let raw = ProcessInfo.processInfo.environment["INKSTONE_DEMO_COMMANDS"], !started else { return }
+        let path = resolve(raw)
         started = true
         MainStallMonitor.shared.startIfRequested()
         Task { @MainActor in
@@ -60,6 +78,26 @@ enum DemoDirector {
                     done += 1
                 }
             }
+        }
+    }
+
+    /// An absolute path as is; a relative one inside Documents.
+    static func resolve(_ path: String) -> String {
+        guard !path.hasPrefix("/") else { return path }
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appending(path: path).path(percentEncoded: false)
+    }
+
+    /// Appends one line to INKSTONE_DEMO_RESULT, for a script on the Mac to
+    /// copy off the device and read.
+    private static func result(_ line: String) {
+        guard let raw = ProcessInfo.processInfo.environment["INKSTONE_DEMO_RESULT"] else { return }
+        let url = URL(fileURLWithPath: resolve(raw))
+        let data = Data((line + "\n").utf8)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile(); handle.write(data); try? handle.close()
+        } else {
+            try? data.write(to: url)
         }
     }
 
@@ -113,10 +151,74 @@ enum DemoDirector {
             return
         default: break
         }
+        // Commands that need no open vault.
+        if line.hasPrefix("real-sync-off ") {
+            // The person's own settings, not the throwaway suite this launch
+            // runs on: one vault's sync switch, and nothing else.
+            let id = String(line.dropFirst("real-sync-off ".count)).trimmingCharacters(in: .whitespaces)
+            let real = AppSettings()
+            if var binding = real.data.vaultSync[id] {
+                binding.isEnabled = false
+                real.data.vaultSync[id] = binding
+                result("real-sync-off \(id) ok repository=\(binding.repository) enabled=\(real.data.vaultSync[id]?.isEnabled ?? true)")
+            } else {
+                result("real-sync-off \(id) no-such-vault")
+            }
+            return
+        }
         guard !line.isEmpty, let root = workspace.root else { return }
         let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
         let arg = parts.count > 1 ? parts[1] : ""
         switch parts[0] {
+        case "sync-bind":
+            let words = arg.split(separator: " ").map(String.init)
+            guard words.count == 2 else { result("sync-bind bad-args"); return }
+            workspace.syncBinding = VaultSyncBinding(repository: words[0], branch: words[1], isEnabled: true)
+            result("sync-bind \(words[0]) \(words[1]) ok")
+        case "sync-now":
+            let direction: FirstSyncDirection? = switch arg {
+            case "local": .preferLocal
+            case "remote": .preferRemote
+            case "both": .keepBoth
+            default: nil
+            }
+            Task { @MainActor in
+                await workspace.sync(firstSyncDirection: direction)
+                switch workspace.syncStatus {
+                case .finished(let r):
+                    result("sync ok up=\(r.uploaded.count) down=\(r.downloaded.count) delR=\(r.deletedRemotely.count) delL=\(r.deletedLocally.count) conflicted=\(r.conflicted.sorted()) failures=\(r.failures.map(\.path))")
+                case .failed(let message): result("sync failed \(message)")
+                default: result("sync other \(workspace.syncStatus)")
+                }
+            }
+        case "write":
+            let pieces = arg.split(separator: "|", maxSplits: 1).map(String.init)
+            guard pieces.count == 2 else { result("write bad-args"); return }
+            let url = root.appending(path: pieces[0])
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let ok = (try? Data(pieces[1].replacingOccurrences(of: "\\n", with: "\n").utf8).write(to: url)) != nil
+            result("write \(pieces[0]) \(ok ? "ok" : "failed")")
+        case "refresh":
+            let changed = (try? EntryFiles.refresh(in: root)) ?? []
+            result("refresh \(changed.sorted())")
+        case "rm":
+            let ok = (try? FileManager.default.removeItem(at: root.appending(path: arg))) != nil
+            result("rm \(arg) \(ok ? "ok" : "failed")")
+        case "ls":
+            let base = root.standardizedFileURL.path(percentEncoded: false)
+            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+            var names: [String] = []
+            while let url = walker?.nextObject() as? URL {
+                if url.lastPathComponent == ".inkstone" { walker?.skipDescendants(); continue }
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue {
+                    names.append(String(url.standardizedFileURL.path(percentEncoded: false).dropFirst(base.count)))
+                }
+            }
+            result("ls \(names.count)")
+            names.sorted().forEach { result("  \($0)") }
+        case "forget-vault":
+            if let vault = workspace.vault { workspace.forget(vault); result("forget-vault ok") }
         case "open":
             workspace.openNote(at: root.appending(path: arg))
         case "follow":

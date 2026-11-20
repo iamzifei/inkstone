@@ -148,6 +148,23 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
 
   # iOS share sheet → the vault's Inbox note (through the app group).
+  InkstoneDeviceUITests:
+    # Device-only UI checks of the share extension through other apps (Safari,
+    # Photos). Its own scheme; CI never builds it.
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DeviceUITests
+    dependencies:
+      - target: Inkstone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.orris.inkstone.deviceuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Inkstone
+    scheme:
+      testTargets: [InkstoneDeviceUITests]
+
   InkstoneShare:
     type: app-extension
     platform: iOS
