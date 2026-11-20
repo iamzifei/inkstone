@@ -1197,7 +1197,9 @@ struct MarkdownHighlighter {
         let end = lines.count > 1 ? lines[1].location : NSMaxRange(block)
         guard end > start else { return }
         let code = fullText.substring(with: NSRange(location: start, length: end - start))
-        guard let spans = CodeHighlighter.shared.spans(code: code, language: language, block: block.location) else { return }
+        // Identity: this text storage (one per open note) and where the block starts.
+        let identity = "\(ObjectIdentifier(storage).hashValue)@\(block.location)"
+        guard let spans = CodeHighlighter.shared.spans(code: code, language: language, block: identity) else { return }
         for span in spans {
             guard let color = CodeHighlighter.color(for: span.scope, isDark: style.isDark) else { continue }
             let range = NSRange(location: start + span.range.location, length: span.range.length)

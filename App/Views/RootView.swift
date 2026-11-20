@@ -141,7 +141,12 @@ struct RootView: View {
         #if os(iOS)
         // The exported file is left for the share target to finish reading;
         // the next export sweeps folders over an hour old.
-        .sheet(item: $workspace.exportedFile) { file in
+        .sheet(item: $workspace.exportedFile, onDismiss: {
+            if let notice = workspace.pendingExportNotice {
+                workspace.pendingExportNotice = nil
+                workspace.exportNotice = notice
+            }
+        }) { file in
             ShareSheet(items: [file.url]).ignoresSafeArea()
         }
         #endif

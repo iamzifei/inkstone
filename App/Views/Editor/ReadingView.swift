@@ -160,7 +160,7 @@ enum ReadingTypesetter {
                 // Coloured by language once CodeHighlighter has it (the same
                 // colours as live preview); plain until then.
                 let codeText = (result.string as NSString).substring(with: span.range)
-                for run in CodeHighlighter.shared.spans(code: codeText, language: language, block: span.range.location) ?? [] {
+                for run in CodeHighlighter.shared.spans(code: codeText, language: language) ?? [] {
                     guard let colour = CodeHighlighter.color(for: run.scope, isDark: style.isDark),
                           NSMaxRange(run.range) <= span.range.length else { continue }
                     result.addAttribute(.foregroundColor, value: colour,

@@ -121,6 +121,9 @@ final class Workspace {
     var exportFailure: String?
     /// Something to say about an export that worked: an image cut short.
     var exportNotice: String?
+    /// The same, held until the iOS share sheet closes: two presentations at
+    /// once and SwiftUI may drop one.
+    var pendingExportNotice: String?
     private(set) var isExporting = false
 
     /// Exports the open note. On Mac asks where to save it; on iOS hands the
@@ -133,9 +136,9 @@ final class Workspace {
             defer { isExporting = false }
             do {
                 let file = try await NoteExporter.export(note, as: format, in: self)
-                if format == .png, NoteExporter.lastImageWasCut {
-                    exportNotice = localized("This note is too long for one image, so the image stops partway. Export as PDF for the whole note.")
-                }
+                let notice = format == .png && NoteExporter.lastImageWasCut
+                    ? localized("This note is too long for one image, so the image stops partway. Export as PDF for the whole note.")
+                    : nil
                 #if os(macOS)
                 defer { NoteExporter.discard(file) }
                 let panel = NSSavePanel()
@@ -155,7 +158,10 @@ final class Workspace {
                 } else {
                     try FileManager.default.copyItem(at: file, to: destination)
                 }
+                // After it is saved (and not at all if the save was cancelled).
+                exportNotice = notice
                 #else
+                pendingExportNotice = notice
                 exportedFile = ExportedFile(url: file)   // discarded when the share sheet closes
                 #endif
             } catch {

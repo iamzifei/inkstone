@@ -100,9 +100,10 @@ private final class ImageRenderer: NSObject, WKNavigationDelegate {
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: 800), configuration: config)
         webView.navigationDelegate = self
         #if os(macOS)
-        let scale = NSScreen.main?.backingScaleFactor ?? 2
         let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: width, height: 800),
                               styleMask: [.borderless], backing: .buffered, defer: false)
+        // The window's own scale is the one the snapshot is taken at.
+        let scale = window.backingScaleFactor
         window.isReleasedWhenClosed = false
         window.contentView = webView
         defer { window.close() }
@@ -122,7 +123,15 @@ private final class ImageRenderer: NSObject, WKNavigationDelegate {
         let once = Once<Bool>()
         return try await withCheckedThrowingContinuation { (done: CheckedContinuation<Bool, Error>) in
             once.continuation = done
-            let work = Task { @MainActor in
+            // The deadline first, so the work can call it off when it is done
+            // (otherwise it holds the renderer for its full 30 seconds).
+            let deadline = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                self.finishLoad(.failure(CocoaError(.fileWriteUnknown)))
+                once.finish(.failure(CocoaError(.fileWriteUnknown)))
+            }
+            Task { @MainActor in
                 do {
                     #if os(macOS)
                     let cut = try await self.produce(webView, html: html, scale: scale, to: url) { window.setContentSize($0) }
@@ -133,12 +142,7 @@ private final class ImageRenderer: NSObject, WKNavigationDelegate {
                 } catch {
                     once.finish(.failure(error))
                 }
-            }
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(30))
-                work.cancel()
-                self.finishLoad(.failure(CocoaError(.fileWriteUnknown)))
-                once.finish(.failure(CocoaError(.fileWriteUnknown)))
+                deadline.cancel()
             }
         }
     }
@@ -161,6 +165,7 @@ private final class ImageRenderer: NSObject, WKNavigationDelegate {
               var article = document.querySelector("article") || document.body;
               var bottom = article.getBoundingClientRect().bottom + window.scrollY;
               var margin = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
+              // A little air below the last line, as the top has.
               return Math.ceil(bottom + margin + 32);
             })()
             """) as? Double

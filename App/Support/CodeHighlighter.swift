@@ -37,16 +37,19 @@ final class CodeHighlighter: @unchecked Sendable {
     private var cache: [Key: [Span]] = [:]
     private var order: [Key] = []
     /// Large enough that a long note's blocks do not evict one another and
-    /// colour round and round.
+    /// colour round and round; an edited block's old versions are dropped as
+    /// its new ones land, so typing does not fill it.
     private let limit = 4_096
     private var pending: Set<Key> = []
     /// Languages highlight.js does not know; asked once, then left plain.
     private var unknown: Set<String> = []
     /// The latest version asked for, per block, while it waits: a newer one
     /// replaces it rather than queueing behind it.
-    private var latest: [Int: Key] = [:]
+    private var latest: [String: Key] = [:]
     /// Each block's last coloured version, shown while its next one is worked out.
-    private var recent: [Int: (code: String, spans: [Span])] = [:]
+    private var recent: [String: (code: String, spans: [Span])] = [:]
+    /// Bounds both maps (block identities come and go as text moves).
+    private let blockLimit = 512
 
     private let queue = DispatchQueue(label: "com.orris.inkstone.code-highlighter", qos: .userInitiated)
     /// Created on `queue` and only ever used there.
@@ -58,20 +61,29 @@ final class CodeHighlighter: @unchecked Sendable {
     /// The coloured runs of a block of code, or nil while they are being worked
     /// out (or for a language with none). Cheap enough to call on every pass.
     ///
-    /// - Parameter block: a stable identity for the block on screen (where it
-    ///   starts), so a block being edited keeps its colours between versions.
-    func spans(code: String, language: String?, block: Int? = nil) -> [Span]? {
+    /// - Parameter block: the block's identity in its view — which text it is
+    ///   in and where it starts — so a block being edited keeps its colours
+    ///   between versions. The language is added to it here. nil for views
+    ///   that are rebuilt whole (reading), where it would not help.
+    func spans(code: String, language: String?, block blockID: String? = nil) -> [Span]? {
         guard let language = CodeHighlighting.normalised(language), !code.isEmpty,
               (code as NSString).length <= Self.maximumLength else { return nil }
         let key = Key(language: language, code: code)
+        let block = blockID.map { "\(language)|\($0)" }
         lock.lock()
         defer { lock.unlock() }
         if let hit = cache[key] {
-            if let block { recent[block] = (code, hit) }
+            if let block {
+                if recent.count > blockLimit, recent[block] == nil { recent.removeAll() }
+                recent[block] = (code, hit)
+            }
             return hit
         }
         if unknown.contains(language) { return nil }
-        if let block { latest[block] = key }
+        if let block {
+            if latest.count > blockLimit { latest.removeAll() }
+            latest[block] = key
+        }
         if !pending.contains(key) {
             pending.insert(key)
             queue.async { [weak self] in self?.work(key, block: block) }
@@ -100,7 +112,7 @@ final class CodeHighlighter: @unchecked Sendable {
 
     // MARK: - Work (on `queue`)
 
-    private func work(_ key: Key, block: Int?) {
+    private func work(_ key: Key, block: String?) {
         // A newer version of the same block arrived while this one waited:
         // skip it; the newer one has its own job.
         lock.lock()
@@ -114,9 +126,21 @@ final class CodeHighlighter: @unchecked Sendable {
         store(spans, for: key)
         lock.lock()
         pending.remove(key)
-        if let block, latest[block] == key { latest[block] = nil }
+        if let block {
+            if latest[block] == key { latest[block] = nil }
+            // This block's previous version is superseded: drop its cached
+            // colours, or a session of typing keeps every version of the block.
+            if let spans, let previous = recent[block], previous.code != key.code {
+                let old = Key(language: key.language, code: previous.code)
+                cache[old] = nil
+                order.removeAll { $0 == old }
+                if recent.count > blockLimit { recent.removeAll() }
+                recent[block] = (key.code, spans)
+            }
+        }
         lock.unlock()
-        guard spans != nil else { return }
+        // Nothing to draw: no restyle.
+        guard let spans, !spans.isEmpty else { return }
         DispatchQueue.main.async {
             // The same "something drawn asynchronously is ready, style again"
             // signal decoded pictures send: the editor and the reading view
