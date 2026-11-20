@@ -73,8 +73,12 @@ struct VaultBlueprintTests {
         let original = try String(contentsOf: readme, encoding: .utf8)
         let edited = "My own intro.\n\n" + original + "\n## My notes\n\nKeep this.\n"
         try edited.write(to: readme, atomically: true, encoding: .utf8)
-        // Something changes in the vault: a new project folder.
+        // Something changes in the vault: a new project folder, with a note in
+        // it. (2026-11-20: an empty folder no longer counts — git cannot carry
+        // it, so listing it made each device's entry files differ. A folder
+        // with something in it is the change this test is about.)
         try FileManager.default.createDirectory(at: root.appending(path: "10-Projects/Garden"), withIntermediateDirectories: true)
+        try Data("plan".utf8).write(to: root.appending(path: "10-Projects/Garden/Plan.md"))
         let changed = try EntryFiles.refresh(in: root)
         let now = try String(contentsOf: readme, encoding: .utf8)
         #expect(changed.contains("README.md"))
@@ -175,7 +179,11 @@ struct VaultBlueprintTests {
     @Test func longListsAreCapped() throws {
         let root = try tempVault(); defer { try? FileManager.default.removeItem(at: root) }
         _ = try VaultBlueprint.apply(to: root, language: .english)
-        for i in 0..<60 { try FileManager.default.createDirectory(at: root.appending(path: "20-Areas/a\(i)"), withIntermediateDirectories: true) }
+        // Each with a note: empty folders are not listed (2026-11-20, see above).
+        for i in 0..<60 {
+            try FileManager.default.createDirectory(at: root.appending(path: "20-Areas/a\(i)"), withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: root.appending(path: "20-Areas/a\(i)/n.md"))
+        }
         _ = try EntryFiles.refresh(in: root)
         let sot = try read(root, "SOURCE_OF_TRUTH.md")
         #expect(sot.components(separatedBy: "20-Areas/a").count - 1 <= 21)

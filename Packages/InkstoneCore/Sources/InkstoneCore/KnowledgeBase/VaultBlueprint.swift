@@ -55,6 +55,7 @@ public enum VaultBlueprint {
         }
 
         for path in skeleton ? layout.allFolders : [layout.system] { folder(path) }
+        keepEmptyFolders(in: root, layout: layout)
         let s = SystemFileText(layout: layout, date: date)
         try file(layout.rulesFile, s.rules(rules ?? OrganizingPolicy.defaultText(layout.language)))
         try file(layout.logFile, s.log)
@@ -64,6 +65,85 @@ public enum VaultBlueprint {
             try file(name, EntryFiles.newFile(name, in: root, layout: layout))
         }
         return created
+    }
+
+    /// Puts an empty `.gitkeep` in each of the layout's folders that exists
+    /// but holds nothing that reaches other devices, so the folder itself
+    /// does (git carries no empty folders) and every device lists the same
+    /// folders in its entry files. "Nothing that reaches other devices" and
+    /// not "empty": a folder of images with attachment sync off is just as
+    /// absent on the other device. Only the layout's own folders: an empty
+    /// folder of the person's is theirs to fill or delete. Returns the
+    /// keep-files written.
+    @discardableResult
+    public static func keepEmptyFolders(in root: URL, layout: KnowledgeBaseLayout) -> [String] {
+        let fm = FileManager.default
+        let ignore = GitIgnore.load(from: root)
+        var written: [String] = []
+        for path in layout.allFolders {
+            let folder = root.appending(path: path, directoryHint: .isDirectory)
+            let keep = folder.appending(path: SyncFilePolicy.keepFileName)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: folder.path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue,
+                  !fm.fileExists(atPath: keep.path(percentEncoded: false)),
+                  // A keep-file that would not sync either is no use.
+                  SyncEngine.isSyncablePath("\(path)/\(SyncFilePolicy.keepFileName)"),
+                  !ignore.ignores("\(path)/\(SyncFilePolicy.keepFileName)"),
+                  !travels(folder, root: root, ignore: ignore)
+            else { continue }
+            if (try? Data().write(to: keep, options: .withoutOverwriting)) != nil {
+                written.append("\(path)/\(SyncFilePolicy.keepFileName)")
+            }
+        }
+        return written
+    }
+
+    /// Whether a folder will exist on every device that syncs this vault:
+    /// it (or a folder inside it) has a `.gitkeep`, or it holds a note that
+    /// syncs whatever each device's settings — Markdown or a canvas, not
+    /// hidden, not ignored. Attachments do not count: whether they sync is a
+    /// per-device setting, and the answer here must be the same everywhere.
+    /// A note evicted to iCloud (a hidden `.Name.md.icloud` stub) counts as
+    /// the note.
+    static func travels(_ folder: URL, root: URL, ignore: GitIgnore) -> Bool {
+        let fm = FileManager.default
+        let base = root.standardizedFileURL.path(percentEncoded: false)
+        let prefix = base.hasSuffix("/") ? base : base + "/"
+        func relative(_ url: URL) -> String? {
+            let p = url.standardizedFileURL.path(percentEncoded: false)
+            return p.hasPrefix(prefix) ? String(p.dropFirst(prefix.count)) : nil
+        }
+        func counts(_ rel: String) -> Bool {
+            SyncEngine.isSyncablePath(rel) && !ignore.ignores(rel)
+        }
+        // Fast path, and the common one for layout folders: a folder of
+        // thousands of photos with a keep-file is answered without a walk.
+        if let rel = relative(folder.appending(path: SyncFilePolicy.keepFileName)),
+           fm.fileExists(atPath: folder.appending(path: SyncFilePolicy.keepFileName).path(percentEncoded: false)),
+           counts(rel) { return true }
+        guard let walker = fm.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey],
+                                         options: [.skipsPackageDescendants]) else { return false }
+        for case let url as URL in walker {
+            guard let rel = relative(url) else { continue }
+            var name = url.lastPathComponent
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                // Hidden or never-synced folders hold nothing that travels.
+                if !counts(rel) { walker.skipDescendants() }
+                continue
+            }
+            if name == SyncFilePolicy.keepFileName {
+                if counts(rel) { return true }
+                continue
+            }
+            var path = rel
+            if name.hasPrefix("."), name.hasSuffix(".icloud") {
+                name = String(name.dropFirst().dropLast(".icloud".count))
+                path = ((rel as NSString).deletingLastPathComponent as NSString).appendingPathComponent(name)
+            }
+            guard ["md", "markdown", "canvas"].contains((name as NSString).pathExtension.lowercased()) else { continue }
+            if counts(path) { return true }
+        }
+        return false
     }
 }
 

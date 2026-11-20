@@ -50,7 +50,7 @@ struct DropImporterTests {
         let r = DropImporter.importItems([missing], into: kb, layout: layout, action: .move)
         #expect(r.first?.destination == nil)
         #expect(r.first?.error != nil)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path).isEmpty)
+        #expect(try visible(kb.appending(path: "00-收件箱")).isEmpty)
     }
 
     @Test func somethingAlreadyInTheVaultIsNotBroughtIn() throws {
@@ -81,7 +81,7 @@ struct DropImporterTests {
         let r = DropImporter.importItems([parent], into: kb, layout: layout, action: .move)
         #expect(r.first?.destination == nil)
         #expect(FileManager.default.fileExists(atPath: kb.appending(path: "AGENTS.md").path))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path).isEmpty)
+        #expect(try visible(kb.appending(path: "00-收件箱")).isEmpty)
     }
 
     @Test func symlinksAndEmptyFoldersComeAlongAndAreChecked() throws {
@@ -112,7 +112,7 @@ struct DropImporterTests {
         let (outside, kb, layout) = try setup(); defer { try? FileManager.default.removeItem(at: outside.deletingLastPathComponent()) }
         let file = outside.appending(path: "a.md"); try Data("x".utf8).write(to: file)
         _ = DropImporter.importItems([file], into: kb, layout: layout, action: .copy)
-        let names = try FileManager.default.contentsOfDirectory(atPath: kb.appending(path: "00-收件箱").path)
+        let names = try visible(kb.appending(path: "00-收件箱"))
         #expect(names == ["a.md"])
     }
 
@@ -153,5 +153,12 @@ struct DropImporterTests {
         DropImporter.sweepLeftovers(root: kb)
         #expect(!FileManager.default.fileExists(atPath: stale.path))
     }
-}
 
+    /// A folder's entries without the skeleton's `.gitkeep` (2026-11-20: the
+    /// empty inbox carries one so it syncs; it is not debris). Any other
+    /// hidden leftover — a temporary copy — still counts.
+    private func visible(_ folder: URL) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            .filter { $0 != SyncFilePolicy.keepFileName }.sorted()
+    }
+}

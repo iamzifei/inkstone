@@ -26,6 +26,10 @@ public enum EntryFiles {
     public static func refresh(in root: URL) throws -> [String] {
         lock.lock(); defer { lock.unlock() }    // one refresh at a time
         guard let layout = KnowledgeBaseLayout.detect(in: root) else { return [] }
+        // Knowledge bases made before keep-files existed: their empty skeleton
+        // folders get one now, so the folders below are the ones every device
+        // will have.
+        VaultBlueprint.keepEmptyFolders(in: root, layout: layout)
         var changed: [String] = []
         for name in names {
             let url = root.appending(path: name)
@@ -47,6 +51,17 @@ public enum EntryFiles {
     }
 
     private static let lock = NSLock()
+
+    /// Whether two versions of an entry file differ at most inside the
+    /// automatic block: same text before the start marker, same after the end
+    /// marker. Sync uses it to tell "two devices regenerated the block" (no
+    /// one's words at stake) from a real edit. A file without exactly one
+    /// well-formed block on both sides is never "the same": it is treated as
+    /// a person's file.
+    public static func sameOutsideAutoBlock(_ a: String, _ b: String) -> Bool {
+        guard let (beforeA, afterA) = split(a), let (beforeB, afterB) = split(b) else { return false }
+        return beforeA == beforeB && afterA == afterB
+    }
 
     /// The text before the start marker and after the end marker — when the
     /// file has exactly one of each, each alone on its line, outside code
@@ -150,9 +165,16 @@ private struct Tree {
 
     init(root: URL, layout: KnowledgeBaseLayout) {
         let fm = FileManager.default
+        // A folder counts only when it will exist on every device
+        // (`VaultBlueprint.travels`): one that exists on just this device —
+        // empty (git has no empty folders), or holding only files that do
+        // not sync — made each device's block different, and the devices
+        // rewrote these files at each other on every sync (2026-11-20).
+        let ignore = GitIgnore.load(from: root)
+        func hasContent(_ url: URL) -> Bool { VaultBlueprint.travels(url, root: root, ignore: ignore) }
         func dirs(_ url: URL) -> [String] {
             ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
-                .filter { !$0.lastPathComponent.hasPrefix(".") && ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) }
+                .filter { !$0.lastPathComponent.hasPrefix(".") && ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) && hasContent($0) }
                 .map(\.lastPathComponent)
                 .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         }

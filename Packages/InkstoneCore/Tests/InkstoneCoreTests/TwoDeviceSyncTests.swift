@@ -28,6 +28,20 @@ extension GitHubClientTests {
         /// `failWritesWith`: every upload/delete answers this status.
         var truncated = false
         var failWritesWith: Int?
+        /// Real GitHub refuses a write whose `sha` is not the file's current
+        /// blob (409) — that is how it stops two devices overwriting each
+        /// other. Off by default so the older tests keep their meaning; the
+        /// conflict simulation (2026-11-20) turns it on.
+        var strictSHA = false
+        /// Runs once, just before the next write is handled: another device
+        /// pushing in the gap between this run's listing and its upload.
+        var beforeNextWrite: ((FakeRemote) -> Void)?
+        /// Writes refused because the caller's `sha` was stale.
+        private(set) var staleWritesRefused = 0
+        /// Every file the remote holds, path → text, for whole-vault comparisons.
+        var snapshot: [String: String] {
+            lock.withLock { files.mapValues { String(decoding: $0, as: UTF8.self) } }
+        }
 
         /// Puts a file on the remote directly, as another client would.
         func put(_ path: String, _ text: String) { lock.withLock { files[path] = Data(text.utf8) } }
@@ -95,6 +109,20 @@ extension GitHubClientTests {
 
                 if let status = failWritesWith {
                     return reply(status, Data(#"{"message":"Bad credentials"}"#.utf8))
+                }
+                if let hook = lock.withLock({ () -> ((FakeRemote) -> Void)? in
+                    defer { beforeNextWrite = nil }
+                    return beforeNextWrite
+                }) {
+                    hook(self)
+                }
+                if strictSHA {
+                    let expected = body["sha"] as? String
+                    let current = lock.withLock { files[filePath].map(gitBlobSHA) }
+                    if expected != current {
+                        lock.withLock { staleWritesRefused += 1 }
+                        return reply(409, Data(#"{"message":"\#(filePath) does not match"}"#.utf8))
+                    }
                 }
                 if request.httpMethod == "DELETE" {
                     lock.withLock { _ = files.removeValue(forKey: filePath) }

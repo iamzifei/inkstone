@@ -7,6 +7,20 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## Unreleased
+
+### Sync
+- A note deleted on one device and edited on another comes back under its own name, not
+  only as a "(conflict …)" copy.
+- AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer produce conflict copies when two
+  devices only refreshed the part Inkstone maintains; your own text in them still keeps both
+  versions if both sides changed it.
+- The knowledge base's empty folders now reach your other devices (each carries a hidden,
+  empty `.gitkeep`), so the entry files stop being rewritten back and forth.
+- The entry files list only folders that exist on every device: a folder holding only
+  attachments (PDFs, images) is listed once it has a note or a `.gitkeep` in it, because
+  whether attachments sync is a per-device setting.
+
 ## 0.5.1 — 2026-11-20
 
 ### Faster

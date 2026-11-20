@@ -217,6 +217,12 @@ public struct SyncFilePolicy: Codable, Hashable, Sendable {
     /// - Parameter sizeBytes: pass `nil` when the size is not known yet.
     /// The file whose whole job is saying what this vault does not carry.
     public static let ignoreFileName = ".gitignore"
+    /// The empty file that makes a folder travel. Git (and so GitHub) has no
+    /// empty folders: without it a knowledge base's empty skeleton folders
+    /// existed on one device and not on the other, the entry files listed
+    /// different folders on each, and the two devices rewrote them forever
+    /// (2026-11-20, conflict simulation). `.gitkeep` is the usual git name.
+    public static let keepFileName = ".gitkeep"
 
     public func allows(_ url: URL, sizeBytes: Int? = nil) -> Bool {
         // The vault's own rules travel with the vault.
@@ -229,6 +235,7 @@ public struct SyncFilePolicy: Codable, Hashable, Sendable {
         // excludes. Not a hypothetical: one vault's `.gitignore` excludes a
         // folder of source recordings, and they sit in its repository anyway.
         if url.lastPathComponent == SyncFilePolicy.ignoreFileName { return true }
+        if url.lastPathComponent == SyncFilePolicy.keepFileName { return true }
 
         let ext = url.pathExtension.lowercased()
         // Notes, canvases and the app's own state always sync.
