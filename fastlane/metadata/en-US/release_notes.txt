@@ -1,6 +1,7 @@
-Faster, and files from anywhere.
+Files from anywhere, a faster editor, and safer sync.
 
 • Share files from any app — Files, Mail, Photos and more — straight into your knowledge base. They land in the inbox and are filed like anything you drop in.
-• Notes with pictures open without freezing: photos load in the background while their space is kept, so the text doesn't jump.
-• Long notes open faster, and switching between notes does less work.
+• Notes with pictures open without freezing: photos load in the background while their space is kept, so the text doesn't jump. Long notes open faster, and switching between notes does less work.
+• Safer sync across your devices: a note deleted on one device and edited on another comes back under its own name; AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies; Inkstone's own knowledge-base folders reach your other devices even while empty; a repository emptied of every file no longer stops sync with "branch not found".
+• The assistant now remembers your API key and model when you reopen Inkstone. If it asks for the key once more, enter it again; after that it stays.
 • Settings › Knowledge Base now opens at the top.

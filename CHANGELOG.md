@@ -7,19 +7,34 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
-## Unreleased
+## 0.5.2 — 2026-11-20
 
-### Sync
+### Sync, safer with several devices
+Tested with a Mac, an iPhone and edits made directly on GitHub, all changing the same
+knowledge base before anyone synced: 2,000 notes in simulation, and 300 on a real iPhone 15 Pro
+against a real repository (details in docs/plans). In both, nothing was lost and every conflict
+copy stood for a real disagreement.
+
 - A note deleted on one device and edited on another comes back under its own name, not
   only as a "(conflict …)" copy.
 - AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer produce conflict copies when two
   devices only refreshed the part Inkstone maintains; your own text in them still keeps both
   versions if both sides changed it.
-- The knowledge base's empty folders now reach your other devices (each carries a hidden,
-  empty `.gitkeep`), so the entry files stop being rewritten back and forth.
+- Inkstone's own knowledge-base folders reach your other devices even while empty (each
+  carries a hidden, empty `.gitkeep`; your own empty folders stay yours), so the entry
+  files stop being rewritten back and forth.
 - The entry files list only folders that exist on every device: a folder holding only
   attachments (PDFs, images) is listed once it has a note or a `.gitkeep` in it, because
   whether attachments sync is a per-device setting.
+- A repository whose files were all deleted is treated as empty, with the usual question
+  before anything is removed here, instead of "branch not found" — which stopped that
+  device from ever syncing again.
+
+### Fixed
+- The assistant remembers its setup: your API key, model and chosen profile now survive
+  quitting and reopening Inkstone. Since the assistant arrived, every launch silently reset
+  its profiles, so a key you had entered no longer matched. A key saved in an earlier
+  session may need entering once more; after that it stays.
 
 ## 0.5.1 — 2026-11-20
 

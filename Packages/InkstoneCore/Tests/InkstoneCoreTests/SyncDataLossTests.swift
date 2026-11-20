@@ -180,6 +180,35 @@ extension GitHubClientTests {
         #expect(confirmed.deletedLocally == ["a.md"])
     }
 
+    /// GitHub answers 404 for the tree of a branch that still exists but whose
+    /// files were all deleted. That was read as "no such branch", so the one
+    /// device that had to catch up was told its branch was missing and could
+    /// never sync again (found 2026-11-20). It is the emptied-repository case
+    /// above, and must be handled like it.
+    @Test("A branch emptied of every file is empty, not missing")
+    func emptiedBranchAsGitHubReportsIt() async throws {
+        let remote = Remote(); remote.emptyTreeIs404 = true
+        let mac = try vault("mac"); defer { try? FileManager.default.removeItem(at: mac) }
+        try write("a\n", "a.md", in: mac)
+        _ = try await engine(mac, remote).run()
+        let other = try vault("other"); defer { try? FileManager.default.removeItem(at: other) }
+        _ = try await engine(other, remote).run()
+        try FileManager.default.removeItem(at: other.appending(path: "a.md"))
+        _ = try await engine(other, remote).run(confirmingLargeDeletion: true)
+        #expect(remote.paths.isEmpty)
+        await #expect {
+            _ = try await engine(mac, remote).run()
+        } throws: { error in
+            if case SyncError.remoteUnexpectedlyEmpty = error { return true } else { return false }
+        }
+        let confirmed = try await engine(mac, remote).run(confirmingLargeDeletion: true)
+        #expect(confirmed.deletedLocally == ["a.md"])
+        // And the emptied branch takes new notes again.
+        try write("b\n", "b.md", in: mac)
+        let again = try await engine(mac, remote).run()
+        #expect(again.uploaded == ["b.md"])
+    }
+
     @Test("Bad credentials mid-run fail the run instead of reporting success")
     func unauthorisedMidRunFails() async throws {
         let remote = Remote()

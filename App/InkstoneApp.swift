@@ -796,7 +796,7 @@ struct InkstoneApp: App {
         let hookPath = hookParts?.first
         let hookNote = hookParts?.count == 2 ? hookParts?[1] : nil
         if let path = (hookPath?.isEmpty == false ? hookPath : nil)
-            ?? ProcessInfo.processInfo.environment["INKSTONE_OPEN_VAULT"] {
+            ?? ProcessInfo.processInfo.environment["INKSTONE_OPEN_VAULT"].map(DemoDirector.resolve) {
             do {
                 let vault = try workspace.registry.register(folder: URL(fileURLWithPath: path, isDirectory: true))
                 workspace.open(vault)

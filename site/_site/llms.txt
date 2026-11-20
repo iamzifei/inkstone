@@ -16,9 +16,9 @@
   what is left goes to Apple's on-device model, and anything below 0.7
   confidence waits in the review folder. An optional cloud model uses the
   person's own key, is off by default, and never receives files that look private.
-- On iPhone and iPad (since 0.5.1), share from any app — Safari pages, Photos,
-  Files, Mail attachments — into the knowledge base: items land in the inbox
-  and are filed like anything dropped in.
+- On iPhone and iPad, share from any app — Safari links, Photos, Files, Mail
+  attachments — into a knowledge base: items land in its inbox and are filed
+  like anything dropped in.
 - Nothing is deleted: duplicates go to `_Archive/To-Delete/`, every move is
   logged before it happens, and a whole round can be undone.
 - AI context management: AGENTS.md, README.md and SOURCE_OF_TRUTH.md are written
