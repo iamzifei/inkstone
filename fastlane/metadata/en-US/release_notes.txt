@@ -2,5 +2,5 @@ Safer sync across your devices.
 
 • A note deleted on one device and edited on another comes back under its own name.
 • AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies when two devices refresh them.
-• Your knowledge base's empty folders now reach your other devices, so its entry files stop being rewritten back and forth.
+• Inkstone's own knowledge-base folders now reach your other devices even while empty, so its entry files stop being rewritten back and forth.
 • A repository emptied of every file no longer stops sync with "branch not found".

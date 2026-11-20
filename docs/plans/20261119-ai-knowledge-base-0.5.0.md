@@ -117,8 +117,12 @@ size: XL
 - [x] 8 本机 Inkstone 0.5.0 → 0.5.1（公证 DMG，Developer ID 验证通过；旧版备份在 scratchpad）
 - [x] 詹有才库只读核查（James：「不要 break 掉，以 Mac 为准」）：副本上 0.5.1 与 0.5.2 的同步预演**逐行相同**；该库自 2026-08-22 起未用 Inkstone 同步、靠 git 管理；若此时开 Inkstone 同步会产生 34 个冲突副本并把 1 篇 git 已移走的稿件下回原处 → 不建议在 Inkstone 里开这个库的同步
 - [x] 发现：iPhone 15 Pro 上开发版 0.2.2 绑着 `iamzifei/zhanyoucai`，11-19 起每次同步都被防删保护拦住（「会删本机 2635/2641」），未写过 GitHub。James 定：关掉手机上这个库的同步（只关开关，不动文件）
-- [ ] 5 真机测试（James 定：原地升级开发版 + 新建「Inkstone QA」测试库绑 `inkstone-sync-test`，詹有才库绑定不动）：分享扩展（Safari 等）+ 同步冲突（Mac + iPhone + GitHub 三方）；测完删测试库
-- [ ] 4 仓库删空时列表 404 被当成「分支不存在」→ 先写失败测试再修
-- [ ] 2 官网补「从任何 App 分享文件」（8 语言 + llms.txt），PR 准备好，0.5.1 上架后合并部署
+- [x] 5 真机测试（James 定：原地升级开发版 + 测试库，詹有才库绑定不动）。iPhone 15 Pro 装 main 的 Debug 构建，以隔离的设置组（INKSTONE_DEMO_DEFAULTS）打开测试库，绑 `iamzifei/inkstone-sync-test`；Mac 端用 InkstoneCore 的 SyncEngine 直连同一仓库；GitHub 端用 Contents API 直接改文件。
+  - **同步冲突（实测）**：300 篇 + 知识库骨架。Mac 改 0–39、iPhone 改 20–59、GitHub 改 50–69；iPhone 删 100–109、Mac 改 105–109；两边同名新建 5 篇；两边各加一个项目并重建入口文件。2 轮收敛，三方一致（除不同步的 File Index.csv）；295 篇逐篇核对版本集合正确、无多余副本，30 个冲突副本 = 真实冲突数；105–109 原名恢复；入口文件无副本、同时列出两个项目；17 个 .gitkeep 三方一致。同名新建的 10 个版本全部保留——被手机端收件箱自动整理归档（整理日志可撤销），不是同步丢失。
+  - **分享（实测，XCUITest 经系统分享面板，只点 App 行）**：Safari 网页 → 收件箱笔记（标题+链接）→ 自动整理；相册普通照片 → PNG 原图；实况照片 → JPEG 静态图（iOS 分享时的转换，无视频部分）。Inkstone 在分享面板的「更多」里，未出现在默认 App 行。
+  - 清理（实测）：手机测试库与 Documents 测试文件已删/清空；Mac 上从手机拷出的副本（含两张照片）已删；照片未进入测试仓库。手机真实设置仅剩原「Inkstone」库，詹有才同步保持关闭。
+  - 工具：PR #39（仅 DEBUG 的 DemoDirector 命令 + 设备 UI 测试 scheme，CI 不构建）
+- [x] 4（PR #37 合入 `8e35600`，两轮评审：只在 head tree 恰为 git 空树 4b825dc 时算空）仓库删空时列表 404 被当成「分支不存在」→ 先写失败测试再修
+- [~] 2 官网补「从任何 App 分享文件」（8 语言 + llms.txt），PR #38 已就绪，0.5.1 上架后合并部署
 - [ ] 3 发版 0.5.2（同步冲突修复 #36 + 第 4 条）：Mac 公证 DMG + Sparkle + Homebrew；iOS 等 0.5.1 审核结束后提交
 - [ ] 1 HQ 更新
