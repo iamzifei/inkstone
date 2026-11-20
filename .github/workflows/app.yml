@@ -19,6 +19,15 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      # Building the app makes Xcode write the app's own packages (Sparkle,
+      # SwiftMath) into InkstoneCore's lockfile, and `git commit -a` picks that
+      # up — three times on 2026-11-20 alone. InkstoneCore depends on neither.
+      - name: InkstoneCore lockfile has only its own packages
+        run: |
+          if grep -qiE '"identity" *: *"(sparkle|swiftmath)"' Packages/InkstoneCore/Package.resolved; then
+            echo "::error file=Packages/InkstoneCore/Package.resolved::holds app-only packages; restore it from main"
+            exit 1
+          fi
       - name: Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)" && xcodebuild -version
       - name: InkstoneCore tests
