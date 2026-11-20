@@ -11,7 +11,7 @@ work. This file is the summary; those are the reasoning.
 
 ### Code, diagrams and Chinese text
 - Code blocks are coloured by language — Swift, Python, JavaScript/TypeScript, Go, Rust, SQL,
-  YAML, shell and 28 more — in the editor, in reading mode and in exports, in light and dark.
+  YAML, shell and 27 more — in the editor, in reading mode and in exports, in light and dark.
 - Mermaid diagrams draw with far less waiting: opening a note with ten diagrams stalls the app
   about 60% less (measured: 424 → 184 ms on Mac, 303 → 144 ms on iPhone), and a diagram drawn
   once comes back instantly after a relaunch. Diagrams now keep their own proportions — wide
