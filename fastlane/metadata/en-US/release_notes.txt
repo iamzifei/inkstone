@@ -4,3 +4,4 @@ Safer sync across your devices.
 • AGENTS.md, README.md and SOURCE_OF_TRUTH.md no longer leave conflict copies when two devices refresh them.
 • Inkstone's own knowledge-base folders now reach your other devices even while empty, so its entry files stop being rewritten back and forth.
 • A repository emptied of every file no longer stops sync with "branch not found".
+• The assistant now remembers your API key and model when you reopen Inkstone. If it asks for the key once more, enter it again; after that it stays.

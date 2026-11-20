@@ -21,13 +21,20 @@ copy stood for a real disagreement.
   devices only refreshed the part Inkstone maintains; your own text in them still keeps both
   versions if both sides changed it.
 - Inkstone's own knowledge-base folders reach your other devices even while empty (each
-  carries a hidden, empty `.gitkeep`; your own empty folders stay yours), so the entry files stop being rewritten back and forth.
+  carries a hidden, empty `.gitkeep`; your own empty folders stay yours), so the entry
+  files stop being rewritten back and forth.
 - The entry files list only folders that exist on every device: a folder holding only
   attachments (PDFs, images) is listed once it has a note or a `.gitkeep` in it, because
   whether attachments sync is a per-device setting.
 - A repository whose files were all deleted is treated as empty, with the usual question
   before anything is removed here, instead of "branch not found" — which stopped that
   device from ever syncing again.
+
+### Fixed
+- The assistant remembers its setup: your API key, model and chosen profile now survive
+  quitting and reopening Inkstone. Since the assistant arrived, every launch silently reset
+  its profiles, so a key you had entered no longer matched. A key saved in an earlier
+  session may need entering once more; after that it stays.
 
 ## 0.5.1 — 2026-11-20
 
