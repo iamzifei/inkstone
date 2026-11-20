@@ -293,7 +293,14 @@ public struct GitHubClient: Sendable {
         do {
             data = try await send(request(url), describing: configuration.branch)
         } catch GitHubError.notFound {
-            // A 404 here is "no such branch", and it used to be swallowed as "the
+            // The branch is there; its tree is not. GitHub answers 404 for the
+            // tree of a branch whose last commit deleted every file (measured
+            // 2026-11-20). That is an empty remote, and the engine's own guard
+            // for an unexpectedly empty remote asks before anything follows
+            // from it. Reported as a missing branch, the device that had to
+            // catch up could never sync again.
+            if try await branchExists(configuration.branch) { return [] }
+            // Otherwise a 404 here is "no such branch", and it used to be swallowed as "the
             // repository is empty". Those lead opposite ways: empty means upload
             // everything, missing means we cannot see the remote at all. Reported
             // as an empty remote, a mistyped branch told the planner every synced
@@ -465,6 +472,18 @@ public struct GitHubClient: Sendable {
             if page.count < 100 { break }
         }
         return found
+    }
+
+    /// Whether a branch exists. Only a 404 means no: anything else that fails
+    /// is thrown, so an outage is never read as "the branch is gone".
+    func branchExists(_ branch: String) async throws -> Bool {
+        let url = try base().appending(path: "branches").appending(path: branch)
+        do {
+            _ = try await send(request(url), describing: branch)
+            return true
+        } catch GitHubError.notFound {
+            return false
+        }
     }
 
     /// Branch names on the configured repository, for the branch picker.

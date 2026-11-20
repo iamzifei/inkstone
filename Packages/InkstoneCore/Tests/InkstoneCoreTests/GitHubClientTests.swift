@@ -106,7 +106,11 @@ struct GitHubClientTests {
         //
         // The genuinely empty repository is the 409 above.
         let client = makeClient { request in
-            if request.url?.path.contains("/branches") == true {
+            // The list of branches exists; the configured one does not. As on
+            // GitHub, `/branches/<name>` for a missing branch is 404 (measured
+            // 2026-11-20): the client now asks it to tell a missing branch from
+            // an emptied one, and the old stub answered 200 to every path.
+            if request.url?.path.hasSuffix("/branches") == true {
                 return (self.response(200), Data(#"[{"name":"master"}]"#.utf8))
             }
             return (self.response(404), Data("{}".utf8))

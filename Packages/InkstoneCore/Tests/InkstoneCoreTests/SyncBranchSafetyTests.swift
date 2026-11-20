@@ -38,7 +38,9 @@ extension GitHubClientTests {
     func missingBranchIsNotEmpty() async throws {
         let client = makeClient { [reply] request in
             let path = request.url?.path ?? ""
-            if path.contains("/branches") {
+            // List of branches only; `/branches/<name>` for the missing one is
+            // 404, as on GitHub (2026-11-20, see GitHubClientTests).
+            if path.hasSuffix("/branches") {
                 return reply(200, #"[{"name":"master"}]"#)
             }
             return reply(404, #"{"message":"Not Found"}"#)

@@ -36,6 +36,11 @@ extension GitHubClientTests {
         /// Runs once, just before the next write is handled: another device
         /// pushing in the gap between this run's listing and its upload.
         var beforeNextWrite: ((FakeRemote) -> Void)?
+        /// Real GitHub answers 404 for the tree of a branch whose last commit
+        /// removed every file (measured 2026-11-20 on a private test repo),
+        /// while the branch itself still answers 200. Off by default, like
+        /// `strictSHA`.
+        var emptyTreeIs404 = false
         /// Writes refused because the caller's `sha` was stale.
         private(set) var staleWritesRefused = 0
         /// Every file the remote holds, path → text, for whole-vault comparisons.
@@ -82,6 +87,9 @@ extension GitHubClientTests {
                 )
             }
 
+            if path.contains("git/trees"), emptyTreeIs404, lock.withLock({ files.isEmpty }) {
+                return reply(404, Data(#"{"message":"Not Found"}"#.utf8))
+            }
             if path.contains("git/trees") {
                 let entries = lock.withLock {
                     files.map { key, value in
@@ -134,6 +142,8 @@ extension GitHubClientTests {
                 return reply(201, Data(#"{"content":{"sha":"\#(gitBlobSHA(content))"}}"#.utf8))
             }
 
+            if path.hasSuffix("/branches/main") { return reply(200, Data(#"{"name":"main"}"#.utf8)) }
+            if path.contains("/branches/") { return reply(404, Data(#"{"message":"Branch not found"}"#.utf8)) }
             if path.contains("/branches") { return reply(200, Data(#"[{"name":"main"}]"#.utf8)) }
             return reply(200, Data(#"{"full_name":"owner/notes"}"#.utf8))
         }
