@@ -137,4 +137,4 @@ size: XL
 - [x] C（#43；编辑器原已有，补到阅读视图、加假名、代码与表格区分）中英文自动间距（仅显示，不改文件）：CJK 与拉丁字母/数字交界加 kern；设置开关默认开。验收：截图；复制出来的文本不含额外空格；单元测试。
 - [x] D（#43：导出图片已做；超长段落实测不卡——oneline 段 Mac 116 ms/iOS 183 ms 未变差，不加保护；图表错误提示 MiaoYan 也无，不做）小项：超长单段不着色保护；Mermaid 语法错误在源码下显示一行错误提示（不进导出）；导出整篇为 PNG 长图（Mac + iOS 分享）。
 - [x] E（实测：801 测试；Mac/iOS Debug+Release；最终基准全段不劣于改前，见 docs/perf/2026-11-21-0.5.3-rendering.md；Mac 与 iPhone 模拟器深浅色截图逐屏看过；评审中还抓到并修好：所有 Mermaid 图被压成 300 宽的旧 bug、导出深色下代码不可读）全面验收：全部单元测试；Mac/iOS 构建（Debug+Release）；卡顿基准全场景（切换/长笔记/图片/输入/Mermaid/代码）不回退；Mac 与 iPhone 模拟器截图逐屏看（编辑、阅读、深色、中文）；真机抽查。
-- [~] F 发版 0.5.3：**Mac 已发（实测）**：公证 DMG、GitHub Release v0.5.3、appcast 0.5.3(17) 线上生效、Homebrew cask 0.5.3（sha 与资产一致）、本机已升。**iOS 0.5.2 已过审上架（READY_FOR_SALE）；iOS 0.5.3 已提交审核（build 17，WAITING_FOR_REVIEW，说明只写 0.5.3 的四项）**。Mac 公证 DMG + Sparkle + Homebrew；iOS（若 0.5.2 仍未开审则撤回换 0.5.3，否则新版本）提交审核；HQ。
+- [x] F 发版 0.5.3：**Mac 已发（实测）**：公证 DMG、GitHub Release v0.5.3、appcast 0.5.3(17) 线上生效、Homebrew cask 0.5.3（sha 与资产一致）、本机已升。**iOS 0.5.2、0.5.3 均已过审上架**（实测：ASC READY_FOR_SALE；App Store 公开查询 us/cn/au 均为 0.5.3，上线时间 2026-11-20T22:06Z = 悉尼 11-21 09:06）。Mac 公证 DMG + Sparkle + Homebrew；iOS（若 0.5.2 仍未开审则撤回换 0.5.3，否则新版本）提交审核；HQ。
