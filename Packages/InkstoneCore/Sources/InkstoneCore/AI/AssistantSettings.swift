@@ -141,3 +141,48 @@ public struct AssistantSettings: Codable, Hashable, Sendable {
         ])
     }
 }
+
+// MARK: - Lenient decoding
+//
+// Settings are stored as one JSON blob, and a blob written by an older build
+// (before `thinking` or the switches existed) or a newer one (a kind this build
+// does not know) must still decode. Synthesised Codable fails the whole value on
+// one missing key or unknown case; the settings decoder then falls back to the
+// default, the profiles are re-seeded with new ids, and the API key stored in
+// the Keychain under the old id is lost. So each field falls back on its own,
+// and each profile is read on its own.
+
+extension AssistantProfile {
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Without its id a profile cannot find its key: not a profile.
+        id = try c.decode(UUID.self, forKey: .id)
+        // A kind this build does not know: not usable here, so not read (the
+        // rest of the list still is).
+        kind = try c.decode(ProviderKind.self, forKey: .kind)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil ?? kind.displayName
+        endpoint = (try? c.decodeIfPresent(String.self, forKey: .endpoint)) ?? nil ?? ""
+        model = (try? c.decodeIfPresent(String.self, forKey: .model)) ?? nil ?? ""
+        thinking = (try? c.decodeIfPresent(ThinkingEffort.self, forKey: .thinking)) ?? nil ?? .off
+    }
+}
+
+extension AssistantSettings {
+    /// One profile that may or may not decode.
+    private struct MaybeProfile: Decodable {
+        let profile: AssistantProfile?
+        init(from decoder: any Decoder) throws { profile = try? AssistantProfile(from: decoder) }
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = AssistantSettings()
+        let maybe = (try? c.decodeIfPresent([MaybeProfile].self, forKey: .profiles)) ?? nil ?? []
+        self.init(
+            profiles: maybe.compactMap(\.profile),
+            activeProfileID: (try? c.decodeIfPresent(UUID.self, forKey: .activeProfileID)) ?? nil,
+            includesCurrentNote: (try? c.decodeIfPresent(Bool.self, forKey: .includesCurrentNote)) ?? nil ?? defaults.includesCurrentNote,
+            isEnabled: (try? c.decodeIfPresent(Bool.self, forKey: .isEnabled)) ?? nil ?? defaults.isEnabled
+        )
+    }
+}
