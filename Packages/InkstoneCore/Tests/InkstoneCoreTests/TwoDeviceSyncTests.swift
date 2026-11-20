@@ -142,7 +142,12 @@ extension GitHubClientTests {
                 return reply(201, Data(#"{"content":{"sha":"\#(gitBlobSHA(content))"}}"#.utf8))
             }
 
-            if path.hasSuffix("/branches/main") { return reply(200, Data(#"{"name":"main"}"#.utf8)) }
+            if path.hasSuffix("/branches/main") {
+                // The head commit's root tree: git's empty tree when no file is
+                // left, as on GitHub; any other SHA otherwise.
+                let tree = lock.withLock { files.isEmpty } ? GitHubClient.emptyTreeSHA : "1111111111111111111111111111111111111111"
+                return reply(200, Data(#"{"name":"main","commit":{"commit":{"tree":{"sha":"\#(tree)"}}}}"#.utf8))
+            }
             if path.contains("/branches/") { return reply(404, Data(#"{"message":"Branch not found"}"#.utf8)) }
             if path.contains("/branches") { return reply(200, Data(#"[{"name":"main"}]"#.utf8)) }
             return reply(200, Data(#"{"full_name":"owner/notes"}"#.utf8))

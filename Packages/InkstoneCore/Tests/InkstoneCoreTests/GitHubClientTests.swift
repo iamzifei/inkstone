@@ -38,16 +38,25 @@ struct GitHubClientTests {
 
     private func makeClient(
         repository: String = "owner/notes",
+        branch: String = "main",
         respond: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)
     ) -> GitHubClient {
         StubProtocol.handler = respond
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         return GitHubClient(
-            configuration: .init(repository: repository, branch: "main"),
+            configuration: .init(repository: repository, branch: branch),
             token: "test-token",
             session: URLSession(configuration: configuration)
         )
+    }
+
+    /// URLs a stub saw, collected across URLSession's threads.
+    final class SeenURLs: @unchecked Sendable {
+        private let lock = NSLock()
+        private var urls: [String] = []
+        func add(_ url: String) { lock.withLock { urls.append(url) } }
+        var all: [String] { lock.withLock { urls } }
     }
 
     private func response(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
@@ -116,6 +125,45 @@ struct GitHubClientTests {
             return (self.response(404), Data("{}".utf8))
         }
         await #expect(throws: GitHubError.self) { _ = try await client.listFiles() }
+    }
+
+    /// The emptied-branch reading is proven from the head commit's tree, never
+    /// assumed from the 404 (2026-11-20 review): a branch that exists with
+    /// files and a tree that will not list is an error.
+    @Test("A 404 tree on a branch that has files is an error, not an empty remote")
+    func unlistableTreeOnNonEmptyBranchFails() async throws {
+        let client = makeClient { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/branches/main") {
+                return (self.response(200), Data(#"{"name":"main","commit":{"commit":{"tree":{"sha":"abc"}}}}"#.utf8))
+            }
+            return (self.response(404), Data("{}".utf8))
+        }
+        await #expect(throws: GitHubError.self) { _ = try await client.listFiles() }
+    }
+
+    @Test("A failure while checking the branch is thrown, not read as missing or empty")
+    func branchCheckOutageFails() async throws {
+        let client = makeClient { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/branches/") { return (self.response(500), Data("{}".utf8)) }
+            return (self.response(404), Data("{}".utf8))
+        }
+        await #expect(throws: (any Error).self) { _ = try await client.listFiles() }
+    }
+
+    @Test("The branch is looked up by its full name, slashes and all")
+    func branchNameWithSlash() async throws {
+        let seen = SeenURLs()
+        let client = makeClient(branch: "feature/x") { request in
+            seen.add(request.url?.absoluteString ?? "")
+            if request.url?.path.contains("/branches/") == true {
+                return (self.response(200), Data(#"{"name":"feature/x","commit":{"commit":{"tree":{"sha":"4b825dc642cb6eb9a060e54bf8d69288fbee4904"}}}}"#.utf8))
+            }
+            return (self.response(404), Data("{}".utf8))
+        }
+        #expect(try await client.listFiles().isEmpty)
+        #expect(seen.all.contains { $0.hasSuffix("/branches/feature/x") }, "\(seen.all)")
     }
 
     @Test("Requests bypass the URL cache")

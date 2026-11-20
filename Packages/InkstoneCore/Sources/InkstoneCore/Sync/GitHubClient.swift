@@ -299,7 +299,16 @@ public struct GitHubClient: Sendable {
             // for an unexpectedly empty remote asks before anything follows
             // from it. Reported as a missing branch, the device that had to
             // catch up could never sync again.
-            if try await branchExists(configuration.branch) { return [] }
+            //
+            // Only when the head commit's tree *is* git's empty tree, though —
+            // proven, not inferred from the 404. (Asking for that tree is no
+            // help: GitHub answers 404 for it too, measured.) A branch that
+            // exists with files in it and a tree that cannot be listed is not
+            // something to guess about: it fails the run.
+            if let tree = try await branchTreeSHA(configuration.branch) {
+                if tree == Self.emptyTreeSHA { return [] }
+                throw GitHubError.notFound(configuration.branch)
+            }
             // Otherwise a 404 here is "no such branch", and it used to be swallowed as "the
             // repository is empty". Those lead opposite ways: empty means upload
             // everything, missing means we cannot see the remote at all. Reported
@@ -474,16 +483,29 @@ public struct GitHubClient: Sendable {
         return found
     }
 
-    /// Whether a branch exists. Only a 404 means no: anything else that fails
-    /// is thrown, so an outage is never read as "the branch is gone".
-    func branchExists(_ branch: String) async throws -> Bool {
+    /// Git's empty tree: the root tree of a commit that holds no files. The
+    /// same SHA-1 in every repository.
+    static let emptyTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+    /// The root tree SHA of a branch's head commit, or nil when the branch
+    /// does not exist. Only a 404 means "does not exist": anything else that
+    /// fails is thrown, so an outage is never read as "the branch is gone".
+    func branchTreeSHA(_ branch: String) async throws -> String? {
         let url = try base().appending(path: "branches").appending(path: branch)
+        let data: Data
         do {
-            _ = try await send(request(url), describing: branch)
-            return true
+            data = try await send(request(url), describing: branch)
         } catch GitHubError.notFound {
-            return false
+            return nil
         }
+        struct Response: Decodable {
+            struct Commit: Decodable {
+                struct Inner: Decodable { struct Tree: Decodable { let sha: String }; let tree: Tree }
+                let commit: Inner
+            }
+            let commit: Commit
+        }
+        return try JSONDecoder().decode(Response.self, from: data).commit.commit.tree.sha
     }
 
     /// Branch names on the configured repository, for the branch picker.
