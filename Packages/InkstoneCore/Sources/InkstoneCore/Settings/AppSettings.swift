@@ -334,6 +334,11 @@ public struct SettingsData: Codable, Hashable, Sendable {
         graphLinkForce = value(.graphLinkForce, defaults.graphLinkForce)
         graphLinkDistance = value(.graphLinkDistance, defaults.graphLinkDistance)
         graphGroups = value(.graphGroups, defaults.graphGroups)
+        // Missing from 2026-08-26 to 2026-11-20: every launch decoded an empty
+        // assistant, re-seeded its profiles with new ids, and so orphaned the
+        // API key stored in the Keychain under the old id.
+        // `SettingsDecodeTests.decoderReadsEveryProperty` now catches this.
+        assistant = value(.assistant, defaults.assistant)
     }
 }
 
