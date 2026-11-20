@@ -7,6 +7,21 @@ The working notes behind each change — what was reported, what it actually
 turned out to be — are in [`docs/plans/`](docs/plans), one file per piece of
 work. This file is the summary; those are the reasoning.
 
+## 0.5.3 — 2026-11-21
+
+### Code, diagrams and Chinese text
+- Code blocks are coloured by language — Swift, Python, JavaScript/TypeScript, Go, Rust, SQL,
+  YAML, shell and 28 more — in the editor, in reading mode and in exports, in light and dark.
+- Mermaid diagrams draw with far less waiting: opening a note with ten diagrams stalls the app
+  about 60% less (measured: 424 → 184 ms on Mac, 303 → 144 ms on iPhone), and a diagram drawn
+  once comes back instantly after a relaunch. Diagrams now keep their own proportions — wide
+  charts are no longer shrunk and tall ones no longer blown up.
+- Reading mode spaces Chinese and Japanese from Latin letters and digits the way the editor
+  does (display only; the file is unchanged), and code is never spaced.
+- Export as Image…: the whole note as one PNG, for sharing where a document will not go.
+
+Ideas borrowed, with thanks, from MiaoYan. Full numbers: `docs/perf/2026-11-21-0.5.3-rendering.md`.
+
 ## 0.5.2 — 2026-11-20
 
 ### Sync, safer with several devices
