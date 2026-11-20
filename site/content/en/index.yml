@@ -31,7 +31,7 @@ how:
   - title: Name it, choose where it lives
     body: iCloud Drive, any folder, or a folder you already have. Inkstone lays out the folders — inbox, projects, areas, resources, media, outputs, private — and writes the organizing rules.
   - title: Drop anything in
-    body: Drag files onto the window, or add them from the Files app. The first time, choose copy or move — copy is the default.
+    body: Drag files onto the window, or add them from the Files app. The first time, choose copy or move — copy is the default. On iPhone and iPad, share from any app — Safari, Photos, Files, Mail — and it lands in the inbox.
   - title: It is filed for you
     body: Private-looking files go to the private folder first, then your rules, then the on-device model. Renamed by date and topic. Anything unsure waits in a review folder for you to decide.
   alts:
