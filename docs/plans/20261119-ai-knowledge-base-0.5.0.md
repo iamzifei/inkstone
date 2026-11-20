@@ -124,6 +124,6 @@ size: XL
   - 工具：PR #39（仅 DEBUG 的 DemoDirector 命令 + 设备 UI 测试 scheme，CI 不构建）
 - [x] 4（PR #37 合入 `8e35600`，两轮评审：只在 head tree 恰为 git 空树 4b825dc 时算空）仓库删空时列表 404 被当成「分支不存在」→ 先写失败测试再修
 - [~] 2 官网补「从任何 App 分享文件」（8 语言 + llms.txt），PR #38 已就绪，0.5.1 上架后合并部署
-- [~] 3 发版 0.5.2 — **Mac 已发（实测）**：两次公证 Accepted、启动检查通过；GitHub Release v0.5.2、latest 下载 200；appcast 0.5.2(16) 线上生效；Homebrew cask 0.5.2（sha 与 release 资产一致）；本机已升 0.5.2。**iOS 0.5.2 待 0.5.1 审核结束后提交**（build 16 尚未上传）。（#36 同步冲突、#37 删空仓库、#41 助手设置解码；#39 真机测试工具 + CI 锁文件检查；#40 版本号/说明，均两轮独立评审 + CI 绿后合入，main `3b55454`）：Mac 公证 DMG + Sparkle + Homebrew；iOS 等 0.5.1 审核结束后提交
+- [~] 3 发版 0.5.2 — **Mac 已发（实测）**：两次公证 Accepted、启动检查通过；GitHub Release v0.5.2、latest 下载 200；appcast 0.5.2(16) 线上生效；Homebrew cask 0.5.2（sha 与 release 资产一致）；本机已升 0.5.2。**iOS**：James 要求直接提交 0.5.2 → 撤回排队中的 0.5.1（未开始审核），同一版本记录改为 0.5.2、换 build 16、说明合并 0.5.1+0.5.2，重新提交，实测 WAITING_FOR_REVIEW。（#36 同步冲突、#37 删空仓库、#41 助手设置解码；#39 真机测试工具 + CI 锁文件检查；#40 版本号/说明，均两轮独立评审 + CI 绿后合入，main `3b55454`）：Mac 公证 DMG + Sparkle + Homebrew；iOS 等 0.5.1 审核结束后提交
 - [x] 1 HQ 更新（11-20）
 - 新发现（实测）：**AI 助手设置自 2026-08-26 起每次启动都被重置**——`SettingsData.init(from:)` 漏读 `assistant`，配置被重新生成（新 id），钥匙串里按 id 存的 API 密钥对不上。#41 修复：补读 + 助手配置宽松解码 + 源码级守卫测试（每个设置项都必须被读取）。升级后旧密钥可能需重填一次。
