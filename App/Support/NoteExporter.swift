@@ -7,15 +7,19 @@ import AppKit
 import UIKit
 #endif
 
-/// Export the open note as a self-contained HTML file or a paginated PDF.
+/// Export the open note as a self-contained HTML file, a paginated PDF, or one
+/// long PNG image (for sharing where a document will not go — a chat, a post).
 ///
-/// The HTML comes from `HTMLExporter` (core). The PDF is that same HTML
-/// printed by WebKit onto A4 pages — not `WKWebView.createPDF`, which makes
-/// one very long page.
+/// The HTML comes from `HTMLExporter` (core), with code coloured by language.
+/// The PDF is that same HTML printed by WebKit onto A4 pages — not
+/// `WKWebView.createPDF`, which makes one very long page. The image is that
+/// same HTML laid out at reading width and snapshotted whole.
 @MainActor
 enum NoteExporter {
-    enum Format { case html, pdf
-        var fileExtension: String { self == .html ? "html" : "pdf" }
+    enum Format { case html, pdf, png
+        var fileExtension: String {
+            switch self { case .html: "html"; case .pdf: "pdf"; case .png: "png" }
+        }
     }
 
     /// The note's HTML, with its embedded images inlined.
@@ -23,7 +27,8 @@ enum NoteExporter {
         guard let text = workspace.documents[url]?.text ?? (try? workspace.store?.read(url)) else { return nil }
         return HTMLExporter.document(
             text, title: url.deletingPathExtension().lastPathComponent,
-            resolveAttachment: { workspace.resolveEmbed($0, from: url) })
+            resolveAttachment: { workspace.resolveEmbed($0, from: url) },
+            highlight: { CodeHighlighter.shared.spansNow(code: $0, language: $1) })
     }
 
     /// Prints HTML to a paginated PDF file (also used by the smoke test).
@@ -61,12 +66,94 @@ enum NoteExporter {
             switch format {
             case .html: try Data(html.utf8).write(to: out)
             case .pdf: try await PDFPrinter().print(html, to: out)
+            case .png: try await ImageRenderer().render(html, to: out)
             }
         } catch {
             try? FileManager.default.removeItem(at: dir)
             throw error
         }
         return out
+    }
+}
+
+/// Lays HTML out in an off-screen web view at reading width and writes the
+/// whole page as one PNG.
+@MainActor
+private final class ImageRenderer: NSObject, WKNavigationDelegate {
+    private var loaded: CheckedContinuation<Void, Error>?
+    /// The article's own width (the stylesheet caps it) plus its margins.
+    private let width: CGFloat = 760
+    /// Past this the image would be too tall for most places to take it; the
+    /// note is cut there (the PDF has the rest).
+    private let maximumHeight: CGFloat = 16_000
+
+    func render(_ html: String, to url: URL) async throws {
+        let config = WKWebViewConfiguration()
+        // As for PDF: notes can hold raw HTML, so no scripts; the document's
+        // CSP blocks every network load.
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: 800), configuration: config)
+        webView.navigationDelegate = self
+        #if os(macOS)
+        let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: width, height: 800),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = webView
+        defer { window.close() }
+        #else
+        // A web view outside a window does not lay out (or snapshot).
+        let host = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows).first { $0.isKeyWindow }
+        webView.frame.origin = CGPoint(x: -20_000, y: -20_000)
+        host?.addSubview(webView)
+        defer { webView.removeFromSuperview() }
+        #endif
+        let timeout = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            self?.finishLoad(.failure(CocoaError(.fileReadUnknown)))
+        }
+        defer { timeout.cancel() }
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            loaded = c
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+        // Scripts are off for the page, not for the app asking it its height.
+        let height = (try? await webView.evaluateJavaScript("document.documentElement.scrollHeight")) as? Double ?? 800
+        let size = CGSize(width: width, height: min(CGFloat(height), maximumHeight))
+        webView.frame.size = size
+        #if os(macOS)
+        window.setContentSize(size)
+        #endif
+        try? await Task.sleep(for: .milliseconds(150))   // one layout after the resize
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(origin: .zero, size: size)
+        let image = try await webView.takeSnapshot(configuration: configuration)
+        #if os(macOS)
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let data = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        else { throw CocoaError(.fileWriteUnknown) }
+        #else
+        guard let data = image.pngData() else { throw CocoaError(.fileWriteUnknown) }
+        #endif
+        try data.write(to: url)
+    }
+
+    private func finishLoad(_ result: Result<Void, Error>) {
+        guard let loaded else { return }
+        self.loaded = nil
+        loaded.resume(with: result)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finishLoad(.success(())) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finishLoad(.failure(error)) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finishLoad(.failure(error))
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finishLoad(.failure(CocoaError(.fileReadUnknown))) }
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        // Only the document itself; a link in it must not navigate the export.
+        action.navigationType == .other && action.request.url?.scheme != "http" && action.request.url?.scheme != "https"
+            ? .allow : .cancel
     }
 }
 

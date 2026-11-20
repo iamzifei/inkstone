@@ -3964,6 +3964,28 @@
         }
       }
     },
+    "Export as Image…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export as Image…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出为图片…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯出為圖片…"
+          }
+        }
+      }
+    },
     "Export as PDF…": {
       "localizations": {
         "en": {

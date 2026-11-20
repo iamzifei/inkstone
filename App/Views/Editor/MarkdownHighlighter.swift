@@ -649,7 +649,7 @@ struct MarkdownHighlighter {
                 for line in fenceLines(of: token.range, in: fullText) { concealLines(line) }
             }
 
-        case .codeBlock:
+        case .codeBlock(let language):
             // Shared with the Mermaid path above, which falls back to this while
             // a diagram renders. Duplicating it here is how the fenced block
             // kept its per-line paragraph spacing after the table lost it.
@@ -657,6 +657,7 @@ struct MarkdownHighlighter {
                 to: storage, token: token, fullText: fullText,
                 conceal: conceal, isBeingEdited: isBeingEdited
             )
+            colourCode(in: token.range, language: language, storage: storage, fullText: fullText)
 
             // Collapse the ``` fences themselves: the shaded block already says
             // "this is code", so the backticks are pure noise once you stop
@@ -1177,6 +1178,32 @@ struct MarkdownHighlighter {
         let end = lines.count > 1 ? lines[1].location : block.location + block.length
         guard end > start else { return "" }
         return text.substring(with: NSRange(location: start, length: end - start))
+    }
+
+    /// Colours a fenced block's code by its language (`CodeHighlighter`). The
+    /// first pass over a block of new code finds nothing cached and leaves it
+    /// plain; the highlighter posts when its colours are ready and the editor
+    /// styles again. Only the text between the fences is coloured, and only
+    /// on top of the code style, so a block with no colours yet looks exactly
+    /// as it did before.
+    private func colourCode(in block: NSRange, language: String?, storage: NSTextStorage, fullText: NSString) {
+        let lines = fenceLines(of: block, in: fullText)
+        guard let opener = lines.first else { return }
+        // A fence inside a quote has `> ` before every line of code; coloured
+        // as code, the markers would throw every offset off. Left plain.
+        let openerText = fullText.substring(with: opener).drop { $0 == " " || $0 == "\t" }
+        guard !openerText.hasPrefix(">") else { return }
+        let start = opener.location + opener.length
+        let end = lines.count > 1 ? lines[1].location : NSMaxRange(block)
+        guard end > start else { return }
+        let code = fullText.substring(with: NSRange(location: start, length: end - start))
+        guard let spans = CodeHighlighter.shared.spans(code: code, language: language) else { return }
+        for span in spans {
+            guard let color = CodeHighlighter.color(for: span.scope, isDark: style.isDark) else { continue }
+            let range = NSRange(location: start + span.range.location, length: span.range.length)
+            guard NSMaxRange(range) <= end else { continue }
+            storage.addAttribute(.foregroundColor, value: color, range: range)
+        }
     }
 
     /// Styles a fenced block as code. Extracted so an unrendered Mermaid diagram
@@ -2238,40 +2265,17 @@ struct MarkdownHighlighter {
     /// Latin letters or digits — the "盘古之白" convention — without touching the
     /// underlying text. Purely visual, so the file on disk stays clean.
     private func applyCJKLatinSpacing(to storage: NSTextStorage, text: NSString, within scope: NSRange) {
-        // Only the scoped substring is walked. On a large document this loop
-        // visits every character, so restricting it matters as much as skipping
-        // the tokens does.
-        let string = text.substring(with: scope)
-        let characters = Array(string.unicodeScalars)
-        guard characters.count > 1 else { return }
-
-        var utf16Offset = scope.location
-        var previousScalar: Unicode.Scalar?
+        // Only the scoped substring is walked (CJKSpacing): on a large document
+        // the walk visits every character, so restricting it matters as much as
+        // skipping the tokens does.
         let spacing = style.typography.editorFontSize * 0.14
-
-        for scalar in characters {
-            defer {
-                utf16Offset += UTF16.width(scalar)
-                previousScalar = scalar
-            }
-            guard let previous = previousScalar else { continue }
-            let boundary = (isHan(previous) && isLatinOrDigit(scalar))
-                || (isLatinOrDigit(previous) && isHan(scalar))
-            guard boundary, utf16Offset > scope.location, utf16Offset < text.length else { continue }
-            storage.addAttribute(.kern, value: spacing, range: NSRange(location: utf16Offset - 1, length: 1))
+        for position in CJKSpacing.positions(in: text, range: scope) where position < text.length {
+            // Not inside code: monospaced text keeps its columns, and a Chinese
+            // comment in a code block must not push the code beside it along.
+            let attributes = storage.attributes(at: position, effectiveRange: nil)
+            if attributes[.inkstoneBlockFill] != nil || attributes[.inkstoneInlineFill] != nil { continue }
+            storage.addAttribute(.kern, value: spacing, range: NSRange(location: position, length: 1))
         }
-    }
-
-    private func isHan(_ scalar: Unicode.Scalar) -> Bool {
-        (0x4E00...0x9FFF).contains(scalar.value)
-            || (0x3400...0x4DBF).contains(scalar.value)
-            || (0xF900...0xFAFF).contains(scalar.value)
-    }
-
-    private func isLatinOrDigit(_ scalar: Unicode.Scalar) -> Bool {
-        (scalar.value >= 0x30 && scalar.value <= 0x39)
-            || (scalar.value >= 0x41 && scalar.value <= 0x5A)
-            || (scalar.value >= 0x61 && scalar.value <= 0x7A)
     }
 }
 

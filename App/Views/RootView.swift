@@ -363,6 +363,9 @@ struct RootView: View {
                     Button("Export as HTML…", systemImage: "chevron.left.forwardslash.chevron.right") {
                         workspace.exportActiveNote(as: .html)
                     }
+                    Button("Export as Image…", systemImage: "photo") {
+                        workspace.exportActiveNote(as: .png)
+                    }
                     Divider()
                 }
                 Button("Command Palette…", systemImage: "command") {

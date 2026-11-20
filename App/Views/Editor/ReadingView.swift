@@ -151,12 +151,21 @@ enum ReadingTypesetter {
                 result.addAttribute(.backgroundColor,
                                     value: palette.codeBackground.platformColor, range: span.range)
 
-            case .codeBlock:
+            case .codeBlock(let language):
                 result.addAttribute(
                     .font,
                     value: typography.codeFont.platformFont(size: typography.codeFontSize),
                     range: span.range
                 )
+                // Coloured by language once CodeHighlighter has it (the same
+                // colours as live preview); plain until then.
+                let codeText = (result.string as NSString).substring(with: span.range)
+                for run in CodeHighlighter.shared.spans(code: codeText, language: language) ?? [] {
+                    guard let colour = CodeHighlighter.color(for: run.scope, isDark: style.isDark),
+                          NSMaxRange(run.range) <= span.range.length else { continue }
+                    result.addAttribute(.foregroundColor, value: colour,
+                                        range: NSRange(location: span.range.location + run.range.location, length: run.range.length))
+                }
                 result.addAttribute(.backgroundColor,
                                     value: palette.codeBackground.platformColor, range: span.range)
                 // Every line of a fenced block is its own paragraph, so the body
@@ -224,6 +233,23 @@ enum ReadingTypesetter {
 
             case .horizontalRule:
                 break
+            }
+        }
+        // The same spacing between Chinese/Japanese and Latin text that live
+        // preview draws, so the two modes set a paragraph alike. Before the
+        // tables, whose column alignment also writes `.kern` and must win.
+        if typography.cjkLatinSpacing {
+            let text = result.string as NSString
+            let code = document.spans.compactMap { span -> NSRange? in
+                switch span.style {
+                case .codeBlock, .inlineCode: return span.range
+                default: return nil
+                }
+            }
+            let spacing = typography.editorFontSize * 0.14
+            for position in CJKSpacing.positions(in: text, range: NSRange(location: 0, length: text.length))
+            where !code.contains(where: { NSLocationInRange(position, $0) }) {
+                result.addAttribute(.kern, value: spacing, range: NSRange(location: position, length: 1))
             }
         }
         drawTables(into: result, document: document, style: style)

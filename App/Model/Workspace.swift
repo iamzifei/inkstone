@@ -135,7 +135,7 @@ final class Workspace {
                 defer { NoteExporter.discard(file) }
                 let panel = NSSavePanel()
                 panel.nameFieldStringValue = file.lastPathComponent
-                panel.allowedContentTypes = [format == .pdf ? .pdf : .html]
+                panel.allowedContentTypes = [format == .pdf ? .pdf : format == .png ? .png : .html]
                 guard panel.runModal() == .OK, let destination = panel.url else { return }
                 if FileManager.default.fileExists(atPath: destination.path) {
                     // Atomic: the old file is only gone once the new one is in
