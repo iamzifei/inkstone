@@ -126,6 +126,21 @@ extension GitHubClientTests {
         files(vault).filter { SyncFilePolicy().allows(URL(fileURLWithPath: $0.key)) }
     }
 
+    /// The `.gitkeep` files in a vault, which `files` (skipping hidden files)
+    /// cannot see.
+    private func keepFiles(_ vault: URL) -> Set<String> {
+        let base = vault.standardizedFileURL.path + "/"
+        var out: Set<String> = []
+        let walker = FileManager.default.enumerator(at: vault, includingPropertiesForKeys: nil)
+        while let url = walker?.nextObject() as? URL {
+            if url.lastPathComponent == ".inkstone" { walker?.skipDescendants(); continue }
+            if url.lastPathComponent == SyncFilePolicy.keepFileName {
+                out.insert(String(url.standardizedFileURL.path.dropFirst(base.count)))
+            }
+        }
+        return out
+    }
+
     private func copies(_ remote: Remote) -> Int {
         remote.paths.filter { $0.contains("(conflict ") }.count
     }
@@ -284,9 +299,73 @@ extension GitHubClientTests {
             #expect(FileManager.default.fileExists(
                 atPath: phone.appending(path: folder).path, isDirectory: &isDir) && isDir.boolValue, "\(folder)")
         }
+        #expect(keepFiles(phone) == keepFiles(mac))
         // Same folders, so the same entry files: nothing to rewrite on either.
         #expect(try EntryFiles.refresh(in: phone).isEmpty)
         #expect(try EntryFiles.refresh(in: mac).isEmpty)
+    }
+
+    /// Found in review (2026-11-20): a folder holding only files that do not
+    /// sync — images with attachment sync off, ignored notes — counted as
+    /// content on the device that has them and did not exist on the other, so
+    /// the two listed different folders and rewrote the entry files forever.
+    @Test("Folders whose files do not sync do not set the devices against each other")
+    func unsyncedContentDoesNotChurn() async throws {
+        let remote = Remote(); remote.strictSHA = true
+        let parent = try makeVault("parents")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let mac = try KnowledgeBaseCreator.create(named: "KB", in: parent, language: .english)
+        let phone = parent.appending(path: "phone-kb")
+        try FileManager.default.createDirectory(at: phone, withIntermediateDirectories: true)
+        let layout = try #require(KnowledgeBaseLayout.detect(in: mac))
+
+        try write("Drafts/\n", ".gitignore", in: mac)
+        try write("private\n", "Drafts/Secret.md", in: mac)
+        try write("not a real png", "\(layout.resources)/Photos/pic.png", in: mac)
+        _ = try EntryFiles.refresh(in: mac)
+        _ = try await sync(mac, remote)
+        _ = try await sync(phone, remote)
+        #expect(!remote.paths.contains("Drafts/Secret.md"))
+
+        try await settle([mac, phone], remote, refresh: true)
+        #expect(try EntryFiles.refresh(in: mac).isEmpty)
+        #expect(try EntryFiles.refresh(in: phone).isEmpty)
+        #expect(synced(mac).filter { !$0.key.hasPrefix("Drafts/") } == synced(phone))
+        // Nothing hidden is out of step either: the keep-files match too.
+        #expect(keepFiles(mac) == keepFiles(phone))
+        #expect(keepFiles(phone) == Set(remote.paths.filter { $0.hasSuffix("/.gitkeep") }))
+    }
+
+    @Test("A skeleton folder deleted on one device stays deleted on both")
+    func deletedSkeletonFolderStaysDeleted() async throws {
+        let remote = Remote(); remote.strictSHA = true
+        let parent = try makeVault("parents")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let mac = try KnowledgeBaseCreator.create(named: "KB", in: parent, language: .english)
+        let phone = parent.appending(path: "phone-kb")
+        try FileManager.default.createDirectory(at: phone, withIntermediateDirectories: true)
+        let layout = try #require(KnowledgeBaseLayout.detect(in: mac))
+        _ = try await sync(mac, remote)
+        _ = try await sync(phone, remote)
+        #expect(FileManager.default.fileExists(atPath: phone.appending(path: layout.outputs).path))
+
+        try FileManager.default.removeItem(at: mac.appending(path: layout.outputs))
+        try await settle([mac, phone], remote, refresh: true)
+        #expect(!FileManager.default.fileExists(atPath: phone.appending(path: layout.outputs).path))
+        #expect(!FileManager.default.fileExists(atPath: mac.appending(path: layout.outputs).path))
+    }
+
+    @Test("A keep-file that is not an empty marker is not uploaded")
+    func oversizedKeepFileStaysLocal() async throws {
+        let remote = Remote(); remote.strictSHA = true
+        let mac = try makeVault("mac")
+        defer { try? FileManager.default.removeItem(at: mac) }
+        try write("note\n", "Folder/Note.md", in: mac)
+        try write(String(repeating: "x", count: 10_000), "Folder/.gitkeep", in: mac)
+        try write("", "Empty/.gitkeep", in: mac)
+        let report = try await sync(mac, remote)
+        #expect(report.failures.isEmpty)
+        #expect(remote.paths.sorted() == ["Empty/.gitkeep", "Folder/Note.md"])
     }
 
     @Test("Entry files regenerated on both devices do not pile up conflict copies")

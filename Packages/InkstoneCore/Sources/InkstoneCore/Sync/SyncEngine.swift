@@ -567,6 +567,18 @@ public struct SyncEngine: Sendable {
                     if FileManager.default.fileExists(atPath: url.path) {
                         try FileManager.default.removeItem(at: url)
                     }
+                    // A keep-file is the folder: deleted elsewhere means the
+                    // folder was. Removed too when nothing else is in it, or
+                    // the next entry-file refresh sees an empty layout folder,
+                    // writes a new keep-file and brings the folder back on the
+                    // device that deleted it.
+                    if url.lastPathComponent == SyncFilePolicy.keepFileName {
+                        let folder = url.deletingLastPathComponent()
+                        if let rest = try? FileManager.default.contentsOfDirectory(atPath: folder.path),
+                           rest.allSatisfy({ $0 == ".DS_Store" }) {
+                            try? FileManager.default.removeItem(at: folder)
+                        }
+                    }
                     state.blobs.removeValue(forKey: path)
                     report.deletedLocally.append(path)
 
@@ -838,7 +850,12 @@ public struct SyncEngine: Sendable {
                 excluded.insert(relative)
                 continue
             }
-            guard let data = try? Data(contentsOf: url) else { excluded.insert(relative); continue }
+            // A keep-file is an empty marker. A symlink, a folder or a file
+            // someone filled is not one: not carried, never read in full.
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values?.isRegularFile == true, values?.isSymbolicLink != true,
+                  (values?.fileSize ?? .max) <= 4096,
+                  let data = try? Data(contentsOf: url) else { excluded.insert(relative); continue }
             result[relative] = gitBlobSHA(data)
         }
 

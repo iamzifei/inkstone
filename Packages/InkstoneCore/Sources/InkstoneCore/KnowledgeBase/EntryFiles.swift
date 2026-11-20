@@ -165,24 +165,13 @@ private struct Tree {
 
     init(root: URL, layout: KnowledgeBaseLayout) {
         let fm = FileManager.default
-        // A folder counts only when it holds something that syncs: a visible
-        // file somewhere inside, or a `.gitkeep`. An empty folder exists on
-        // the device that made it and nowhere else (git has no empty
-        // folders), so listing it made each device's block different and the
-        // devices rewrote these files at each other on every sync.
-        func hasContent(_ url: URL) -> Bool {
-            if fm.fileExists(atPath: url.appending(path: SyncFilePolicy.keepFileName).path(percentEncoded: false)) { return true }
-            guard let walker = fm.enumerator(at: url, includingPropertiesForKeys: [.isDirectoryKey],
-                                             options: [.skipsHiddenFiles]) else { return false }
-            for case let item as URL in walker {
-                if (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
-                    if fm.fileExists(atPath: item.appending(path: SyncFilePolicy.keepFileName).path(percentEncoded: false)) { return true }
-                } else {
-                    return true
-                }
-            }
-            return false
-        }
+        // A folder counts only when it will exist on every device
+        // (`VaultBlueprint.travels`): one that exists on just this device —
+        // empty (git has no empty folders), or holding only files that do
+        // not sync — made each device's block different, and the devices
+        // rewrote these files at each other on every sync (2026-11-20).
+        let ignore = GitIgnore.load(from: root)
+        func hasContent(_ url: URL) -> Bool { VaultBlueprint.travels(url, root: root, ignore: ignore) }
         func dirs(_ url: URL) -> [String] {
             ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
                 .filter { !$0.lastPathComponent.hasPrefix(".") && ((try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) && hasContent($0) }
