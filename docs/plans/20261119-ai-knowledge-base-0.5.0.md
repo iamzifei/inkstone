@@ -123,7 +123,7 @@ size: XL
   - 清理（实测）：手机测试库与 Documents 测试文件已删/清空；Mac 上从手机拷出的副本（含两张照片）已删；照片未进入测试仓库。手机真实设置仅剩原「Inkstone」库，詹有才同步保持关闭。
   - 工具：PR #39（仅 DEBUG 的 DemoDirector 命令 + 设备 UI 测试 scheme，CI 不构建）
 - [x] 4（PR #37 合入 `8e35600`，两轮评审：只在 head tree 恰为 git 空树 4b825dc 时算空）仓库删空时列表 404 被当成「分支不存在」→ 先写失败测试再修
-- [~] 2 官网补「从任何 App 分享文件」（8 语言 + llms.txt），PR #38 已就绪，0.5.1 上架后合并部署
+- [x] 2（PR #38 两轮评审，iOS 0.5.2 上架后合并，线上核验 en/zh/ja + llms.txt 已出现）官网补「从任何 App 分享文件」（8 语言 + llms.txt），0.5.1 上架后合并部署
 - [~] 3 发版 0.5.2 — **Mac 已发（实测）**：两次公证 Accepted、启动检查通过；GitHub Release v0.5.2、latest 下载 200；appcast 0.5.2(16) 线上生效；Homebrew cask 0.5.2（sha 与 release 资产一致）；本机已升 0.5.2。**iOS**：James 要求直接提交 0.5.2 → 撤回排队中的 0.5.1（未开始审核），同一版本记录改为 0.5.2、换 build 16、说明合并 0.5.1+0.5.2，重新提交，实测 WAITING_FOR_REVIEW。（#36 同步冲突、#37 删空仓库、#41 助手设置解码；#39 真机测试工具 + CI 锁文件检查；#40 版本号/说明，均两轮独立评审 + CI 绿后合入，main `3b55454`）：Mac 公证 DMG + Sparkle + Homebrew；iOS 等 0.5.1 审核结束后提交
 - [x] 1 HQ 更新（11-20）
 - 新发现（实测）：**AI 助手设置自 2026-08-26 起每次启动都被重置**——`SettingsData.init(from:)` 漏读 `assistant`，配置被重新生成（新 id），钥匙串里按 id 存的 API 密钥对不上。#41 修复：补读 + 助手配置宽松解码 + 源码级守卫测试（每个设置项都必须被读取）。升级后旧密钥可能需重填一次。
@@ -137,4 +137,4 @@ size: XL
 - [x] C（#43；编辑器原已有，补到阅读视图、加假名、代码与表格区分）中英文自动间距（仅显示，不改文件）：CJK 与拉丁字母/数字交界加 kern；设置开关默认开。验收：截图；复制出来的文本不含额外空格；单元测试。
 - [x] D（#43：导出图片已做；超长段落实测不卡——oneline 段 Mac 116 ms/iOS 183 ms 未变差，不加保护；图表错误提示 MiaoYan 也无，不做）小项：超长单段不着色保护；Mermaid 语法错误在源码下显示一行错误提示（不进导出）；导出整篇为 PNG 长图（Mac + iOS 分享）。
 - [x] E（实测：801 测试；Mac/iOS Debug+Release；最终基准全段不劣于改前，见 docs/perf/2026-11-21-0.5.3-rendering.md；Mac 与 iPhone 模拟器深浅色截图逐屏看过；评审中还抓到并修好：所有 Mermaid 图被压成 300 宽的旧 bug、导出深色下代码不可读）全面验收：全部单元测试；Mac/iOS 构建（Debug+Release）；卡顿基准全场景（切换/长笔记/图片/输入/Mermaid/代码）不回退；Mac 与 iPhone 模拟器截图逐屏看（编辑、阅读、深色、中文）；真机抽查。
-- [~] F 发版 0.5.3：**Mac 已发（实测）**：公证 DMG、GitHub Release v0.5.3、appcast 0.5.3(17) 线上生效、Homebrew cask 0.5.3（sha 与资产一致）、本机已升。iOS：build 17 已上传；0.5.2 正在苹果审核中（IN_REVIEW），过审后即提交 0.5.3（说明已覆盖 0.5.1–0.5.3）。Mac 公证 DMG + Sparkle + Homebrew；iOS（若 0.5.2 仍未开审则撤回换 0.5.3，否则新版本）提交审核；HQ。
+- [~] F 发版 0.5.3：**Mac 已发（实测）**：公证 DMG、GitHub Release v0.5.3、appcast 0.5.3(17) 线上生效、Homebrew cask 0.5.3（sha 与资产一致）、本机已升。**iOS 0.5.2 已过审上架（READY_FOR_SALE）；iOS 0.5.3 已提交审核（build 17，WAITING_FOR_REVIEW，说明只写 0.5.3 的四项）**。Mac 公证 DMG + Sparkle + Homebrew；iOS（若 0.5.2 仍未开审则撤回换 0.5.3，否则新版本）提交审核；HQ。
