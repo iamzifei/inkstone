@@ -1,6 +1,15 @@
 {
-  "originHash" : "6dc0755b41420882c41c375cdfc4d99ae6964e5fc14490f08a9d7c524d39de02",
+  "originHash" : "bcc8bac5541163fa54ecfc3c504105b3a8eee9795e6e3e866615540f497fb6f9",
   "pins" : [
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle.git",
+      "state" : {
+        "revision" : "ab7d71291238df6e0492143b120c9b696a35f603",
+        "version" : "2.10.1"
+      }
+    },
     {
       "identity" : "swift-cmark",
       "kind" : "remoteSourceControl",
@@ -17,6 +26,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "27b7fc1a19068bcea3d2072db0ce86360d1400ed"
+      }
+    },
+    {
+      "identity" : "swiftmath",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mgriebling/SwiftMath.git",
+      "state" : {
+        "revision" : "fa8244ed032f4a1ade4cb0571bf87d2f1a9fd2d7",
+        "version" : "1.7.3"
       }
     },
     {

@@ -12,12 +12,12 @@ final class ShareFromOtherAppsTests: XCTestCase {
         continueAfterFailure = false
         // Even when a step fails after the item was queued, Inkstone opens on
         // the QA suite before anything else can drain the queue.
-        addTeardownBlock { [weak self] in self?.qaLaunch() }
+        addTeardownBlock { @MainActor in ShareFromOtherAppsTests.qaLaunch() }
     }
 
     /// Inkstone on the QA settings suite with the test vault open, which
     /// drains the shared items into that vault.
-    private func qaLaunch() {
+    @MainActor private static func qaLaunch() {
         let app = XCUIApplication()
         app.launchEnvironment = [
             "INKSTONE_DEMO_DEFAULTS": "com.orris.inkstone.qa",
