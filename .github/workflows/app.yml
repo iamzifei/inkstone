@@ -4,8 +4,11 @@
 name: App
 
 on:
+  # Push runs only on main. Feature branches are covered by `pull_request`;
+  # running both made every commit on an open PR build twice, which was most of
+  # November 2026's macOS minutes.
   push:
-    branches: ["**"]
+    branches: [main]
     paths-ignore: ["site/**", "docs/**", "*.md"]
   pull_request:
     paths-ignore: ["site/**", "docs/**", "*.md"]
@@ -38,14 +41,18 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        include:
-          - destination: "platform=macOS"
-            runner: macos-26
-          # Xcode 27 (GitHub's preview image): its iOS SDK has the iPhone Duo
-          # APIs (iOS 27.1+). On macos-26 (Xcode 26.6) that code is compiled
-          # out, so CI would never build the Duo path.
-          - destination: "generic/platform=iOS Simulator"
-            runner: xcode-27
+        # macOS on macos-26 always. The iOS Simulator build runs on Xcode 27
+        # (GitHub's preview image `xcode-27`): its iOS SDK has the iPhone Duo
+        # APIs (iOS 27.1+), which macos-26 (Xcode 26.6) compiles out, so CI
+        # would otherwise never build the Duo path.
+        #
+        # `xcode-27` is billed even on this public repo (~1,100 minutes cost
+        # about $177 in Nov 2026), while macos-26 is free. So the iOS build runs
+        # on pull requests only, not again on the push to main after merge.
+        # A job-level `if` cannot read the matrix, hence the computed list.
+        include: ${{ fromJSON(github.event_name == 'pull_request'
+          && '[{"destination":"platform=macOS","runner":"macos-26"},{"destination":"generic/platform=iOS Simulator","runner":"xcode-27"}]'
+          || '[{"destination":"platform=macOS","runner":"macos-26"}]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Xcode
